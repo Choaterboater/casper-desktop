@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-casper-checks",
-  "description": "Casper checks: record project checks before edits, replay them after, and never report a check that did not run as passed",
+  "description": "Casper checks: run the project's own checks after edits, send real failures back for repair, close the turn with a receipt, and never report a check that did not run as passed",
   "version": "0.2.2-alpha.3",
   "publishConfig": {
     "access": "public"
@@ -21,12 +21,19 @@
     "lib/types/**/*.d.ts"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
+    "directory": "packages/casper/tool-checks"
+  },
   "dependencies": {
-    "@deepseek-ai/schemastery": "workspace:~"
+    "@deepseek-ai/schemastery": "workspace:~",
+    "yaml": "^2.8.1"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-agent": "workspace:*",
+    "@deepseek-ai/dsh-fs": "workspace:*",
     "@deepseek-ai/dsh-llm": "workspace:*",
     "@deepseek-ai/dsh-shell": "workspace:*",
     "@deepseek-ai/dsh-system-prompt": "workspace:*",
@@ -36,6 +43,7 @@
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-agent": "workspace:*",
+    "@deepseek-ai/dsh-fs": "workspace:*",
     "@deepseek-ai/dsh-llm": "workspace:*",
     "@deepseek-ai/dsh-session": "workspace:*",
     "@deepseek-ai/dsh-shell": "workspace:*",

@@ -1,0 +1,8 @@
+# Casper checks composition: the shipped checks plugin runs the scenario's
+# `.casper/project.yaml` check after edits. Replay keeps the passthrough
+# sandbox runner unconfined, so the plugin is allowed to run unconfined.
+- insert:
+    - id: casper-checks
+      name: '@deepseek-ai/dsh-casper-checks'
+      config:
+        runUnconfined: true

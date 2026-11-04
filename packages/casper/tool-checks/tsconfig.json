@@ -15,6 +15,7 @@
     { "path": "../../core/system-prompt" },
     { "path": "../../llm/llm" },
     { "path": "../../shell/shell" },
-    { "path": "../../session/working-directory" }
+    { "path": "../../session/working-directory" },
+    { "path": "../../fs/fs" }
   ]
 }

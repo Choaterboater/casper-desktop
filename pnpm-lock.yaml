@@ -3430,6 +3430,9 @@ importers:
       '@deepseek-ai/schemastery':
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
+      yaml:
+        specifier: ^2.8.1
+        version: 2.9.0
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: workspace:~
@@ -3437,6 +3440,9 @@ importers:
       '@deepseek-ai/dsh-agent':
         specifier: workspace:*
         version: link:../../core/agent
+      '@deepseek-ai/dsh-fs':
+        specifier: workspace:*
+        version: link:../../fs/fs
       '@deepseek-ai/dsh-llm':
         specifier: workspace:*
         version: link:../../llm/llm

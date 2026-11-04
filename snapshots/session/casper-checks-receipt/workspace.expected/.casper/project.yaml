@@ -1,0 +1,4 @@
+verify:
+  test: node test.cjs
+repair:
+  maxAttempts: 2

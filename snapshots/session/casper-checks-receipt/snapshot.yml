@@ -1,0 +1,10 @@
+version: 1
+scenario: casper-checks-receipt
+profile: headless
+composition: casper-checks
+recording: authored
+header:
+  class: casper-checks
+  pin: true
+workspace:
+  final: true
