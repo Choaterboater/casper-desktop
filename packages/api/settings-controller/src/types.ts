@@ -25,6 +25,11 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
      * never the value.
      */
     'credential/rejected': { readonly ref: string }
+    /**
+     * A sign-in request named no registered flow, an unknown prompt, or the
+     * store refused a sign-out. The details name only the record key.
+     */
+    'authorization/rejected': { readonly key: string }
   }
 }
 
@@ -32,3 +37,52 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
 export interface SettingsDocumentOpenValue {
   readonly opened: true
 }
+
+/** One sign-in method a flow offers, as a configuration page labels its button. */
+export interface AuthorizationMethodView {
+  readonly id: string
+  readonly label: string
+}
+
+/**
+ * One registered sign-in flow as a configuration page sees it. Carries no
+ * credential: `signedIn` reports only that a record is stored.
+ */
+export interface AuthorizationEntryView {
+  /** The `<scope>/<id>` credential record the flow writes. */
+  readonly key: string
+  /** User-facing name of what is being signed into. */
+  readonly label: string
+  /** Methods offered, most preferred first. */
+  readonly methods: readonly AuthorizationMethodView[]
+  /** Whether an attempt for this key is running. */
+  readonly inFlight: boolean
+  /** Whether a record is currently stored for this key. */
+  readonly signedIn: boolean
+}
+
+/** One choice of a `select` prompt. */
+export interface AuthorizationPromptOptionView {
+  readonly id: string
+  readonly label: string
+  readonly description?: string
+}
+
+/**
+ * One frame of a sign-in stream. Notices never carry a secret; a prompt is
+ * answered through `authorization/answer` with its `promptId`, and the stream
+ * ends after `settled` or `failed`.
+ */
+export type AuthorizationEventView =
+  | { readonly type: 'notice'; readonly message: string; readonly url?: string; readonly code?: string }
+  | {
+    readonly type: 'prompt'
+    readonly promptId: string
+    readonly kind: 'text' | 'secret' | 'select'
+    readonly message: string
+    readonly placeholder?: string
+    readonly options?: readonly AuthorizationPromptOptionView[]
+  }
+  | { readonly type: 'prompt-withdrawn'; readonly promptId: string }
+  | { readonly type: 'settled'; readonly status: 'authorized' | 'cancelled' }
+  | { readonly type: 'failed'; readonly message: string }

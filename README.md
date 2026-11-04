@@ -1,8 +1,8 @@
-# DeepSeek Harness
+# Casper
 
 English | [中文](README.zh.md)
 
-DeepSeek Harness (`dsh`) is an open-source agent harness developed by [DeepSeek AI](https://deepseek.com).
+This is the desktop and web app of [Casper](https://github.com/Choaterboater/casper), published by Choaterboater. It is built on [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (`dsh`, MIT), the open-source agent harness developed by [DeepSeek AI](https://deepseek.com); it is not an official DeepSeek product. On top of the harness it adds Casper's checks (record, replay, never report a check that did not run as passed) and the read-only casper-network-mcp server.
 
 It is built on an **everything-is-a-plugin** architecture and powered by [Cordis](https://github.com/cordiverse/cordis), whose design is described in [_A Programming Paradigm for Spatiotemporal Composability_](https://arxiv.org/abs/2608.25512).
 
@@ -10,7 +10,7 @@ Documentation: [https://deepseek-harness.github.io/deepseek-harness/](https://de
 
 ## Developer preview
 
-DeepSeek Harness is in _developer preview_ and iterating rapidly. **THERE WILL BE COMPATIBILITY-BREAKING CHANGES.**
+Casper and the DeepSeek Harness it builds on are in _developer preview_ and iterating rapidly. **THERE WILL BE COMPATIBILITY-BREAKING CHANGES.**
 
 Review the [safety notice](SAFETY.md) before running the project.
 
@@ -44,7 +44,7 @@ pnpm dsh web
 
 - Submit feedback or bug reports through [GitHub Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions).
 - Add the [`dsh-plugin`](https://github.com/topics/dsh-plugin) topic to your plugin repository for discoverability.
-- Join <a href="https://discord.gg/4MrtZUhpxg">DeepSeek Harness Discord community</a>.
+- Join <a href="https://discord.gg/4MrtZUhpxg">upstream DeepSeek Harness Discord community</a>.
 
 ## Contributing
 

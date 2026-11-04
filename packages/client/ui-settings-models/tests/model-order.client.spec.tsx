@@ -27,7 +27,13 @@ function Editor(props: {
     ? <DeepSeekModelsEditor {...shared} defaultContextWindow={undefined} defaultMaxTokens={undefined} />
     : <ModelListEditor
       {...shared} probe={{ settingsNs: 'llm-pi-ai' }} onBusyChange={() => {}}
-      operations={{ discoverModels: vi.fn(), storeCredential: vi.fn(), removeCredential: vi.fn(), writeSettings: vi.fn() }}
+      operations={{
+        discoverModels: vi.fn(), storeCredential: vi.fn(), removeCredential: vi.fn(), writeSettings: vi.fn(),
+        listSignIns: vi.fn(() => Promise.resolve([])),
+        signIn: vi.fn(() => Promise.resolve()),
+        answerSignIn: vi.fn(() => Promise.resolve(undefined)),
+        signOut: vi.fn(() => Promise.resolve(undefined)),
+      }}
     />
 }
 

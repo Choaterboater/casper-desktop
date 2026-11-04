@@ -74,6 +74,7 @@ import * as StagehandBrowserTools from '@deepseek-ai/dsh-experimental-browser-us
 import TeamService from '@deepseek-ai/dsh-agent-team'
 import * as ToolTeam from '@deepseek-ai/dsh-tool-agent-team'
 import * as ToolTodo from '@deepseek-ai/dsh-tool-todo'
+import * as CasperChecks from '@deepseek-ai/dsh-casper-checks'
 import type PluginManager from '@deepseek-ai/dsh-plugin-manager'
 import * as PluginManagerTools from '@deepseek-ai/dsh-plugin-manager/tools'
 import type PluginMarket from '@deepseek-ai/dsh-plugin-market'
@@ -650,6 +651,21 @@ const TOOL_PACKAGES: ToolPackage[] = [
     scope: ctx => catalogChildScopes.get(ctx) as Agent,
     note:
       'Four task-board tools share the subagent tree’s root Session. Enabling Team mode on the root Session adds task-board guidance alongside standard subagent delegation and control tools. Standard subagent controls provide required identity independently of Team mode.',
+  },
+  {
+    pkg: '@deepseek-ai/dsh-casper-checks',
+    dir: 'tool-checks',
+    source: 'packages/casper/tool-checks/src/index.ts',
+    requires: ['ctx.workingDirectory', 'ctx.tools', 'ctx.shell', 'ctx.systemPrompt', 'an owning Agent at execution time'],
+    writes: ['tool/call', 'tool/result'],
+    async mount(ctx) {
+      await ctx.plugin(LocalSubprocessRuntime)
+      await ctx.plugin(BashEnvPlugin)
+      await ctx.plugin(LocalBashExecutor)
+      await ctx.plugin(CasperChecks)
+    },
+    note:
+      'Casper checks keep per-agent state in memory: check_record runs the command as a baseline, any mutating tool result in an overlapping working directory marks checks stale, and the agent/turn-stopping checkpoint replays stale checks. A run without a clean exit code is `not_run`, never `passed`.',
   },
   {
     pkg: '@deepseek-ai/dsh-tool-todo',

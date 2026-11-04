@@ -14,6 +14,10 @@ function operations(discoverModels: ModelsOperations['discoverModels']): ModelsO
     storeCredential: vi.fn(),
     removeCredential: vi.fn(),
     writeSettings: vi.fn(),
+    listSignIns: vi.fn(() => Promise.resolve([])),
+    signIn: vi.fn(() => Promise.resolve()),
+    answerSignIn: vi.fn(() => Promise.resolve(undefined)),
+    signOut: vi.fn(() => Promise.resolve(undefined)),
   }
 }
 

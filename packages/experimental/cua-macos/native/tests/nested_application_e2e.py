@@ -34,7 +34,7 @@ def main():
         subprocess.run(['codesign', '--force', '--sign', '-', '--timestamp=none', str(application)],
                        check=True, capture_output=True, timeout=30)
         key = hashlib.sha256(helper.read_bytes()).hexdigest()
-        cache = Path.home() / 'Library/Application Support/DeepSeek Harness/Computer Use'
+        cache = Path.home() / 'Library/Application Support/Casper/Computer Use'
         generation = cache / key
         assert not generation.exists(), 'The unique signed fixture unexpectedly shares an existing generation'
         cleanup.callback(lambda: (cache / (key + '.lock')).unlink(missing_ok=True))

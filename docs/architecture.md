@@ -1,4 +1,4 @@
-# DeepSeek Harness Architecture
+# Casper Architecture
 
 English | [中文](architecture.zh.md)
 

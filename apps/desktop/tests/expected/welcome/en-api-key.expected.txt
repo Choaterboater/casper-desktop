@@ -1,7 +1,7 @@
-DeepSeek Harness
-DeepSeek Harness
+Casper
+Casper
 Add an API key to get started
-Configure official DeepSeek models to start using Harness
+Add a DeepSeek API key, or set up later and choose any provider in Settings → Models
 Enter API key [password]
 Save and continue [disabled]
 Set up later

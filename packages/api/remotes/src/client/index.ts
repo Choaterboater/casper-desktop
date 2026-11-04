@@ -154,6 +154,10 @@ export type {
 } from '@deepseek-ai/dsh-cordis-host-runner/types'
 // Credential state vocabulary for the credentials namespace (values never ride it).
 export type { CredentialInfo } from '@deepseek-ai/dsh-credentials/types'
+// Provider sign-in vocabulary for the authorization namespace (no credential rides it).
+export type {
+  AuthorizationEntryView, AuthorizationEventView, AuthorizationMethodView, AuthorizationPromptOptionView,
+} from '@deepseek-ai/dsh-api-settings-controller/types'
 // Redacted namespace vocabulary for the settings namespace (secrets never ride
 // it). It travels with its seam, whose `./types` the Client face already reads.
 export type {

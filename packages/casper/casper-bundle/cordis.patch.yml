@@ -1,0 +1,10 @@
+- insert:
+    - id: mcp-network
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: network
+        transport: stdio
+        # uvx from PATH, else uv's default install folders, so a Finder-launched app or a Windows PATH without uv still finds it.
+        command: !!js '(() => { const fs = process.getBuiltinModule("node:fs"); const path = process.getBuiltinModule("node:path"); const os = process.getBuiltinModule("node:os"); const exe = process.platform === "win32" ? "uvx.exe" : "uvx"; const dirs = [...(process.env.PATH ?? "").split(path.delimiter), path.join(os.homedir(), ".local", "bin"), path.join(os.homedir(), ".cargo", "bin"), "/opt/homebrew/bin", "/usr/local/bin"]; for (const dir of dirs) { if (dir !== "" && fs.existsSync(path.join(dir, exe))) return path.join(dir, exe) } return exe })()'
+        args: ['--from', 'casper-network-mcp==0.1.7', 'casper-network-mcp', '--read-only']
+        env: !!js 'Object.fromEntries(Object.entries(process.env).filter(([name, value]) => value !== undefined && /^(MIST|CENTRAL|CLEARPASS|UXI|OPSRAMP)_[A-Z0-9_]+$/.test(name)))'

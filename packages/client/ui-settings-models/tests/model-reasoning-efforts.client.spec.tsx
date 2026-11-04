@@ -244,6 +244,10 @@ describe('reasoning levels in the model list', () => {
     storeCredential: vi.fn(),
     removeCredential: vi.fn(),
     writeSettings: vi.fn(),
+    listSignIns: vi.fn(() => Promise.resolve([])),
+    signIn: vi.fn(() => Promise.resolve()),
+    answerSignIn: vi.fn(() => Promise.resolve(undefined)),
+    signOut: vi.fn(() => Promise.resolve(undefined)),
   }
 
   /** Render the list over local state, reporting every write. */

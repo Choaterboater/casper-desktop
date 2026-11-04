@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-ptc-runtime",
-  "description": "Abstract PTC execution seam (ctx.ptcRuntime) for the DeepSeek Harness",
+  "description": "Abstract PTC execution seam (ctx.ptcRuntime) for Casper",
   "version": "0.2.2-alpha.3",
   "publishConfig": {
     "access": "public"

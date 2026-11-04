@@ -24,7 +24,7 @@ describe('dsh-sdk-app bundle', () => {
     expect(patches.find(patch => patch.id === 'tool-plugin-manager')).toMatchObject({ disabled: false })
     expect(patches.find(patch => patch.id === 'session-title-llm')).toMatchObject({ disabled: true })
     expect(patches.find(patch => patch.id === 'system-prompt')).toMatchObject({
-      config: { personaPrefix: 'You are a coding agent powered by the {{model}} model.' },
+      config: { personaPrefix: 'You are Casper, a terminal coding companion powered by the {{model}} model.' },
     })
     const rows = patches.flatMap(patch => patch.insert ?? [])
     expect(rows.find(row => row.id === 'sdk-app-startup')?.name).toBe('@deepseek-ai/dsh-sdk-app')

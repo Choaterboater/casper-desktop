@@ -12,7 +12,7 @@
 
 import { useSyncExternalStore, type ReactNode } from 'react'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import { FishLogo } from '@deepseek-ai/dsh-client-ui-primitives'
+import { GhostLogo } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SidebarBrandMarkOwnerProps } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import { NS } from './locales.ts'
@@ -58,7 +58,7 @@ function useViewerContextFacts(): ReturnType<typeof viewerContextFacts.getSnapsh
  * @returns the Harness mark.
  */
 export function ViewerBrandMark({ size }: SidebarBrandMarkOwnerProps): ReactNode {
-  return <FishLogo size={size} />
+  return <GhostLogo size={size} />
 }
 
 /**

@@ -17,7 +17,7 @@
 - id: system-prompt
   config:
     personaPrefix: >-
-      You are a coding agent powered by the {{model}} model.
+      You are Casper, a terminal coding companion powered by the {{model}} model.
 
 # Full-text session search is opt-in (the base row's `openAt: never`). This
 # restatement keeps the Web values on one ephemeral in-memory index; a
@@ -599,3 +599,50 @@
       name: '@deepseek-ai/dsh-agent-preset-registry'
       config:
         default: standard
+
+# ── Casper: casper-network-mcp (Aruba Central, Juniper Mist, ClearPass, UXI, OpsRamp) ──
+# Pinned release, started with --read-only: the server refuses every change before anything is
+# sent, and nothing turns writes on while it runs. The subprocess seam scrubs KEY/SECRET/TOKEN
+# variables from the ambient env, so only the product login variables the server documents are
+# passed through; a product without a login still starts and answers login_missing.
+- insert:
+    - id: mcp-network
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: network
+        transport: stdio
+        # uvx from PATH, else uv's default install folders, so a Finder-launched app or a Windows PATH without uv still finds it.
+        command: !!js '(() => { const fs = process.getBuiltinModule("node:fs"); const path = process.getBuiltinModule("node:path"); const os = process.getBuiltinModule("node:os"); const exe = process.platform === "win32" ? "uvx.exe" : "uvx"; const dirs = [...(process.env.PATH ?? "").split(path.delimiter), path.join(os.homedir(), ".local", "bin"), path.join(os.homedir(), ".cargo", "bin"), "/opt/homebrew/bin", "/usr/local/bin"]; for (const dir of dirs) { if (dir !== "" && fs.existsSync(path.join(dir, exe))) return path.join(dir, exe) } return exe })()'
+        args: ['--from', 'casper-network-mcp==0.1.7', 'casper-network-mcp', '--read-only']
+        env: !!js 'Object.fromEntries(Object.entries(process.env).filter(([name, value]) => value !== undefined && /^(MIST|CENTRAL|CLEARPASS|UXI|OPSRAMP)_[A-Z0-9_]+$/.test(name)))'
+
+# ── Casper: no DeepSeek services and no usage reporting ─────────────────────
+# Casper sends nothing to DeepSeek unless the user adds DeepSeek as a model
+# provider in Settings → Models (pi-ai catalog). Product telemetry, product
+# analytics, the DeepSeek account sign-in, DeepSeek-hosted web search and the
+# DeepSeek-only API extensions are off; session upload is DISABLED in dsh-base.
+# Feedback ratings stay in the local Session log only.
+- id: desktop-product-telemetry
+  disabled: true
+- id: product-analytics
+  disabled: true
+- id: deepseek-account
+  disabled: true
+- id: llm-deepseek-account
+  disabled: true
+- id: account-controller
+  disabled: true
+- id: ui-settings-account
+  disabled: true
+- id: web-search-deepseek
+  disabled: true
+- id: web-deepseek-api
+  disabled: true
+- id: session-log-deepseek
+  disabled: true
+- id: deepseek-llm-api-extensions
+  disabled: true
+- id: llm-deepseek
+  disabled: true
+- id: plugin-package-inventory-deepseek
+  disabled: true

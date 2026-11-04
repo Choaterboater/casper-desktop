@@ -28,7 +28,7 @@
 Usage: dsh [--profile] <name> [options] [app-args...]
        dsh plugin --profile <name> <pnpm-args...>
 
-dsh: boot a DeepSeek Harness profile — an ordered stack of plugin-bundle patch
+dsh: boot a Casper profile — an ordered stack of plugin-bundle patch
 layers under your own overrides.
 
 Arguments:
@@ -144,7 +144,7 @@ Examples:
 ```text
 Usage: dsh --profile sdk [options]
 
-Serve DeepSeek Harness SDK clients over stdio JSON-RPC.
+Serve Casper SDK clients over stdio JSON-RPC.
 
 Options:
   -h, --help  show this help
@@ -162,7 +162,7 @@ Example:
 ```text
 Usage: dsh --profile sdk-minimal [options]
 
-Serve DeepSeek Harness SDK clients over stdio JSON-RPC.
+Serve Casper SDK clients over stdio JSON-RPC.
 
 Options:
   -h, --help  show this help
@@ -180,7 +180,7 @@ Example:
 ```text
 Usage: dsh --profile web [options]
 
-Serve the DeepSeek Harness browser UI.
+Serve the Casper browser UI.
 
 Options:
   --host <host>                  bind address: one concrete IPv4 or IPv6 literal

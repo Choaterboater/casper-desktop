@@ -32,6 +32,8 @@ export const remoteDefaultResponses: RemoteTable = {
     'dynamicCordisRunner/inventory': ok([]),
     // ui-settings-web-search page `readCredential()` when the settings mirror first publishes.
     'credentials/describe': ok({}),
+    // ui-settings-models provider sign-in field: no flows unless a spec stages one.
+    'authorization/list': ok([]),
     // ui-settings-web-search page provider options at apply and on `connection/reset`.
     'web/listProviders': ok({ search: [], fetch: [] }),
     // ui-permission-presets `PermissionCatalogDirectory` on its first read for a connection generation.

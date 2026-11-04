@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-session",
-  "description": "Event-sourced session store for the DeepSeek Harness",
+  "description": "Event-sourced session store for Casper",
   "version": "0.2.2-alpha.3",
   "publishConfig": {
     "access": "public"

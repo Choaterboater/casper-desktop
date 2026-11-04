@@ -175,7 +175,7 @@ function capabilitiesOf(entry: Fields): ListedCapabilities {
   const outputs = entry.output_modalities === undefined ? ['text'] : knownModalities(entry.output_modalities)
   if (outputs?.includes('text') !== true) return { usable: false, reason: 'declares no text output' }
   const inputs = entry.input_modalities === undefined ? ['text' as const] : knownModalities(entry.input_modalities)
-  if (inputs === undefined || inputs.length === 0) return { usable: false, reason: 'declares no input modality DeepSeek Harness supports' }
+  if (inputs === undefined || inputs.length === 0) return { usable: false, reason: 'declares no input modality Casper supports' }
   const contextWindow = capacity(entry.context_window)
   const maxOutputTokens = capacity(entry.max_output_tokens)
   if (contextWindow === false || maxOutputTokens === false) {

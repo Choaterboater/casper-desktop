@@ -1,53 +1,53 @@
 {
   "darwin:en-US": {
     "menu": [
-      { "label": "About DeepSeek Harness", "role": "about" },
+      { "label": "About Casper", "role": "about" },
       { "type": "separator" }
     ],
     "options": {
-      "applicationName": "DeepSeek Harness",
+      "applicationName": "Casper",
       "applicationVersion": "1.0.0",
       "version": "",
-      "copyright": "",
+      "copyright": "Choaterboater · built on DeepSeek Harness (MIT)",
       "iconPath": "<app icon>"
     }
   },
   "darwin:zh-CN": {
     "menu": [
-      { "label": "关于 DeepSeek Harness", "role": "about" },
+      { "label": "关于 Casper", "role": "about" },
       { "type": "separator" }
     ],
     "options": {
-      "applicationName": "DeepSeek Harness",
+      "applicationName": "Casper",
       "applicationVersion": "1.0.0",
       "version": "",
-      "copyright": "",
+      "copyright": "Choaterboater · built on DeepSeek Harness (MIT)",
       "iconPath": "<app icon>"
     }
   },
   "win32:zh-CN": {
     "menu": [
-      { "label": "关于 DeepSeek Harness" },
+      { "label": "关于 Casper" },
       { "type": "separator" }
     ],
     "options": {
-      "applicationName": "DeepSeek Harness",
+      "applicationName": "Casper",
       "applicationVersion": "1.0.0",
       "version": "",
-      "copyright": "",
+      "copyright": "Choaterboater · built on DeepSeek Harness (MIT)",
       "iconPath": "<app icon>"
     }
   },
   "win32:en-US": {
     "menu": [
-      { "label": "About DeepSeek Harness" },
+      { "label": "About Casper" },
       { "type": "separator" }
     ],
     "options": {
-      "applicationName": "DeepSeek Harness",
+      "applicationName": "Casper",
       "applicationVersion": "1.0.0",
       "version": "",
-      "copyright": "",
+      "copyright": "Choaterboater · built on DeepSeek Harness (MIT)",
       "iconPath": "<app icon>"
     }
   }

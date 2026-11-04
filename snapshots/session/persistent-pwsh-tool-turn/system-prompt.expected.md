@@ -1,4 +1,4 @@
-You are an AI agent powered by DeepSeek Harness.
+You are an AI agent powered by Casper.
 
 You are a concise snapshot agent.
 

@@ -554,6 +554,50 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'authorizationController',
+    summary: 'Host service backing the generated `ctx.remote.authorization` namespace.',
+    description: 'Host service backing the generated `ctx.remote.authorization` namespace. It stays registered when no authorization seam is mounted, so `list` answers an empty roster and the other calls report the missing service.',
+    methods: [
+      {
+        signature: '@Remote async list(): Promise<AuthorizationEntryView[]>',
+        description: 'List every registered sign-in flow with whether it is signed in.',
+        parameters: [],
+        returns: 'one view per flow in registration order; empty when no seam is mounted.',
+      },
+      {
+        signature: '@Remote({ mode: \'stream\' }) signIn(key: string, method: string | undefined, signal: AbortSignal): AsyncIterable<AuthorizationEventView>',
+        description: 'Run one sign-in attempt and stream its notices, prompts, and outcome. Closing the stream withdraws the attempt.',
+        parameters: [{ name: 'key', description: 'the `<scope>/<id>` record a listed flow writes.' }, { name: 'method', description: 'one of that flow\'s method ids, or undefined for its first.' }, { name: 'signal', description: 'stream lifetime; aborting cancels the attempt.' }],
+        returns: 'frames ending with `settled` or `failed`.',
+        throws: ['RemoteError when the key names no flow or no seam is mounted.'],
+      },
+      {
+        signature: '@Remote answer(promptId: string, value: string): void',
+        description: 'Answer one open prompt of a running sign-in.',
+        parameters: [{ name: 'promptId', description: 'the id its `prompt` frame carried.' }, { name: 'value', description: 'the typed text, or the chosen option\'s id.' }],
+        throws: ['RemoteError when no prompt with that id is open.'],
+      },
+      {
+        signature: '@Remote decline(promptId: string): void',
+        description: 'Decline one open prompt; the attempt settles as cancelled.',
+        parameters: [{ name: 'promptId', description: 'the id its `prompt` frame carried.' }],
+        throws: ['RemoteError when no prompt with that id is open.'],
+      },
+      {
+        signature: '@Remote cancel(key: string): void',
+        description: 'Withdraw the attempt running for a key, if any.',
+        parameters: [{ name: 'key', description: 'the `<scope>/<id>` record of a listed flow.' }],
+        throws: ['RemoteError when the key names no flow or no seam is mounted.'],
+      },
+      {
+        signature: '@Remote async signOut(key: string): Promise<void>',
+        description: 'Delete the stored sign-in for a key.',
+        parameters: [{ name: 'key', description: 'the `<scope>/<id>` record of a listed flow.' }],
+        throws: ['RemoteError when the key names no flow, a seam is missing, or the store refuses.'],
+      },
+    ],
+  },
+  {
     key: 'browserUse',
     summary: 'Owns one optional provider registration in the shared browser-use service.',
     description: 'Owns one optional provider registration in the shared browser-use service.',
@@ -5695,6 +5739,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface AuthorizationEntry {\n    key: CredentialKey;\n    label: string;\n    methods: readonly AuthorizationMethod[];\n    inFlight: boolean;\n}',
   },
   {
+    name: 'AuthorizationEntryView',
+    declaration: 'export interface AuthorizationEntryView {\n    readonly key: string;\n    readonly label: string;\n    readonly methods: readonly AuthorizationMethodView[];\n    readonly inFlight: boolean;\n    readonly signedIn: boolean;\n}',
+  },
+  {
+    name: 'AuthorizationEventView',
+    declaration: 'export type AuthorizationEventView = {\n    readonly type: \'notice\';\n    readonly message: string;\n    readonly url?: string;\n    readonly code?: string;\n} | {\n    readonly type: \'prompt\';\n    readonly promptId: string;\n    readonly kind: \'text\' | \'secret\' | \'select\';\n    readonly message: string;\n    readonly placeholder?: string;\n    readonly options?: readonly AuthorizationPromptOptionView[];\n} | {\n    readonly type: \'prompt-withdrawn\';\n    readonly promptId: string;\n} | {\n    readonly type: \'settled\';\n    readonly status: \'authorized\' | \'cancelled\';\n} | {\n    readonly type: \'failed\';\n    readonly message: string;\n};',
+  },
+  {
     name: 'AuthorizationFlow',
     declaration: 'export interface AuthorizationFlow {\n    readonly key: CredentialKey;\n    readonly label: string;\n    readonly methods: readonly [\n        AuthorizationMethod,\n        ...AuthorizationMethod[]\n    ];\n    run(session: AuthorizationSession): Promise<void>;\n}',
   },
@@ -5705,6 +5757,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'AuthorizationMethod',
     declaration: 'export interface AuthorizationMethod {\n    id: string;\n    label: string;\n}',
+  },
+  {
+    name: 'AuthorizationMethodView',
+    declaration: 'export interface AuthorizationMethodView {\n    readonly id: string;\n    readonly label: string;\n}',
   },
   {
     name: 'AuthorizationNotice',
@@ -5721,6 +5777,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'AuthorizationPromptOption',
     declaration: 'export interface AuthorizationPromptOption {\n    id: string;\n    label: string;\n    description?: string;\n}',
+  },
+  {
+    name: 'AuthorizationPromptOptionView',
+    declaration: 'export interface AuthorizationPromptOptionView {\n    readonly id: string;\n    readonly label: string;\n    readonly description?: string;\n}',
   },
   {
     name: 'AuthorizationRequest',

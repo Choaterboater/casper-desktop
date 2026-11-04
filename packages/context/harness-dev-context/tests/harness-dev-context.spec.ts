@@ -12,7 +12,7 @@ import { SessionId, type Session } from '@deepseek-ai/dsh-session'
 import { renderContextSnapshot, renderPrompt } from '@deepseek-ai/dsh-system-prompt'
 import * as HarnessDevContext from '../src/index.ts'
 
-const SOURCE_PROMPT = 'The runtime context names the DeepSeek Harness implementation checkout. The checkout location and current working directory are separate values and may differ; never infer the working directory from the checkout path. Use pwd to determine the current working directory. Use this checkout only to inspect or extend DSH itself.'
+const SOURCE_PROMPT = 'The runtime context names the Casper implementation checkout. The checkout location and current working directory are separate values and may differ; never infer the working directory from the checkout path. Use pwd to determine the current working directory. Use this checkout only to inspect or extend DSH itself.'
 const WEB_GUIDANCE = 'When the user refers to "this page", "this GUI", or "this app" without naming another target, they mean this GUI. '
   + 'The browser provides no implicit DOM, route, or screenshot context. '
   + 'The client-plugin HMR receiver is active, but client-plugin changes reload without a refresh only while '
@@ -21,12 +21,12 @@ const WEB_GUIDANCE = 'When the user refers to "this page", "this GUI", or "this 
   + 'Starting another server does not update this GUI. '
   + 'The apps/web Vite entry builds the shell but is not a standalone application because only dsh web injects window.__DSH_BOOT__. '
   + 'Do not start a replacement server unless the user asks; if one is needed, use a managed background job and verify its exact URL.'
-const WEB_PROMPT = `You are interacting with the user through the DeepSeek Harness Web GUI whose URL the runtime context names. ${WEB_GUIDANCE}`
+const WEB_PROMPT = `You are interacting with the user through the Casper Web GUI whose URL the runtime context names. ${WEB_GUIDANCE}`
 
 /** The value-bearing paragraphs earlier releases rendered. */
-const LEGACY_SOURCE = 'The DeepSeek Harness implementation checkout is at /old/checkout/. The checkout location and current working directory are separate values and may differ; never infer the working directory from this path. Use pwd to determine the current working directory. Use this checkout only to inspect or extend DSH itself.'
+const LEGACY_SOURCE = 'The Casper implementation checkout is at /old/checkout/. The checkout location and current working directory are separate values and may differ; never infer the working directory from this path. Use pwd to determine the current working directory. Use this checkout only to inspect or extend DSH itself.'
 // Frozen as earlier releases rendered it, independent of the current guidance.
-const LEGACY_WEB = 'You are interacting with the user through the DeepSeek Harness Web GUI at http://127.0.0.1:3100. '
+const LEGACY_WEB = 'You are interacting with the user through the Casper Web GUI at http://127.0.0.1:3100. '
   + 'When the user refers to "this page", "this GUI", or "this app" without naming another target, they mean this GUI. '
   + 'The browser provides no implicit DOM, route, or screenshot context. '
   + 'The client-plugin HMR receiver is active, but client-plugin changes reload without a refresh only while '
@@ -142,8 +142,8 @@ describe('harness-dev-context', () => {
       .map(entry => entry.text)).toEqual([SOURCE_PROMPT, WEB_PROMPT])
     expect(renderPrompt(assembly)).not.toContain('127.0.0.1')
     expect(renderContextSnapshot(assembly).split('\n\n').slice(1)).toEqual([
-      expect.stringMatching(/^Current DeepSeek Harness implementation checkout: ".+"\.$/u),
-      'Current DeepSeek Harness Web GUI URL: "http://127.0.0.1:4567".',
+      expect.stringMatching(/^Current Casper implementation checkout: ".+"\.$/u),
+      'Current Casper Web GUI URL: "http://127.0.0.1:4567".',
     ])
 
     await fiber.dispose()
@@ -171,8 +171,8 @@ describe('harness-dev-context', () => {
       expect(systemPrompts(resumed.session)).toEqual(logged)
       expect(requestSystemPrompts(h.adapter.requests.at(-1))).toEqual(logged)
       expect(latestRuntimeContext(resumed.session))
-        .toContain(`Current DeepSeek Harness Web GUI URL: "http://127.0.0.1:${String(port)}".`)
-      expect(latestRuntimeContext(resumed.session)).toContain('Current DeepSeek Harness implementation checkout: "')
+        .toContain(`Current Casper Web GUI URL: "http://127.0.0.1:${String(port)}".`)
+      expect(latestRuntimeContext(resumed.session)).toContain('Current Casper implementation checkout: "')
       session = resumed.session
     }
   })
@@ -198,7 +198,7 @@ describe('harness-dev-context', () => {
   })
 
   it.each([
-    { variant: 'a paragraph without the fixed ending', source: 'The DeepSeek Harness implementation checkout is at /old/checkout/.' },
+    { variant: 'a paragraph without the fixed ending', source: 'The Casper implementation checkout is at /old/checkout/.' },
     { variant: 'a paragraph broken across lines', source: LEGACY_SOURCE.replace('/old/checkout/', '/old/\ncheckout/') },
   ])('replaces text that only resembles an earlier paragraph: $variant', async ({ source }) => {
     const h = await promptLoop(undefined)
@@ -219,12 +219,12 @@ describe('harness-dev-context', () => {
     expect(logged[0]).toContain(SOURCE_PROMPT)
     expect(logged[0]).toContain(WEB_PROMPT)
     expect(logged[0]).not.toContain('127.0.0.1')
-    expect(latestRuntimeContext(agent.session)).toContain('Current DeepSeek Harness Web GUI URL: "http://127.0.0.1:4567".')
+    expect(latestRuntimeContext(agent.session)).toContain('Current Casper Web GUI URL: "http://127.0.0.1:4567".')
 
     h.listener.port = 4568
     const resumed = await h.resume(agent.session, 'fresh-on-4568')
     await send(resumed, 'second')
     expect(systemPrompts(resumed.session)).toEqual(logged)
-    expect(latestRuntimeContext(resumed.session)).toContain('Current DeepSeek Harness Web GUI URL: "http://127.0.0.1:4568".')
+    expect(latestRuntimeContext(resumed.session)).toContain('Current Casper Web GUI URL: "http://127.0.0.1:4568".')
   })
 })

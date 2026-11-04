@@ -7,6 +7,7 @@
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type {
+  AuthorizationEntryView, AuthorizationEventView,
   LlmDiscoveredModel, LlmModelDiscoveryRequest,
   SettingsNamespaceView, SettingsPathOpView,
 } from '@deepseek-ai/dsh-api-remotes/client'
@@ -65,6 +66,33 @@ export interface ModelsOperations {
    * @returns the candidates, or the refusal.
    */
   discoverModels(settingsNs: string, request: LlmModelDiscoveryRequest): Promise<ModelDiscoveryOutcome>
+  /**
+   * List the provider sign-in flows the Host offers.
+   * @returns the flows, or an empty list when the Host offers none or the read fails.
+   */
+  listSignIns(): Promise<readonly AuthorizationEntryView[]>
+  /**
+   * Run one provider sign-in, delivering each frame until it settles.
+   * @param key - the flow's credential record key.
+   * @param method - the method id to run.
+   * @param signal - aborting closes the stream and cancels the attempt.
+   * @param onFrame - receives every notice, prompt, and the final outcome.
+   * @returns once a `settled` or `failed` frame arrived or the stream closed.
+   */
+  signIn(key: string, method: string, signal: AbortSignal, onFrame: (frame: AuthorizationEventView) => void): Promise<void>
+  /**
+   * Answer one open sign-in prompt, or decline it with `undefined`.
+   * @param promptId - the id its prompt frame carried.
+   * @param value - the typed text or chosen option id.
+   * @returns the refusal message, or undefined once delivered.
+   */
+  answerSignIn(promptId: string, value: string | undefined): Promise<string | undefined>
+  /**
+   * Delete a stored provider sign-in.
+   * @param key - the flow's credential record key.
+   * @returns the refusal message, or undefined once removed.
+   */
+  signOut(key: string): Promise<string | undefined>
 }
 
 /**
@@ -94,6 +122,36 @@ export function createModelsOperations(ctx: ClientContext): ModelsOperations {
       return response.ok
         ? { kind: 'found', models: response.value }
         : { kind: 'refused', message: response.error.message }
+    },
+    listSignIns: async () => {
+      // A Host without the namespace, or a failed read, just means no sign-in button.
+      try {
+        const response = await ctx.remote.authorization.list()
+        return response.ok ? response.value : []
+      } catch {
+        return []
+      }
+    },
+    signIn: async (key, method, signal, onFrame) => {
+      try {
+        for await (const frame of ctx.remote.authorization.signIn(key, method, signal)) {
+          onFrame(frame)
+          if (frame.type === 'settled' || frame.type === 'failed') return
+        }
+      } catch (error: unknown) {
+        if (signal.aborted) return
+        onFrame({ type: 'failed', message: error instanceof Error ? error.message : String(error) })
+      }
+    },
+    answerSignIn: async (promptId, value) => {
+      const response = value === undefined
+        ? await ctx.remote.authorization.decline(promptId)
+        : await ctx.remote.authorization.answer(promptId, value)
+      return response.ok ? undefined : response.error.message
+    },
+    signOut: async (key) => {
+      const response = await ctx.remote.authorization.signOut(key)
+      return response.ok ? undefined : response.error.message
     },
   }
 }

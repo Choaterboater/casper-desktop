@@ -9,7 +9,7 @@
 - id: system-prompt
   config:
     personaPrefix: >-
-      You are a coding agent powered by the {{model}} model.
+      You are Casper, a terminal coding companion powered by the {{model}} model.
 
 - insert:
     - id: headless-startup

@@ -129,7 +129,7 @@ DeepSeek 将省略的 `inputModalities` 视为纯文本，并拒绝空列表。�
         maxTokens: 131072
 ```
 
-需要更新版 DeepSeek Harness 的模型会以 `CLIENT_UPGRADE_REQUIRED` 失败，并写明需要安装的版本。列表、兜底和门控规则见[账号提供方参考](../../../packages/llm/llm-deepseek-account/README.zh.md)。
+需要更新版 Casper 的模型会以 `CLIENT_UPGRADE_REQUIRED` 失败，并写明需要安装的版本。列表、兜底和门控规则见[账号提供方参考](../../../packages/llm/llm-deepseek-account/README.zh.md)。
 
 ### 推理等级
 

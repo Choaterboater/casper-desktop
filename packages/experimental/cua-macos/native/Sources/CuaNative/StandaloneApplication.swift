@@ -20,7 +20,7 @@ enum StandaloneApplication {
         let support = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask,
                                                   appropriateFor: nil, create: true)
         return try install(source, runtimeKey: runtimeKey,
-                           root: support.appendingPathComponent("DeepSeek Harness/Computer Use"), deadline: deadline)
+                           root: support.appendingPathComponent("Casper/Computer Use"), deadline: deadline)
     }
 
     // Published generations remain immutable while any installed DSH version may still run them.

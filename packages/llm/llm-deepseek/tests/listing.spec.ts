@@ -77,8 +77,8 @@ describe('parseModelListing', () => {
     [{ api_capabilities: { anthropic_messages: 'yes' } }, 'declares no api_capabilities.anthropic_messages'],
     [{ ...MESSAGES, output_modalities: ['image'] }, 'declares no text output'],
     [{ ...MESSAGES, output_modalities: 'text' }, 'declares no text output'],
-    [{ ...MESSAGES, input_modalities: ['audio'] }, 'declares no input modality DeepSeek Harness supports'],
-    [{ ...MESSAGES, input_modalities: 'text' }, 'declares no input modality DeepSeek Harness supports'],
+    [{ ...MESSAGES, input_modalities: ['audio'] }, 'declares no input modality Casper supports'],
+    [{ ...MESSAGES, input_modalities: 'text' }, 'declares no input modality Casper supports'],
     [{ ...MESSAGES, context_window: 0 }, 'declares an invalid context_window or max_output_tokens'],
     [{ ...MESSAGES, max_output_tokens: 1.5 }, 'declares an invalid context_window or max_output_tokens'],
   ])('marks %j unusable', (row, reason) => {

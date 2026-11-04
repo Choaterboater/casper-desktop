@@ -131,6 +131,64 @@ async begin(request: AuthorizationRequest): Promise<AuthorizationOutcome>
 
 Source: [`packages/credentials/authorization/src/index.ts`](../../packages/credentials/authorization/src/index.ts)
 
+<a id="ctxauthorizationcontroller--authorizationcontroller"></a>
+
+### `ctx.authorizationController` — `AuthorizationController`
+
+Host service backing the generated `ctx.remote.authorization` namespace. It stays registered when no authorization seam is mounted, so `list` answers an empty roster and the other calls report the missing service.
+
+```ts cordis-catalog
+/**
+ * List every registered sign-in flow with whether it is signed in.
+ * @returns one view per flow in registration order; empty when no seam is mounted.
+ */
+@Remote async list(): Promise<AuthorizationEntryView[]>
+
+/**
+ * Run one sign-in attempt and stream its notices, prompts, and outcome.
+ * Closing the stream withdraws the attempt.
+ * @param key - the `<scope>/<id>` record a listed flow writes.
+ * @param method - one of that flow's method ids, or undefined for its first.
+ * @param signal - stream lifetime; aborting cancels the attempt.
+ * @returns frames ending with `settled` or `failed`.
+ * @throws RemoteError when the key names no flow or no seam is mounted.
+ */
+@Remote({ mode: 'stream' }) signIn(key: string, method: string | undefined, signal: AbortSignal): AsyncIterable<AuthorizationEventView>
+
+/**
+ * Answer one open prompt of a running sign-in.
+ * @param promptId - the id its `prompt` frame carried.
+ * @param value - the typed text, or the chosen option's id.
+ * @throws RemoteError when no prompt with that id is open.
+ */
+@Remote answer(promptId: string, value: string): void
+
+/**
+ * Decline one open prompt; the attempt settles as cancelled.
+ * @param promptId - the id its `prompt` frame carried.
+ * @throws RemoteError when no prompt with that id is open.
+ */
+@Remote decline(promptId: string): void
+
+/**
+ * Withdraw the attempt running for a key, if any.
+ * @param key - the `<scope>/<id>` record of a listed flow.
+ * @throws RemoteError when the key names no flow or no seam is mounted.
+ */
+@Remote cancel(key: string): void
+
+/**
+ * Delete the stored sign-in for a key.
+ * @param key - the `<scope>/<id>` record of a listed flow.
+ * @throws RemoteError when the key names no flow, a seam is missing, or the store refuses.
+ */
+@Remote async signOut(key: string): Promise<void>
+```
+
+Types: [AuthorizationEntryView](settings.md) · [AuthorizationEventView](settings.md)
+
+Source: [`packages/api/settings-controller/src/authorization.ts`](../../packages/api/settings-controller/src/authorization.ts)
+
 <a id="ctxcredentials--credentialprovider-abstract-seam"></a>
 
 ### `ctx.credentials` — `CredentialProvider` (abstract seam)

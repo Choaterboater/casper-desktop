@@ -10,7 +10,7 @@ import { join } from 'node:path'
 
 function requireDesktopProfile(dir: string): void {
   if (!existsSync(join(dir, 'package.json'))) {
-    throw new Error('Open DeepSeek Harness Desktop once to initialize its profile, then fully quit it before running dsh plugin --profile desktop.')
+    throw new Error('Open the Casper desktop app once to initialize its profile, then fully quit it before running dsh plugin --profile desktop.')
   }
 }
 

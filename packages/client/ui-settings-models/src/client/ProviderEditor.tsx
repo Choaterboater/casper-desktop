@@ -41,6 +41,7 @@ import type { ModelsOperations } from './operations.ts'
 import type { SettingsSchemaOperations } from './schema-operations.ts'
 import type { en } from './locales.ts'
 import { ApiKeyInput } from './ApiKeyInput.tsx'
+import { ProviderSignIn } from './ProviderSignIn.tsx'
 import styles from './ModelsSection.module.css'
 
 /** Per-adapter-family curated field sets (unknown namespaces get the hint alone). */
@@ -415,6 +416,9 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
     }
     return (
       <>
+        {nativeAuth?.oauth === true
+          ? <ProviderSignIn provider={props.provider} operations={operations} t={t} disabled={disabled} />
+          : null}
         {keylessNativeAuth
           ? null
           : <div className={styles['field']}>
