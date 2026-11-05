@@ -63,7 +63,7 @@ it('ships install metadata with the built web application', async () => {
   // each mount its own identity. `public-mount.e2e.ts` reads the resolved form.
   expect(manifest).toEqual({
     name: 'Casper',
-    short_name: 'DSH',
+    short_name: 'Casper',
     start_url: './',
     scope: './',
     // `standalone` keeps the phone's status bar; `fullscreen` hides it and the
@@ -114,10 +114,10 @@ it('ships fixed-color favicons selected by document media queries', async () => 
   expect(index).toContain('<link rel="icon" type="image/svg+xml" href="./favicon.svg" media="(prefers-color-scheme: light)" />')
   const light = await readFile(join(DIST_ROOT, 'favicon.svg'), 'utf8')
   const dark = await readFile(join(DIST_ROOT, 'favicon-dark.svg'), 'utf8')
+  // Casper's ghost keeps its outline on light and dark tabs, so both schemes ship the same colours.
   expect(light).not.toContain('<style>')
-  expect(light).toContain('fill="#000"')
-  expect(dark).toContain('fill="#fff"')
-  expect(dark.replace('fill="#fff"', 'fill="#000"')).toBe(light)
+  expect(light).toContain('stroke="#0f766e"')
+  expect(dark).toBe(light)
 })
 
 it('preserves fractional coverage along the Apple icon curves', async () => {
