@@ -23,7 +23,7 @@ const SNAPSHOT_DIR = fileURLToPath(new URL('../../../snapshots/web/web-search-ro
 const FIXTURE = fileURLToPath(new URL('../../../snapshots/web/web-search-round/session.v3.jsonl', import.meta.url))
 const UI_EXPECTED = fileURLToPath(new URL('../../../snapshots/web/web-search-round/ui.expected.md', import.meta.url))
 const MODE = webSnapshotMode()
-const QUERIES = ['Casper snapshot search', 'Casper multi-query search'] as const
+const QUERIES = ['DeepSeek Harness snapshot search', 'DeepSeek Harness multi-query search'] as const
 const PROMPT = `Use web_search once with queries ${JSON.stringify(QUERIES)}. Then reply exactly SEARCH_DONE and stop.`
 const SEARCH_CREDENTIAL_REF = credentialRef('DSH_WEB_SEARCH_E2E_KEY')
 const SEARCH_CREDENTIAL = 'snapshot-search-key'
@@ -154,7 +154,11 @@ describe('web e2e: default Search API web search', () => {
     const search = await startSearchServer(searchRequests)
     searchServer = search.server
     scaffold = await launchWebScaffold({
-      extraOverlayPath: fileURLToPath(new URL('./pin-browse-picker.overlay.yml', import.meta.url)),
+      // The shipped Casper profile disables the DeepSeek Search API; this scenario composes it back.
+      extraOverlayPath: [
+        fileURLToPath(new URL('./pin-browse-picker.overlay.yml', import.meta.url)),
+        fileURLToPath(new URL('./deepseek-web-search.overlay.yml', import.meta.url)),
+      ],
       compareReplaySession: true,
       // Own YAML endpoint settings pin Search to the local endpoint and a dedicated key.
       deepSeekWebApi: {

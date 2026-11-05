@@ -1,0 +1,8 @@
+# Loader overlay for scenarios whose subject is the DeepSeek-hosted web search
+# and fetch providers. The shipped Casper Web profile disables these rows so it
+# makes no DeepSeek search traffic (packages/bundle/web-app/cordis.patch.yml);
+# scenarios of those providers and their settings compose them back.
+- id: web-search-deepseek
+  disabled: false
+- id: web-deepseek-api
+  disabled: false

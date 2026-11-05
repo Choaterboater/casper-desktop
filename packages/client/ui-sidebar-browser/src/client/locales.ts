@@ -55,7 +55,7 @@ export const en = {
   'error.invalid': 'That address is invalid or too long.',
   'error.protocol': 'Only HTTP and HTTPS addresses are supported; use Document Preview for local files.',
   'error.credentials': 'Addresses cannot contain a username or password.',
-  'error.application-origin': 'The embedded browser cannot open the DSH application itself.',
+  'error.application-origin': 'The embedded browser cannot open the Casper application itself.',
   'load.failed': 'The page could not load; reload or open it in the system browser.',
   'load.failed.detail': 'Page load failed ({code}): {description}',
   'address.unknown': 'The page navigated; this carrier cannot read its new URL.',

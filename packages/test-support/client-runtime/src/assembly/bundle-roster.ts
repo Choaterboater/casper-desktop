@@ -45,6 +45,7 @@ interface BundleLayer {
  * @param bundles - bundle package names in application order.
  * @param anchor - file whose package resolution locates the bundles; default this package.
  * @param disabledContext - optional Loader evaluation scope for trusted `disabled` expressions.
+ * @param overrides - patches applied after every bundle layer, as a profile's own patch file is.
  * @returns the roster in composition order, one row per package.
  * @throws {Error} when a bundle, its patch file, or an enabled row's package does not resolve, when the patch list
  * is not a list or does not apply as written, or when a browser row has an unevaluated `disabled` expression.
@@ -53,9 +54,11 @@ export function bundleRoster(
   bundles: readonly string[],
   anchor: string = fileURLToPath(import.meta.url),
   disabledContext?: object,
+  overrides: readonly PatchOptions[] = [],
 ): ClientRoster {
   const layers = bundles.map(name => readLayer(name, anchor))
-  const entries = applyEntryPatches([], layers.flatMap(layer => layer.patches), (message: string, ...args: unknown[]) => {
+  const patches = [...layers.flatMap(layer => layer.patches), ...overrides]
+  const entries = applyEntryPatches([], patches, (message: string, ...args: unknown[]) => {
     throw new Error(`client-test-runtime: bundle patch ${describe(message, args)}`)
   })
   const anchors = layers.map(layer => layer.manifestPath)
@@ -161,7 +164,16 @@ function describe(message: string, args: readonly unknown[]): string {
 
 const webProfileServices: Readonly<Record<string, object | undefined>> = { profileContext: { name: 'web' } }
 
+const webProfileContext = { get: (name: string) => webProfileServices[name] }
+
 /** The `web` profile's browser roster, composed with its profile name and no business Host services. */
-export const webApp: ClientRoster = bundleRoster(WEB_PROFILE_BUNDLES, undefined, {
-  get: (name: string) => webProfileServices[name],
-})
+export const webApp: ClientRoster = bundleRoster(WEB_PROFILE_BUNDLES, undefined, webProfileContext)
+
+/**
+ * The `web` profile's browser roster with the DeepSeek account sign-in UI row (`ui-settings-account`) enabled at its
+ * bundle position. The shipped Casper profile disables that row so it makes no DeepSeek traffic; specs of the account
+ * UI, and of surfaces it contributes to, use this roster to keep that code covered.
+ */
+export const webAppWithDeepSeekAccount: ClientRoster = bundleRoster(WEB_PROFILE_BUNDLES, undefined, webProfileContext, [
+  { id: 'ui-settings-account', disabled: false },
+])

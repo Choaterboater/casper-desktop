@@ -767,7 +767,7 @@ export const en = {
   'queue.remove': 'Remove queued message',
   'queue.steer': 'Steer queued message',
   'queue.steer.unavailable': 'Steering is available only while the agent is running',
-  'error.sessionInUse': 'This session is already in use, possibly by another running DSH instance (such as dsh web or the desktop app). Quit other running DSH instances and try again.',
+  'error.sessionInUse': 'This session is already in use, possibly by another running Casper instance (such as dsh web or the desktop app). Quit other running Casper instances and try again.',
   'queue.editFailed': 'Edit failed: this message may have already started sending.',
   'queue.removeFailed': 'Removal failed: this message may have already started sending.',
   'queue.steerFailed': 'Steering failed. Try again.',

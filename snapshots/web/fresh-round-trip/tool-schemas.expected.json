@@ -137,6 +137,52 @@
       }
     },
     {
+      "name": "check_list",
+      "description": "List recorded checks with their latest verdict and whether code changed since.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "check_record",
+      "description": "Record a project check (a shell command whose exit code 0 means pass), run it now as the baseline, and keep it for replay. Recording a name again replaces it.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Short id, e.g. test, lint, build."
+          },
+          "command": {
+            "type": "string",
+            "description": "Shell command run in the working directory."
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "description": "Optional deadline; a timeout is reported as not run."
+          }
+        },
+        "required": [
+          "name",
+          "command"
+        ]
+      }
+    },
+    {
+      "name": "check_replay",
+      "description": "Replay recorded checks against the current code. Omit `name` to replay every check.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "One recorded check; omit for all."
+          }
+        }
+      }
+    },
+    {
       "name": "create_goal",
       "description": "Create a persisted goal that keeps this session working across automatic continuation rounds. Use it when the direct human request is a long-running objective, even if the user did not say \"goal\"; not for single-turn work.",
       "parameters": {

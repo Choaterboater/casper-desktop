@@ -249,7 +249,7 @@ describe('ui-model-selection dual entry', () => {
     expect(options[1]?.active).toBeUndefined()
     expect(b.popup().searchLabels?.()).toEqual(locale === 'zh'
       ? { placeholder: '搜索模型…', empty: '暂无可用模型', noResults: '没有匹配的模型。' }
-      : { placeholder: 'Search models…', empty: 'No models available.', noResults: 'No matching models.' })
+      : { placeholder: 'Search models…', empty: 'No models yet. Add a model provider in Settings → Models.', noResults: 'No matching models.' })
   })
 
   it('orders popup provider groups account-first while retaining third-party catalog order', async () => {

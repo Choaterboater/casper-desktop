@@ -49,6 +49,18 @@ it('uploads no Session logs unless the user opts in', () => {
   expect(evaluate({ env: { DSH_TELEMETRY_MODE: 'FEEDBACK_ONLY' } })).toBe('FEEDBACK_ONLY')
 })
 
+it('has no DeepSeek collector to fall back to when the user opts in to Session upload', () => {
+  const exporter = desktopRows().find(entry => entry.id === 'session-telemetry-otel')?.config?.['exporter']
+  const url = typeof exporter === 'object' && exporter !== null && 'url' in exporter ? exporter.url : undefined
+  const source = typeof url === 'object' && url !== null && '__jsExpr' in url ? String(url.__jsExpr) : String(url)
+  expect(source).not.toMatch(/deepseek/iu)
+  // eslint-disable-next-line typescript/no-implied-eval -- evaluates the shipped Loader expression against a fixed env.
+  const evaluate = new Function('process', `return (${source})`) as (process: { env: Record<string, string | undefined> }) => unknown
+  expect(evaluate({ env: { DSH_TELEMETRY_MODE: 'FEEDBACK_ONLY' } })).toBeUndefined()
+  expect(evaluate({ env: { DSH_TELEMETRY_OTLP_URL: 'https://collector.example/v1/logs' } })).toBe('https://collector.example/v1/logs')
+  expect(exporter).toMatchObject({ compression: 'gzip', timeoutMillis: 1000 })
+})
+
 it('keeps a non-DeepSeek model provider available', () => {
   const piAi = desktopRows().find(entry => entry.id === 'llm-pi-ai')
   expect(piAi?.name).toBe('@deepseek-ai/dsh-llm-pi-ai')

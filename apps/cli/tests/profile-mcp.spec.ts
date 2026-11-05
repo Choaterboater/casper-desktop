@@ -25,8 +25,7 @@ describe('shipped MCP resource composition', () => {
       expect(rows.filter(row => row.name === resourcePackage)).toEqual([
         { id: 'mcp-resources', name: resourcePackage },
       ])
-      // The Web profile ships Casper's read-only network server;
-      // every other profile ships none.
+      // The Web profile ships Casper's read-only network server; every other profile ships none.
       const clients = rows.filter(row => row.name === '@deepseek-ai/dsh-mcp-client').map(row => row.id).sort()
       expect(clients).toEqual(name === 'web' ? ['mcp-network'] : [])
       expect(warnings).toEqual([])

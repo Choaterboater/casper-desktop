@@ -55,13 +55,13 @@ export const en = {
   'effort.providerDefault': 'Default',
   'status.loading': 'Refreshing model list…',
   'error.action': 'Model operation failed: {message}',
-  'error.sessionInUse': 'This session is already in use, possibly by another running DSH instance (such as dsh web or the desktop app). Quit other running DSH instances and try again.',
+  'error.sessionInUse': 'This session is already in use, possibly by another running Casper instance (such as dsh web or the desktop app). Quit other running Casper instances and try again.',
   'action.reload': 'Reload',
   'warning.groupLoad': '{name} failed to load: {message}',
   'search.placeholder': 'Search models…',
   'search.clear': 'Clear search',
   'search.empty': 'No matching models.',
-  'empty.models': 'No models available.',
+  'empty.models': 'No models yet. Add a model provider in Settings → Models.',
   'empty.efforts': 'This model provides no reasoning effort levels.',
 } satisfies Record<ModelKey, string>
 

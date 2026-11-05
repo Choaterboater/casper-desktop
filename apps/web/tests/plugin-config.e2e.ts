@@ -38,7 +38,11 @@ describe('web e2e: plugin configuration pages', () => {
     // Legacy Messages search names an unset credential so the goldens show the
     // unconfigured key whatever keys the host environment carries.
     scaffold = await launchWebScaffold({
-      extraOverlayPath: fileURLToPath(new URL('./pin-browse-picker.overlay.yml', import.meta.url)),
+      // The shipped Casper profile disables the DeepSeek search and fetch providers; these pages compose them back.
+      extraOverlayPath: [
+        fileURLToPath(new URL('./pin-browse-picker.overlay.yml', import.meta.url)),
+        fileURLToPath(new URL('./deepseek-web-search.overlay.yml', import.meta.url)),
+      ],
       deepSeekSearch: { apiKeyEnv: UNUSED_KEY_ENV },
       profile: { packages: [{ dir: join(FIXTURE_PLUGINS, 'fixture-live-client') }] },
     })

@@ -385,7 +385,7 @@ export const en = {
   'message.failure.auth': 'API key is invalid',
   'message.taskStopped': 'Task stopped',
   'message.failure.accountSignedOut': 'Stopped because you signed out of DeepSeek.',
-  'message.failure.interrupted': 'The DSH process exited before this turn finished (for example, it was killed, crashed, or timed out while shutting down), so the turn was closed when DSH restarted. Unfinished tool calls have unknown outcomes.',
+  'message.failure.interrupted': 'The Casper process exited before this turn finished (for example, it was killed, crashed, or timed out while shutting down), so the turn was closed when Casper restarted. Unfinished tool calls have unknown outcomes.',
   'message.failure.accountSignInRequired': 'Sign in to DeepSeek and ensure the request destination supports account authentication.',
   'message.failure.quota': 'Request quota exhausted.',
   'message.turnError': 'This turn failed',

@@ -1,6 +1,8 @@
 - insert:
     - id: mcp-network
       name: '@deepseek-ai/dsh-mcp-client'
+      # stdio servers need a local host; the in-browser preview runs in a Worker and cannot spawn them.
+      disabled: !!js "typeof WorkerGlobalScope !== 'undefined'"
       config:
         serverName: network
         transport: stdio

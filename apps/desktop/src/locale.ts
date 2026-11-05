@@ -58,7 +58,7 @@ export const en = {
   selectAll: 'Select All',
   startupFailed: 'Casper is unavailable',
   fatalSummary: 'The application could not start or stopped unexpectedly.',
-  startupAddressInUse: 'Another DSH instance (such as dsh web or the desktop app) is running. They cannot start at the same time. Quit the other running DSH instance, then restart.',
+  startupAddressInUse: 'Another Casper instance (such as dsh web or the desktop app) is running. They cannot start at the same time. Quit the other running Casper instance, then restart.',
   diagnosticTruncated: '… Error details shortened.',
   reportWrittenTo: 'Diagnostic report: {path}',
   getDiagnosticReport: 'Get diagnostic report',

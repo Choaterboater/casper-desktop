@@ -107,7 +107,8 @@ describe.skipIf(MODE === 'record')('web e2e: DeepSeek account sign-in in a plain
     root = await mkdtemp(join(tmpdir(), 'dsh-web-account-login-'))
     const overlay = join(root, 'account-login.overlay.yml')
     await writeFile(overlay, (await readFile(OVERLAY_TEMPLATE, 'utf8')).replaceAll('{{origin}}', platform.origin))
-    scaffold = await launchWebScaffold({ extraOverlayPath: overlay })
+    // The shipped Casper profile disables the DeepSeek account sign-in; this scenario composes it back.
+    scaffold = await launchWebScaffold({ extraOverlayPath: [fileURLToPath(new URL('./deepseek-account.overlay.yml', import.meta.url)), overlay] })
     browser = await chromium.launch()
   })
 
