@@ -426,6 +426,15 @@ describe('Hero chrome', () => {
     expect(brandMarkOwner.className).toBeTypeOf('string')
     expect(renderSlot.mock.calls[0]?.[2]?.fallback).toBeTruthy()
   })
+
+  it('falls back to the resting Casper ghost at the hero size', () => {
+    const renderSlot = vi.fn<HeroShellProps['renderSlot']>((_name, _owner, options) => options?.fallback ?? null)
+    const view = render(<HeroShell t={makeTranslate(en, commonEn)} renderSlot={renderSlot} />)
+    const mark = view.container.querySelector('svg')!
+    expect(mark.getAttribute('width')).toBe('34')
+    expect(mark.querySelector('path')?.getAttribute('d')).toMatch(/^M12 30a20 20 0 0 1 40 0v24/u)
+    expect(mark.querySelector('animate')).toBeNull()
+  })
 })
 
 describe('ConversationRoot resident composer', () => {

@@ -79,7 +79,7 @@ kind: "package-library"
 | `UserTextRun`、`ReferenceChip` | 不做解析的行内文本，以及业务已解析的引用标签或激活按钮。 |
 | `CommandText` | 可选中的命令或参数文本；仅横向溢出时添加具名的键盘聚焦目标。 |
 | `TerminalBlock`、`ReadBlock`、`DiffBlock`、`SearchBlock`、`WebBlock` | 与各类工具结果意图对应的 agent 输出卡片。 |
-| `icons/*`、`FishLogo`、`BrandWordmark`、`ReferenceIconRegular`/`ReferenceIconMedium`、`LinkIconRegular`/`LinkIconMedium` | 字形与品牌标识。`IconDragHandleOutlineRegular`/`Medium` 以三条横线表示可拖动的排序手柄。思考图标的轨道在 16px 视口内保留内边距。“更多”入口使用的 `IconAppsAddOutlineRegular`/`Medium` 接受 `compact`，在卡片尺寸下让方块更靠近。`LinkIconMedium` 用于 14px 的可点击链接分类及已知站点标记。 |
+| `icons/*`、`GhostLogo`、`BrandWordmark`、`ReferenceIconRegular`/`ReferenceIconMedium`、`LinkIconRegular`/`LinkIconMedium` | 字形与品牌标识。`GhostLogo` 以网站幽灵自身的配色绘制，并接受 `wave` 让裙摆起伏；`FishLogo` 是它已弃用的别名。`IconDragHandleOutlineRegular`/`Medium` 以三条横线表示可拖动的排序手柄。思考图标的轨道在 16px 视口内保留内边距。“更多”入口使用的 `IconAppsAddOutlineRegular`/`Medium` 接受 `compact`，在卡片尺寸下让方块更靠近。`LinkIconMedium` 用于 14px 的可点击链接分类及已知站点标记。 |
 | `PermissionIconReadOnlyRegular`/`Medium`、`PermissionIconWorkspaceWriteRegular`/`Medium`、`PermissionIconFullAccessRegular`/`Medium`、`PermissionIconAutoReviewRegular`/`Medium` | 只读、工作区写入、完全访问与自动审查选项使用的权限模式图形。 |
 | `PluginArtworkTerminal`/`Loop`/`Subagent`/`Search`/`Default` | 固定配色的 36×36 插件插画；`Terminal` 为插件卡片和侧边栏开始页入口提供浅蓝色提示符。`Default` 用于没有自有插画的插件。def id 按实例生成，同一插画可在一页中安全重复。 |
 | `GuideArtworkBrowser`/`Files` | 固定配色的 36×36 浏览器与文件夹插画，用于侧栏引导入口。 |
@@ -234,7 +234,6 @@ kind: "package-library"
 - **超长行不着色**：所有高亮界面中，长度达到 1,000 个 UTF-16 单元的源码行渲染为一段纯文本，因为 TextMate 扫描成本随行长超线性增长，单个生成行否则会阻塞页面数秒。语法状态会跳过该行，因此在该行开始或结束的注释、模板字符串会使后续行着色错误。高亮仍在渲染期间同步执行，因此数千个普通行的文件仍按比例增加开销。
 - **裸 URL 在非 ASCII 标点前结束**：[tokenizer 补丁](../../../patches/micromark-extension-gfm-autolink-literal@2.1.0.patch)和[转换补丁](../../../patches/mdast-util-gfm-autolink-literal@2.0.1.patch)让 GFM 自动链接在非 ASCII 标点、符号或空白处结束，因此路径中含未编码 `（`、`・` 等字符的 URL 只链接到该字符之前；这类 URL 请写成 `<…>` 或 `[…](…)`。URL 后直接跟中日韩文字时仍会并入链接，因为 `/wiki/中文` 这类路径是合法的。两个补丁都绑定精确版本：升级任一依赖时必须重新应用或撤销对应补丁，否则该边界规则会悄然失效。
 - **Go 结构体字段规则在本地打了补丁**：Go 语法加载时，重复匹配单行结构体字段的规则会替换为 [worlpaker/go-syntax#25](https://github.com/worlpaker/go-syntax/pull/25) 合入的规则，因为内置规则在 `struct {` 之后含花括号注释等行上会指数级回溯。若依赖升级后该规则消失，加载语法会抛错，Go 代码以纯文本显示；`@shikijs/langs` 发布上游规则后删除此补丁。
-- **鱼形标志是重新绘制的近似版本**：它来自字体字形，而本地设计数据无法导出其矢量几何；在获得精确导出路径前，使用手工重建版本代替。
 - **`Pill` 与 `Input` 没有设计来源**：两个原子组件均自行定义；与其相似的侧边栏搜索字段和视图标签条由消费方组合，不是这些原子组件。
 - **产品图标依赖 ui-theme 的 sprite**：每个图标只引用自己的 symbol，因此没有 ui-theme 时，或在 iframe 等另一个文档中，图标不渲染任何内容。
 - **`StateDot` 没有 `Active` 变体**：支持的状态为 done、warning、ongoing、error 和 idle。

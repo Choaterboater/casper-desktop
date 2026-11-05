@@ -265,15 +265,32 @@ describe('product icon set', () => {
 })
 
 describe('GhostLogo', () => {
-  it('renders the ghost path in currentColor as a square mark', () => {
+  // A path's commands and its count of numbers: `d` morphs smoothly only between paths that agree on both.
+  const segments = (d: string) => ({ commands: d.match(/[a-z]/giu)?.join(''), numbers: d.match(/-?(?:\d+\.?\d*|\.\d+)/gu)?.length })
+
+  it('draws the website ghost in its own colours as a square mark', () => {
     const { container } = render(<primitives.GhostLogo />)
     const svg = container.querySelector('svg')!
     expect(svg.getAttribute('width')).toBe('24')
     expect(svg.getAttribute('height')).toBe('24')
-    expect(svg.getAttribute('viewBox')).toBe('0 0 24 24')
-    expect(container.querySelectorAll('path')).toHaveLength(1)
-    expect(container.innerHTML).toContain('currentColor')
-    expect(container.innerHTML).not.toContain('M0 0L23.16')
+    expect(svg.getAttribute('viewBox')).toBe('7 7 50 50')
+    const body = container.querySelector('path')!
+    expect(body.getAttribute('d')).toMatch(/^M12 30a20 20 0 0 1 40 0v24/u)
+    expect([body.getAttribute('fill'), body.getAttribute('stroke')]).toEqual(['#f4f7fb', '#0f766e'])
+    expect(container.querySelectorAll('ellipse')).toHaveLength(2)
+    expect(container.innerHTML).not.toContain('currentColor')
+    expect(container.querySelector('animate')).toBeNull()
+  })
+
+  it('ripples the skirt through shapes the body can morph into while waving', () => {
+    const { container } = render(<primitives.GhostLogo wave />)
+    const body = container.querySelector('path')!
+    const animate = body.querySelector('animate')!
+    expect(animate.getAttribute('attributeName')).toBe('d')
+    const values = animate.getAttribute('values')!.split(';')
+    expect(values.length).toBeGreaterThan(1)
+    expect(new Set(values).size).toBeGreaterThan(1)
+    for (const value of values) expect(segments(value)).toEqual(segments(body.getAttribute('d')!))
   })
 })
 
