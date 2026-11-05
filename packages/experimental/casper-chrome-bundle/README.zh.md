@@ -27,7 +27,7 @@ kind: "package-bundle"
 
 在 Google Chrome 中安装 [Playwright Extension](https://chromewebstore.google.com/detail/playwright-extension/mmlmfjhmonkocbjadbfplnigmagldckm)。在 Casper 中打开插件页，在官方分组启用 **Chrome 中的 Casper**。然后让 Casper 在 Chrome 中完成任务。未安装扩展时，第一次浏览器调用会返回一个错误，其中包含该扩展的 Chrome 应用商店链接。
 
-对话中的第一次浏览器工具调用会在 Chrome 中打开扩展的连接页面并等待。在该页面批准连接，并选择 Casper 可以使用的标签页；每个新对话都会再次询问。等待超过 120 秒的调用会失败；批准后让 Casper 重试即可。若要跳过批准，请将扩展显示的 `PLAYWRIGHT_MCP_EXTENSION_TOKEN` 值写入 Casper 的[启动环境](../../util/launch-environment/README.zh.md)，例如 `$DSH_HOME/.env`；提供方只把该变量转发给扩展连接，任何持有该令牌的程序都无需询问即可连接。
+对话中的第一次浏览器工具调用会在 Chrome 中打开扩展的连接页面并等待。在该页面批准连接，并选择 Casper 可以使用的标签页；每个新对话都会再次询问。等待超过 5 分钟的调用会失败；批准后让 Casper 重试即可。若要跳过批准，请将扩展显示的 `PLAYWRIGHT_MCP_EXTENSION_TOKEN` 值写入 Casper 的[启动环境](../../util/launch-environment/README.zh.md)，例如 `$DSH_HOME/.env`；提供方只把该变量转发给扩展连接，任何持有该令牌的程序都无需询问即可连接。
 
 每个对话都有自己的 Chrome 工具和自己的连接。扩展会把每个已批准对话的标签页放在单独的标签页组中，并且不会提供其他对话已在使用的标签页。启用插件时已经打开的对话，在 Casper 重启前没有 Chrome 工具。关闭此插件会移除其配置层和这些工具。
 
@@ -41,7 +41,7 @@ kind: "package-bundle"
 <details>
 <summary>实现细节 — 点击展开</summary>
 
-[`cordis.patch.yml`](cordis.patch.yml) 插入两个 Host 行：`casper-chrome-browser-use` 挂载 `@deepseek-ai/dsh-browser-use`，`casper-chrome` 以 `mode: extension` 和 `toolCallTimeoutMs: 120000` 挂载 Playwright 提供方。提供方使用 `--extension --browser chrome` 运行固定版本的 `@playwright/mcp` 服务器。`casper-chrome` 行在 Web 预览 Worker 中禁用，因为该 Worker 无法启动本地服务器。后续配置补丁可以按 id 覆盖任一行。
+[`cordis.patch.yml`](cordis.patch.yml) 插入两个 Host 行：`casper-chrome-browser-use` 挂载 `@deepseek-ai/dsh-browser-use`，`casper-chrome` 以 `mode: extension` 和 `toolCallTimeoutMs: 300000` 挂载 Playwright 提供方。提供方使用 `--extension --browser chrome` 运行固定版本的 `@playwright/mcp` 服务器。`casper-chrome` 行在 Web 预览 Worker 中禁用，因为该 Worker 无法启动本地服务器。后续配置补丁可以按 id 覆盖任一行。
 
 </details>
 

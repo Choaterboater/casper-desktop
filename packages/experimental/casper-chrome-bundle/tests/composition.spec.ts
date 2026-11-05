@@ -33,8 +33,9 @@ it('mounts the browser-use registry and the extension-mode provider, disabled on
   const rows = await patchRows()
   expect(rows.map(row => row.name)).toEqual(['@deepseek-ai/dsh-browser-use', PROVIDER])
   const provider = rows[1]!
-  expect(provider.config).toMatchObject({ mode: 'extension' })
-  expect(Provider.Config(provider.config as Provider.Config)).toMatchObject({ mode: 'extension' })
+  // The first call in a conversation waits for the user's approval in Chrome, which can take a few minutes.
+  expect(provider.config).toMatchObject({ mode: 'extension', toolCallTimeoutMs: 300_000 })
+  expect(Provider.Config(provider.config as Provider.Config)).toMatchObject({ mode: 'extension', toolCallTimeoutMs: 300_000 })
   expect(interpolate({}, provider.disabled)).toBe(false)
   expect(interpolate({ WorkerGlobalScope: Object }, provider.disabled)).toBe(true)
 })

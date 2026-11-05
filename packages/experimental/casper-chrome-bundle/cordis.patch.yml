@@ -8,4 +8,4 @@
       config:
         mode: extension
         # The first browser call waits while the user approves the connection in Chrome.
-        toolCallTimeoutMs: 120000
+        toolCallTimeoutMs: 300000

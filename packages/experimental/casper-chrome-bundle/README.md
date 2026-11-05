@@ -27,7 +27,7 @@ Let Casper browse and act in your own Google Chrome, with your tabs and signed-i
 
 Install the [Playwright Extension](https://chromewebstore.google.com/detail/playwright-extension/mmlmfjhmonkocbjadbfplnigmagldckm) in Google Chrome. In Casper, open Plugins and enable **Casper in Chrome** in Official. Then ask Casper to do something in Chrome. Without the extension, the first browser call returns an error that links its Chrome Web Store page.
 
-The first browser tool call in a conversation opens the extension's connection page in Chrome and waits. Approve the connection there and choose the tab Casper may use; the extension asks again for each new conversation. A call that waits longer than 120 seconds fails; ask Casper to try again after approving. To skip the approval, copy the `PLAYWRIGHT_MCP_EXTENSION_TOKEN` value the extension shows into Casper's [launch environment](../../util/launch-environment/README.md), for example `$DSH_HOME/.env`; the provider forwards only that variable to the extension connection, and anyone holding the token can connect without asking.
+The first browser tool call in a conversation opens the extension's connection page in Chrome and waits. Approve the connection there and choose the tab Casper may use; the extension asks again for each new conversation. A call that waits longer than 5 minutes fails; ask Casper to try again after approving. To skip the approval, copy the `PLAYWRIGHT_MCP_EXTENSION_TOKEN` value the extension shows into Casper's [launch environment](../../util/launch-environment/README.md), for example `$DSH_HOME/.env`; the provider forwards only that variable to the extension connection, and anyone holding the token can connect without asking.
 
 Every conversation has its own Chrome tools and its own connection. The extension puts each approved conversation's tabs in a separate tab group and does not offer a tab that another conversation already uses. A conversation that was already open when you switched the plugin on has no Chrome tools until Casper restarts. Switching the plugin off removes its profile layer and the tools.
 
@@ -41,7 +41,7 @@ The agent acts as you on every site that the shared tab can reach, including sit
 <details>
 <summary>Implementation details — click to expand</summary>
 
-[`cordis.patch.yml`](cordis.patch.yml) inserts two Host rows: `casper-chrome-browser-use` mounts `@deepseek-ai/dsh-browser-use`, and `casper-chrome` mounts the Playwright provider with `mode: extension` and `toolCallTimeoutMs: 120000`. The provider runs the pinned `@playwright/mcp` server with `--extension --browser chrome`. The `casper-chrome` row is disabled in the Web preview Worker, which cannot start a local server. Later profile patches can override either row by id.
+[`cordis.patch.yml`](cordis.patch.yml) inserts two Host rows: `casper-chrome-browser-use` mounts `@deepseek-ai/dsh-browser-use`, and `casper-chrome` mounts the Playwright provider with `mode: extension` and `toolCallTimeoutMs: 300000`. The provider runs the pinned `@playwright/mcp` server with `--extension --browser chrome`. The `casper-chrome` row is disabled in the Web preview Worker, which cannot start a local server. Later profile patches can override either row by id.
 
 </details>
 
