@@ -12,10 +12,16 @@
       "path": "../../../vendor/cordis"
     },
     {
+      "path": "../../../vendor/schemastery"
+    },
+    {
       "path": "../browser-use-runtime"
     },
     {
       "path": "../../session/working-directory"
+    },
+    {
+      "path": "../../util/values"
     }
   ]
 }

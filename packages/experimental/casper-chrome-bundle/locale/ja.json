@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Chrome で Casper",
+    "description": "Casper があなた自身の Google Chrome で、開いているタブやログイン済みのサイトを使って閲覧・操作できるようにします。先に Chrome に Playwright Extension をインストールしてください。拡張機能が接続ごとに承認と、Casper が使用できるタブの選択を求めます。Chrome を使用できる会話は一度に 1 つだけです。"
+  }
+}

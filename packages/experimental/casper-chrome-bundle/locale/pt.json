@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Casper no Chrome",
+    "description": "Permite que o Casper navegue e aja no seu próprio Google Chrome, com suas guias e os sites em que você está conectado. Primeiro instale a Playwright Extension no Chrome. A extensão pede que você aprove cada conexão e escolha a guia que o Casper pode usar. Apenas uma conversa por vez pode usar o Chrome."
+  }
+}

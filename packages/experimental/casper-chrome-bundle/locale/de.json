@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Casper in Chrome",
+    "description": "Lässt Casper in Ihrem eigenen Google Chrome surfen und handeln, mit Ihren Tabs und angemeldeten Websites. Installieren Sie zuerst die Playwright Extension in Chrome. Die Erweiterung bittet Sie, jede Verbindung zu bestätigen und den Tab auszuwählen, den Casper verwenden darf. Chrome kann jeweils nur von einer Unterhaltung verwendet werden."
+  }
+}

@@ -1,5 +1,5 @@
 ---
-description: "通过 Playwright MCP 操作 Chromium，为每个活动 Session 保持独立浏览器状态。"
+description: "通过 Playwright MCP 操作 Chromium，为每个活动 Session 保持独立浏览器状态，或通过 Playwright Extension 操作用户自己的 Chrome。"
 kind: "package-reference"
 ---
 
@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-通过 Playwright MCP 的上游工具检查网页并操作 Chromium。提供方在 Session 创建或恢复完成前初始化其 MCP 连接，并跨轮次保留连接。可以启动独立浏览器，也可以让一个 Session 接入已有浏览器，使用其现有标签页和登录状态。本包以实验状态发布，仅在显式挂载后启用。
+通过 Playwright MCP 的上游工具检查网页并操作 Chromium。提供方在 Session 创建或恢复完成前初始化其 MCP 连接，并跨轮次保留连接。可以启动独立浏览器，让一个 Session 接入已有浏览器并使用其现有标签页和登录状态，或让每个 Session 通过 Playwright Extension 连接用户自己的 Google Chrome。本包以实验状态发布，仅在显式挂载后启用。
 
 ## 目录
 
@@ -37,15 +37,17 @@ kind: "package-reference"
 
 使用 `mode: attach`，并在 `endpoint` 中设置 HTTP(S) 调试 URL 或 WS(S) 浏览器端点，即可操作已有浏览器。新的活动 Session 在初始化时占用附加连接，并持续保留直到卸载。如果连接已被占用，本次激活不使用该浏览器，但继续运行，后续轮次不会重试。连接释放后，新创建或恢复的激活可以获取它。其他 Session 的直接调用会失败。清理只断开连接，保留外部浏览器及其页面。
 
+使用 `mode: extension` 可通过 [Playwright Extension](https://chromewebstore.google.com/detail/playwright-extension/mmlmfjhmonkocbjadbfplnigmagldckm) 在用户正在运行的 Google Chrome profile 中工作。服务器以 `--extension --browser chrome` 运行，并在 Chrome 的默认用户数据目录中查找扩展。与 attach 模式不同，扩展模式不做任何占用：每个活动 Session 启动自己的服务器和连接，扩展将每个已批准的连接放在各自的 Chrome 标签页组中，且不会提供另一个连接正在控制的标签页。Session 的第一次浏览器工具调用会在 Chrome 中打开扩展的连接页面，并等待用户在该页面批准连接并选择标签页；请将 `toolCallTimeoutMs` 设置得足够长，以便完成批准。Host 环境中的 `PLAYWRIGHT_MCP_EXTENSION_TOKEN` 可跳过批准：扩展会显示这个按 profile 区分的令牌，提供方仅在此模式下转发它。[Chrome 中的 Casper 组合包](../casper-chrome-bundle/README.zh.md)随附此配置。
+
 | 字段 | 默认值 | 含义 |
 |---|---|---|
-| `mode` | 必填 | `launch` 或 `attach`，在本次提供方激活期间固定 |
+| `mode` | 必填 | `launch`、`attach` 或 `extension`，在本次提供方激活期间固定 |
 | `headless` | `true` | 启动时不显示窗口 |
 | `executablePath` | 上游发现 | 启动使用的 Chromium 可执行文件 |
 | `endpoint` | attach 时必填 | 已有浏览器调试端点 |
 | `toolCallTimeoutMs` | MCP 客户端默认值 | 单次调用超时，单位为毫秒 |
 
-[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-experimental-browser-use-playwright-mcp)列出接受的字段。浏览器模式由 profile 或 preset 选择。子进程会清空继承的 `PLAYWRIGHT_MCP_*` 选项，避免其替换该配置。
+[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-experimental-browser-use-playwright-mcp)列出接受的字段。浏览器模式由 profile 或 preset 选择。子进程会清空继承的 `PLAYWRIGHT_MCP_*` 选项，避免其替换该配置；扩展模式仅保留 `PLAYWRIGHT_MCP_EXTENSION_TOKEN`。
 
 为整个进程配置系统提示词的 `toolOrder` 时，将浏览器工具留在 `<unlisted-tools>` 中。显式列出浏览器工具名称可能导致未获得浏览器连接的 Session 无法组装提示词。
 
@@ -97,9 +99,10 @@ kind: "package-reference"
 
 本集成保留固定版本服务器的浏览器与工具限制。
 
-- 仅支持 Chromium；不可选择 Firefox 或 WebKit。
+- 仅支持 Chromium；不可选择 Firefox 或 WebKit。扩展模式仅支持 Google Chrome；不可选择 Edge 或其他 Chrome 渠道。
 - 启动失败或取消会拒绝 Session 创建或恢复，并触发客户端清理。断开的客户端不会重试；修复原因后，创建新 Session，或卸载并恢复已有 Session。
 - 连接独占仅在此提供方实例内有效。其他进程与浏览器用户仍可修改相同页面。
+- launch 与 extension 模式会在每个活动 Session 创建时为其启动一个服务器进程，包括从不调用浏览器工具的 Session。
 - 共享资源服务器目录可以显示继承的服务器名称，但不会授予对其他 Session 浏览器的访问权限。
 - 取消不会撤销已发送给浏览器的导航、点击或其他操作。
 - 工具 schema 跟随固定的实验依赖版本，不承诺 DSH 稳定性。

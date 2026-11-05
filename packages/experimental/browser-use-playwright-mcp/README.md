@@ -1,5 +1,5 @@
 ---
-description: "Operate Chromium through Playwright MCP with separate browser state for each live Session."
+description: "Operate Chromium through Playwright MCP with separate browser state for each live Session, or the user's own Chrome through the Playwright Extension."
 kind: "package-reference"
 ---
 
@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Use Playwright MCP to inspect pages and operate Chromium through its upstream tools. The provider initializes a Session's MCP connection before creation or resume completes and retains it across turns. Launch a separate browser or attach one Session to an existing browser with its current tabs and login state. This published experimental package activates only when explicitly mounted.
+Use Playwright MCP to inspect pages and operate Chromium through its upstream tools. The provider initializes a Session's MCP connection before creation or resume completes and retains it across turns. Launch a separate browser, attach one Session to an existing browser with its current tabs and login state, or connect each Session to the user's own Google Chrome through the Playwright Extension. This published experimental package activates only when explicitly mounted.
 
 ## Table of Contents
 
@@ -37,15 +37,17 @@ Mount both entries before creating or resuming a Session, in a profile compositi
 
 Use `mode: attach` and set `endpoint` to an HTTP(S) debugging URL or WS(S) browser endpoint to operate an existing browser. The new live Session claims the attachment during initialization and retains it until unloading. If the attachment is busy, that activation continues without this browser and does not retry on later turns. After release, a newly created or resumed activation can acquire it. Direct calls from another Session fail. Cleanup disconnects and leaves the external browser and its pages running.
 
+Use `mode: extension` to work in the user's running Google Chrome profile through the [Playwright Extension](https://chromewebstore.google.com/detail/playwright-extension/mmlmfjhmonkocbjadbfplnigmagldckm). The server runs with `--extension --browser chrome` and finds the extension in Chrome's default user data directory. Unlike attach mode, extension mode reserves nothing: each live Session starts its own server and connection, and the extension keeps each approved connection in its own Chrome tab group and does not offer a tab that another connection controls. A Session's first browser tool call opens the extension's connection page in Chrome and waits until the user approves the connection and chooses a tab there; set `toolCallTimeoutMs` long enough for that approval. A `PLAYWRIGHT_MCP_EXTENSION_TOKEN` in the Host environment skips the approval: the extension shows this per-profile token, and the provider forwards it only in this mode. The [Casper in Chrome bundle](../casper-chrome-bundle/README.md) ships this configuration.
+
 | Field | Default | Meaning |
 |---|---|---|
-| `mode` | required | `launch` or `attach`, fixed for this provider activation |
+| `mode` | required | `launch`, `attach`, or `extension`, fixed for this provider activation |
 | `headless` | `true` | Launch without a visible window |
 | `executablePath` | upstream discovery | Chromium executable for launch |
 | `endpoint` | required for attach | Existing browser debugging endpoint |
 | `toolCallTimeoutMs` | MCP client default | Per-call timeout in milliseconds |
 
-The [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-experimental-browser-use-playwright-mcp) lists accepted fields. The profile or preset selects the browser mode. The child process clears inherited `PLAYWRIGHT_MCP_*` options so they cannot replace that configuration.
+The [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-experimental-browser-use-playwright-mcp) lists accepted fields. The profile or preset selects the browser mode. The child process clears inherited `PLAYWRIGHT_MCP_*` options so they cannot replace that configuration; extension mode keeps only `PLAYWRIGHT_MCP_EXTENSION_TOKEN`.
 
 When configuring the system prompt's `toolOrder` for the whole process, leave browser tools under `<unlisted-tools>`. Explicitly listing browser tool names can make prompt assembly fail for Sessions without a browser connection.
 
@@ -97,9 +99,10 @@ An unchanged catalog preserves its tool-definition prefix. Results append to his
 
 The integration retains the pinned server's browser and tool restrictions.
 
-- Chromium only; Firefox and WebKit are not selectable.
+- Chromium only; Firefox and WebKit are not selectable. Extension mode supports Google Chrome only; Edge and other Chrome channels are not selectable.
 - Startup failure or cancellation rejects Session creation or resume and triggers client cleanup. A disconnected client is not retried; after fixing the cause, create a new Session or unload and resume the existing one.
 - Attachment exclusivity is local to this provider instance. Other processes and browser users can still modify the same pages.
+- Launch and extension modes start one server process for every live Session during its creation, including Sessions that never call a browser tool.
 - The shared resource-server inventory can show inherited server names; it does not grant access to another Session's browser.
 - Cancellation does not undo navigation, clicks, or other actions already delivered to the browser.
 - Tool schemas follow the pinned experimental dependency and carry no DSH stability promise.

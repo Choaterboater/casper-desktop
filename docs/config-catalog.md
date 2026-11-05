@@ -280,7 +280,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-api-settings-controller`
 
-- `source`: [`packages/api/settings-controller/src/index.ts:35`](../packages/api/settings-controller/src/index.ts)
+- `source`: [`packages/api/settings-controller/src/index.ts:38`](../packages/api/settings-controller/src/index.ts)
 
 ```ts config-catalog
 /** Host integrations replaceable by direct unit tests. */
@@ -470,6 +470,39 @@ export interface Config {
 export type Config = LocalConfig
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-bash-sandbox -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-casper-checks -->
+<a id="deepseek-aidsh-casper-checks"></a>
+
+## `@deepseek-ai/dsh-casper-checks`
+
+- `inject`: `tools` · `shell` · `systemPrompt` · `workingDirectory` · `fs`
+- `source`: [`packages/casper/tool-checks/src/index.ts:60`](../packages/casper/tool-checks/src/index.ts)
+
+```ts config-catalog
+/** Deployment configuration. */
+export interface Config {
+  /** Tool names whose results invalidate checks and count as a turn's changes. */
+  mutatingTools: string[]
+  /** Replay stale checks and run project checks at the turn-stopping checkpoint. */
+  replayOnStop: boolean
+  /** Repair rounds the checkpoint may force in one turn; `repair.maxAttempts` in the project file overrides it. */
+  maxRepairRounds: number
+  /** Characters of command output retained per run, shared between stdout and stderr. */
+  outputChars: number
+  /** Recorded checks one agent may hold. */
+  maxChecks: number
+  /** Run the project's checks after a top-level turn changes files; `verification.mode` in the project file overrides it. */
+  projectChecks: boolean
+  /** Deadline of one project check; `verification.timeoutMs` in the project file overrides it. */
+  projectTimeoutMs: number
+  /** Run project checks even when the shell sandbox does not confine them. */
+  runUnconfined: boolean
+  /** Steer the closing receipt to the agent so its final reply carries it. */
+  receipt: boolean
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-casper-checks -->
 
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-client-connection -->
 <a id="deepseek-aidsh-client-connection"></a>
@@ -935,11 +968,19 @@ export type Config = BrowserMcpConfig
 
 - `inject`: `browserUse` · `agents` · `tools` · `systemPrompt` · `workingDirectory`
 - `refs`: `BrowserMcpConfig` (`@deepseek-ai/dsh-experimental-browser-use-runtime/mcp`)
-- `source`: [`packages/experimental/browser-use-playwright-mcp/src/index.ts:16`](../packages/experimental/browser-use-playwright-mcp/src/index.ts)
+- `source`: [`packages/experimental/browser-use-playwright-mcp/src/index.ts:26`](../packages/experimental/browser-use-playwright-mcp/src/index.ts)
 
 ```ts config-catalog
-/** Fixed Chromium launch or existing-browser attachment settings. */
-export type Config = BrowserMcpConfig
+/** Fixed Chromium launch, existing-browser attachment, or Playwright Extension connection settings. */
+export type Config = BrowserMcpConfig | PlaywrightExtensionConfig
+
+/** Connection to the user's running Google Chrome through the Playwright Extension. */
+export interface PlaywrightExtensionConfig {
+  /** Exclusively connect one live Session to the Chrome tabs the user approves in the Playwright Extension. */
+  mode: 'extension'
+  /** Per-call timeout override in milliseconds; omission uses the MCP client default. */
+  toolCallTimeoutMs?: number
+}
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-browser-use-playwright-mcp -->
 
@@ -4895,6 +4936,8 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 | `@deepseek-ai/dsh-api-remotes` | `typertGateway` | [`packages/api/remotes/src/index.ts`](../packages/api/remotes/src/index.ts) |
 | `@deepseek-ai/dsh-authorization` | `credentials` | [`packages/credentials/authorization/src/index.ts`](../packages/credentials/authorization/src/index.ts) |
 | `@deepseek-ai/dsh-browser-use` | — | [`packages/browser-use/browser-use/src/index.ts`](../packages/browser-use/browser-use/src/index.ts) |
+| `@deepseek-ai/dsh-casper-sidebar-browser` | `tools` · `sessionProjections` | [`packages/casper/tool-sidebar-browser/src/index.ts`](../packages/casper/tool-sidebar-browser/src/index.ts) |
+| `@deepseek-ai/dsh-casper-sidebar-browser-client` | — | [`packages/casper/sidebar-browser-client/src/index.ts`](../packages/casper/sidebar-browser-client/src/index.ts) |
 | `@deepseek-ai/dsh-client-file-upload` | `agents` · `attachments` · `commands` · `connection` | [`packages/client/file-upload/src/index.ts`](../packages/client/file-upload/src/index.ts) |
 | `@deepseek-ai/dsh-client-locale` | — | [`packages/client/locale/src/index.ts`](../packages/client/locale/src/index.ts) |
 | `@deepseek-ai/dsh-client-modules` | `loader` | [`packages/client/modules/src/index.ts`](../packages/client/modules/src/index.ts) |
@@ -5047,6 +5090,8 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 | `@deepseek-ai/dsh-atomic-write` | — | [`packages/util/atomic-write/src/index.ts`](../packages/util/atomic-write/src/index.ts) |
 | `@deepseek-ai/dsh-base` | — | [`packages/bundle/base/src/index.ts`](../packages/bundle/base/src/index.ts) |
 | `@deepseek-ai/dsh-brand` | — | [`packages/util/brand/src/index.ts`](../packages/util/brand/src/index.ts) |
+| `@deepseek-ai/dsh-casper-bundle` | — | [`packages/casper/casper-bundle/src/index.ts`](../packages/casper/casper-bundle/src/index.ts) |
+| `@deepseek-ai/dsh-casper-chrome-bundle` | — | [`packages/experimental/casper-chrome-bundle/src/index.ts`](../packages/experimental/casper-chrome-bundle/src/index.ts) |
 | `@deepseek-ai/dsh-chunked-list` | — | [`packages/util/chunked-list/src/index.ts`](../packages/util/chunked-list/src/index.ts) |
 | `@deepseek-ai/dsh-client-store` | — | [`packages/client/store/src/index.ts`](../packages/client/store/src/index.ts) |
 | `@deepseek-ai/dsh-client-test-runtime` | — | [`packages/test-support/client-runtime/src/index.ts`](../packages/test-support/client-runtime/src/index.ts) |

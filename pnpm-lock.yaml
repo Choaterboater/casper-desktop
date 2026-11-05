@@ -312,6 +312,9 @@ importers:
       '@deepseek-ai/dsh-base':
         specifier: workspace:*
         version: link:../../packages/bundle/base
+      '@deepseek-ai/dsh-casper-chrome-bundle':
+        specifier: workspace:*
+        version: link:../../packages/experimental/casper-chrome-bundle
       '@deepseek-ai/dsh-client-ui-agent-preset':
         specifier: workspace:*
         version: link:../../packages/client/ui-agent-preset
@@ -8739,6 +8742,12 @@ importers:
       '@deepseek-ai/dsh-experimental-browser-use-runtime':
         specifier: workspace:*
         version: link:../browser-use-runtime
+      '@deepseek-ai/dsh-util-values':
+        specifier: workspace:*
+        version: link:../../util/values
+      '@deepseek-ai/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
       '@playwright/mcp':
         specifier: 0.0.80
         version: 0.0.80
@@ -8934,6 +8943,58 @@ importers:
       tsx:
         specifier: ^4.23.13
         version: 4.23.13
+
+  packages/experimental/casper-chrome-bundle:
+    dependencies:
+      '@deepseek-ai/dsh-browser-use':
+        specifier: workspace:*
+        version: link:../../browser-use/browser-use
+      '@deepseek-ai/dsh-experimental-browser-use-playwright-mcp':
+        specifier: workspace:*
+        version: link:../browser-use-playwright-mcp
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/cordis-plugin-include':
+        specifier: workspace:~
+        version: link:../../../vendor/include
+      '@deepseek-ai/cordis-plugin-loader':
+        specifier: workspace:~
+        version: link:../../../vendor/loader
+      '@deepseek-ai/dsh-agent':
+        specifier: workspace:*
+        version: link:../../core/agent
+      '@deepseek-ai/dsh-agent-loop':
+        specifier: workspace:*
+        version: link:../../core/agent-loop
+      '@deepseek-ai/dsh-fs-local':
+        specifier: workspace:*
+        version: link:../../fs/fs-local
+      '@deepseek-ai/dsh-llm':
+        specifier: workspace:*
+        version: link:../../llm/llm
+      '@deepseek-ai/dsh-session':
+        specifier: workspace:*
+        version: link:../../core/session
+      '@deepseek-ai/dsh-session-projection':
+        specifier: workspace:*
+        version: link:../../session/session-projection
+      '@deepseek-ai/dsh-system-prompt':
+        specifier: workspace:*
+        version: link:../../core/system-prompt
+      '@deepseek-ai/dsh-tool-executor-native':
+        specifier: workspace:*
+        version: link:../../core/tool-executor-native
+      '@deepseek-ai/dsh-tools':
+        specifier: workspace:*
+        version: link:../../core/tools
+      '@deepseek-ai/dsh-working-directory':
+        specifier: workspace:*
+        version: link:../../session/working-directory
+      js-yaml:
+        specifier: ^4.2.0
+        version: 4.3.2
 
   packages/experimental/claude-code-mods:
     dependencies:

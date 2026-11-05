@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Casper dans Chrome",
+    "description": "Permet à Casper de naviguer et d'agir dans votre propre Google Chrome, avec vos onglets et les sites auxquels vous êtes connecté. Installez d'abord Playwright Extension dans Chrome. L'extension vous demande d'approuver chaque connexion et de choisir l'onglet que Casper peut utiliser. Une seule conversation à la fois peut utiliser Chrome."
+  }
+}

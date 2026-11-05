@@ -1,0 +1,11 @@
+- insert:
+    - id: casper-chrome-browser-use
+      name: '@deepseek-ai/dsh-browser-use'
+    - id: casper-chrome
+      name: '@deepseek-ai/dsh-experimental-browser-use-playwright-mcp'
+      # The provider starts a local stdio server; the in-browser preview runs in a Worker and cannot spawn it.
+      disabled: !!js "typeof WorkerGlobalScope !== 'undefined'"
+      config:
+        mode: extension
+        # The first browser call waits while the user approves the connection in Chrome.
+        toolCallTimeoutMs: 120000

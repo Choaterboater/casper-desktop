@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Casper in Chrome",
+    "description": "Lets Casper browse and act in your own Google Chrome, with your tabs and signed-in sites. Install the Playwright Extension in Chrome first. The extension asks you to approve each connection and choose the tab Casper may use. One conversation at a time can use Chrome."
+  }
+}

@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-experimental-browser-use-playwright-mcp",
-  "description": "Experimental per-Session Chromium browser tools through @playwright/mcp",
+  "description": "Experimental per-Session Chromium browser tools, or tools in the user's own Chrome, through @playwright/mcp",
   "version": "0.2.2-alpha.3",
   "publishConfig": {
     "access": "public"
@@ -30,7 +30,9 @@
   "license": "MIT",
   "dependencies": {
     "@deepseek-ai/dsh-experimental-browser-use-runtime": "workspace:*",
-    "@playwright/mcp": "0.0.80"
+    "@playwright/mcp": "0.0.80",
+    "@deepseek-ai/dsh-util-values": "workspace:*",
+    "@deepseek-ai/schemastery": "workspace:~"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~",

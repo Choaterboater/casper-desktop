@@ -33,6 +33,32 @@ it('supports headed launch and attaches without launching a browser or creating 
   expect(options.args.slice(1)).toEqual(['--browser', 'chromium', '--cdp-endpoint', 'http://127.0.0.1:9222'])
 })
 
+it('connects every live Session separately to the user\'s Chrome through the Playwright Extension', () => {
+  vi.stubEnv('PLAYWRIGHT_MCP_BROWSER', 'firefox')
+  vi.stubEnv('PLAYWRIGHT_MCP_USER_DATA_DIR', '/unrelated/profile')
+  Provider.apply(new Context(), Provider.Config({ mode: 'extension', toolCallTimeoutMs: 456 }))
+  const options = vi.mocked(mountSessionMcp).mock.calls[0]![1]
+  expect(options).toMatchObject({ name: 'playwright-mcp', exclusive: false, command: process.execPath, toolCallTimeoutMs: 456 })
+  expect(options.args.slice(1)).toEqual(['--extension', '--browser', 'chrome'])
+  expect(options.env).toMatchObject({ PLAYWRIGHT_MCP_BROWSER: '', PLAYWRIGHT_MCP_USER_DATA_DIR: '' })
+  expect(options.env).not.toHaveProperty('PLAYWRIGHT_MCP_EXTENSION_TOKEN')
+})
+
+it('forwards the Host\'s extension token only to the extension connection', () => {
+  vi.stubEnv('PLAYWRIGHT_MCP_EXTENSION_TOKEN', 'token-from-extension')
+  Provider.apply(new Context(), Provider.Config({ mode: 'extension' }))
+  Provider.apply(new Context(), Provider.Config({ mode: 'launch' }))
+  Provider.apply(new Context(), Provider.Config({ mode: 'attach', endpoint: 'http://127.0.0.1:9222' }))
+  const [extension, launch, attach] = vi.mocked(mountSessionMcp).mock.calls.map(call => call[1].env)
+  expect(extension?.PLAYWRIGHT_MCP_EXTENSION_TOKEN).toBe('token-from-extension')
+  expect(launch?.PLAYWRIGHT_MCP_EXTENSION_TOKEN).toBe('')
+  expect(attach?.PLAYWRIGHT_MCP_EXTENSION_TOKEN).toBe('')
+})
+
+it('rejects a non-positive extension tool timeout at configuration', () => {
+  expect(() => Provider.Config({ mode: 'extension', toolCallTimeoutMs: 0 })).toThrow()
+})
+
 it('rejects malformed endpoints before mounting any browser resources', () => {
   expect(() => { Provider.apply(new Context(), Provider.Config({ mode: 'attach', endpoint: 'http://localhost:bad/path' })) }).toThrow('browser endpoint')
   expect(mountSessionMcp).not.toHaveBeenCalled()

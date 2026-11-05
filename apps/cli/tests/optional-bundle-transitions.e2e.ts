@@ -32,6 +32,8 @@ const bundles = {
   badge: '@deepseek-ai/dsh-experimental-badge-skill-bundle',
   titles: '@deepseek-ai/dsh-experimental-session-titles-bundle',
 } as const
+/** Starts one Playwright MCP server per live Session; kept apart from the global-tool bundles above. */
+const casperChrome = '@deepseek-ai/dsh-casper-chrome-bundle'
 type Response = StreamChunk[] | ((request: GenerateOptions) => StreamChunk[])
 
 /** Only the external model is scripted; tools and child Agents use the shipped implementations. */
@@ -325,6 +327,23 @@ describe.skipIf(!existsSync(join(root, 'apps/cli/lib/bin.js')))('Official option
     await turn(restored.agent, 'The title stays on the first prompt.', [textResponse('TWO')])
     expect(titleRequests(restored.agent)).toHaveLength(1)
     expect(titleRequests(restored.agent)[0]?.data.titleProvider).toBe('session-title-first-prompt-llm')
+  })
+
+  it('gives every new Session Chrome tools while an earlier Session stays live', async () => {
+    await select(casperChrome, true)
+    // The Web client creates a blank Session on page load; the user's next Session must not lose Chrome to it.
+    const first = await agent()
+    const second = await agent()
+    const third = await agent('minimal')
+    // Listing starts the extension-mode server only; Chrome is contacted on the first browser call, which this test never makes.
+    for (const owner of [first, second, third]) {
+      expect(names(owner.agent)).toEqual(expect.arrayContaining([
+        'mcp__playwright-mcp__browser_navigate', 'mcp__playwright-mcp__browser_snapshot', 'mcp__playwright-mcp__browser_click',
+      ]))
+    }
+    expect(names().some(name => name.startsWith('mcp__playwright-mcp__'))).toBe(false)
+    await select(casperChrome, false)
+    expect(names(second.agent).some(name => name.startsWith('mcp__playwright-mcp__'))).toBe(false)
   })
 
   it('composes all five bundles as global tools across every preset', async () => {

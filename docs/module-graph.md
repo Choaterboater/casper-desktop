@@ -148,6 +148,12 @@ flowchart TD
     pkg_sdk_minimal["sdk-minimal"]
     pkg_web_app["web-app"]
   end
+  subgraph group_casper["packages/casper"]
+    pkg_casper_bundle["casper-bundle"]
+    pkg_casper_checks["casper-checks"]
+    pkg_casper_sidebar_browser["casper-sidebar-browser"]
+    pkg_casper_sidebar_browser_client["casper-sidebar-browser-client"]
+  end
   subgraph group_client["packages/client"]
     pkg_client_connection["client-connection"]
     pkg_client_file_upload["client-file-upload"]
@@ -256,6 +262,7 @@ flowchart TD
   end
   subgraph group_experimental["packages/experimental"]
     pkg_action_cards["action-cards"]
+    pkg_casper_chrome_bundle["casper-chrome-bundle"]
     pkg_client_ui_action_cards["client-ui-action-cards"]
     pkg_client_ui_creation_recommendations["client-ui-creation-recommendations"]
     pkg_client_ui_plugin_recommendations["client-ui-plugin-recommendations"]
@@ -916,6 +923,18 @@ flowchart TD
   pkg_plan_mode --> pkg_system_prompt
   pkg_plan_mode --> pkg_tools
   pkg_plan_mode --> pkg_user_questions
+  pkg_casper_checks --> pkg_agent
+  pkg_casper_checks --> pkg_fs
+  pkg_casper_checks --> pkg_llm
+  pkg_casper_checks --> pkg_shell
+  pkg_casper_checks --> pkg_system_prompt
+  pkg_casper_checks --> pkg_tools
+  pkg_casper_checks --> pkg_working_directory
+  pkg_casper_sidebar_browser --> pkg_attachment
+  pkg_casper_sidebar_browser --> pkg_scope
+  pkg_casper_sidebar_browser --> pkg_session_projection
+  pkg_casper_sidebar_browser --> pkg_tools
+  pkg_casper_sidebar_browser --> pkg_user_questions
   pkg_command_compact --> pkg_commands
   pkg_command_compact --> pkg_compaction
   pkg_compaction_image_offload --> pkg_agent
@@ -1120,6 +1139,7 @@ flowchart TD
   pkg_session_query --> pkg_session_title
   pkg_session_query --> pkg_tool_todo
   pkg_api_settings_controller --> pkg_agent_preset_registry
+  pkg_api_settings_controller --> pkg_authorization
   pkg_api_settings_controller --> pkg_credentials
   pkg_api_settings_controller --> pkg_native_command
   pkg_api_settings_controller --> pkg_session
@@ -1549,6 +1569,8 @@ flowchart TD
 | [`base`](../packages/bundle/base) | `bundle` | — |
 | [`sdk-app`](../packages/bundle/sdk-app) | `bundle` | — |
 | [`sdk-minimal`](../packages/bundle/sdk-minimal) | `bundle` | — |
+| [`casper-bundle`](../packages/casper/casper-bundle) | `casper` | — |
+| [`casper-sidebar-browser-client`](../packages/casper/sidebar-browser-client) | `casper` | — |
 | [`client-file-upload`](../packages/client/file-upload) | `client` | — |
 | [`client-hmr`](../packages/client/hmr) | `client` | — |
 | [`client-locale`](../packages/client/locale) | `client` | — |
@@ -1620,6 +1642,7 @@ flowchart TD
 | [`client-web`](../packages/client/web) | `client` | — |
 | [`credentials`](../packages/credentials/credentials) | `credentials` | — |
 | [`office-to-pdf`](../packages/document/office-to-pdf) | `document` | — |
+| [`casper-chrome-bundle`](../packages/experimental/casper-chrome-bundle) | `experimental` | — |
 | [`client-ui-action-cards`](../packages/experimental/client-ui-action-cards) | `experimental` | — |
 | [`client-ui-creation-recommendations`](../packages/experimental/client-ui-creation-recommendations) | `experimental` | — |
 | [`client-ui-plugin-recommendations`](../packages/experimental/client-ui-plugin-recommendations) | `experimental` | — |
@@ -1790,6 +1813,8 @@ flowchart TD
 | [`web-deepseek-api`](../packages/web/web-deepseek-api) | `web` | [`agent`](../packages/core/agent), [`credentials`](../packages/credentials/credentials), [`deepseek-account`](../packages/credentials/deepseek-account), [`launch-environment`](../packages/util/launch-environment), [`llm`](../packages/llm/llm), [`llm-deepseek`](../packages/llm/llm-deepseek), [`llm-deepseek-account`](../packages/llm/llm-deepseek-account), [`llm-deepseek-api-key`](../packages/llm/llm-deepseek-api-key), [`session`](../packages/core/session), [`web`](../packages/web/web) |
 | [`tool-todo`](../packages/todo/tool-todo) | `todo` | [`agent`](../packages/core/agent), [`session`](../packages/core/session), [`session-projection`](../packages/session/session-projection), [`tools`](../packages/core/tools) |
 | [`plan-mode`](../packages/plan/plan-mode) | `plan` | [`agent`](../packages/core/agent), [`commands`](../packages/interaction/commands), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`session-projection`](../packages/session/session-projection), [`system-prompt`](../packages/core/system-prompt), [`tools`](../packages/core/tools), [`user-questions`](../packages/interaction/user-questions) |
+| [`casper-checks`](../packages/casper/tool-checks) | `casper` | [`agent`](../packages/core/agent), [`fs`](../packages/fs/fs), [`llm`](../packages/llm/llm), [`shell`](../packages/shell/shell), [`system-prompt`](../packages/core/system-prompt), [`tools`](../packages/core/tools), [`working-directory`](../packages/session/working-directory) |
+| [`casper-sidebar-browser`](../packages/casper/tool-sidebar-browser) | `casper` | [`attachment`](../packages/attachment/attachment), [`scope`](../packages/core/scope), [`session-projection`](../packages/session/session-projection), [`tools`](../packages/core/tools), [`user-questions`](../packages/interaction/user-questions) |
 | [`command-compact`](../packages/compaction/command-compact) | `compaction` | [`commands`](../packages/interaction/commands), [`compaction`](../packages/compaction/compaction) |
 | [`compaction-image-offload`](../packages/compaction/compaction-image-offload) | `compaction` | [`agent`](../packages/core/agent), [`compaction`](../packages/compaction/compaction), [`llm`](../packages/llm/llm), [`session`](../packages/core/session) |
 | [`agent-instructions`](../packages/context/agent-instructions) | `context` | [`agent`](../packages/core/agent), [`fs`](../packages/fs/fs), [`home-paths`](../packages/util/home-paths), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`tools`](../packages/core/tools), [`working-directory`](../packages/session/working-directory) |
@@ -1831,7 +1856,7 @@ flowchart TD
 | [`plugin-package-inventory-deepseek`](../packages/llm/plugin-package-inventory-deepseek) | `llm` | [`agent`](../packages/core/agent), [`agent-preset-registry`](../packages/preset/agent-preset-registry), [`deepseek-llm-api-extensions`](../packages/llm/deepseek-llm-api-extensions), [`session`](../packages/core/session) |
 | [`token-meter`](../packages/llm/token-meter) | `llm` | [`compaction`](../packages/compaction/compaction), [`compaction-image-offload`](../packages/compaction/compaction-image-offload), [`llm`](../packages/llm/llm), [`llm-retry`](../packages/llm/llm-retry), [`session`](../packages/core/session), [`session-projection`](../packages/session/session-projection) |
 | [`session-query`](../packages/session-query/session-query) | `session-query` | [`brand`](../packages/util/brand), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`session-persistence`](../packages/session/session-persistence), [`session-projection`](../packages/session/session-projection), [`session-projection-cache`](../packages/session/session-projection-cache), [`session-title`](../packages/session/session-title), [`tool-todo`](../packages/todo/tool-todo) |
-| [`api-settings-controller`](../packages/api/settings-controller) | `api` | [`agent-preset-registry`](../packages/preset/agent-preset-registry), [`credentials`](../packages/credentials/credentials), [`native-command`](../packages/util/native-command), [`session`](../packages/core/session), [`settings`](../packages/settings/settings), [`typert-protocol`](../packages/typert/protocol) |
+| [`api-settings-controller`](../packages/api/settings-controller) | `api` | [`agent-preset-registry`](../packages/preset/agent-preset-registry), [`authorization`](../packages/credentials/authorization), [`credentials`](../packages/credentials/credentials), [`native-command`](../packages/util/native-command), [`session`](../packages/core/session), [`settings`](../packages/settings/settings), [`typert-protocol`](../packages/typert/protocol) |
 | [`web-app`](../packages/bundle/web-app) | `bundle` | [`shell-env`](../packages/shell/shell-env) |
 | [`experimental-auto-review`](../packages/experimental/auto-review) | `experimental` | [`agent`](../packages/core/agent), [`agent-instructions`](../packages/context/agent-instructions), [`llm`](../packages/llm/llm), [`permission-presets`](../packages/interaction/permission-presets), [`session`](../packages/core/session), [`tools`](../packages/core/tools), [`working-directory`](../packages/session/working-directory) |
 | [`experimental-forge-session`](../packages/experimental/forge-session) | `experimental` | [`experimental-forge`](../packages/experimental/forge), [`sandbox-policy`](../packages/sandbox/sandbox-policy), [`session`](../packages/core/session), [`session-projection`](../packages/session/session-projection), [`shell`](../packages/shell/shell), [`shell-env`](../packages/shell/shell-env), [`tools`](../packages/core/tools) |

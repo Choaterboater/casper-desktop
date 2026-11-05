@@ -311,6 +311,7 @@
     { "path": "./packages/experimental/browser-use-playwright-mcp" },
     { "path": "./packages/experimental/browser-use-chrome-devtools-mcp" },
     { "path": "./packages/experimental/browser-use-stagehand-native" },
+    { "path": "./packages/experimental/casper-chrome-bundle" },
     { "path": "./packages/api/terminal-controller/tsconfig.host.json" },
     { "path": "./packages/computer-use/computer-use" },
     { "path": "./packages/experimental/computer-use-cua-driver-mcp" },

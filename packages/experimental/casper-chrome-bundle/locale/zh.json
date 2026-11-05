@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Chrome 中的 Casper",
+    "description": "让 Casper 在你自己的 Google Chrome 中浏览和操作，使用你的标签页和已登录的网站。请先在 Chrome 中安装 Playwright Extension。该扩展会请你批准每次连接，并选择 Casper 可以使用的标签页。同一时间只有一个对话可以使用 Chrome。"
+  }
+}

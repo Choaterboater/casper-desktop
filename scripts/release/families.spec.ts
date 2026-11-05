@@ -57,6 +57,7 @@ describe('release families', () => {
       '@deepseek-ai/dsh-experimental-browser-use-playwright-mcp',
       '@deepseek-ai/dsh-experimental-browser-use-runtime',
       '@deepseek-ai/dsh-experimental-browser-use-stagehand-native',
+      '@deepseek-ai/dsh-casper-chrome-bundle',
       '@deepseek-ai/dsh-experimental-claude-code-mods',
       '@deepseek-ai/dsh-client-ui-action-cards',
       '@deepseek-ai/dsh-experimental-client-ui-claude-code-mods',

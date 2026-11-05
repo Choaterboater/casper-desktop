@@ -38,6 +38,11 @@
     - status
     - switch "启用 自动授权审查"
   - listitem:
+    - button "查看 Chrome 中的 Casper": Chrome 中的 Casper
+    - text: 实验性 让 Casper 在你自己的 Google Chrome 中浏览和操作，使用你的标签页和已登录的网站。请先在 Chrome 中安装 Playwright Extension。该扩展会请你批准每次连接，并选择 Casper 可以使用的标签页。同一时间只有一个对话可以使用 Chrome。
+    - status
+    - switch "启用 Chrome 中的 Casper"
+  - listitem:
     - button "查看 变更请求与工作树": 变更请求与工作树
     - text: 实验性 在会话侧栏集中跟踪关联的 GitHub PR：查看检查状态、评审意见与代码差异，并把修改建议交给智能体继续处理。也可查看本地改动，用独立工作树隔离任务。GitHub 功能需要本机安装 gh 并登录。
     - status
