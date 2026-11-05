@@ -834,6 +834,10 @@ async function main(): Promise<void> {
     assertProductSender(event)
     return browserGuests.release(event.sender, lease)
   })
+  ipcMain.handle(DESKTOP_IPC.browserControl, (event, lease: unknown, command: unknown) => {
+    assertProductSender(event)
+    return browserGuests.control(event.sender, lease, command)
+  })
 
   session.defaultSession.webRequest.onBeforeSendHeaders({ urls: ['ws://127.0.0.1/*', 'wss://127.0.0.1/*'] }, (details, callback) => {
     if (hostUrl === undefined || hostCookie === undefined || details.webContentsId !== mainWindow?.webContents.id) {

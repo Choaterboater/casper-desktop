@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Contrôle du navigateur par l’agent",
+    "description": "Permet à l’agent d’utiliser les onglets du navigateur à côté d’une conversation dans l’application de bureau Casper."
+  }
+}

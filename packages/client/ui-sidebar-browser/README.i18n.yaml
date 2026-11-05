@@ -21,8 +21,8 @@
   en: fb79cb7d59bc01af
   zh: 5f6202d8b0b62d7d
 /deepseek-ai-dsh-client-ui-sidebar-browser/use-this-package/minimal-configuration:
-  en: abf28ea63777e2a8
-  zh: 1b68bdf5729de71e
+  en: fbd2e509e8530df8
+  zh: 538049b963e4e990
 /deepseek-ai-dsh-client-ui-sidebar-browser/understand-the-implementation:
   en: 42b15ac6321706aa
   zh: e15901d8462ec7c7
@@ -33,20 +33,26 @@
   en: e535f7330bb62a79
   zh: 485932298fdabaa3
 /deepseek-ai-dsh-client-ui-sidebar-browser/understand-the-implementation/controller:
-  en: 6ddc24ffe34846cd
-  zh: aa81157d18f850cd
+  en: 079a510443fdd5d0
+  zh: d8a31d5f32dd07a5
+/deepseek-ai-dsh-client-ui-sidebar-browser/understand-the-implementation/agent-control:
+  en: f06da8e576448414
+  zh: bcb48dc98603f806
+/deepseek-ai-dsh-client-ui-sidebar-browser/understand-the-implementation/shortcuts:
+  en: ce25bd5ef4b9424f
+  zh: 02efde9a9d519e0c
 /deepseek-ai-dsh-client-ui-sidebar-browser/further-exploration:
-  en: 4ebd881b4ade9d8f
-  zh: 715f2553210c08e6
+  en: d3f002909c6d7154
+  zh: e387d65a55756025
 /deepseek-ai-dsh-client-ui-sidebar-browser/model-experience:
-  en: 69e711858e7d9ebc
-  zh: d84610491e69a35b
+  en: 19e4e9f61a5d128b
+  zh: 3f56e1bd9b3af642
 /deepseek-ai-dsh-client-ui-sidebar-browser/model-experience/kv-cache-effect:
-  en: e17a5fd3d5405745
-  zh: db957a16dddce770
+  en: df70403fb6184691
+  zh: 021bc426f77cec20
 /deepseek-ai-dsh-client-ui-sidebar-browser/known-limitations-and-deferred-work:
-  en: 307604babbe74f38
-  zh: 7d7a5aa4b99964d0
+  en: 7bced785982ee499
+  zh: ca1bedac6eb0a54d
 /deepseek-ai-dsh-client-ui-sidebar-browser/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: e88aeb617ffb74ea

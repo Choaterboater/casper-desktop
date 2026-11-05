@@ -63,6 +63,9 @@
       "path": "../../interaction/user-questions"
     },
     {
+      "path": "../../casper/tool-sidebar-browser"
+    },
+    {
       "path": "../session-controller/tsconfig.host.json"
     },
     {

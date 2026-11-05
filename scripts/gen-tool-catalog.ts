@@ -75,6 +75,7 @@ import TeamService from '@deepseek-ai/dsh-agent-team'
 import * as ToolTeam from '@deepseek-ai/dsh-tool-agent-team'
 import * as ToolTodo from '@deepseek-ai/dsh-tool-todo'
 import * as CasperChecks from '@deepseek-ai/dsh-casper-checks'
+import * as CasperSidebarBrowser from '@deepseek-ai/dsh-casper-sidebar-browser'
 import type PluginManager from '@deepseek-ai/dsh-plugin-manager'
 import * as PluginManagerTools from '@deepseek-ai/dsh-plugin-manager/tools'
 import type PluginMarket from '@deepseek-ai/dsh-plugin-market'
@@ -666,6 +667,18 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
     note:
       'Casper checks keep per-agent state in memory: check_record runs the command as a baseline, any mutating tool result in an overlapping working directory marks checks stale, and the agent/turn-stopping checkpoint replays stale checks. A run without a clean exit code is `not_run`, never `passed`.',
+  },
+  {
+    pkg: '@deepseek-ai/dsh-casper-sidebar-browser',
+    dir: 'tool-sidebar-browser',
+    source: 'packages/casper/tool-sidebar-browser/src/index.ts',
+    requires: ['ctx.tools', 'ctx.sessionProjections', 'a calling Agent', 'the Casper desktop app showing the Session'],
+    writes: ['tool/call', 'tool/result', 'Sidebar browser tabs and pages'],
+    async mount(ctx) {
+      await ctx.plugin(CasperSidebarBrowser)
+    },
+    note:
+      'The Desktop presets mount these tools; each call runs in the Sidebar browser of the Desktop Client showing the calling Session, and answers `unavailable` without one. browser_click, browser_type, browser_key, and browser_scroll first ask the user to allow the tab\'s origin once per Session; a successful input result records its origin in `tool/result` metadata so the grant survives a restart. browser_screenshot returns an image only to a model that declares image input.',
   },
   {
     pkg: '@deepseek-ai/dsh-tool-todo',

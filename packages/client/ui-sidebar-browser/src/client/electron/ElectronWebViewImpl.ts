@@ -1,8 +1,10 @@
 /** Electron navigation and guest lifetime, independent from DOM placement. */
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
-import type { DesktopBrowserBridge, DesktopBrowserLeaseId } from '../../types.ts'
+import type { DesktopBrowserBridge, DesktopBrowserLeaseId, SidebarBrowserCommand, SidebarBrowserControlResult } from '../../types.ts'
 import type { ElectronWebviewPresentation, WebviewElement } from './ElectronWebviewPresentation.ts'
-import { emptyBrowserFrame, type BrowserFrame, type BrowserFrameState, type BrowserLoadError } from '../browser/BrowserFrame.ts'
+import {
+  browserControlFailure, emptyBrowserFrame, type BrowserFrame, type BrowserFrameState, type BrowserLoadError,
+} from '../browser/BrowserFrame.ts'
 import type { BrowserPageOptions } from '../browser/BrowserPage.ts'
 import { browserAddressCheckpoint, currentBrowserTarget } from '../browser/BrowserPersistence.ts'
 import { parseBrowserAddress, type BrowserTarget } from '../browser/url.ts'
@@ -108,6 +110,24 @@ export class ElectronWebViewImpl implements BrowserFrame {
     } else this.navigate('reload')
   }
 
+  /**
+   * Send one agent operation to the current guest through its lease; main re-checks ownership and attachment.
+   * @param command - operation from a Session-scoped caller.
+   * @returns the bridge result; without a ready guest, or when the bridge rejects, `unavailable`.
+   */
+  async control(command: SidebarBrowserCommand): Promise<SidebarBrowserControlResult> {
+    const lease = this.lease
+    if (!this.ready || lease === undefined || this.lifetime.signal.aborted) {
+      return browserControlFailure('unavailable', 'Browser tab has no live page; show it in the Sidebar and retry')
+    }
+    try { return await this.bridge.control(lease, command) }
+    catch (error) {
+      console.error('Desktop browser control failed', error)
+      return browserControlFailure('unavailable', 'Browser tab was replaced during the operation; inspect it before another action',
+        'unknown')
+    }
+  }
+
   /** @returns after pending initialization and the owned guest have been released. */
   dispose(): Promise<void> {
     if (this.disposal !== undefined) return this.disposal
@@ -158,6 +178,7 @@ export class ElectronWebViewImpl implements BrowserFrame {
     signal.addEventListener('abort', unsubscribeOpen, { once: true })
     element.addEventListener('dom-ready', () => {
       this.ready = true
+      if (!this.store.getSnapshot().live) this.store.set({ ...this.store.getSnapshot(), live: true })
       this.observe(this.store.getSnapshot().address !== 'requested')
       this.loadPending()
     }, { signal })
@@ -255,6 +276,7 @@ export class ElectronWebViewImpl implements BrowserFrame {
     this.presentation.clear()
     this.element = undefined
     this.ready = false
+    if (this.store.getSnapshot().live) this.store.set({ ...this.store.getSnapshot(), live: false })
     this.firstDocument = true
     const lease = this.lease
     this.lease = undefined

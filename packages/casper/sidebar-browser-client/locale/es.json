@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Control del navegador por el agente",
+    "description": "Permite que el agente use las pestañas del navegador junto a una conversación en la aplicación de escritorio de Casper."
+  }
+}

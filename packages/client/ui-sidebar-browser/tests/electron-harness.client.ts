@@ -1,6 +1,8 @@
 /** Native webview events controlled by each test; presentation and navigation stay real. */
 import { vi } from 'vitest'
-import type { DesktopBrowserBridge, DesktopBrowserLeaseId, DesktopBrowserReservation } from '../src/types.ts'
+import type {
+  DesktopBrowserBridge, DesktopBrowserLeaseId, DesktopBrowserReservation, SidebarBrowserCommand, SidebarBrowserControlResult,
+} from '../src/types.ts'
 import type { BrowserTabState } from '../src/client/browser/BrowserPersistence.ts'
 import { createElectronPage } from '../src/client/electron/pages.ts'
 import { ElectronWebviewPresentation } from '../src/client/electron/ElectronWebviewPresentation.ts'
@@ -18,6 +20,8 @@ export function electronFixture(initial?: BrowserTabState) {
       opens.add(listener)
       return () => { opens.delete(listener) }
     }),
+    control: vi.fn(async (_lease: DesktopBrowserLeaseId, _command: SidebarBrowserCommand): Promise<SidebarBrowserControlResult> =>
+      ({ ok: true, observation: { url: 'https://example.test/', title: 'Example', status: 'dispatched' } })),
   } satisfies DesktopBrowserBridge
   const workspace = vi.fn(async (_signal: AbortSignal) => 'cwd:/workspace')
   const persist = vi.fn()

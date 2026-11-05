@@ -374,6 +374,11 @@
       "@deepseek-ai/dsh-agent-team": ["./packages/team/agent-team/src"],
       // Casper's checks tool lives in casper/tool-checks, so its alias stays hand-written.
       "@deepseek-ai/dsh-casper-checks": ["./packages/casper/tool-checks/src"],
+      // The Sidebar browser tools and their Client half live under role-named casper/ folders, so their aliases stay hand-written.
+      "@deepseek-ai/dsh-casper-sidebar-browser": ["./packages/casper/tool-sidebar-browser/src"],
+      "@deepseek-ai/dsh-casper-sidebar-browser/types": ["./packages/casper/tool-sidebar-browser/src/types.ts"],
+      "@deepseek-ai/dsh-casper-sidebar-browser-client": ["./packages/casper/sidebar-browser-client/src"],
+      "@deepseek-ai/dsh-casper-sidebar-browser-client/client": ["./packages/casper/sidebar-browser-client/src/client/index.ts"],
       "@deepseek-ai/dsh-agent-team/types": ["./packages/team/agent-team/src/types.ts"],
       "@deepseek-ai/dsh-experimental-auto-review": ["./packages/experimental/auto-review/src"],
       "@deepseek-ai/dsh-experimental-claude-code-mods": ["./packages/experimental/claude-code-mods/src"],

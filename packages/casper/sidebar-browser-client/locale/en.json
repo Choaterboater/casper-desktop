@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Agent browser control",
+    "description": "Lets the agent use the browser tabs beside a conversation in the Casper desktop app."
+  }
+}

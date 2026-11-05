@@ -42,6 +42,8 @@ The package has no plugin configuration. A Web profile enables the shipped entry
 
 Client plugins can open a tab through `ctx.sidebarRight.openTab('browser', { params: { url } })`. The optional URL passes the same validation as address-bar input before navigation.
 
+On Desktop, agent-facing Client plugins drive one Session's Browser tabs through the optional `sidebarBrowserControl` service: read it with `ctx.get('sidebarBrowserControl')` after `import type {} from '@deepseek-ai/dsh-client-ui-sidebar-browser/client'`. `tabs(sessionId)` lists that Session's Browser tabs. `open(sessionId, url, signal)` opens a tab while that Session is on screen and waits up to 30 seconds for its first page. `control(sessionId, tabId, command, signal)` runs `read`, `screenshot`, `navigate`, `click`, `type`, `key` or `scroll`. Results are values, `{ ok: true, observation }` or `{ ok: false, code, message, outcome }`; an aborted signal rejects the call. Web provides no such service.
+
 The `browser.new` command opens a separate Browser page in the focused dock pane, replacing a guide and retaining existing content pages. From the conversation or a floating content page, it uses the active dock pane. Desktop defaults to Cmd+T on macOS and Ctrl+T on Windows; Windows and macOS Web use the [shortcut service’s platform defaults](../shortcuts/README.md); Linux Web leaves the command unbound. The guide button uses a blue globe and displays the effective shortcut inline without a duplicate tooltip.
 
 The toolbar provides Back, Forward, Reload, Go, and Open in system browser. Web also offers a per-tab sandbox toggle; disabling it is temporary and displays an amber warning with neutral text. Desktop shows the observed page title. After a restart, Browser shows the saved title and URL; Restore or Reload opens that address only when requested.
@@ -70,6 +72,14 @@ Each tab's `BrowserController` owns address validation, commands and explicit re
 
 Desktop's main process approves guest leases and enforces attachment, navigation and permission policy. Preload exposes only scoped Browser operations. Shared declarations use the standard `/types` export with `import type`; the Host and Client compile through separate tsconfig files. Desktop Browser tabs declare `keepMounted`, so Sidebar preserves their DOM across tab changes, Session switches, collapse and floating.
 
+### Agent control
+
+Each `sidebarBrowserControl` call reaches a tab only when the Sidebar layout records it, with kind `browser`, for the named Session, and dispatches through that Session's own controllers. `BrowserFrame.control` sends the command with the page's current lease over `DesktopBrowserBridge.control`; the iframe carrier answers `unavailable`. The main process accepts a lease only from the window that acquired it while its guest is attached, rejects unknown command fields and out-of-range values, and runs one bounded operation at a time per lease: 15 seconds, or 30 seconds for `navigate`. A hung page therefore yields `timed-out` and the next queued command runs.
+
+`read` runs fixed code in an isolated world. It returns at most 20,000 characters of rendered body text and up to 200 visible interactive elements with role, name of at most 200 characters, and a viewport-clipped rectangle; `ref` is the element's 1-based position in that result. Coordinates are integer CSS pixels: `screenshot` scales its PNG, at most 8 MiB, to the CSS viewport, so its pixels are click coordinates, and positive `scroll.deltaY` moves toward the bottom of the page. Input reports `status: 'dispatched'`, never the page's reaction. `outcome: 'not-dispatched'` means nothing reached the page; `'unknown'` means it may have, and nothing is retried. Failure messages are English diagnostics for agent-facing callers.
+
+### Shortcuts
+
 The page refresh shortcut calls the same reload operation as the toolbar. Its tooltip and ARIA key combination follow the effective binding. Desktop routes accepted shortcuts from an approved guest through its owning window; the focused webview must still carry that guest’s lease. Web leaves browser-reserved combinations unchanged.
 
 </details>
@@ -83,17 +93,18 @@ The page refresh shortcut calls the same reload operation as the toolbar. Its to
 - [Document Preview](../ui-sidebar-documentpreview/README.md) — local source, Markdown, images, HTML, and PDF rendering.
 - [Sidebar Browser decision](../../../.agents/notes/implemented/feature/2026-09-16-sidebar-browser.md) — iframe behavior and controller ownership.
 - [Desktop Browser decision](../../../.agents/notes/implemented/feature/2026-09-20-desktop-browser-webview.md) — webview leases, CWD storage grouping and manual restoration.
+- [Sidebar Browser agent control decision](../../../.agents/notes/implemented/feature/2026-11-04-sidebar-browser-agent-control.md) — Session-scoped Client service and lease-scoped main-process operations.
 
 -----
 
 <a id="model-experience"></a>
 ## Model Experience
 
-None, as Browser tabs are user-facing presentation state and register no tool, prompt section, or Session event.
+Indirectly, through agent-facing tools built on `sidebarBrowserControl`, which own the model experience of the page observations they return, while this package registers no tool, prompt section, or Session event.
 
 #### KV Cache effect
 
-None; browsing does not enter a model request.
+None; page content enters a model request only through such a tool's results.
 
 ## Known Limitations and Deferred Work
 
@@ -107,6 +118,7 @@ The isolation policy deliberately gives up some browser compatibility:
 - Browsers conceal many iframe failures for security: DNS, TLS, mixed-content, CSP, and `X-Frame-Options` failures may emit `load` or no actionable event instead of `error`. The load-failure notice is best-effort.
 - Saved title and URL survive reloads and plugin unload while the tab remains in Sidebar's layout. Closing the tab removes its checkpoint. Restart restoration does not recover page memory, unsaved forms or Chromium's history stack.
 - Local files are rejected and remain owned by Document Preview.
+- Agent control reads only the main document: iframe and shadow-root content is not listed, and elements outside the viewport need a scroll first. A hidden guest cannot be captured. Keyboard input is sent without focusing the guest, so it reaches the page's focused element only. Opening a tab requires its conversation to be on screen. Operated pages use the Workspace's site logins.
 - Desktop shares process-local storage partitions by canonical workspace CWD; Sessions without a resolved Workspace are isolated separately. Cookies and Web storage do not survive application restart. Guest permissions, downloads and native popups are denied; approved HTTP(S) popup requests open Sidebar tabs. Host-address filtering is not a general private-network or DNS-rebinding firewall.
 
 <a id="dev-note"></a>

@@ -15,9 +15,12 @@ import { createElectronPage } from './electron/pages.ts'
 import type { DesktopBrowserBridge } from '../types.ts'
 import { browserWorkspace } from './electron/workspace.ts'
 import type { BrowserPageFactory } from './browser/BrowserPage.ts'
-import { BROWSER_ID, browserDefinition } from './definition.tsx'
+import { BROWSER_ID, BROWSER_KIND, browserDefinition } from './definition.tsx'
 import { en, ja, es, fr, de, ru, pt, zh } from './locales.ts'
 import { createBrowserStore } from './browser/store.ts'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
+import { createSidebarBrowserControl, type BrowserControlSession } from './control.ts'
+import type { SidebarBrowserControl } from '../types.ts'
 
 export type { BrowserBodyProps } from './view/BrowserBody.tsx'
 export type { BrowserControllerState, BrowserInjected, BrowserMountRequest } from './browser/BrowserController.ts'
@@ -28,6 +31,7 @@ export type { BrowserFailure, BrowserHistoryEntry, BrowserNavigationStatus, Brow
 export type { SidebarBrowserKey } from './locales.ts'
 export type { BrowserState } from './browser/store.ts'
 export type { BrowserAddressFailure, BrowserAddressResult, BrowserTarget } from './browser/url.ts'
+export type { BrowserControlSession, SidebarBrowserControlSources } from './control.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-sidebar-right/client' {
   interface SidebarRightTabParamsMap {
@@ -35,6 +39,19 @@ declare module '@deepseek-ai/dsh-client-ui-sidebar-right/client' {
     browser: { readonly url?: string }
   }
 }
+
+declare module '@deepseek-ai/cordis' {
+  interface Context {
+    /**
+     * Agent control of Sidebar Browser tabs, provided only in the Desktop renderer where guests exist. It is
+     * optional: read it with `ctx.get('sidebarBrowserControl')`, after `import type {}` from this `/client` entry.
+     */
+    sidebarBrowserControl: SidebarBrowserControl
+  }
+}
+
+/** Bound for a tab opened through `sidebarBrowserControl` to show its first page. */
+const OPEN_TIMEOUT_MS = 30_000
 
 /** Required Browser services. */
 export const inject = ['slots', 'locale', 'sidebarRight', 'sidebarRightTabs']
@@ -72,8 +89,10 @@ export function apply(ctx: Context): void {
   const desktop = carrier?.protocolVersion === 1 ? carrier.browser : undefined
   ctx.effect(() => ctx.locale.register(namespace, { zh, en, ja, es, fr, de, ru, pt }), 'ui-sidebar-browser.copy')
   ctx.effect(() => ctx.sidebarRightTabs.register({ ...browserDefinition(t), keepMounted: desktop !== undefined }), 'ui-sidebar-browser.type')
-  const installFrames = (scope: Context, factory: (sessionId: BrowserBodyProps['sessionId']) => BrowserPageFactory): void => {
+  const installFrames = (scope: Context, factory: (sessionId: BrowserBodyProps['sessionId']) => BrowserPageFactory) => {
     const controllers = new Map<BrowserBodyProps['sessionId'], BrowserInjected>()
+    const revision = createSnapshotStore(0)
+    const changed = (): void => { revision.set(revision.getSnapshot() + 1) }
     scope.effect(() => async () => {
       const pending = [...controllers.values()].map(controller => controller.dispose())
       controllers.clear()
@@ -88,16 +107,34 @@ export function apply(ctx: Context): void {
           return existing
         }
         const controller = createBrowserControllers(actions, factory(sessionId), tabId =>
-          openTabs.getSnapshot().some(tab => tab.sessionId === sessionId && tab.tabId === tabId))
+          openTabs.getSnapshot().some(tab => tab.sessionId === sessionId && tab.tabId === tabId), changed)
         controllers.set(sessionId, controller)
+        changed()
         return controller
       },
     }, BrowserBody)), 'ui-sidebar-browser.body')
+    return {
+      revision,
+      session: (sessionId: string): BrowserControlSession | undefined => {
+        const controller = controllers.get(sessionId as BrowserBodyProps['sessionId'])
+        return controller === undefined ? undefined : {
+          state: tabId => controller.keyedHooks.browserState(tabId)?.getSnapshot(),
+          control: (tabId, command) => controller.control(tabId, command),
+        }
+      },
+    }
   }
   if (desktop === undefined) installFrames(ctx, () => createIframePage)
   else ctx.inject(['workspaces'], (scope) => {
-    installFrames(scope, sessionId => options => createElectronPage(options, desktop,
+    const frames = installFrames(scope, sessionId => options => createElectronPage(options, desktop,
       signal => browserWorkspace(scope.workspaces.list, sessionId, signal)))
+    // Desktop only: a Web iframe exposes no page that agent control could reach.
+    scope.provide('sidebarBrowserControl', createSidebarBrowserControl({
+      openTabs, onScreen: scope.sidebarRight.mounted, activeTab: () => scope.sidebarRight.active()?.id,
+      openTab: (url) => { scope.sidebarRight.openTab(BROWSER_KIND, { params: { url } }) },
+      session: frames.session, controllers: frames.revision,
+      applicationOrigin: window.location.origin, openTimeoutMs: OPEN_TIMEOUT_MS,
+    }))
   })
   ctx.effect(() => ctx.slots.inject('sidebar.right.pane.tab.title', () => ctx.slots.register({
     name: 'sidebar.right.pane.tab.title', key: BROWSER_ID, store,

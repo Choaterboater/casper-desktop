@@ -42,6 +42,8 @@ Browser 在 Web profile 中默认禁用，在 Desktop 中默认启用。Web 用�
 
 Client 插件可以调用 `ctx.sidebarRight.openTab('browser', { params: { url } })` 打开 tab。可选 URL 会在导航前接受与地址栏输入相同的校验。
 
+在 Desktop 中，面向 agent 的 Client 插件通过可选的 `sidebarBrowserControl` 服务操作某个 Session 的 Browser tab：先 `import type {} from '@deepseek-ai/dsh-client-ui-sidebar-browser/client'`，再用 `ctx.get('sidebarBrowserControl')` 读取。`tabs(sessionId)` 列出该 Session 的 Browser tab。`open(sessionId, url, signal)` 仅在该 Session 显示于屏幕上时打开 tab，并最多等待 30 秒直到其首个页面就绪。`control(sessionId, tabId, command, signal)` 执行 `read`、`screenshot`、`navigate`、`click`、`type`、`key` 或 `scroll`。结果以值返回：`{ ok: true, observation }` 或 `{ ok: false, code, message, outcome }`；signal 中止时调用会 reject。Web 不提供该服务。
+
 命令 `browser.new` 在焦点停靠分栏打开独立浏览器页，替换开始页并保留已有内容页。从聊天区或浮动内容页触发时，使用活动停靠分栏。桌面默认键在 macOS 上为 Cmd+T，在 Windows 上为 Ctrl+T；Windows 和 macOS Web 使用[快捷键服务的平台默认值](../shortcuts/README.zh.md)；Linux Web 默认不绑定此命令。开始页按钮使用蓝色地球图标，并在按钮内显示有效快捷键，不额外弹出重复提示。
 
 工具栏提供后退、前进、刷新、前往和在系统浏览器中打开。Web 还提供逐 tab sandbox 开关；关闭它是临时选择，并会显示灰字、琥珀色底的警告。Desktop 显示观察到的页面标题。重启后，Browser 展示保存的标题和 URL；只有点击恢复或刷新才打开该地址。
@@ -70,6 +72,14 @@ Web 记录 toolbar 提交和 typed tab 打开。导航状态机把每个受控 r
 
 Desktop 主进程批准 guest 租约，并执行挂载、导航和权限策略。preload 只暴露限定范围的 Browser 操作。共享声明通过标准 `/types` 出口配合 `import type` 引入；Host 与 Client 使用独立 tsconfig 编译。Desktop Browser tab 声明 `keepMounted`，Sidebar 因而在切 tab、切 Session、收起与浮动期间保留其 DOM。
 
+### Agent 控制
+
+每次 `sidebarBrowserControl` 调用只有在 Sidebar 布局把该 tab 以 `browser` 类型记录在所指定的 Session 下时才能触达它，并通过该 Session 自己的 controller 分发。`BrowserFrame.control` 携带页面当前租约，经 `DesktopBrowserBridge.control` 发送命令；iframe 载体返回 `unavailable`。主进程只接受由获取该租约的窗口发来、且 guest 已挂载的租约，拒绝未知命令字段与越界值，并对每个租约一次只运行一个有时限的操作：15 秒，`navigate` 为 30 秒。因此挂起的页面会得到 `timed-out`，队列中的下一条命令随即运行。
+
+`read` 在 isolated world 中运行固定代码，返回最多 20,000 个字符的已渲染 body 文本，以及最多 200 个可见的可交互元素，每个元素带 role、最多 200 个字符的名称和裁剪到视口内的矩形；`ref` 是元素在该次结果中从 1 开始的位置。坐标为整数 CSS 像素：`screenshot` 把最多 8 MiB 的 PNG 缩放到 CSS 视口，因此其像素就是点击坐标；`scroll.deltaY` 为正时朝页面底部滚动。输入命令报告 `status: 'dispatched'`，从不报告页面的反应。`outcome: 'not-dispatched'` 表示没有任何内容到达页面；`'unknown'` 表示可能已经到达，且不会重试。失败消息是面向 agent 调用方的英文诊断。
+
+### 快捷键
+
 页面刷新快捷键调用工具栏使用的同一重载操作。其 Tooltip 和 ARIA 组合随有效绑定更新。Desktop 通过所属窗口路由已批准 guest 中的有效快捷键；获焦 webview 必须仍持有该 guest 的租约。Web 保留浏览器专用组合。
 
 </details>
@@ -83,17 +93,18 @@ Desktop 主进程批准 guest 租约，并执行挂载、导航和权限策略�
 - [Document Preview](../ui-sidebar-documentpreview/README.zh.md)——本地源码、Markdown、图片、HTML 与 PDF 渲染。
 - [Sidebar Browser 决策](../../../.agents/notes/implemented/feature/2026-09-16-sidebar-browser.zh.md)——iframe 行为与 controller 所有权。
 - [Desktop Browser 决策](../../../.agents/notes/implemented/feature/2026-09-20-desktop-browser-webview.zh.md)——webview 租约、CWD 存储分组与手动恢复。
+- [Sidebar Browser agent 控制决策](../../../.agents/notes/implemented/feature/2026-11-04-sidebar-browser-agent-control.zh.md)——按 Session 限定的 Client 服务与按租约限定的主进程操作。
 
 -----
 
 <a id="model-experience"></a>
 ## 模型体验
 
-无。Browser tab 是用户侧呈现状态，不注册工具、prompt section 或 Session event。
+间接地，通过基于 `sidebarBrowserControl` 构建的面向 agent 的工具：它们负责所返回页面观察结果的模型体验，而本包不注册工具、prompt section 或 Session event。
 
 #### KV Cache 影响
 
-无；浏览内容不进入模型请求。
+无；页面内容只会通过这类工具的结果进入模型请求。
 
 ## 已知限制与延期工作
 
@@ -107,6 +118,7 @@ Desktop 主进程批准 guest 租约，并执行挂载、导航和权限策略�
 - 出于安全原因，浏览器会隐藏很多 iframe 失败：DNS、TLS、mixed-content、CSP 与 `X-Frame-Options` 失败可能触发 `load`，也可能不提供可操作 event，而不是触发 `error`。加载失败 notice 只能作为 best-effort 提示。
 - 只要 tab 仍在 Sidebar 布局中，保存的标题和 URL 就会跨刷新与插件卸载保留。关闭 tab 会删除其检查点。重启恢复不恢复页面内存、未保存的表单或 Chromium history 栈。
 - 本地文件会被拒绝，并继续由 Document Preview 负责。
+- Agent 控制只读取主文档：不列出 iframe 与 shadow root 中的内容，视口外的元素需要先滚动。隐藏的 guest 无法截图。键盘输入发送时不会让 guest 获得焦点，因此只会到达页面内已获焦的元素。打开 tab 需要其对话显示在屏幕上。被操作的页面使用该工作区的站点登录状态。
 - Desktop 按规范化的工作区 CWD 共享进程内存储分区；没有解析到 Workspace 的 Session 单独隔离。Cookie 与 Web storage 不跨应用重启保留。guest 权限、下载与原生 popup 均被拒绝；通过检查的 HTTP(S) popup 请求会打开 Sidebar tab。Host 地址过滤不是通用私网或 DNS-rebinding 防火墙。
 
 <a id="dev-note"></a>

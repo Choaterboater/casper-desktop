@@ -1,7 +1,10 @@
 /** Iframe navigation provider with bounded application-known history. */
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { IframePresentation } from '../view/IframePresentation.ts'
-import { emptyBrowserFrame, type BrowserFrame, type BrowserFrameState, type BrowserLoadError, type BrowserSandboxControl } from './BrowserFrame.ts'
+import type { SidebarBrowserControlResult } from '../../types.ts'
+import {
+  browserControlFailure, emptyBrowserFrame, type BrowserFrame, type BrowserFrameState, type BrowserLoadError, type BrowserSandboxControl,
+} from './BrowserFrame.ts'
 import type { BrowserPageOptions } from './BrowserPage.ts'
 import { BrowserNavigation } from './BrowserNavigation.ts'
 import type { BrowserTarget } from './url.ts'
@@ -62,6 +65,11 @@ export class IframeImpl implements BrowserFrame {
   /** Reload the last application-known address. */
   reload(): void { if (!this.disposed) this.load(this.navigation.reload()) }
 
+  /** @returns `unavailable`: a cross-origin iframe exposes no page to operate. */
+  control(): Promise<SidebarBrowserControlResult> {
+    return Promise.resolve(browserControlFailure('unavailable', 'Browser control requires the Casper desktop app'))
+  }
+
   /** @returns after the presentation has been removed; repeated calls join disposal. */
   dispose(): Promise<void> {
     if (this.disposal !== undefined) return this.disposal
@@ -94,7 +102,7 @@ export class IframeImpl implements BrowserFrame {
     return { target, address: target === undefined ? 'empty' : state.navigation.status === 'unknown' ? 'unknown' : 'requested',
       loading: state.navigation.status === 'loading' && this.error === undefined,
       canGoBack: this.navigation.canGoBack, canGoForward: this.navigation.canGoForward,
-      error: this.error, sandboxEnabled: this.sandboxed }
+      error: this.error, sandboxEnabled: this.sandboxed, live: false }
   }
 
   private publish(): void {

@@ -2,11 +2,14 @@
 import { createSnapshotStore, type BoundActions, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
 import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
-import type { BrowserFrameState } from './BrowserFrame.ts'
+import type { SidebarBrowserCommand, SidebarBrowserControlResult } from '../../types.ts'
+import { browserControlFailure, type BrowserFrameState } from './BrowserFrame.ts'
 import type { BrowserPage, BrowserPageFactory } from './BrowserPage.ts'
 import { currentBrowserTarget, type BrowserTabState } from './BrowserPersistence.ts'
 import type { BrowserStore } from './store.ts'
 import { parseBrowserAddress, type BrowserAddressFailure, type BrowserTarget } from './url.ts'
+
+const NO_PAGE = 'Browser tab has no page yet; show it in the Sidebar and retry'
 
 /** Live tab state; navigation comes from its provider and draft validation stays local. */
 export interface BrowserControllerState {
@@ -134,6 +137,16 @@ export class BrowserController implements HostObservable<BrowserControllerState>
   }
 
   /**
+   * Forward one agent operation to the page.
+   * @param command - operation from a Session-scoped caller.
+   * @returns the page's result; a disposed controller is `unavailable`.
+   */
+  control(command: SidebarBrowserCommand): Promise<SidebarBrowserControlResult> {
+    if (this.disposed) return Promise.resolve(browserControlFailure('unavailable', NO_PAGE))
+    return this.page.frame.control(command)
+  }
+
+  /**
    * Redirect future checkpoint writes to a replacement Session binding.
    * @param actions - replacement persistence writer.
    */
@@ -202,6 +215,11 @@ export interface BrowserInjected {
   reload(tabId: TabId): void
   /** @param tabId - owning tab. @param enabled - provider's optional sandbox control. */
   setSandbox(tabId: TabId, enabled: boolean): void
+  /**
+   * @param tabId - owning tab. @param command - agent operation.
+   * @returns the page's result; a tab without a mounted page is `unavailable`.
+   */
+  control(tabId: TabId, command: SidebarBrowserCommand): Promise<SidebarBrowserControlResult>
 }
 
 /**
@@ -209,15 +227,17 @@ export interface BrowserInjected {
  * @param actions - persisted view-state writer.
  * @param createPage - composition-selected provider.
  * @param isTabOpen - authoritative layout membership, independent of mounted bodies and plugin lifetime.
+ * @param changed - called after a controller is created or forgotten and after any controller state change.
  * @returns tab callbacks.
  */
 export function createBrowserControllers(actions: BoundActions<BrowserStore>, createPage: BrowserPageFactory,
-  isTabOpen: (tabId: TabId) => boolean): BrowserInjected {
+  isTabOpen: (tabId: TabId) => boolean, changed: () => void): BrowserInjected {
   let currentActions = actions
   const controllers = new Map<TabId, {
     readonly signal: AbortSignal
     readonly controller: BrowserController
     readonly forget: () => void
+    readonly unsubscribe: () => void
   }>()
   const controller = (id: TabId): BrowserController | undefined => controllers.get(id)?.controller
   return {
@@ -229,28 +249,35 @@ export function createBrowserControllers(actions: BoundActions<BrowserStore>, cr
       if (held?.signal !== signal) {
         if (held !== undefined) {
           held.signal.removeEventListener('abort', held.forget)
+          held.unsubscribe()
           void held.controller.dispose()
         }
         const created = new BrowserController({ ...request, actions: currentActions, createPage })
+        const unsubscribe = created.subscribe(changed)
         const forget = (): void => {
+          unsubscribe()
           controllers.delete(tabId)
           // Plugin unload also aborts occurrences; only layout removal deletes saved navigation.
           if (!isTabOpen(tabId)) currentActions.forget(tabId)
+          changed()
         }
-        held = { signal, controller: created, forget }
+        held = { signal, controller: created, forget, unsubscribe }
         controllers.set(tabId, held)
         signal.addEventListener('abort', forget, { once: true })
+        changed()
       }
       const hide = held.controller.mount(request.viewportId)
       held.controller.start(request.initialUrl)
       return hide
     },
     dispose: async () => {
-      const pending = [...controllers.values()].map(({ signal, controller, forget }) => {
+      const pending = [...controllers.values()].map(({ signal, controller, forget, unsubscribe }) => {
         signal.removeEventListener('abort', forget)
+        unsubscribe()
         return controller.dispose()
       })
       controllers.clear()
+      changed()
       await Promise.all(pending)
     },
     rebind: (actions) => {
@@ -263,5 +290,6 @@ export function createBrowserControllers(actions: BoundActions<BrowserStore>, cr
     goForward: (id) => { controller(id)?.goForward() },
     reload: (id) => { controller(id)?.reload() },
     setSandbox: (id, enabled) => { controller(id)?.setSandbox(enabled) },
+    control: (id, command) => controller(id)?.control(command) ?? Promise.resolve(browserControlFailure('unavailable', NO_PAGE)),
   }
 }

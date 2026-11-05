@@ -43,7 +43,7 @@ function mountBrowser(navigation?: { readonly url?: string },
   if (options.initial !== undefined) store.actions.replace(TAB, options.initial)
   const lifetime = new AbortController()
   lifetimes.add(lifetime)
-  const injected = createBrowserControllers(store.actions, options.createPage ?? createIframePage, () => true)
+  const injected = createBrowserControllers(store.actions, options.createPage ?? createIframePage, () => true, () => {})
   controllers.push(injected)
   const { keyedHooks, ...commands } = injected
   const tabActions = { bindCommands: vi.fn<ReturnType<BrowserBodyProps['useTabInfo']>['tab']['actions']['bindCommands']>(() => vi.fn()), openResource: vi.fn(), openTab: vi.fn(), close: vi.fn() }
@@ -113,7 +113,7 @@ describe('BrowserBody', () => {
       return {
         presentation: { mount: () => () => {} },
         frame: { getSnapshot: () => state.getSnapshot(), subscribe: listener => state.subscribe(listener),
-          loadUrl: vi.fn(), goBack: vi.fn(), goForward: vi.fn(), reload: vi.fn(), dispose: async () => {} },
+          loadUrl: vi.fn(), goBack: vi.fn(), goForward: vi.fn(), reload: vi.fn(), control: vi.fn(), dispose: async () => {} },
       }
     } })
     expect(mounted.view.getByRole('status').textContent).toContain('DNS failure')

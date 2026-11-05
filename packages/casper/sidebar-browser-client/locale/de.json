@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Browsersteuerung durch den Agenten",
+    "description": "Lässt den Agenten die Browser-Tabs neben einer Unterhaltung in der Casper-Desktop-App verwenden."
+  }
+}

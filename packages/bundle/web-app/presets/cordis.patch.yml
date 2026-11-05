@@ -116,6 +116,10 @@
               allowParallelInProgress: true
           - id: casper-checks
             name: '@deepseek-ai/dsh-casper-checks'
+          # Desktop only: the Sidebar browser exists only in the Desktop app.
+          - id: casper-sidebar-browser
+            name: '@deepseek-ai/dsh-casper-sidebar-browser'
+            disabled: !!js "ctx.get('profileContext')?.name !== 'desktop'"
           - id: tool-web
             name: '@deepseek-ai/dsh-tool-web'
             config:

@@ -1,8 +1,11 @@
 /** Main-process ownership and fixed isolation policy for Sidebar webview guests. */
 import { randomUUID } from 'node:crypto'
 import { app, session, type BrowserWindow, type Session, type WebContents } from 'electron'
-import type { DesktopBrowserLeaseId, DesktopBrowserOpenRequest, DesktopBrowserReservation } from '@deepseek-ai/dsh-client-ui-sidebar-browser/types'
+import type {
+  DesktopBrowserLeaseId, DesktopBrowserOpenRequest, DesktopBrowserReservation, SidebarBrowserControlResult,
+} from '@deepseek-ai/dsh-client-ui-sidebar-browser/types'
 import { DESKTOP_IPC } from './ipc.ts'
+import { BrowserControlError, executeBrowserControl, parseBrowserControl } from './browser-control.ts'
 
 interface GuestLease {
   readonly owner: WebContents
@@ -10,6 +13,8 @@ interface GuestLease {
   attached: boolean
   guest?: WebContents
   releaseInput?: () => void
+  /** Settles after the lease's latest control operation; the next one starts only then. */
+  controlTail: Promise<void>
 }
 
 /** Owns workspace storage partitions independently from individual tab guests. */
@@ -37,7 +42,7 @@ export class DesktopBrowserGuests {
       this.partitions.set(workspace, partition)
     }
     const lease = randomUUID() as DesktopBrowserLeaseId
-    this.leases.set(lease, { owner, partition, attached: false })
+    this.leases.set(lease, { owner, partition, attached: false, controlTail: Promise.resolve() })
     return { lease, partition }
   }
 
@@ -136,6 +141,37 @@ export class DesktopBrowserGuests {
     })
     owner.on('render-process-gone', releaseAll)
     owner.once('destroyed', releaseAll)
+  }
+
+  /**
+   * Run one agent operation on an attached guest leased to the calling window. Operations on one lease run one at a
+   * time and each is bounded, so a hung page fails with `timed-out` and releases the queue. A lease that is unknown,
+   * released, unattached or owned by another window yields the same `unavailable` value.
+   * @param owner - authenticated IPC sender.
+   * @param id - lease received over IPC.
+   * @param input - untrusted command JSON.
+   * @returns the observation, or a failure value; delivered input is neither rolled back nor retried.
+   */
+  async control(owner: WebContents, id: unknown, input: unknown): Promise<SidebarBrowserControlResult> {
+    try {
+      const command = parseBrowserControl(input)
+      if (typeof id !== 'string') throw new BrowserControlError('invalid-input', 'Browser lease must be a string')
+      const key = id as DesktopBrowserLeaseId
+      const lease = this.leases.get(key)
+      const guest = lease?.guest
+      if (lease === undefined || lease.owner !== owner || guest === undefined) {
+        throw new BrowserControlError('unavailable', 'Browser tab has no live page')
+      }
+      const isAvailable = (): boolean => this.leases.get(key) === lease && lease.guest === guest && !guest.isDestroyed()
+        && !owner.isDestroyed()
+      const operation = lease.controlTail.then(() => executeBrowserControl({ guest, isAvailable }, command,
+        url => this.allowedNavigation(url)))
+      lease.controlTail = operation.then(() => {}, () => {})
+      return { ok: true, observation: await operation }
+    } catch (error) {
+      if (!(error instanceof BrowserControlError)) throw error
+      return { ok: false, code: error.code, message: error.message, outcome: error.outcome }
+    }
   }
 
   private configureSession(browserSession: Session): void {

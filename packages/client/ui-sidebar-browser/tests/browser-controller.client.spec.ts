@@ -26,7 +26,8 @@ function harness() {
   const id = `browser-controller-test-${String(++sequence)}`
   const store = createBrowserStore().create(id)
   let open = true
-  const face = createBrowserControllers(store.actions, createIframePage, () => open)
+  const changed = vi.fn()
+  const face = createBrowserControllers(store.actions, createIframePage, () => open, changed)
   disposables.push(face)
   const host = document.createElement('div')
   host.id = id
@@ -41,7 +42,7 @@ function harness() {
     if (element === null) throw new Error('expected a mounted iframe')
     return element
   }
-  return { store, face, mount, iframe, close: () => { open = false } }
+  return { store, face, mount, iframe, changed, close: () => { open = false } }
 }
 
 afterEach(async () => {
@@ -110,7 +111,7 @@ describe('BrowserController', () => {
         frame: { getSnapshot: () => frames.getSnapshot(), subscribe: (listener) => {
           pendingNotifications.push(listener)
           return frames.subscribe(listener)
-        }, loadUrl: vi.fn(), goBack: vi.fn(), goForward: vi.fn(), reload: vi.fn(), dispose: async () => {} },
+        }, loadUrl: vi.fn(), goBack: vi.fn(), goForward: vi.fn(), reload: vi.fn(), control: vi.fn(), dispose: async () => {} },
         presentation: { mount: () => () => {}, dispose: () => {} },
       }
     }
@@ -137,6 +138,45 @@ describe('BrowserController', () => {
     expect(controller.getSnapshot()).toBe(before)
     expect(store.getSnapshot().byTab[TAB]).toBeUndefined()
     expect(openTab).toHaveBeenCalledOnce()
+  })
+
+  it('routes agent control to the tab page and reports controller changes', async () => {
+    const h = harness()
+    const read = { action: 'read' } as const
+    await expect(h.face.control(TAB, read)).resolves.toMatchObject({ ok: false, code: 'unavailable', outcome: 'not-dispatched' })
+    expect(h.changed).not.toHaveBeenCalled()
+    const tabLifetime = lifetime()
+    h.mount(tabLifetime.signal)
+    expect(h.changed).toHaveBeenCalledOnce()
+    expect(h.face.keyedHooks.browserState(TAB)?.getSnapshot().frame.live).toBe(false)
+    await expect(h.face.control(TAB, read)).resolves.toEqual({ ok: false, code: 'unavailable',
+      message: 'Browser control requires the Casper desktop app', outcome: 'not-dispatched' })
+    h.face.loadUrl(TAB, 'https://example.test/')
+    expect(h.changed.mock.calls.length).toBeGreaterThan(1)
+    const replacement = lifetime()
+    h.mount(replacement.signal)
+    const calls = h.changed.mock.calls.length
+    tabLifetime.abort()
+    expect(h.changed).toHaveBeenCalledTimes(calls)
+    replacement.abort()
+    expect(h.changed).toHaveBeenCalledTimes(calls + 1)
+    h.mount(lifetime().signal)
+    await h.face.dispose()
+    expect(h.changed).toHaveBeenCalledTimes(calls + 3)
+  })
+
+  it('answers control as unavailable after disposal without reaching the page', async () => {
+    const control = vi.fn()
+    const controller = new BrowserController({ tabId: TAB, signal: lifetime().signal, applicationOrigin: APP,
+      actions: createBrowserStore().create('control-disposed').actions, initial: undefined, openTab: vi.fn(),
+      createPage: () => ({
+        frame: { getSnapshot: emptyBrowserFrame, subscribe: () => () => {}, loadUrl: vi.fn(), goBack: vi.fn(), goForward: vi.fn(),
+          reload: vi.fn(), control, dispose: async () => {} },
+        presentation: { mount: () => () => {}, dispose: () => {} },
+      }) })
+    await controller.dispose()
+    await expect(controller.control({ action: 'read' })).resolves.toMatchObject({ ok: false, code: 'unavailable' })
+    expect(control).not.toHaveBeenCalled()
   })
 
   it('ignores navigation commands after its tab occurrence ends', async () => {

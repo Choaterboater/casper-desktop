@@ -7,6 +7,7 @@
  */
 
 import type {} from '@deepseek-ai/dsh-api-session-controller/remote-events'
+import type {} from '@deepseek-ai/dsh-casper-sidebar-browser/types'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-deepseek-account/types'
 import type {} from '@deepseek-ai/dsh-permission-presets/types'
@@ -32,6 +33,7 @@ export const API_REMOTE_FORWARDED_EVENTS = [
   { event: 'api-session/error', mode: 'emit', resources: { session: (sessionId): SessionId => sessionId } },
   { event: 'api-session/removed', mode: 'emit', resources: { session: (sessionId): SessionId => sessionId } },
   { event: 'api-session/status', mode: 'emit', resources: { session: (sessionId): SessionId => sessionId } },
+  { event: 'casper-sidebar-browser/request', mode: 'waterfall' },
   { event: 'commands/change', mode: 'emit' },
   { event: 'deepseek-account/session-expired', mode: 'emit' },
   { event: 'deepseek-account/model-sign-in-required', mode: 'emit' },

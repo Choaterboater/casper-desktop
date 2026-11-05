@@ -14,7 +14,7 @@ import { apply, inject } from '../src/client/index.ts'
 import { en, ja, zh, es, fr, de, ru, pt } from '../src/client/locales.ts'
 import { createBrowserStore } from '../src/client/browser/store.ts'
 import type { TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
-import type { DesktopBrowserBridge, DesktopBrowserLeaseId } from '../src/types.ts'
+import type { DesktopBrowserBridge, DesktopBrowserLeaseId, SidebarBrowserControlResult } from '../src/types.ts'
 
 const contexts: Context[] = []
 
@@ -53,10 +53,11 @@ async function boot(platform: ShortcutPlatform = 'macos', runtime: 'desktop' | '
       return () => { dictionaries.delete(namespace) }
     }),
   }
-  const openTabs = createSnapshotStore<readonly { sessionId: string; tabId: TabId }[]>([])
+  const openTabs = createSnapshotStore<readonly { sessionId: string; tabId: TabId; kind?: string }[]>([])
+  const mounted = createSnapshotStore<string | undefined>(undefined)
   const target = { sessionId: 'session', paneId: 'pane' }
-  const sidebar = { openTabs, commandTarget: vi.fn<() => typeof target | undefined>(() => target),
-    openTabFromTarget: vi.fn() }
+  const sidebar = { openTabs, mounted, commandTarget: vi.fn<() => typeof target | undefined>(() => target),
+    openTabFromTarget: vi.fn(), openTab: vi.fn(), active: vi.fn<() => { id: TabId } | undefined>(() => undefined) }
   const registry = new ShortcutRegistry(runtime, platform)
   ctx.provide('sidebarRight', sidebar as never)
   ctx.provide('shortcuts', { register: (command: ShortcutCommand) => registry.register(command) } as never)
@@ -66,7 +67,18 @@ async function boot(platform: ShortcutPlatform = 'macos', runtime: 'desktop' | '
   ctx.provide('locale', locale as never)
   const fiber = ctx.plugin({ inject: [...inject], apply })
   await fiber.await()
-  return { tabs, registered, dictionaries, fiber, openTabs, registry, sidebar, target }
+  return { ctx, tabs, registered, dictionaries, fiber, openTabs, mounted, registry, sidebar, target }
+}
+
+function desktopBridge() {
+  const bridge = {
+    acquire: vi.fn(async () => ({ lease: 'control-lease' as DesktopBrowserLeaseId, partition: 'test-partition' })),
+    release: vi.fn(async () => {}),
+    onOpenRequested: vi.fn(() => () => {}),
+    control: vi.fn(async (): Promise<SidebarBrowserControlResult> => ({ ok: true, observation: { url: 'https://b.example/', title: 'B', status: 'dispatched' } })),
+  } satisfies DesktopBrowserBridge
+  vi.stubGlobal('dshDesktop', { protocolVersion: 1, browser: bridge })
+  return bridge
 }
 
 describe('ui-sidebar-browser apply', () => {
@@ -76,6 +88,7 @@ describe('ui-sidebar-browser apply', () => {
       acquire,
       release: vi.fn(async () => {}),
       onOpenRequested: vi.fn(() => () => {}),
+      control: vi.fn(),
     }
     vi.stubGlobal('dshDesktop', { protocolVersion, browser: bridge })
     const h = await boot()
@@ -112,6 +125,70 @@ describe('ui-sidebar-browser apply', () => {
         initial: undefined, initialUrl: undefined, openTab: vi.fn() })
       await h.fiber.dispose()
       expect(controller.keyedHooks.browserState(tabId)).toBeUndefined()
+    } finally {
+      await h.fiber.dispose()
+      host.remove()
+    }
+  })
+
+  it('provides agent control only with the Desktop bridge and withdraws it on unload', async () => {
+    const web = await boot('macos', 'web')
+    expect(web.ctx.get('sidebarBrowserControl')).toBeUndefined()
+    await web.fiber.dispose()
+    desktopBridge()
+    const desktop = await boot()
+    expect(desktop.ctx.get('sidebarBrowserControl')).toBeDefined()
+    await desktop.fiber.dispose()
+    expect(desktop.ctx.get('sidebarBrowserControl')).toBeUndefined()
+  })
+
+  it('routes control from the named Session to its own live guest only', async () => {
+    const bridge = desktopBridge()
+    const h = await boot()
+    const control = h.ctx.get('sidebarBrowserControl')!
+    const injectFace = h.registered.find(entry => entry.name === 'sidebar.right.pane.tab')!.inject as
+      (sessionId: string, actions: Parameters<BrowserInjected['rebind']>[0]) => BrowserInjected
+    injectFace('session-a', createBrowserStore().create('control-a').actions)
+    const sessionB = injectFace('session-b', createBrowserStore().create('control-b').actions)
+    const tabId = 'tab-b' as TabId
+    h.openTabs.set([{ sessionId: 'session-b', tabId, kind: BROWSER_KIND }, { sessionId: 'session-c', tabId: 'tab-c' as TabId, kind: BROWSER_KIND }])
+    const host = document.createElement('div')
+    host.id = 'browser-control-route'
+    document.body.append(host)
+    const signal = new AbortController().signal
+    const read = { action: 'read' } as const
+    try {
+      expect(control.tabs('session-a')).toEqual([])
+      expect(control.tabs('session-c')).toEqual([{ tabId: 'tab-c', url: undefined, title: undefined, active: false, live: false }])
+      await expect(control.control('session-c', 'tab-c', read, signal)).resolves.toMatchObject({ ok: false, code: 'unavailable' })
+      expect(control.tabs('session-b')).toEqual([{ tabId, url: undefined, title: undefined, active: false, live: false }])
+      sessionB.mount({ tabId, signal, viewportId: host.id, applicationOrigin: 'https://dsh.example', initial: undefined,
+        initialUrl: 'https://b.example/', openTab: vi.fn() })
+      await vi.waitFor(() => { expect(host.querySelector('webview')).not.toBeNull() })
+      const guest = Object.assign(host.querySelector('webview')!, {
+        loadURL: vi.fn(async () => {}), getURL: () => 'https://b.example/', getTitle: () => 'B', isLoading: () => false,
+        canGoBack: () => false, canGoForward: () => false, clearHistory: vi.fn(),
+      })
+      await expect(control.control('session-b', tabId, read, signal)).resolves.toMatchObject({ ok: false, code: 'unavailable' })
+      guest.dispatchEvent(new Event('dom-ready'))
+      guest.dispatchEvent(new Event('did-navigate'))
+      expect(control.tabs('session-b')).toEqual([{ tabId, url: 'https://b.example/', title: 'B', active: false, live: true }])
+      await expect(control.control('session-a', tabId, read, signal)).resolves.toMatchObject({ ok: false, code: 'unavailable', outcome: 'not-dispatched' })
+      expect(bridge.control).not.toHaveBeenCalled()
+      await expect(control.control('session-b', tabId, read, signal)).resolves.toMatchObject({ ok: true })
+      expect(bridge.control).toHaveBeenCalledExactlyOnceWith('control-lease', read)
+      await expect(control.open('session-a', 'https://a.example/', signal)).resolves.toMatchObject({ ok: false, code: 'unavailable' })
+      h.mounted.set('session-b')
+      expect(control.tabs('session-b')[0]?.active).toBe(false)
+      h.sidebar.active.mockReturnValue({ id: tabId })
+      expect(control.tabs('session-b')[0]?.active).toBe(true)
+      h.mounted.set('session-a')
+      expect(control.tabs('session-b')[0]?.active).toBe(false)
+      const cancel = new AbortController()
+      const opening = control.open('session-a', 'a.example', cancel.signal)
+      expect(h.sidebar.openTab).toHaveBeenCalledExactlyOnceWith(BROWSER_KIND, { params: { url: 'https://a.example/' } })
+      cancel.abort(new Error('cancelled'))
+      await expect(opening).rejects.toThrow('cancelled')
     } finally {
       await h.fiber.dispose()
       host.remove()

@@ -1,0 +1,24 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types"
+  },
+  "include": [
+    "src"
+  ],
+  "references": [
+    { "path": "../../../vendor/cordis" },
+    { "path": "../../api/gateway/tsconfig.host.json" },
+    { "path": "../../attachment/attachment" },
+    { "path": "../../client/ui-sidebar-browser/tsconfig.host.json" },
+    { "path": "../../core/agent" },
+    { "path": "../../core/scope" },
+    { "path": "../../core/session" },
+    { "path": "../../core/tools" },
+    { "path": "../../interaction/user-questions" },
+    { "path": "../../llm/llm" },
+    { "path": "../../session/session-projection" },
+    { "path": "../../util/values" }
+  ]
+}

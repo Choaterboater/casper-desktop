@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Controle do navegador pelo agente",
+    "description": "Permite que o agente use as abas do navegador ao lado de uma conversa no aplicativo de desktop do Casper."
+  }
+}

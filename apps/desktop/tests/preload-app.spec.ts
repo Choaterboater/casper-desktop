@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import type { DesktopFileDrag, FileDragHandle, FileDragRequestId } from '@deepseek-ai/dsh-util-file-drag'
+import type { DesktopBrowserLeaseId } from '@deepseek-ai/dsh-client-ui-sidebar-browser/types'
 import { JSDOM } from 'jsdom'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { installMandatoryUpdateOverlay } from '../src/preload-mandatory-overlay.ts'
@@ -267,6 +268,23 @@ it('forwards browser guest input only for the focused live webview lease', async
   handler({}, input)
   expect(listener).toHaveBeenCalledOnce()
   off()
+})
+
+it('sends Browser lease operations, including agent control, through their fixed channels', async () => {
+  vi.stubGlobal('location', new URL('dsh-app://app/'))
+  await import('../src/preload-app.ts')
+  const api = electron.contextBridge.exposeInMainWorld.mock.calls.find(([name]) => name === 'dshDesktop')?.[1] as DshDesktopProductApi
+  const lease = 'lease' as DesktopBrowserLeaseId
+  const result = { ok: false, code: 'unavailable', message: 'Browser tab has no live page', outcome: 'not-dispatched' }
+  electron.ipcRenderer.invoke.mockResolvedValueOnce({ lease, partition: 'partition' }).mockResolvedValueOnce(result).mockResolvedValueOnce(undefined)
+  await api.browser.acquire('cwd:/workspace')
+  await expect(api.browser.control(lease, { action: 'click', x: 1, y: 2 })).resolves.toBe(result)
+  await api.browser.release(lease)
+  expect(electron.ipcRenderer.invoke.mock.calls).toEqual([
+    [DESKTOP_IPC.browserAcquire, 'cwd:/workspace'],
+    [DESKTOP_IPC.browserControl, lease, { action: 'click', x: 1, y: 2 }],
+    [DESKTOP_IPC.browserRelease, lease],
+  ])
 })
 
 it('prepares original image bytes and starts native drags without renderer filesystem paths', async () => {
