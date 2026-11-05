@@ -603,7 +603,26 @@
     - id: agent-preset-registry
       name: '@deepseek-ai/dsh-agent-preset-registry'
       config:
-        default: standard
+        # Desktop starts new Sessions on Casper; a default saved in Settings still wins. Same gate as the
+        # casper-agent row and the casper preset, so the default never names a preset whose driver is absent.
+        default: !!js "typeof WorkerGlobalScope === 'undefined' && ctx.get('profileContext')?.name === 'desktop' ? 'casper' : 'standard'"
+
+# ── Casper: the Casper agent drives Sessions on the Casper preset ────────────
+# A Session on the `casper` preset runs `casper acp` (one process per Session, started at its first
+# prompt) instead of the DeepSeek agent loop; every other preset keeps agent-loop. Desktop only: a
+# local host spawns Casper, and the in-browser preview runs in a Worker.
+- insert:
+    - id: casper-agent
+      name: '@deepseek-ai/dsh-casper-agent'
+      disabled: !!js "typeof WorkerGlobalScope !== 'undefined' || ctx.get('profileContext')?.name !== 'desktop'"
+      config:
+        presets: [casper]
+        # casper from PATH, else the folders its installers use, so a Finder-launched app still finds it.
+        command: !!js '(() => { const fs = process.getBuiltinModule("node:fs"); const path = process.getBuiltinModule("node:path"); const os = process.getBuiltinModule("node:os"); const exe = process.platform === "win32" ? "casper.exe" : "casper"; const dirs = [...(process.env.PATH ?? "").split(path.delimiter), path.join(os.homedir(), ".local", "bin"), path.join(os.homedir(), ".bun", "bin"), "/opt/homebrew/bin", "/usr/local/bin"]; for (const dir of dirs) { if (dir !== "" && fs.existsSync(path.join(dir, exe))) return path.join(dir, exe) } return exe })()'
+        args: ['acp']
+        # Casper runs on bun, so bun's folders lead PATH. The subprocess scrub drops KEY/SECRET/TOKEN and DSH_* names
+        # and the plugin drops DEEPSEEK_* names; only the OpenRouter key is passed on. Casper's saved logins cover the rest.
+        env: !!js '(() => { const path = process.getBuiltinModule("node:path"); const os = process.getBuiltinModule("node:os"); const extra = [path.join(os.homedir(), ".bun", "bin"), "/opt/homebrew/bin", "/usr/local/bin"]; const env = { PATH: [...extra, process.env.PATH ?? ""].filter(Boolean).join(path.delimiter) }; if (process.env.OPENROUTER_API_KEY) env.OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY; return env })()'
 
 # ── Casper: casper-network-mcp (Aruba Central, Juniper Mist, ClearPass, UXI, OpsRamp) ──
 # Pinned release, started with --read-only: the server refuses every change before anything is

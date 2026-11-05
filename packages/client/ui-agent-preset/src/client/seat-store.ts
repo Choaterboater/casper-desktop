@@ -18,6 +18,8 @@ import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type {} from '@deepseek-ai/dsh-agent-preset-registry/types'
+// Type-only: pulls the Workspace UI navigation service merge (ctx.uiWorkspace).
+import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { presetOptions, readRoster } from './settings-store.ts'
 import type { AgentPresetOption } from './settings-store.ts'
 
@@ -53,10 +55,11 @@ export interface AgentPresetStage {
 /**
  * Result of one attempt to hand a staged preset to the current Session: the Host applied it,
  * it waits for a Session to appear, nothing changed (busy, already composed, started, or no
- * stage), or the Host refused it.
+ * stage), a new Session was started because another Agent driver serves the preset, or the
+ * Host refused it.
  */
 export type AgentPresetApplyOutcome =
-  | { readonly kind: 'applied' | 'staged' | 'unchanged' }
+  | { readonly kind: 'applied' | 'staged' | 'unchanged' | 'started' }
   | { readonly kind: 'refused'; readonly reason: string }
 
 const UNCHANGED: AgentPresetApplyOutcome = { kind: 'unchanged' }
@@ -244,6 +247,14 @@ export class AgentPresetSeatController {
       const result = await this.ctx.remote.agentPresets.select(session.id, staged)
       if (!result.ok) {
         const { error } = result
+        // Another Agent driver serves the preset, so the pick moves to a new Session.
+        const workspace = error.code === 'agent-preset/locked' && 'newSession' in error.details
+          ? this.ctx.get('uiWorkspace') : undefined
+        if (workspace !== undefined) {
+          workspace.startSession(undefined, { agentPreset: staged })
+          this.set({ current: staged })
+          return { kind: 'started' }
+        }
         // Prefer the bare cause; the Toast already names the rejected preset.
         const refusal = 'reason' in error.details && typeof error.details.reason === 'string'
           ? error.details.reason

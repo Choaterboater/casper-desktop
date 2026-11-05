@@ -54,6 +54,8 @@ interface HarnessOptions {
   readonly resolving?: ReadonlyMap<string, Promise<void>>
   /** Workspace placement served to `workspaceId` requests. */
   readonly workspace?: { readonly members: readonly SessionId[]; readonly archived: readonly SessionId[] }
+  /** Presets a second factory route serves instead of the default factory. */
+  readonly routed?: readonly string[]
 }
 
 const WORKSPACE = 'workspace-1' as WorkspaceId
@@ -70,6 +72,10 @@ async function harness(options: HarnessOptions = {}) {
   const presets = options.presets
   const selections: { sessionId: SessionId; agentPreset: string }[] = []
   const resumed: SessionId[] = []
+  /** Presets mounted into Agent setups, in order. */
+  const mounts: (string | undefined)[] = []
+  /** Resume requests the default factory received, as passed. */
+  const resumeRequests: Parameters<AgentFactory['resume']>[1][] = []
   if (presets !== undefined) {
     const known = (id?: string): string => {
       const wanted = id ?? presets[0] ?? ''
@@ -92,7 +98,11 @@ async function harness(options: HarnessOptions = {}) {
       presetForSession: (session: Session) => preset.stateOf(session),
       resolve: (id?: string) => Promise.resolve(id === undefined ? undefined : options.resolving?.get(id))
         .then(() => ({ id: known(id) })),
-      mount: (_ctx: Context, id?: string) => Promise.resolve().then(() => ({ id: usable(id) })),
+      mount: (_ctx: Context, id?: string) => Promise.resolve().then(() => {
+        mounts.push(id)
+        return { id: usable(id) }
+      }),
+      list: () => Promise.resolve(presets.map(id => ({ id, ...options.broken?.has(id) === true ? { broken: 'activation failed' } : {} }))),
       select: async (agent: Agent, agentPreset: string) => {
         usable(agentPreset)
         if (options.locked?.has(agent.id) === true) {
@@ -143,10 +153,15 @@ async function harness(options: HarnessOptions = {}) {
   }
   const factory: AgentFactory = {
     async createAgent(_ownerCtx, create) {
-      const session = ctx.sessions.prepare(create.sessionId, create.meta === undefined ? {} : { meta: create.meta })
+      const session = ctx.sessions.prepare(create.sessionId, {
+        ...create.meta === undefined ? {} : { meta: create.meta },
+        ...create.seed === undefined ? {} : { seed: [...create.seed] },
+        ...create.inheritedEventCount === undefined ? {} : { inheritedEventCount: create.inheritedEventCount },
+      })
       return publish(session, create.setup)
     },
     async resume(_ownerCtx, resume) {
+      resumeRequests.push(resume)
       const id = resume.resumeSessionId
       if (options.held?.has(id) === true) {
         throw Object.assign(new Error(`session "${id}" is written by another owner`), { name: 'SessionAlreadyOwnedError' })
@@ -168,6 +183,34 @@ async function harness(options: HarnessOptions = {}) {
     },
   }
   ctx.agents.setFactory(factory)
+  /** Factory calls the route served, with the facts it received. */
+  const routedCalls: { kind: 'create' | 'resume'; sessionId: SessionId; agentPreset: string | undefined }[] = []
+  const routedSet = new Set(options.routed ?? [])
+  if (routedSet.size > 0) {
+    ctx.agents.route({
+      selects: facts => facts.agentPreset !== undefined && routedSet.has(facts.agentPreset),
+      factory: {
+        createAgent(ownerCtx, create) {
+          routedCalls.push({ kind: 'create', sessionId: create.sessionId, agentPreset: create.meta?.agentPreset })
+          return factory.createAgent(ownerCtx, create)
+        },
+        resume(ownerCtx, resume) {
+          routedCalls.push({ kind: 'resume', sessionId: resume.resumeSessionId, agentPreset: resume.agentPreset })
+          return factory.resume(ownerCtx, resume)
+        },
+      },
+    })
+  }
+  // Captures the Agent context resolver the controller configures, so a test can activate a stored Session.
+  const hostResolvers = new Map<string, (id: SessionId) => Promise<unknown>>()
+  const noop = (): void => {}
+  ctx.provide('typert', {
+    lookups: { configure: () => noop },
+    contexts: {
+      configureHost: (key: string, resolve: (id: SessionId) => Promise<unknown>) => { hostResolvers.set(key, resolve); return noop },
+    },
+    resources: { register: () => noop },
+  } as never)
   const remote = await createSessionTestRemote(ctx, {
     defaultModelSelection: () => ({ provider: 'test', model: 'test-model' }),
     cwd,
@@ -182,7 +225,12 @@ async function harness(options: HarnessOptions = {}) {
       .filter(event => event.type === 'agent-preset/selected')
       .map(event => event.data)
   }
-  return { ctx, remote, cwd, selections, resumed, presetOf, selectedEvents }
+  /** Resolve one stored Session as a prompt or lookup would. */
+  const activate = async (id: SessionId): Promise<Agent | undefined> => {
+    await hostResolvers.get('agent')?.(id)
+    return ctx.agents.get(id)
+  }
+  return { ctx, remote, cwd, selections, resumed, presetOf, selectedEvents, routedCalls, activate, mounts, resumeRequests }
 }
 
 function storedHeader(id: SessionId, cwd: string, extra: Partial<SessionHeader> = {}): SessionHeader {
@@ -675,5 +723,158 @@ describe('session.create Workspace placement', () => {
     expect(created.value.sessionId).not.toBe('placed-draft')
     expect(selections).toEqual([])
     expect(presetOf(draft)).toBe('minimal')
+  })
+})
+
+describe('session.create across Agent factory routes', () => {
+  it('creates a new Session instead of switching a live blank Session to a routed preset', async () => {
+    const { ctx, remote, selections, presetOf, routedCalls } = await harness({ presets: ['standard', 'x'], routed: ['x'] })
+    await remote.create({ sessionId: SessionId('draft') })
+    const before = ctx.agents.get(SessionId('draft'))
+
+    const created = await remote.create({ sessionId: SessionId('draft'), agentPreset: 'x' })
+
+    if (!created.ok) throw new Error(`create failed: ${created.error.message}`)
+    expect(created.value).toMatchObject({ agentPreset: 'x' })
+    expect(created.value.sessionId).not.toBe('draft')
+    expect(ctx.agents.get(SessionId('draft'))).toBe(before)
+    expect(presetOf(SessionId('draft'))).toBe('standard')
+    expect(selections).toEqual([])
+    expect(routedCalls).toEqual([{ kind: 'create', sessionId: created.value.sessionId, agentPreset: 'x' }])
+  })
+
+  it('creates a new Session instead of switching a live routed blank Session back to the default factory', async () => {
+    const { remote, selections } = await harness({ presets: ['x', 'standard'], routed: ['x'] })
+    await remote.create({ sessionId: SessionId('draft') })
+
+    const created = await remote.create({ sessionId: SessionId('draft'), agentPreset: 'standard' })
+
+    if (!created.ok) throw new Error(`create failed: ${created.error.message}`)
+    expect(created.value.sessionId).not.toBe('draft')
+    expect(selections).toEqual([])
+  })
+
+  it('still reuses a live blank Session when both presets share a route', async () => {
+    const { remote, selections } = await harness({ presets: ['x', 'y'], routed: ['x', 'y'] })
+    await remote.create({ sessionId: SessionId('draft') })
+
+    const reused = await remote.create({ sessionId: SessionId('draft'), agentPreset: 'y' })
+
+    expect(reused).toMatchObject({ ok: true, value: { sessionId: 'draft', agentPreset: 'y' } })
+    expect(selections).toEqual([{ sessionId: 'draft', agentPreset: 'y' }])
+  })
+
+  it('creates a new Session instead of resuming a stored blank Session under a routed preset', async () => {
+    const draft = SessionId('stored-draft')
+    const cwd = realpathSync(mkdtempSync(join(tmpdir(), 'dsh-session-preset-stored-')))
+    tempDirs.push(cwd)
+    const { remote, resumed, routedCalls } = await harness({
+      presets: ['standard', 'x'],
+      routed: ['x'],
+      stored: new Map([[draft, { header: storedHeader(draft, cwd, { agentPreset: 'standard' }), events: [modelSelection(0)] }]]),
+    })
+
+    const created = await remote.create({ sessionId: draft, cwd, agentPreset: 'x' })
+
+    if (!created.ok) throw new Error(`create failed: ${created.error.message}`)
+    expect(created.value.sessionId).not.toBe('stored-draft')
+    expect(resumed).toEqual([])
+    expect(routedCalls).toEqual([{ kind: 'create', sessionId: created.value.sessionId, agentPreset: 'x' }])
+  })
+
+  it('resumes a stored blank routed Session through its route', async () => {
+    const draft = SessionId('stored-routed-draft')
+    const cwd = realpathSync(mkdtempSync(join(tmpdir(), 'dsh-session-preset-stored-')))
+    tempDirs.push(cwd)
+    const { remote, routedCalls } = await harness({
+      presets: ['x', 'y'],
+      routed: ['x', 'y'],
+      stored: new Map([[draft, { header: storedHeader(draft, cwd, { agentPreset: 'x' }), events: [modelSelection(0)] }]]),
+    })
+
+    const reused = await remote.create({ sessionId: draft, cwd, agentPreset: 'y' })
+
+    expect(reused).toMatchObject({ ok: true, value: { sessionId: 'stored-routed-draft', agentPreset: 'y' } })
+    expect(routedCalls).toEqual([{ kind: 'resume', sessionId: draft, agentPreset: 'y' }])
+  })
+
+  it('resumes a started Session through the route of its recorded preset', async () => {
+    const talk = SessionId('routed-talk')
+    const cwd = realpathSync(mkdtempSync(join(tmpdir(), 'dsh-session-preset-stored-')))
+    tempDirs.push(cwd)
+    const { activate, routedCalls, presetOf } = await harness({
+      presets: ['standard', 'x'],
+      routed: ['x'],
+      stored: new Map([[talk, { header: storedHeader(talk, cwd, { agentPreset: 'x' }), events: completedTurn(0) }]]),
+    })
+
+    expect(await activate(talk)).toBeDefined()
+    expect(routedCalls).toEqual([{ kind: 'resume', sessionId: talk, agentPreset: 'x' }])
+    expect(presetOf(talk)).toBe('x')
+  })
+
+  it('keeps a started Session that records no preset on the default factory when the default preset is routed', async () => {
+    const talk = SessionId('unrecorded-talk')
+    const cwd = realpathSync(mkdtempSync(join(tmpdir(), 'dsh-session-preset-stored-')))
+    tempDirs.push(cwd)
+    const { activate, routedCalls, resumed, mounts } = await harness({
+      presets: ['x', 'broken', 'standard'],
+      broken: new Set(['broken']),
+      routed: ['x'],
+      stored: new Map([[talk, { header: storedHeader(talk, cwd), events: completedTurn(0) }]]),
+    })
+
+    expect(await activate(talk)).toBeDefined()
+    expect(resumed).toEqual([talk])
+    expect(routedCalls).toEqual([])
+    expect(mounts).toEqual(['standard'])
+  })
+
+  it('forks a Session that records no preset on the default factory when the default preset is routed', async () => {
+    const talk = SessionId('unrecorded-fork-source')
+    const cwd = realpathSync(mkdtempSync(join(tmpdir(), 'dsh-session-preset-stored-')))
+    tempDirs.push(cwd)
+    const { remote, ctx, routedCalls, mounts } = await harness({
+      presets: ['x', 'standard'],
+      routed: ['x'],
+      stored: new Map([[talk, { header: storedHeader(talk, cwd), events: completedTurn(0) }]]),
+    })
+
+    const forked = await remote.fork({ sessionId: talk, allowMigration: false })
+
+    if (!forked.ok) throw new Error(`fork failed: ${forked.error.message}`)
+    expect(routedCalls).toEqual([])
+    expect(mounts).toEqual(['standard'])
+    expect(ctx.sessions.get(forked.value.sessionId)?.header).toMatchObject({ isSeeded: true, agentPreset: 'standard' })
+  })
+
+  it('resumes a stored blank Session without a preset when no preset registry is mounted', async () => {
+    const draft = SessionId('stored-unregistered-draft')
+    const cwd = realpathSync(mkdtempSync(join(tmpdir(), 'dsh-session-preset-stored-')))
+    tempDirs.push(cwd)
+    const { remote, resumeRequests } = await harness({
+      stored: new Map([[draft, { header: storedHeader(draft, cwd), events: [modelSelection(0)] }]]),
+    })
+
+    const reused = await remote.create({ sessionId: draft, cwd })
+
+    expect(reused).toMatchObject({ ok: true, value: { sessionId: 'stored-unregistered-draft' } })
+    expect(resumeRequests.map(request => request.resumeSessionId)).toEqual([draft])
+    expect(resumeRequests.every(request => !('agentPreset' in request))).toBe(true)
+  })
+
+  it('resumes a Session that records no preset under the default when no route serves it', async () => {
+    const talk = SessionId('plain-talk')
+    const cwd = realpathSync(mkdtempSync(join(tmpdir(), 'dsh-session-preset-stored-')))
+    tempDirs.push(cwd)
+    const { activate, routedCalls, mounts } = await harness({
+      presets: ['standard', 'x'],
+      routed: ['x'],
+      stored: new Map([[talk, { header: storedHeader(talk, cwd), events: completedTurn(0) }]]),
+    })
+
+    expect(await activate(talk)).toBeDefined()
+    expect(routedCalls).toEqual([])
+    expect(mounts).toEqual(['standard'])
   })
 })

@@ -27,8 +27,8 @@ export type ClientAssistantStreamResult =
   | {
     readonly type: 'publish'
     readonly entry: SessionLiveEventEntry
-    /** Retire the successful attempt's transient rows after publishing its Step end. */
-    readonly retireAttemptId?: LlmAttemptId
+    /** Retire the successful attempts' transient rows after publishing their Step end. */
+    readonly retireAttemptIds?: readonly LlmAttemptId[]
   }
   | {
     readonly type: 'settlement'
@@ -43,7 +43,12 @@ export type ClientAssistantStreamResult =
 /** Keeps transient Assistant presentation behind one settlement-aware interface. */
 export class ClientAssistantStream {
   private activeAttempt: ActiveAttempt | undefined
-  private retainedAttempt: Pick<ActiveAttempt, 'attemptId' | 'turn' | 'step'> | undefined
+  /** Successful attempts of one open Step; an agent may settle one message per concurrent call. */
+  private retainedAttempts: {
+    readonly attemptIds: LlmAttemptId[]
+    readonly turn: number
+    readonly step: number
+  } | undefined
   private readonly pending = new Map<number, SessionAssistantSettlementEntry>()
   private publishedSeqs = new Set<number>()
   private durableCursor = -1
@@ -62,7 +67,7 @@ export class ClientAssistantStream {
     this.pending.clear()
     this.transientInGap = 0
     this.activeAttempt = undefined
-    this.retainedAttempt = undefined
+    this.retainedAttempts = undefined
     const opening = baseline?.activeAttempt
     if (opening !== undefined) {
       this.activeAttempt = {
@@ -121,16 +126,19 @@ export class ClientAssistantStream {
 
   /**
    * Fold one dense transient frame and release its named durable settlement.
-   * Successful messages retain their transient rows until the owning Step ends;
-   * interrupted messages, failed attempts, and abandonment retire them immediately.
+   * Successful messages retain their transient rows until the owning Step ends,
+   * and a later attempt of that Step may start meanwhile; interrupted messages, failed attempts, and abandonment retire them immediately.
    * @param frame - next Assistant stream frame received by the follow connection.
    * @returns a transient, publication, or rebaseline decision, or `undefined` when no entry becomes visible.
    */
   acceptFrame(frame: SessionAssistantStreamFrame): ClientAssistantStreamResult {
     switch (frame.type) {
-      case 'start':
-        if (this.activeAttempt !== undefined || this.retainedAttempt !== undefined
-          || this.pending.size > 0) return { type: 'rebaseline' }
+      case 'start': {
+        const retained = this.retainedAttempts
+        if (this.activeAttempt !== undefined || this.pending.size > 0
+          || (retained !== undefined && (retained.turn !== frame.turn || retained.step !== frame.step))) {
+          return { type: 'rebaseline' }
+        }
         this.pending.clear()
         this.activeAttempt = {
           attemptId: frame.attemptId,
@@ -140,6 +148,7 @@ export class ClientAssistantStream {
           nextIndex: 0,
         }
         return undefined
+      }
       case 'chunk': {
         const attempt = this.activeAttempt
         // A controller mounted after the Host saw this attempt has no start
@@ -187,7 +196,12 @@ export class ClientAssistantStream {
         }
         this.pending.delete(frame.outcome.seq)
         if (entry.event.type === 'assistant/message' && entry.event.data.interrupted !== true) {
-          this.retainedAttempt = { attemptId: attempt.attemptId, turn: attempt.turn, step: attempt.step }
+          const retained = this.retainedAttempts
+          if (retained === undefined) {
+            this.retainedAttempts = { attemptIds: [attempt.attemptId], turn: attempt.turn, step: attempt.step }
+          } else {
+            retained.attemptIds.push(attempt.attemptId)
+          }
           return this.publish(entry)
         }
         this.publishedSeqs.add(entry.event.seq)
@@ -210,11 +224,11 @@ export class ClientAssistantStream {
 
   private publish(entry: SessionLiveEventEntry): ClientAssistantStreamResult {
     this.publishedSeqs.add(entry.event.seq)
-    const retained = this.retainedAttempt
+    const retained = this.retainedAttempts
     if (retained !== undefined && entry.event.type === 'step/end'
       && entry.event.data.turn === retained.turn && entry.event.data.step === retained.step) {
-      this.retainedAttempt = undefined
-      return { type: 'publish', entry, retireAttemptId: retained.attemptId }
+      this.retainedAttempts = undefined
+      return { type: 'publish', entry, retireAttemptIds: retained.attemptIds }
     }
     return { type: 'publish', entry }
   }

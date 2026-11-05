@@ -172,6 +172,9 @@ const localWorkerBudget = process.env.CI === 'true' ? {} : { maxWorkers: default
 const processBoundTests = [
   'packages/session/session-persistence-jsonl/tests/jsonl.spec.ts',
   'packages/subagent/subagent-acp/tests/subagent-acp.spec.ts',
+  'packages/casper/casper-agent/tests/connection.spec.ts',
+  'packages/casper/casper-agent/tests/agent.spec.ts',
+  'packages/casper/casper-agent/tests/factory.spec.ts',
   'packages/subprocess/subprocess-local/tests/process-exit.spec.ts',
   'packages/subprocess/subprocess-local/tests/spawn.spec.ts',
   'packages/context/time-context/tests/time-context.spec.ts',

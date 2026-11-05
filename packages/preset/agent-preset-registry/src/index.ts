@@ -356,7 +356,10 @@ export class AgentPresetRegistry extends TypertRemoteService {
 
   /** Select a preset before a session starts its first turn. A Session whose
    * log records the preset and whose Agent runs its current revision keeps its
-   * composition; nothing is logged or announced.
+   * composition; nothing is logged or announced. A preset whose Agent factory
+   * route (`ctx.agents.servesRoute`) differs from the one that built the Agent
+   * is refused as `agent-preset/locked` with `newSession: true`, because the
+   * Agent's driver cannot change; the caller starts a new Session instead.
    * @param agent Target Agent.
    * @param agentPreset Requested identity.
    * @returns Committed preset identity.
@@ -367,6 +370,11 @@ export class AgentPresetRegistry extends TypertRemoteService {
       const boundary = this.owner.agents.turnBoundaryOf(agent.session)
       if (boundary.openTurnStartSeq !== null || boundary.lastTurn > 0) {
         throw new RemoteError('agent-preset/locked', 'This session has already started', { sessionId: agent.id, agentPreset })
+      }
+      // A preset served by another Agent factory cannot be mounted into this Agent's driver.
+      if (!this.owner.agents.servesRoute(agent, { agentPreset, origin: agent.session.header.origin })) {
+        throw new RemoteError('agent-preset/locked', `Preset ${agentPreset} runs on another agent, so it needs a new session`,
+          { sessionId: agent.id, agentPreset, newSession: true })
       }
       const current = this.definitions.get(agentPreset)?.generation
       if (current !== undefined && this.generationFor(agent.ctx) === current

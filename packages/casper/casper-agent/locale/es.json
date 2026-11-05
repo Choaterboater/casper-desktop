@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Agente Casper",
+    "description": "Ejecuta Casper como agente en las sesiones del modo Casper, con sus pasos de herramientas, comprobaciones, plan y aprobaciones en la conversación."
+  }
+}

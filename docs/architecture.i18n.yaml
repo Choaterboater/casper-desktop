@@ -2,36 +2,36 @@
 # section, a hash of its English and Chinese blocks outside code blocks and generated regions.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/architecture.md
-/deepseek-harness-architecture:
-  en: 20678ed3f962afba
-  zh: 87a2b81675d93346
-/deepseek-harness-architecture/cordis:
+/casper-architecture:
+  en: b05391fbdd3aa28e
+  zh: 81387516c5d06a02
+/casper-architecture/cordis:
   en: da5060e577578ea7
   zh: 2e77d570e32d8938
-/deepseek-harness-architecture/profiles-and-bundles:
+/casper-architecture/profiles-and-bundles:
   en: 21423f481b18b0be
   zh: 5343bd7ea0fae5bc
-/deepseek-harness-architecture/application-launch:
+/casper-architecture/application-launch:
   en: 334b4f390b6e376b
   zh: ce094f24c6162be3
-/deepseek-harness-architecture/desktop-application:
+/casper-architecture/desktop-application:
   en: b9eeb18645121a8b
   zh: 70d87a12c43e042a
-/deepseek-harness-architecture/core-packages:
-  en: 20ef882e44b06a10
-  zh: c10c3934ed5570e9
-/deepseek-harness-architecture/events:
+/casper-architecture/core-packages:
+  en: 5a0d8f6f99b890cb
+  zh: 2a63eefb1937dd0d
+/casper-architecture/events:
   en: ddebac7cfd41ec73
   zh: 51e6d0866a9e7839
-/deepseek-harness-architecture/turn-flow:
+/casper-architecture/turn-flow:
   en: 1a79a70b62c04cdb
   zh: c86d765e21430405
-/deepseek-harness-architecture/session-log:
-  en: b3b63d8fe7cab9fe
-  zh: 3703fcf30b1639d0
-/deepseek-harness-architecture/capability-seams:
+/casper-architecture/session-log:
+  en: 5a35222cd6200ea5
+  zh: 9f3a17b7bec39469
+/casper-architecture/capability-seams:
   en: 1d425c445bfcc931
   zh: 834d486f88e68edf
-/deepseek-harness-architecture/where-new-behavior-goes:
-  en: ee73b1861378b099
-  zh: 9a182be609485f67
+/casper-architecture/where-new-behavior-goes:
+  en: a542136570a215e3
+  zh: a98c1f28b2578a80

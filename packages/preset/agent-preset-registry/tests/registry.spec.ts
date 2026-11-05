@@ -113,6 +113,23 @@ describe('declarative preset revisions', () => {
     await expect(ctx.agentPresets.select(agent, 'standard')).rejects.toThrow('already started')
   })
 
+  it('refuses a blank Agent a preset that another Agent factory serves', async () => {
+    const ctx = await setup()
+    await declare(ctx, contribution('standard'))
+    await declare(ctx, contribution('minimal'))
+    await declare(ctx, contribution('routed'))
+    const unused = () => Promise.reject(new Error('the routed factory is not called by select'))
+    ctx.agents.route({ factory: { createAgent: unused, resume: unused }, selects: facts => facts.agentPreset === 'routed' })
+    const agent = await agentOn(ctx, 'routed-switch')
+    await expect(ctx.agentPresets.select(agent, 'routed')).rejects.toMatchObject({
+      code: 'agent-preset/locked',
+      details: { sessionId: 'routed-switch', agentPreset: 'routed', newSession: true },
+    })
+    expect(ctx.agentPresets.composedPreset(agent.ctx)).toBe('standard')
+    expect(ctx.sessionProjections.checkpoint(agent.session).agentPreset?.val ?? null).toBeNull()
+    expect(await ctx.agentPresets.select(agent, 'minimal')).toBe('minimal')
+  })
+
   it('inventories active and disabled child entries and declared display metadata', async () => {
     const ctx = await setup()
     await declare(ctx, { ...contribution('standard'), name: 'Standard', description: 'General', order: 2 })

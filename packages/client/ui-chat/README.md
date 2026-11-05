@@ -56,7 +56,7 @@ Settings → General → Open chat links in selects the destination for ordinary
 
 Chat omits system-prompt, ordinary Context injection, and `permission` command rows in every work-details mode. It also hides pending and successful `/team on` and `/team off` receipts, identified by their recorded name and trimmed arguments; failures and commands with missing or unrecognized arguments remain visible. Context containing tool additions or removals remains visible. The filter changes neither recorded Session events nor Trajectory inspection and excludes hidden receipts from flow spacing and process summaries. Non-human Turn triggers remain independent, bordered notices with a contrasting neutral background; other command rows remain in Chat.
 
-When an Assistant attempt retires without a visible message, Chat hides its already-published Node instead of removing its key. A retry in the same Step reuses that key when visible content returns. This also applies when the loaded window lacks the Step start.
+When an Assistant attempt retires without a visible message, Chat hides its already-published Node instead of removing its key. A retry in the same Step reuses that key when visible content returns. This also applies when the loaded window lacks the Step start. When one Step appends several Assistant messages, as an agent that settles one message per concurrent call does, the Node shows their blocks in order, so later tool-only messages keep the earlier text.
 
 Text and reasoning contribute to Assistant visibility only when they contain a non-whitespace character. Streaming appends reuse each block's visibility; block replacement and finalized messages recalculate it while preserving the original text.
 

@@ -1,0 +1,16 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.2-alpha.3/desktop-casper-default/guide.md
+/:
+  en: f68bd24efe7b62f6
+  zh: 7c7dbbefc99aab5b
+/desktop-starts-new-sessions-on-the-casper-preset:
+  en: f89b482e2653cf8e
+  zh: 3a1dba4fc79a345d
+/desktop-starts-new-sessions-on-the-casper-preset/change:
+  en: f5c4ec5094e5943e
+  zh: aac2cd0e062f896e
+/desktop-starts-new-sessions-on-the-casper-preset/migration:
+  en: fbfe010020241211
+  zh: 738c6a292f972259

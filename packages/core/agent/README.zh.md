@@ -29,7 +29,7 @@ kind: "package-reference"
 
 ### 创建或恢复 agent
 
-`ctx.agents.create()` 在一个身份下构建全新 agent 与会话；`ctx.agents.resume()` 加载持久化会话并在此基础上重建 agent。两者都委托给已注册工厂，并返回 `AgentHandle`——唯一能拆除该 agent 的对象。发布和失败清理的时序见 [`AgentFactory`](src/index.ts)。`get(id)` 与 `list()` 用于查找实时 agent。[subagent 服务](../../subagent/subagent/README.zh.md) 拥有委派执行和运行时树成员关系。
+`ctx.agents.create()` 在一个身份下构建全新 agent 与会话；`ctx.agents.resume()` 加载持久化会话并在此基础上重建 agent。两者都委托给已注册工厂，并返回 `AgentHandle`——唯一能拆除该 agent 的对象。只服务部分会话的驱动器用 `ctx.agents.route({ factory, selects })` 注册路由，而不占用工厂槽：create 以 `meta.agentPreset`、`meta.origin` 与 `meta.isSeeded` 查询路由，resume 以其 `agentPreset` 选项查询，首个选中的路由胜出；其他会话使用默认工厂。`sameRoute(a, b)` 与 `servesRoute(agent, facts)` 告诉调用方，组合变更是否会把会话移到另一个驱动器。发布和失败清理的时序见 [`AgentFactory`](src/index.ts)。`get(id)` 与 `list()` 用于查找实时 agent。[subagent 服务](../../subagent/subagent/README.zh.md) 拥有委派执行和运行时树成员关系。
 
 ```text
 const handle = await ctx.agents.create({
@@ -207,6 +207,7 @@ await handle.agent.whenIdle()
 - **创建监听器共享初始化生命周期。** `agent/created` 监听器不得等待 `agent.whenIdle()` 或自身所有者的 dispose：这些操作要等待创建完成。所需的异步工具与提示词安装完成后，监听器才可返回。
 - **`cancel()` 默认清空收件箱**：它会中止正在处理的轮次以及排队和 steering 工作；`cancel(cause, { keepInbox: true })` 只中止轮次并保留待处理项，且不存在让轮次继续运行、只中止步骤的操作。
 - **每条附加 `UserMessage` 恰好携带一个 `MessageSource`**：多个插件合并到一条消息上的贡献会归入同一来源，因此该消息无法列出多个生产者。
+- **恢复只按调用方传入的预设路由**：`ResumeAgentOptions.agentPreset` 是可选的，未传入时即使是路由创建的会话也使用默认工厂。
 
 <a id="dev-note"></a>
 ### 开发备注

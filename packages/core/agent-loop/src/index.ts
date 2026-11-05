@@ -200,6 +200,9 @@ declare module '@deepseek-ai/cordis' {
 }
 
 export { DEFAULT_MAX_PARALLEL_TOOL_CALLS }
+// Shared with alternative Agent drivers that keep the same durable inbox and live assistant frames.
+export { ReactLoopInbox, inboxProjectionDefinition } from './inbox.ts'
+export { AssistantStreamAttempt } from './assistant-stream.ts'
 
 /**
  * One launcher-selected session identity for a configured agent. `resume`

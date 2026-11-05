@@ -726,8 +726,8 @@ export class Session implements SessionFace {
     }
     if (result?.type === 'publish') {
       const changed = this.appendLive(result.entry)
-      if (result.retireAttemptId !== undefined) this.eventSource.settleAssistant(result.retireAttemptId)
-      if (changed || result.retireAttemptId !== undefined) this.notifier.markDirty()
+      for (const attemptId of result.retireAttemptIds ?? []) this.eventSource.settleAssistant(attemptId)
+      if (changed || result.retireAttemptIds !== undefined) this.notifier.markDirty()
     } else if (result?.type === 'transient') {
       this.eventSource.append(result.entry)
       this.notifier.markDirty()

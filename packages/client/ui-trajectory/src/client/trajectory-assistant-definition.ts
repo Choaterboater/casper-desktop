@@ -39,6 +39,12 @@ interface AssistantState {
   readonly startTime: number
   readonly started: boolean
   readonly blocks: readonly (AssistantBlock | undefined)[]
+  /**
+   * Blocks of the Step's appended messages, in order. An agent that runs calls
+   * at once may append one message per call in the same Step; a later attempt
+   * streams after these blocks instead of over them.
+   */
+  readonly settledBlocks: readonly AssistantBlock[]
   readonly visibleBlocks: number
   readonly firstVisibleSeq: number | undefined
   readonly firstVisibleTime: number | undefined
@@ -63,6 +69,7 @@ function initialState(
     startTime,
     started,
     blocks: [],
+    settledBlocks: [],
     visibleBlocks: 0,
     firstVisibleSeq: undefined,
     firstVisibleTime: undefined,
@@ -115,10 +122,13 @@ function addUsage(current: UsageValue | undefined, next: UsageValue): UsageValue
 
 function updateChunk(
   state: AssistantState,
-  chunk: StreamChunk,
+  streamed: StreamChunk,
   seq: number,
   time: number,
 ): AssistantState {
+  // A later attempt in a settled Step numbers its blocks from zero.
+  const offset = state.settledBlocks.length
+  const chunk = offset === 0 || !('index' in streamed) ? streamed : { ...streamed, index: streamed.index + offset }
   if (chunk.type === 'usage') {
     return { ...state, usage: addUsage(state.usage, chunk.usage) }
   }
@@ -206,10 +216,12 @@ function settleMessage(
   match: ConversationMatch,
   event: SessionEvent<'assistant/message'>,
 ): AssistantState {
-  const blocks = toAssistantBlocks(event.data.message.content)
+  const prefix = event.surfaceOp === 'append' ? state.settledBlocks : []
+  const blocks = [...prefix, ...toAssistantBlocks(event.data.message.content)]
   return {
     ...settleTiming(state, event),
     blocks,
+    settledBlocks: blocks,
     visibleBlocks: countVisibleBlocks(blocks),
     final: match,
     usage: event.data.usage,
@@ -262,7 +274,7 @@ function finalNode(
       time: event.time,
       turn: state.turn,
       step: state.step,
-      blocks: toAssistantBlocks(event.data.message.content),
+      blocks: [...state.settledBlocks],
       usage: event.data.usage,
       providerMetadata: {
         provider: event.data.message.source.provider,

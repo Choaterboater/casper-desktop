@@ -56,7 +56,10 @@ export class AssistantStreamAttempt {
     })
   }
 
-  /** Snapshot one chunk once, then feed durable compaction, assembly, and live publication. */
+  /**
+   * Snapshot one chunk once, then feed durable compaction, assembly, and live publication.
+   * @param chunk - the next stream chunk of this attempt.
+   */
   push(chunk: StreamChunk): void {
     const timed = this.accumulator.push({ time: Date.now(), chunk })
     this.assembler.push(timed.chunk)
@@ -113,12 +116,18 @@ export class AssistantStreamAttempt {
     return [...this.accumulator.snapshot()] as AssistantStreamRecord[]
   }
 
-  /** Canonical completed-message blocks from the same chunks. */
+  /**
+   * Canonical completed-message blocks from the same chunks.
+   * @returns the assembled blocks.
+   */
   blocks(): ContentBlock[] {
     return this.assembler.blocks()
   }
 
-  /** Safe visible prefix when cancellation interrupts the attempt. */
+  /**
+   * Safe visible prefix when cancellation interrupts the attempt.
+   * @returns the blocks safe to keep after an interruption.
+   */
   interruptedBlocks(): ContentBlock[] {
     return this.assembler.interruptedBlocks()
   }

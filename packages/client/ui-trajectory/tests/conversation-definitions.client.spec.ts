@@ -485,6 +485,45 @@ describe('Trajectory conversation Definitions', () => {
     }])
   })
 
+  it('keeps every settled message of a Step whose later Tool calls settle as further messages', () => {
+    const toolCall = (id: string) => ({ type: 'tool-call', id, name: 'read', arguments: `{"path":"${id}"}` })
+    const durable = [
+      at(1, 'turn/start', { turn: 1 }),
+      at(2, 'step/start', { turn: 1, step: 1 }),
+      at(5, 'assistant/message', {
+        turn: 1, step: 1,
+        message: { ...assistantMessage('assistant-a', ''), content: [{ type: 'text', text: 'Let me look at both files.' }, toolCall('call-a')] },
+      }, { surfaceOp: 'append' }),
+      at(6, 'tool/call', { turn: 1, step: 1, callId: 'call-a', name: 'read', arguments: '{"path":"call-a"}' }),
+      at(7, 'assistant/message', {
+        turn: 1, step: 1,
+        message: { ...assistantMessage('assistant-b', ''), content: [toolCall('call-b')] },
+      }, { surfaceOp: 'append' }),
+      at(8, 'tool/call', { turn: 1, step: 1, callId: 'call-b', name: 'read', arguments: '{"path":"call-b"}' }),
+      at(9, 'step/end', { turn: 1, step: 1 }),
+    ]
+    const blocks = [
+      { kind: 'text', text: 'Let me look at both files.' },
+      { kind: 'tool-call', callId: 'call-a', name: 'read' },
+      { kind: 'tool-call', callId: 'call-b', name: 'read' },
+    ]
+    const replayed = snapshot(assembler(durable))
+    expect(replayed.eventNodes.map(entry => entry.kind)).toEqual(['assistant', 'tool-result', 'tool-result'])
+    expect(replayed.eventNodes[0]).toMatchObject({ kind: 'assistant', blocks, timing: { completedTime: 1_700_000_000_007 } })
+    expect(replayed.requests).toMatchObject([{ status: 'complete', resultSeq: 7 }])
+
+    const live = assembler(durable.slice(0, 4))
+    live.append(at(6.5, 'assistant/live-chunk', {
+      turn: 1, step: 1, chunk: { type: 'tool-call-delta', index: 0, id: 'call-b', name: 'read', argumentsDelta: '{}' },
+    }))
+    live.flush()
+    expect(snapshot(live).eventNodes[0]).toMatchObject({ kind: 'assistant', blocks: blocks.slice(0, 2) })
+    for (const entry of durable.slice(4)) live.append(entry)
+    live.flush()
+    expect(snapshot(live).eventNodes.map(entry => entry.kind)).toEqual(['assistant', 'tool-result', 'tool-result'])
+    expect(snapshot(live).eventNodes[0]).toMatchObject({ seq: 7, blocks })
+  })
+
   it('uses live Assistant deltas without replaying settled embedded streams', () => {
     const runningHistory = [
       at(1, 'turn/start', { turn: 1 }),

@@ -1,0 +1,43 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/casper/casper-agent/README.md
+/:
+  en: 46d3d3bfb2dc30ca
+  zh: baf2ba0857645ba3
+/deepseek-ai-dsh-casper-agent:
+  en: c9639a3881c64d81
+  zh: faa86b67b491657a
+/deepseek-ai-dsh-casper-agent/summary:
+  en: 42feefa9d06636fb
+  zh: 607f70d590687067
+/deepseek-ai-dsh-casper-agent/table-of-contents:
+  en: 76368b6b1da79c80
+  zh: 52384aee991ac542
+/deepseek-ai-dsh-casper-agent/use-this-package:
+  en: 98d6d9643abce8da
+  zh: 91038198bbd2a36a
+/deepseek-ai-dsh-casper-agent/understand-the-implementation:
+  en: c55cbbad56b5d556
+  zh: ff05abb177c57bc7
+/deepseek-ai-dsh-casper-agent/understand-the-implementation/turns-and-events:
+  en: 84ca9b1c881cbdf5
+  zh: 4c9a72a7f4ccbbc3
+/deepseek-ai-dsh-casper-agent/understand-the-implementation/approvals:
+  en: 5baff1027c2d9b24
+  zh: f37bfaa6ead75864
+/deepseek-ai-dsh-casper-agent/understand-the-implementation/process-lifetime-and-resume:
+  en: 9e5e8f3b031ecdae
+  zh: fd116b723f1198cb
+/deepseek-ai-dsh-casper-agent/model-experience:
+  en: 1846e12394598b06
+  zh: aed416a26da053c7
+/deepseek-ai-dsh-casper-agent/model-experience/kv-cache-effect:
+  en: 99237c3b88b098af
+  zh: da166b221288cd59
+/deepseek-ai-dsh-casper-agent/known-limitations-and-deferred-work:
+  en: 6cb14a5465fc1dd8
+  zh: 67dab42b5928b2a2
+/deepseek-ai-dsh-casper-agent/known-limitations-and-deferred-work/dev-note:
+  en: 8cd6e2f500ea491d
+  zh: a4d91e1770ec518a

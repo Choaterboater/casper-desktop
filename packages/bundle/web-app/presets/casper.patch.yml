@@ -1,0 +1,20 @@
+# Agent preset casper: one `@deepseek-ai/dsh-agent-preset` declaration inserted
+# after the web patch. Sessions on this preset are driven by the Casper agent
+# (`@deepseek-ai/dsh-casper-agent`), so the preset mounts only what renders
+# Casper's work: the todo list that shows Casper's plan. Desktop only, never in a
+# Worker, exactly like the casper-agent row.
+- insert:
+    - id: preset-casper
+      name: '@deepseek-ai/dsh-agent-preset'
+      # Same gate as the casper-agent row that drives this preset's Sessions.
+      disabled: !!js "typeof WorkerGlobalScope !== 'undefined' || ctx.get('profileContext')?.name !== 'desktop'"
+      config:
+        id: casper
+        order: 0
+        name: Casper
+        description: Casper does the work and checks it before it says done.
+        plugins:
+          - id: tool-todo
+            name: '@deepseek-ai/dsh-tool-todo'
+            config:
+              allowParallelInProgress: true

@@ -30,6 +30,12 @@ interface AssistantState {
   readonly turn: number
   readonly step: number
   readonly blocks: readonly (AssistantBlock | undefined)[]
+  /**
+   * Blocks of the Step's settled messages, in order. An agent that runs calls
+   * at once may settle one message per call in the same Step; a later attempt
+   * streams after these blocks instead of over them.
+   */
+  readonly settledBlocks: readonly AssistantBlock[]
   /** Missing indices are invisible; same-kind appends preserve already-visible blocks. */
   readonly visibleByIndex: readonly boolean[]
   readonly visibleBlocks: number
@@ -45,6 +51,7 @@ function initialState(turn: number, step: number): AssistantState {
     turn,
     step,
     blocks: [],
+    settledBlocks: [],
     visibleByIndex: [],
     visibleBlocks: 0,
     firstVisibleSeq: undefined,
@@ -83,12 +90,25 @@ function resetForRetry(state: AssistantState): AssistantState {
   }
 }
 
+function withBlocks(state: AssistantState, blocks: readonly AssistantBlock[]): AssistantState {
+  const visibleByIndex = blocks.map(blockIsVisible)
+  return {
+    ...state,
+    blocks,
+    visibleByIndex,
+    visibleBlocks: visibleByIndex.reduce((count, visible) => count + Number(visible), 0),
+  }
+}
+
 function updateChunk(
   state: AssistantState,
-  chunk: StreamChunk,
+  streamed: StreamChunk,
   seq: number,
   time: number,
 ): AssistantState {
+  // A later attempt in a settled Step numbers its blocks from zero.
+  const offset = state.settledBlocks.length
+  const chunk = offset === 0 || !('index' in streamed) ? streamed : { ...streamed, index: streamed.index + offset }
   if (chunk.type === 'tool-call-delta') {
     const previous = state.blocks[chunk.index]
     if (previous?.kind === 'tool-call' && previous.callId !== ''
@@ -175,13 +195,14 @@ function settleMessage(
   match: ConversationMatch,
   event: SessionEvent<'assistant/message'>,
 ): AssistantState {
-  const blocks = toAssistantBlocks(event.data.message.content)
-  const visibleByIndex = blocks.map(blockIsVisible)
+  const blocks = [...state.settledBlocks, ...toAssistantBlocks(event.data.message.content)]
+  const settled = withBlocks(state, blocks)
   return {
-    ...state,
-    blocks,
-    visibleByIndex,
-    visibleBlocks: visibleByIndex.reduce((count, visible) => count + Number(visible), 0),
+    ...settled,
+    settledBlocks: blocks,
+    ...settled.visibleBlocks > 0 && state.firstVisibleSeq === undefined
+      ? { firstVisibleSeq: event.seq, firstVisibleTime: event.time }
+      : {},
     final: match,
     usage: event.data.usage,
   }
@@ -212,7 +233,7 @@ function finalNode(
       time: event.time,
       turn: state.turn,
       step: state.step,
-      blocks: toAssistantBlocks(event.data.message.content),
+      blocks: [...state.settledBlocks],
       usage: event.data.usage,
       timing: {
         stepStartTime: context.start?.event.time ?? null,

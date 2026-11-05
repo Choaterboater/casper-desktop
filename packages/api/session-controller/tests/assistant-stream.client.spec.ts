@@ -55,11 +55,13 @@ function messageEvent(
 function start(
   attemptId = ATTEMPT,
   startedAfterSeq = -1,
+  turn = 1,
+  step = 1,
 ): SessionAssistantStreamFrame {
   return {
     type: 'start', attemptId, revision: 1,
     startedAfterSeq: startedAfterSeq === -1 ? -1 : SessionSeq(startedAfterSeq),
-    turn: 1, step: 1,
+    turn, step,
   }
 }
 
@@ -149,21 +151,41 @@ describe('ClientAssistantStream', () => {
       expect(stream.acceptDurable(unrelated)).toEqual({ type: 'publish', entry: unrelated })
     }
     const closed = entry({ type: 'step/end', seq: SessionSeq(4), time: 4, data: { turn: 1, step: 1 } })
-    expect(stream.acceptDurable(closed)).toEqual({ type: 'publish', entry: closed, retireAttemptId: ATTEMPT })
+    expect(stream.acceptDurable(closed)).toEqual({ type: 'publish', entry: closed, retireAttemptIds: [ATTEMPT] })
     expect(stream.acceptDurable(ordinary(5))).toEqual({ type: 'publish', entry: ordinary(5) })
     expect(stream.acceptFrame(start(LlmAttemptId('session:2'), 4))).toBeUndefined()
   })
 
-  it('clears retained chunks on replacement and refuses a new attempt before Step completion', () => {
+  it('clears retained chunks on replacement and refuses an attempt of another Step before Step completion', () => {
     const stream = opened()
     const durable = messageEvent(2)
     stream.acceptDurable(durable)
     stream.acceptFrame(end(0, { kind: 'committed', eventType: 'assistant/message', seq: 2 }))
-    expect(stream.acceptFrame(start(LlmAttemptId('session:2')))).toEqual({ type: 'rebaseline' })
+    for (const [turn, step] of [[1, 2], [2, 1]]) {
+      expect(stream.acceptFrame(start(LlmAttemptId('session:2'), -1, turn, step))).toEqual({ type: 'rebaseline' })
+    }
     expect(stream.replace([durable])).toEqual([durable])
     const closed = entry({ type: 'step/end', seq: SessionSeq(3), time: 3, data: { turn: 1, step: 1 } })
     expect(stream.acceptDurable(closed)).toEqual({ type: 'publish', entry: closed })
     expect(stream.acceptFrame(start(LlmAttemptId('session:2'), 3))).toBeUndefined()
+  })
+
+  it('follows further successful attempts of the same Step and retires them all at its Step end', () => {
+    const stream = opened()
+    const first = messageEvent(2)
+    expect(stream.acceptDurable(first)).toBeUndefined()
+    expect(stream.acceptFrame(end(0, { kind: 'committed', eventType: 'assistant/message', seq: 2 })))
+      .toEqual({ type: 'publish', entry: first })
+    expect(stream.acceptDurable(ordinary(3))).toEqual({ type: 'publish', entry: ordinary(3) })
+    const SECOND = LlmAttemptId('session:2')
+    expect(stream.acceptFrame(start(SECOND, 3))).toBeUndefined()
+    expect(stream.acceptFrame(chunkFrame(0, SECOND))).toEqual(expect.objectContaining({ type: 'transient' }))
+    const second = messageEvent(4)
+    expect(stream.acceptDurable(second)).toBeUndefined()
+    expect(stream.acceptFrame(end(1, { kind: 'committed', eventType: 'assistant/message', seq: 4 }, SECOND)))
+      .toEqual({ type: 'publish', entry: second })
+    const closed = entry({ type: 'step/end', seq: SessionSeq(5), time: 5, data: { turn: 1, step: 1 } })
+    expect(stream.acceptDurable(closed)).toEqual({ type: 'publish', entry: closed, retireAttemptIds: [ATTEMPT, SECOND] })
   })
 
   it('retires failed attempts and interrupted messages at stream end', () => {

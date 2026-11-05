@@ -113,7 +113,7 @@ export interface Config {
 
 - `inject`: `agents` · `sessions` · `llm` · `tools` · `systemPrompt` · `sessionProjections`
 - `refs`: [`AgentOptions`](subsystems/core.zh.md) · [`SessionId`](subsystems/core.zh.md) · `Volatile` (`@deepseek-ai/cosmokit`)
-- `source`: [`packages/core/agent-loop/src/index.ts:252`](../packages/core/agent-loop/src/index.ts)
+- `source`: [`packages/core/agent-loop/src/index.ts:255`](../packages/core/agent-loop/src/index.ts)
 
 ```ts config-catalog
 /** Agent-loop plugin configuration. */
@@ -472,6 +472,43 @@ export interface Config {
 export type Config = LocalConfig
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-bash-sandbox -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-casper-agent -->
+<a id="deepseek-aidsh-casper-agent"></a>
+
+## `@deepseek-ai/dsh-casper-agent`
+
+- `inject`: `agents` · `sessions` · `sessionProjections` · `sessionPersistence` · `subprocess` · `storageDomain`
+- `source`: [`packages/casper/casper-agent/src/config.ts:9`](../packages/casper/casper-agent/src/config.ts)
+
+```ts config-catalog
+/** Deployment choices for driving Sessions through `casper acp`. */
+export interface Config {
+  /** Agent presets whose Sessions Casper drives; Sessions on any other preset keep the default factory. */
+  presets: string[]
+  /** Casper executable: an absolute path, or a bare name looked up on the child's PATH. */
+  command: string
+  /** Arguments that start Casper's ACP server. */
+  args: string[]
+  /** Casper model passed as `--model` after `args`; unset keeps Casper's own default. */
+  model?: string
+  /** Casper effort passed as `--effort` after `args`; unset keeps Casper's own default. */
+  effort?: string
+  /** Child environment entries merged after the subprocess scrub, so a listed key reaches Casper. */
+  env: Record<string, string>
+  /** Limit for `initialize` plus `session/new` or `session/load` on a fresh process. */
+  startTimeoutMs: number
+  /** Wait for the prompt reply after `session/cancel` before the process is killed. */
+  cancelGraceMs: number
+  /** Wait for the process to exit after stdin closes before termination starts. */
+  exitGraceMs: number
+  /** Termination grace between SIGTERM and SIGKILL. */
+  killGraceMs: number
+  /** Bytes of Casper's stderr kept for start and exit failure messages. */
+  stderrTailBytes: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-casper-agent -->
 
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-casper-checks -->
 <a id="deepseek-aidsh-casper-checks"></a>

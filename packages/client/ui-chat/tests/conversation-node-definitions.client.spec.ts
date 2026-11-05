@@ -1651,6 +1651,80 @@ describe('built-in conversation node Definitions', () => {
     })
   })
 
+  describe('a Step whose later Tool calls settle as further Assistant messages', () => {
+    const toolCallBlock = (id: string) => ({ type: 'tool-call', id, name: 'read', arguments: `{"path":"${id}"}` })
+    const firstMessage = at(5, 'assistant/message', {
+      turn: 1, step: 1,
+      message: { ...assistantMessage('assistant-a', ''), content: [{ type: 'text', text: 'Let me look at both files.' }, toolCallBlock('call-a')] },
+    }, { surfaceOp: 'append' })
+    const secondMessage = at(7, 'assistant/message', {
+      turn: 1, step: 1,
+      message: { ...assistantMessage('assistant-b', ''), content: [toolCallBlock('call-b')] },
+    }, { surfaceOp: 'append' })
+    const durable = [
+      at(1, 'turn/start', { turn: 1 }),
+      at(2, 'step/start', { turn: 1, step: 1 }),
+      firstMessage,
+      at(6, 'tool/call', { turn: 1, step: 1, callId: 'call-a', name: 'read', arguments: '{"path":"call-a"}' }),
+      secondMessage,
+      at(8, 'tool/call', { turn: 1, step: 1, callId: 'call-b', name: 'read', arguments: '{"path":"call-b"}' }),
+      at(9, 'tool/result', { turn: 1, step: 1, message: toolResult('call-b', 'b') }, { surfaceOp: 'append' }),
+      at(10, 'tool/result', { turn: 1, step: 1, message: toolResult('call-a', 'a') }, { surfaceOp: 'append' }),
+      at(11, 'step/end', { turn: 1, step: 1 }),
+    ]
+    const settledBlocks = [
+      { kind: 'text', text: 'Let me look at both files.' },
+      { kind: 'tool-call', callId: 'call-a', name: 'read' },
+      { kind: 'tool-call', callId: 'call-b', name: 'read' },
+    ]
+    const liveChunk = (seq: number, attempt: string, chunk: StreamChunk): SessionEventLikeEntry => ({
+      type: 'transient',
+      event: {
+        type: 'assistant/live-chunk', seq, time: 1_700_000_000_000 + seq,
+        data: { attemptId: LlmAttemptId(attempt), turn: 1, step: 1, chunk },
+      },
+    })
+    const assistantData = (value: ConversationNodeAssembler) => node(snapshot(value), 'assistant-step')
+
+    it('keeps the earlier text and calls when the Step is read back', () => {
+      const value = assembler(durable)
+      const replayed = assistantData(value)
+      const order = snapshot(value).order.map(key => snapshot(value).nodes.get(key))
+      expect(order.map(entry => entry?.kind)).toEqual(['turn-process', 'assistant-step', 'tool-call', 'tool-call'])
+      expect(order.map(entry => entry?.anchorSeq)).toEqual([4.9, 5, 6, 8])
+      expect(replayed?.visibility).toBe('visible')
+      expect(replayed?.data).toMatchObject({ status: 'settled', blocks: settledBlocks })
+      expect((replayed?.data as AssistantChatData).finalNode).toMatchObject({
+        seq: 7, messageId: 'assistant-b', blocks: settledBlocks,
+      })
+    })
+
+    it('keeps the earlier text visible while a later call streams and settles live', () => {
+      const value = assembler([...durable.slice(0, 2), liveChunk(4.1, 'attempt-a', { type: 'block-start', index: 0, blockType: 'text' })])
+      for (const entry of [
+        liveChunk(4.2, 'attempt-a', { type: 'text-delta', index: 0, text: 'Let me look at both files.' }),
+        firstMessage,
+        durable[3]!,
+        liveChunk(6.1, 'attempt-b', { type: 'block-start', index: 0, blockType: 'tool-call' }),
+        liveChunk(6.2, 'attempt-b', { type: 'tool-call-delta', index: 0, id: ToolCallId('call-b'), name: 'read', argumentsDelta: '{}' }),
+      ]) {
+        value.append(entry)
+        value.flush()
+        expect(assistantData(value)?.visibility).toBe('visible')
+      }
+      expect(assistantData(value)?.data).toMatchObject({
+        blocks: [settledBlocks[0], settledBlocks[1]],
+        finalNode: { messageId: 'assistant-a' },
+      })
+      for (const entry of durable.slice(4)) {
+        value.append(entry)
+        value.flush()
+        expect(assistantData(value)?.visibility).toBe('visible')
+      }
+      expect(assistantData(value)?.data).toMatchObject({ status: 'settled', blocks: settledBlocks })
+    })
+  })
+
   it('keeps one keyed Tool node from running through settlement and replays nested dispatch after prepend', () => {
     const value = assembler([
       at(1, 'turn/start', { turn: 1 }),

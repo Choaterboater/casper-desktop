@@ -1,0 +1,25 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types"
+  },
+  "include": [
+    "src"
+  ],
+  "references": [
+    { "path": "../../../vendor/cordis" },
+    { "path": "../../../vendor/schemastery" },
+    { "path": "../../core/agent" },
+    { "path": "../../core/agent-loop" },
+    { "path": "../../llm/llm" },
+    { "path": "../../core/scope" },
+    { "path": "../../core/session" },
+    { "path": "../../session/session-persistence" },
+    { "path": "../../session/session-projection" },
+    { "path": "../../storage/storage-domain" },
+    { "path": "../../subprocess/subprocess" },
+    { "path": "../../todo/tool-todo" },
+    { "path": "../../interaction/user-questions" }
+  ]
+}

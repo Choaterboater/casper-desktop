@@ -72,6 +72,8 @@ async function bench(options: {
   selectRefused?: boolean
   /** The preset the Host reports after a selection, when it differs from the request. */
   selectResult?: string
+  /** The Host refuses every selection because another Agent driver serves the preset, asking for a new Session. */
+  selectNewSession?: boolean
   settingsRosterGate?: Promise<undefined>
   describeGate?: Promise<undefined>
   presets?: AgentPresetRow[]
@@ -168,9 +170,13 @@ async function bench(options: {
     },
     select: (_agentId: SessionId, agentPreset: string) => {
       calls.push(`select:${agentPreset}`)
-      return Promise.resolve(options.selectGate).then(() => options.selectRefused === true
-        ? { ok: false as const, error: new RemoteError('gateway/internal', 'selection refused', {}) }
-        : { ok: true as const, value: options.selectResult ?? agentPreset })
+      return Promise.resolve(options.selectGate).then(() => options.selectNewSession === true
+        ? { ok: false as const, error: new RemoteError('agent-preset/locked', 'another driver serves this preset', {
+          sessionId: _agentId, agentPreset, newSession: true as const,
+        }) }
+        : options.selectRefused === true
+          ? { ok: false as const, error: new RemoteError('gateway/internal', 'selection refused', {}) }
+          : { ok: true as const, value: options.selectResult ?? agentPreset })
     },
   }
   ctx.provide('remote.agentPresets', agentPresets as never)
@@ -1222,7 +1228,8 @@ async function analyticsBench(
     } },
   })
   b.ctx.provide('sessions', sessions as never)
-  b.ctx.provide('uiWorkspace', uiWorkspaceDouble() as never)
+  const workspace = uiWorkspaceDouble()
+  b.ctx.provide('uiWorkspace', workspace as never)
   const track = vi.fn()
   b.ctx.provide('productAnalytics', { enabled: true, track } as never)
   await b.ctx.plugin({ inject: [...inject], apply }).await()
@@ -1230,7 +1237,7 @@ async function analyticsBench(
     (sessionId?: SessionId) => AgentPresetSeatInjected & Record<string, unknown>)(
     bound === undefined ? undefined : SessionId('blank'))
   await seat.load()
-  return { ...b, seat, sessions, track }
+  return { ...b, seat, sessions, track, workspace }
 }
 
 describe('agent preset switch analytics', () => {
@@ -1270,6 +1277,17 @@ describe('agent preset switch analytics', () => {
         switch_from: 'standard', switch_to: 'minimal', code_work_view_enabled: true,
       })
     } finally { gate.resolve(undefined); await b.ctx.fiber.dispose() }
+  })
+
+  it('reports a bound pick that starts a new Session because another driver serves the preset', async () => {
+    const b = await analyticsBench({ selectNewSession: true }, { preset: 'standard', blank: true })
+    try {
+      await expect(b.seat.select('minimal')).resolves.toBeUndefined()
+      expect(b.workspace.starts).toEqual([{ workspaceId: undefined, options: { agentPreset: 'minimal' } }])
+      expect(b.track).toHaveBeenCalledExactlyOnceWith('agent_preset_switch', {
+        switch_from: 'standard', switch_to: 'minimal', code_work_view_enabled: true,
+      })
+    } finally { await b.ctx.fiber.dispose() }
   })
 
   it('does not report a bound pick that only waits for its Session to become current', async () => {

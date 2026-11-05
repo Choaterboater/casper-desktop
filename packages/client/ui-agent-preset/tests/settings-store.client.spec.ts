@@ -203,6 +203,8 @@ describe('the new-session chip controller', () => {
     options: {
       writes?: Recorded[]
       failSelect?: string
+      /** Refuse the switch because another Agent driver serves the preset; records started Sessions. */
+      newSession?: { agentPreset?: string }[]
       failList?: string
       failListCode?: RemoteErrorCode
       list?: () => Promise<ReturnType<typeof remoteRoster>>
@@ -224,6 +226,14 @@ describe('the new-session chip controller', () => {
           }),
           select: (agentId: SessionId, agentPreset: string) => {
             options.writes?.push({ ns: 'select', ops: agentPreset })
+            if (options.newSession !== undefined) {
+              return Promise.resolve({
+                ok: false as const,
+                error: new RemoteError('agent-preset/locked', 'runs on another agent', {
+                  sessionId: agentId, agentPreset, newSession: true as const,
+                }),
+              })
+            }
             return Promise.resolve(options.failSelect === undefined
               ? { ok: true as const, value: agentPreset }
               : {
@@ -236,7 +246,13 @@ describe('the new-session chip controller', () => {
         },
       },
     }
-    const ctx = partial as ClientContext
+    const started = options.newSession
+    const ctx = (started === undefined ? partial : {
+      ...partial,
+      get: (name: string) => name === 'uiWorkspace'
+        ? { startSession: (_workspace: unknown, start: { agentPreset?: string }) => { started.push(start) } }
+        : undefined,
+    }) as ClientContext
     return new AgentPresetSeatController(
       ctx,
       typeof current === 'function' ? current : () => current,
@@ -435,6 +451,21 @@ describe('the new-session chip controller', () => {
     expect(controller.store.getSnapshot()).toMatchObject({
       current: 'standard', error: { preset: { id: 'minimal' }, reason: 'already started' },
     })
+  })
+
+  it('starts a new session when another agent driver serves the pick', async () => {
+    const started: { agentPreset?: string }[] = []
+    const controller = chip(
+      ROSTER,
+      { id: 's1' as SessionId, blank: true, projectionValues: { agentPreset: 'standard' } },
+      { newSession: started },
+    )
+    await controller.load()
+
+    expect(await controller.select('minimal')).toEqual({ kind: 'started' })
+
+    expect(started).toEqual([{ agentPreset: 'minimal' }])
+    expect(controller.store.getSnapshot()).toMatchObject({ current: 'minimal', error: null })
   })
 
   it('ignores a pick while a switch is in flight', async () => {

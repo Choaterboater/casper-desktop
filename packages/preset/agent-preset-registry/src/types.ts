@@ -42,8 +42,11 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'agent-preset/not-found': { readonly agentPreset: string; readonly available: readonly string[] }
     /** The id is unusable, already taken, or its composition cannot be installed. */
     'agent-preset/invalid': { readonly agentPreset: string; readonly reason: string }
-    /** The session's conversation has started, so its composition is fixed. */
-    'agent-preset/locked': { readonly sessionId: SessionId; readonly agentPreset: string }
+    /**
+     * The session's composition is fixed: its conversation has started, or
+     * `newSession` is true because another Agent factory serves the preset.
+     */
+    'agent-preset/locked': { readonly sessionId: SessionId; readonly agentPreset: string; readonly newSession?: true }
   }
 }
 

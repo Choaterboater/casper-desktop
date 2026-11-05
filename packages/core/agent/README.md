@@ -29,7 +29,7 @@ Mount `dsh-agent` with `dsh-session-projection`: it provides `ctx.agents`, the `
 
 ### Create or resume an agent
 
-`ctx.agents.create()` builds a fresh agent and session under one identity; `ctx.agents.resume()` loads a persisted session and rebuilds the agent on it. Both delegate to the registered factory and return an `AgentHandle` — the only object that can tear that agent down. See [`AgentFactory`](src/index.ts) for publication and failure-cleanup timing. `get(id)` and `list()` find live agents. The [subagent service](../../subagent/subagent/README.md) owns delegated execution and runtime tree membership.
+`ctx.agents.create()` builds a fresh agent and session under one identity; `ctx.agents.resume()` loads a persisted session and rebuilds the agent on it. Both delegate to the registered factory and return an `AgentHandle` — the only object that can tear that agent down. A driver that serves only some Sessions registers a route with `ctx.agents.route({ factory, selects })` instead of the factory slot: create consults the routes with `meta.agentPreset`, `meta.origin`, and `meta.isSeeded`, resume with its `agentPreset` option, and the first selecting route wins; any other Session uses the default factory. `sameRoute(a, b)` and `servesRoute(agent, facts)` tell callers whether a composition change would move a Session to another driver. See [`AgentFactory`](src/index.ts) for publication and failure-cleanup timing. `get(id)` and `list()` find live agents. The [subagent service](../../subagent/subagent/README.md) owns delegated execution and runtime tree membership.
 
 ```text
 const handle = await ctx.agents.create({
@@ -207,6 +207,7 @@ These limits define when this package needs special care. They are current packa
 - **Creation listeners share the initialization lifetime.** An `agent/created` listener must not await `agent.whenIdle()` or its own owner's disposal: those operations wait for creation to finish. Return only after required asynchronous tool and prompt installation completes.
 - **`cancel()` clears the inbox by default** — it aborts the in-flight turn plus queued and steering work; `cancel(cause, { keepInbox: true })` aborts only the turn and preserves pending items, and there is no step-only abort that keeps the turn running.
 - **Each additional `UserMessage` carries exactly one `MessageSource`** — contributions from several plugins merged onto one message collapse under one source, so the message cannot name several producers.
+- **Resume routes only on the preset the caller passes** — `ResumeAgentOptions.agentPreset` is optional, and a resume without it uses the default factory even for a Session a route created.
 
 <a id="dev-note"></a>
 ### Dev Note

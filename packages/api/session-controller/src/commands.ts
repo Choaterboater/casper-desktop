@@ -256,7 +256,8 @@ export class SessionCommandController {
       )
     }
     const childId = brandString<SessionId>(`session-${randomUUID()}`)
-    const composition = await this.agents.composeAgent(this.agents.presetForObservation(source))
+    // A source that records no preset forks on a preset the default factory serves, as its resume would.
+    const composition = await this.agents.composeAgent(await this.agents.presetToCompose(source))
     try {
       const { provider, model } = this.ctx.agentDefaultModel.currentSelection()
       await this.ctx.agents.create({

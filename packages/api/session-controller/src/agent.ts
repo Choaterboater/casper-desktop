@@ -211,7 +211,8 @@ export class ApiSessionAgentController {
 
   /**
    * Create a Session for a new conversation, reusing the named blank Session
-   * while it is still reusable. A reused Session runs the requested preset, or
+   * while it is still reusable. A blank Session whose driver factory does not
+   * serve the requested preset is not reused. A reused Session runs the requested preset, or
    * the configured default when the request names none; the preset it recorded
    * is not resolved, and a change is logged as `agent-preset/selected` before
    * the Agent is published. A named Session that has started a turn, fails the
@@ -305,16 +306,44 @@ export class ApiSessionAgentController {
     if (hasApiSessionSubagentOwner({ header: observation.header })) {
       throw new ApiSessionSubagentOwnership(sessionId)
     }
-    const composition = await this.composeAgent(this.presetForObservation(observation))
+    const recorded = this.presetForObservation(observation)
+    const composition = await this.composeAgent(await this.presetToCompose(observation))
     const published = this.ctx.sessions.get(sessionId)
     if (published !== undefined && hasApiSessionSubagentOwner(published)) {
       throw new ApiSessionSubagentOwnership(sessionId)
     }
+    // Routing reads only the recorded preset, so a Session that records none keeps the default factory.
     return (await this.ctx.agents.resume({
       resumeSessionId: sessionId,
       agentOptions: this.agentOptions(),
+      ...recorded === undefined ? {} : { agentPreset: recorded },
       setup: composition.setup,
     })).agent
+  }
+
+  /**
+   * Choose the preset to compose for an existing Session, as resume and fork
+   * do: the recorded preset, or for a Session that records none, a preset the
+   * default factory serves.
+   * @param observation - exact Session observation carrying its projection snapshot.
+   * @returns the preset id, or undefined to resolve the roster default.
+   */
+  async presetToCompose(observation: SessionObservation): Promise<string | undefined> {
+    return this.presetForObservation(observation) ?? await this.unroutedDefault()
+  }
+
+  /**
+   * Choose the preset for a resumed or forked Session that records none. The default
+   * preset is used unless a factory route serves it; then the first usable
+   * roster preset the default factory serves is used, so such a Session keeps
+   * the driver that wrote its history.
+   * @returns the preset id, or undefined to resolve the roster default.
+   */
+  private async unroutedDefault(): Promise<string | undefined> {
+    const presets = this.ctx.get('agentPresets')
+    if (presets === undefined || this.ctx.agents.sameRoute({ agentPreset: presets.defaultId }, {})) return undefined
+    const roster = await presets.list()
+    return roster.find(row => row.broken === undefined && this.ctx.agents.sameRoute({ agentPreset: row.id }, {}))?.id
   }
 
   private async inOrder<Value>(sessionId: SessionId, operation: () => Promise<Value>): Promise<Value> {
@@ -350,6 +379,7 @@ export class ApiSessionAgentController {
       return this.createAgent(sessionId, request.cwd, await this.composeAgent(request.agentPreset))
     }
     let reusable: boolean
+    let observedPreset: string | undefined
     {
       using observed = observation
       if (hasApiSessionSubagentOwner({ header: observed.header })) {
@@ -359,14 +389,19 @@ export class ApiSessionAgentController {
         throw new ApiSessionCwdConflict(sessionId, request.cwd, observed.header.cwd)
       }
       reusable = request.reusable(sessionId) && !observed.events.some(event => event.type === 'turn/start')
+      observedPreset = this.presetForObservation(observed)
     }
     const composition = await this.composeAgent(request.agentPreset)
-    if (!reusable) return this.createMinted(request.cwd, composition)
+    // A preset another factory serves cannot reuse this Session's driver.
+    if (!reusable || !this.ctx.agents.sameRoute({ agentPreset: observedPreset }, { agentPreset: composition.agentPreset })) {
+      return this.createMinted(request.cwd, composition)
+    }
     this.assertPresetApplicable(sessionId, request.agentPreset)
     try {
       return (await this.ctx.agents.resume({
         resumeSessionId: sessionId,
         agentOptions: this.agentOptions(),
+        ...composition.agentPreset === undefined ? {} : { agentPreset: composition.agentPreset },
         setup: this.reuseSetup(composition),
       })).agent
     } catch (error: unknown) {
@@ -391,6 +426,8 @@ export class ApiSessionAgentController {
     const presets = this.ctx.get('agentPresets')
     const target = composition.agentPreset
     if (presets === undefined || target === undefined || target === current) return live
+    // A preset another factory serves needs a new Session; the preset registry refuses the switch as well.
+    if (!this.ctx.agents.servesRoute(live, { agentPreset: target })) return undefined
     try {
       await presets.select(live, target)
     } catch (error: unknown) {

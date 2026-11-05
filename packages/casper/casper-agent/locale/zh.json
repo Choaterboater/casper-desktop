@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Casper agent",
+    "description": "在 Casper 模式的会话中由 Casper 担任 agent，其工具步骤、检查、计划与审批都显示在对话中。"
+  }
+}

@@ -132,6 +132,12 @@ export interface ResumeAgentOptions {
   /** Optional creation-only cancellation signal for persistence load/setup; detached before return. */
   readonly signal?: AbortSignal
   /**
+   * Current Agent preset recorded by the persisted Session, when the caller
+   * knows it. Only factory routes read it ({@link AgentRegistry.route}); an
+   * omitted value selects the default factory.
+   */
+  readonly agentPreset?: string
+  /**
    * Resume-time composition of the agent's fresh scoped world. Persistence is
    * loaded first; the factory then enters and announces the reconstructed Session and awaits
    * setup in the fresh `agentCtx` before registering the Agent. The callback has the
@@ -205,6 +211,31 @@ export interface AgentFactory {
   resume(ownerCtx: Context, options: ResumeAgentOptions): Promise<AgentHandle>
 }
 
+/** Facts a factory route reads when choosing the factory for one Session. */
+export interface AgentRouteFacts {
+  /** Preset the Session runs: the requested preset on create, the recorded one on resume. */
+  readonly agentPreset?: string | undefined
+  /** Coarse Session origin; delegated children carry `subagent`. */
+  readonly origin?: 'subagent' | undefined
+  /** Whether creation seeds the Session with a fork prefix. */
+  readonly isSeeded?: boolean | undefined
+}
+
+/**
+ * A factory that serves only the Sessions it selects. Sessions no route
+ * selects use the default factory registered with {@link AgentRegistry.setFactory}.
+ */
+export interface AgentFactoryRoute {
+  /** Factory that creates and resumes the selected Sessions. */
+  readonly factory: AgentFactory
+  /**
+   * Choose whether this route serves one Session. Must be synchronous and pure.
+   * @param facts - Session facts known before the factory runs.
+   * @returns true when this route's factory serves the Session.
+   */
+  selects(facts: AgentRouteFacts): boolean
+}
+
 /** Thrown when create/resume is called before an agent factory is registered. */
 const NO_FACTORY_MESSAGE = 'no agent factory registered (load an agent-loop plugin)'
 const NO_INITIATOR_MESSAGE = 'no initiating agent is active'
@@ -231,11 +262,22 @@ interface FactorySlot {
   readonly target: AgentFactory
 }
 
+/** One registered route with its canonical factory target. */
+interface RouteSlot extends FactorySlot {
+  readonly route: AgentFactoryRoute
+}
+
+/** Remove a Cordis shadow layer from a Service-backed factory. */
+function canonicalFactory(factory: AgentFactory): AgentFactory {
+  return (factory as AgentFactory & { [symbols.original]?: AgentFactory })[symbols.original] ?? factory
+}
+
 /**
  * Agent service (`ctx.agents`): tracks live agents and carries the initiating
  * Agent through one process-local asynchronous driver chain. Agent *creation*
  * is provided by whichever plugin implements the {@link AgentFactory}
- * (`@deepseek-ai/dsh-agent-loop`), registered via {@link setFactory}.
+ * (`@deepseek-ai/dsh-agent-loop`), registered via {@link setFactory}; a
+ * {@link route} serves only the Sessions it selects.
  *
  * Initiator methods provide same-process causal attribution only. Ambient
  * presence is neither liveness proof nor authorization; subjects and owners
@@ -249,6 +291,9 @@ export class AgentRegistry extends Service {
   private turnBoundaryProjectionHandle!: ProjectionHandle<TurnBoundaryProjection>
   private store = new Map<SessionId, AgentEntry>()
   private factory: FactorySlot | undefined
+  private routes: readonly RouteSlot[] = []
+  /** Canonical factory that built each Agent returned by {@link create} or {@link resume}. */
+  private readonly builders = new WeakMap<Agent, AgentFactory>()
   private readonly initiators = new AsyncLocalStorage<Agent | undefined>()
   private readonly initiatorRuns = new AsyncLocalStorage<InitiatorRun>()
   private initiatorState: 'active' | 'closing' | 'disposed' = 'active'
@@ -380,7 +425,7 @@ export class AgentRegistry extends Service {
       // Avoid stacking two Cordis shadow layers when a caller passes a Service
       // already read through a context. Calls are re-traced through their
       // actual owner context below.
-      const target = (factory as AgentFactory & { [symbols.original]?: AgentFactory })[symbols.original] ?? factory
+      const target = canonicalFactory(factory)
       this.factory = { target }
       return () => { this.factory = undefined }
     }, 'agents.setFactory()')
@@ -392,14 +437,65 @@ export class AgentRegistry extends Service {
     return dispose
   }
 
-  /** Return the active creation factory. */
-  private requireFactory(): FactorySlot {
-    if (this.factory === undefined) throw new Error(NO_FACTORY_MESSAGE)
-    return this.factory
+  /**
+   * Register a factory that serves only the Sessions its `selects` accepts.
+   * Routes are consulted in registration order before the default factory;
+   * the first selecting route wins. A traced Cordis service is canonicalized
+   * as in {@link setFactory}.
+   * @param route - the factory and its selection predicate.
+   * @returns the exact Cordis effect disposer that removes the route; live
+   *   Agents the route already built are unaffected.
+   */
+  route(route: AgentFactoryRoute): () => void {
+    const dispose = this.ctx.effect(() => {
+      const slot: RouteSlot = { route, target: canonicalFactory(route.factory) }
+      this.routes = [...this.routes, slot]
+      return () => { this.routes = this.routes.filter(entry => entry !== slot) }
+    }, 'agents.route()')
+    // oxlint-disable-next-line typescript/no-misused-promises -- synchronous cleanup; direct return preserves disposer identity
+    return dispose
   }
 
   /**
-   * Create and publish a new agent through the registered factory.
+   * Whether two Sessions would be served by the same factory.
+   * @param a - facts of the first Session.
+   * @param b - facts of the second Session.
+   * @returns true when both select the same route, or both fall to the default factory (also when none is registered).
+   */
+  sameRoute(a: AgentRouteFacts, b: AgentRouteFacts): boolean {
+    return this.slotFor(a)?.target === this.slotFor(b)?.target
+  }
+
+  /**
+   * Whether a live Agent was built by the factory that would serve a Session
+   * with these facts, so a composition change cannot move it to another driver.
+   * @param agent - a live Agent.
+   * @param facts - facts of the Session the caller wants the Agent to run.
+   * @returns true when that factory built the Agent or this registry did not build it.
+   */
+  servesRoute(agent: Agent, facts: AgentRouteFacts): boolean {
+    const built = this.builders.get(agent)
+    return built === undefined || built === this.slotFor(facts)?.target
+  }
+
+  /**
+   * Plain holder of the factory serving one Session; a holder keeps a
+   * Service-backed factory from being traced on return.
+   */
+  private slotFor(facts: AgentRouteFacts): FactorySlot | undefined {
+    return this.routes.find(slot => slot.route.selects(facts)) ?? this.factory
+  }
+
+  /** Return the factory slot for one Session, failing as before when no default exists. */
+  private pick(facts: AgentRouteFacts): FactorySlot {
+    const slot = this.slotFor(facts)
+    if (slot === undefined) throw new Error(NO_FACTORY_MESSAGE)
+    return slot
+  }
+
+  /**
+   * Create and publish a new agent through the factory {@link route}s or the
+   * default factory select from `meta.agentPreset`, `meta.origin`, and `meta.isSeeded`.
    * Distinct from {@link register} (which records an already-constructed
    * agent): this constructs the agent and its session. Rejects if no factory is
    * registered or creation/setup fails. The resolved {@link AgentHandle} lets
@@ -413,25 +509,34 @@ export class AgentRegistry extends Service {
     // explicitly. This preserves AgentLoop's dependency origin while binding
     // its effects to ownerCtx; plain factories receive ownerCtx as an explicit
     // capability and need no Cordis tracker magic.
-    const { target } = this.requireFactory()
+    const { target } = this.pick({
+      agentPreset: options.meta?.agentPreset,
+      origin: options.meta?.origin,
+      isSeeded: options.meta?.isSeeded,
+    })
     const receiver = getTraceable(ownerCtx, target)
     // oxlint-disable-next-line typescript/unbound-method -- Reflect.apply intentionally supplies the caller-traced receiver
-    return Reflect.apply(target.createAgent, receiver, [ownerCtx, options])
+    const handle: AgentHandle = await Reflect.apply(target.createAgent, receiver, [ownerCtx, options])
+    this.builders.set(handle.agent, target)
+    return handle
   }
 
   /**
-   * Load a persisted session and resume an agent on it through the registered
-   * factory. Rejects if no factory is registered; the factory rejects if
+   * Load a persisted session and resume an agent on it through the factory
+   * selected from `agentPreset` (see {@link route}). Rejects if no factory is
+   * registered; the factory rejects if
    * session persistence is not configured or persistence/setup fails.
    * @param options - persisted identity, configuration, and setup.
    * @returns the handle after setup, rollback-covered publication, and loop start complete.
    */
   async resume(options: ResumeAgentOptions): Promise<AgentHandle> {
     const ownerCtx = this.ctx
-    const { target } = this.requireFactory()
+    const { target } = this.pick({ agentPreset: options.agentPreset })
     const receiver = getTraceable(ownerCtx, target)
     // oxlint-disable-next-line typescript/unbound-method -- Reflect.apply intentionally supplies the caller-traced receiver
-    return Reflect.apply(target.resume, receiver, [ownerCtx, options])
+    const handle: AgentHandle = await Reflect.apply(target.resume, receiver, [ownerCtx, options])
+    this.builders.set(handle.agent, target)
+    return handle
   }
 
   /**

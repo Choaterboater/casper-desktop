@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Casper agent",
+    "description": "Runs Casper as the agent for sessions in Casper mode, with its tool steps, checks, plan, and approvals in the conversation."
+  }
+}

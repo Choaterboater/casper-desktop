@@ -442,6 +442,7 @@
       "@deepseek-ai/dsh-bash-local": ["./packages/shell/bash-local/src"],
       "@deepseek-ai/dsh-bash-sandbox": ["./packages/shell/bash-sandbox/src"],
       "@deepseek-ai/dsh-brand": ["./packages/util/brand/src"],
+      "@deepseek-ai/dsh-casper-agent": ["./packages/casper/casper-agent/src"],
       "@deepseek-ai/dsh-casper-bundle": ["./packages/casper/casper-bundle/src"],
       "@deepseek-ai/dsh-casper-chrome-bundle": ["./packages/experimental/casper-chrome-bundle/src"],
       "@deepseek-ai/dsh-chunked-list": ["./packages/util/chunked-list/src"],
