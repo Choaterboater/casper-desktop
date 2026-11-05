@@ -13,8 +13,8 @@
 - text: Explain event sourcing in one sentence.Your final answer is delivered automatically if your parent is still online. Include the result and relevant evidence in that answer; the parent does not receive your full transcript, tool output, or reasoning. If your last action is a message to your parent, the completion notice omits your final answer; include the result and relevant evidence in that message. {{clock}}
 - button "Copy"
 - paragraph: partial
-- status: Deep diving
-- text: Deep diving for {{duration}} ···
+- status: Haunting
+- text: Haunting for {{duration}} ···
 - list:
   - listitem:
     - text: Keep working until I stop you again.

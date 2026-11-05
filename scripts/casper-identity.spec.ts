@@ -65,10 +65,10 @@ describe('Casper identity', () => {
     expect(read('apps/desktop/resources/icon-windows.svg')).toContain('<g id="tray-glyph"')
   })
 
-  it('ships no installer bitmap left over from the upstream whale artwork', () => {
+  it('ships no installer or running-status bitmap left over from the upstream whale artwork', () => {
     const digest = (bytes: Buffer): string => createHash('sha256').update(bytes).digest('hex')
-    for (const name of ['brand.png', 'brand-2x.png', 'brand-dark.png', 'brand-dark-2x.png', 'uninstaller-sidebar.png']) {
-      const path = `apps/desktop/installer/assets/${name}`
+    const installer = ['brand.png', 'brand-2x.png', 'brand-dark.png', 'brand-dark-2x.png', 'uninstaller-sidebar.png']
+    for (const path of [...installer.map(name => `apps/desktop/installer/assets/${name}`), 'packages/client/ui-chat/src/client/assets/running-whale@2x.png']) {
       const upstream = execFileSync('git', ['show', `${UPSTREAM}:${path}`], { cwd: root, maxBuffer: 16 * 1024 * 1024 })
       expect(digest(readFileSync(resolve(root, path))), path).not.toBe(digest(upstream))
     }
