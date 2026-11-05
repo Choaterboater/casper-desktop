@@ -51,6 +51,7 @@ const operation: z.ZodType<PluginOperation> = z.discriminatedUnion('phase', [
       'already-installed': 'already-installed',
       'ambiguous-install': 'ambiguous-install',
       'not-bundle': 'not-bundle',
+      'not-offered': 'not-offered',
       'not-removable': 'not-removable',
       'stop-profile': 'stop-profile',
       'bundle-in-use': 'bundle-in-use',

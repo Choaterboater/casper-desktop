@@ -976,7 +976,7 @@ export type Config = BrowserMcpConfig | PlaywrightExtensionConfig
 
 /** Connection to the user's running Google Chrome through the Playwright Extension. */
 export interface PlaywrightExtensionConfig {
-  /** Exclusively connect one live Session to the Chrome tabs the user approves in the Playwright Extension. */
+  /** Connect each live Session separately to the Chrome tabs the user approves for it in the Playwright Extension. */
   mode: 'extension'
   /** Per-call timeout override in milliseconds; omission uses the MCP client default. */
   toolCallTimeoutMs?: number
@@ -2756,6 +2756,12 @@ export interface Config {
   detailFetchTimeoutMs?: number
   /** npm file CDNs that offered bundles are read from, in order; a read's `npmFileSources` moves the CDNs it names first. */
   detailNpmFileSources?: NpmFileSource[]
+  /**
+   * Bundle package names this deployment does not offer. A hidden bundle is left out of the bundle listing while it is
+   * switched off, and switching it on or installing it fails with `not-offered`; one still switched on stays listed so
+   * it can be switched off.
+   */
+  hiddenBundles?: string[]
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-plugin-manager -->

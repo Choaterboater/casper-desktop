@@ -4903,6 +4903,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'key', description: 'the credential record the finished attempt was authorizing.' }, { name: 'settlement', description: 'how it ended, including the `failed` case its caller sees as a thrown error.' }],
   },
   {
+    name: 'casper-sidebar-browser/request',
+    mode: 'waterfall',
+    signature: '\'casper-sidebar-browser/request\'( this: Scoped<Agent>, request: SidebarBrowserToolRequest, next: () => Promise<SidebarBrowserToolResponse>, ): Promise<SidebarBrowserToolResponse>',
+    summary: 'Run one operation on the Sidebar browser of the Agent\'s Session.',
+    description: 'Run one operation on the Sidebar browser of the Agent\'s Session. The Desktop Client showing that Session answers; a Client without the browser or without the Session calls `next()`. Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.',
+    parameters: [{ name: 'request', description: 'operation, operation id, owner Agent, and cancellation.' }, { name: 'next', description: 'delegate to later answerers; the last one reports that no Desktop app answered.' }],
+  },
+  {
     name: 'commands/change',
     mode: 'emit',
     signature: '\'commands/change\'(): void',
@@ -6775,6 +6783,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type IndexInjectionPlacement = \'head\' | \'body\';',
   },
   {
+    name: 'InferValue',
+    declaration: 'export type InferValue<S> = InferValueAt<S, [\n]>;',
+  },
+  {
     name: 'InspectOptions',
     declaration: 'export interface InspectOptions {\n    readonly registry?: Registry;\n}',
   },
@@ -7116,7 +7128,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ManagementError',
-    declaration: 'export interface ManagementError {\n    code: ReadOnlyReason | \'unknown-plugin\' | \'invalid-spec\' | \'already-installed\' | \'ambiguous-install\' | \'not-bundle\' | \'not-removable\' | \'stop-profile\' | \'bundle-in-use\' | \'stale-approval\' | \'incompatible-version\' | \'unsupported-platform\' | \'operation-error\';\n    diagnostic?: string;\n    incompatible?: IncompatiblePlugin[];\n}',
+    declaration: 'export interface ManagementError {\n    code: ReadOnlyReason | \'unknown-plugin\' | \'invalid-spec\' | \'already-installed\' | \'ambiguous-install\' | \'not-bundle\' | \'not-offered\' | \'not-removable\' | \'stop-profile\' | \'bundle-in-use\' | \'stale-approval\' | \'incompatible-version\' | \'unsupported-platform\' | \'operation-error\';\n    diagnostic?: string;\n    incompatible?: IncompatiblePlugin[];\n}',
   },
   {
     name: 'ManualCompactAgentContext',
@@ -9051,6 +9063,42 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ShellSandboxInfo {\n    mode: SandboxMode;\n    denied: boolean;\n    enforcement?: SandboxEnforcement;\n    runnerFailed?: boolean;\n}',
   },
   {
+    name: 'SidebarBrowserCommand',
+    declaration: 'export type SidebarBrowserCommand = {\n    readonly action: \'read\';\n} | {\n    readonly action: \'screenshot\';\n} | {\n    readonly action: \'navigate\';\n    readonly url: string;\n} | {\n    readonly action: \'click\';\n    readonly x: number;\n    readonly y: number;\n} | {\n    readonly action: \'type\';\n    readonly text: string;\n} | {\n    readonly action: \'key\';\n    readonly key: SidebarBrowserKey;\n} | {\n    readonly action: \'scroll\';\n    readonly x: number;\n    readonly y: number;\n    readonly deltaY: number;\n};',
+  },
+  {
+    name: 'SidebarBrowserElement',
+    declaration: 'export interface SidebarBrowserElement {\n    readonly ref: number;\n    readonly role: string;\n    readonly name: string;\n    readonly x: number;\n    readonly y: number;\n    readonly width: number;\n    readonly height: number;\n}',
+  },
+  {
+    name: 'SidebarBrowserFailureCode',
+    declaration: 'export type SidebarBrowserFailureCode = \'invalid-input\' | \'unavailable\' | \'operation-failed\' | \'result-too-large\' | \'timed-out\';',
+  },
+  {
+    name: 'SidebarBrowserKey',
+    declaration: 'export type SidebarBrowserKey = \'Enter\' | \'Tab\' | \'Escape\' | \'Backspace\' | \'Delete\' | \'ArrowUp\' | \'ArrowDown\' | \'ArrowLeft\' | \'ArrowRight\' | \'Home\' | \'End\' | \'PageUp\' | \'PageDown\' | \'Space\';',
+  },
+  {
+    name: 'SidebarBrowserObservation',
+    declaration: 'export interface SidebarBrowserObservation {\n    readonly url: string;\n    readonly title: string;\n    readonly text?: string;\n    readonly truncated?: boolean;\n    readonly elements?: readonly SidebarBrowserElement[];\n    readonly image?: string;\n    readonly mimeType?: \'image/png\';\n    readonly width?: number;\n    readonly height?: number;\n    readonly status?: \'dispatched\';\n}',
+  },
+  {
+    name: 'SidebarBrowserToolOperation',
+    declaration: 'export type SidebarBrowserToolOperation = {\n    readonly kind: \'tabs\';\n} | {\n    readonly kind: \'open\';\n    readonly url: string;\n} | {\n    readonly kind: \'control\';\n    readonly tabId: string;\n    readonly command: SidebarBrowserCommand;\n    readonly origin?: string;\n};',
+  },
+  {
+    name: 'SidebarBrowserToolRequest',
+    declaration: 'export interface SidebarBrowserToolRequest {\n    readonly operationId: string;\n    readonly operation: SidebarBrowserToolOperation;\n    readonly agent?: Agent;\n    readonly signal?: AbortSignal;\n}',
+  },
+  {
+    name: 'SidebarBrowserToolResponse',
+    declaration: 'export type SidebarBrowserToolResponse = {\n    readonly kind: \'tabs\';\n    readonly tabs: readonly SidebarBrowserToolTab[];\n} | {\n    readonly kind: \'opened\';\n    readonly tab: SidebarBrowserToolTab;\n} | {\n    readonly kind: \'observed\';\n    readonly observation: SidebarBrowserObservation;\n} | {\n    readonly kind: \'failed\';\n    readonly code: SidebarBrowserFailureCode;\n    readonly message: string;\n    readonly outcome: \'not-dispatched\' | \'unknown\';\n};',
+  },
+  {
+    name: 'SidebarBrowserToolTab',
+    declaration: 'export interface SidebarBrowserToolTab {\n    readonly tabId: string;\n    readonly url: string | null;\n    readonly title: string | null;\n    readonly active: boolean;\n    readonly live: boolean;\n}',
+  },
+  {
     name: 'SignInAttemptId',
     declaration: 'export type SignInAttemptId = Branded<\'SignInAttemptId\'>;',
   },
@@ -9437,6 +9485,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'SystemPromptUpdate',
     declaration: 'export type SystemPromptUpdate = \'in-history\';',
+  },
+  {
+    name: 'Tab',
+    declaration: 'export type Tab = InferValue<typeof TAB>;',
   },
   {
     name: 'TableKeyOf',

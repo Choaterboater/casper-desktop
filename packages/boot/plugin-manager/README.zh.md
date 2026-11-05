@@ -101,6 +101,7 @@ CLI 提供 `dsh plugin --profile <profile> version-exemptions`、`allow-version 
 | `detailImageMaxBytes` | `5242880` | 与组合包详细介绍文档一同提供的图片的最大大小，单位字节。 |
 | `detailFetchTimeoutMs` | `15000` | 为读取当前安装提供、尚未安装的组合包的详细介绍文档而发出的单次 npm 文件 CDN 请求的时限。 |
 | `detailNpmFileSources` | `['jsdelivr', 'unpkg', 'npmmirror']` | 读取当前安装提供、尚未安装的组合包时按顺序使用的 npm 文件 CDN；一次读取的 `npmFileSources` 把其中列出的 CDN 移到最前。 |
+| `hiddenBundles` | `[]` | 本部署不提供的组合包名称：关闭时 `listBundles()` 不列出它，开启或安装它会以 `not-offered` 失败；仍处于开启状态的组合包保持列出，以便关闭。 |
 
 <a id="bundle-detail-documents"></a>
 ### 组合包详细介绍文档

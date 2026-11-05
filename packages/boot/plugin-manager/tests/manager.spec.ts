@@ -126,6 +126,28 @@ it('allows supported bundle activation and permits deselecting an unsupported sa
   expect(await manager.setBundleEnabled('extra', false)).toMatchObject({ changed: true, application: 'applied' })
 })
 
+it('hides a switched-off bundle the deployment does not offer and refuses to switch it on or install it', async () => {
+  const { manager, dir, ctx } = await fixture('live', false, undefined, { hiddenBundles: ['extra'] }, undefined, (dir) => {
+    const manifest = readProfileManifest('test', dir)
+    manifest.dsh = { profile: { bundles: ['core'] } }
+    writeFileSync(join(dir, 'package.json'), JSON.stringify(manifest))
+  })
+  const before = readFileSync(join(dir, 'package.json'), 'utf8')
+  expect((await manager.listBundles()).some(row => row.name === 'extra')).toBe(false)
+  expect(await manager.setBundleEnabled('extra', true)).toMatchObject({ changed: false, application: 'failed', error: { code: 'not-offered' } })
+  expect(await manager.installBundle('extra')).toMatchObject({ changed: false, application: 'failed', error: { code: 'not-offered' } })
+  expect(readFileSync(join(dir, 'package.json'), 'utf8')).toBe(before)
+  expect(ctx.get('managedProbe')).toBeUndefined()
+})
+
+it('keeps a hidden bundle that is still switched on listed until it is switched off', async () => {
+  const { manager } = await fixture('live', false, undefined, { hiddenBundles: ['extra'] })
+  expect((await manager.listBundles()).find(row => row.name === 'extra')).toMatchObject({ enabled: true })
+  expect(await manager.setBundleEnabled('extra', false)).toMatchObject({ changed: true, application: 'applied' })
+  expect((await manager.listBundles()).some(row => row.name === 'extra')).toBe(false)
+  expect(await manager.setBundleEnabled('extra', true)).toMatchObject({ changed: false, application: 'failed', error: { code: 'not-offered' } })
+})
+
 it.each(['network', 'timeout'] as const)('stops a GitHub %s before pnpm and attributes it to the repository', async (kind) => {
   const { ctx, manager, dir, connection } = await fixture()
   const chunks: PluginInstallLogChunk[] = []

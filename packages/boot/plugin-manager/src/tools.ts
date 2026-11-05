@@ -18,6 +18,7 @@ const ERROR_STEPS: Record<ManagementError['code'], string> = {
   'already-installed': 'The package is already installed; to install another version, call remove_bundle first, then install_bundle again.',
   'ambiguous-install': 'The dependency change named no single package; call list_bundles to see what was installed.',
   'not-bundle': 'The package declares no dsh.bundle and cannot be managed as a plugin; install a DSH plugin bundle instead.',
+  'not-offered': 'This deployment does not offer that bundle; tell the user it is not available rather than retrying.',
   'not-removable': 'Call list_bundles; only bundles marked removable can be removed.',
   'stop-profile': 'This profile runs without HMR; tell the user to stop DSH and run `dsh plugin --profile <profile> remove <bundle>`.',
   'bundle-in-use': 'Call list_plugins, disable the entries from other layers that still use this bundle, then retry.',

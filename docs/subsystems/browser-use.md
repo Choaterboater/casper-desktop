@@ -64,4 +64,30 @@ register(name: BrowserUseProviderName): () => Promise<void>
 ```
 
 Source: [`packages/browser-use/browser-use/src/index.ts`](../../packages/browser-use/browser-use/src/index.ts)
+
+<a id="casper-sidebar-browser-events"></a>
+
+### `casper-sidebar-browser/*` events
+
+<a id="casper-sidebar-browserrequest--waterfall"></a>
+
+#### `casper-sidebar-browser/request` — waterfall
+
+Run one operation on the Sidebar browser of the Agent's Session. The Desktop Client showing that Session answers; a Client without the browser or without the Session calls `next()`. Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.
+
+```ts cordis-catalog
+/**
+ * Run one operation on the Sidebar browser of the Agent's Session. The Desktop Client showing that Session
+ * answers; a Client without the browser or without the Session calls `next()`. Scope-filtered dispatch
+ * (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.
+ * @param request - operation, operation id, owner Agent, and cancellation.
+ * @param next - delegate to later answerers; the last one reports that no Desktop app answered.
+ * @mode waterfall
+ */
+'casper-sidebar-browser/request'( this: Scoped<Agent>, request: SidebarBrowserToolRequest, next: () => Promise<SidebarBrowserToolResponse>, ): Promise<SidebarBrowserToolResponse>
+```
+
+Types: [Agent](core.md) · [Scoped](scope.md)
+
+Source: [`packages/casper/tool-sidebar-browser/src/types.ts`](../../packages/casper/tool-sidebar-browser/src/types.ts)
 <!-- END GENERATED cordis-surface -->

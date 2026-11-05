@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
 import { composeEntries, loadProfileDirectory } from '@deepseek-ai/dsh-app-boot'
+import { OPTIONAL_BUNDLES } from '@deepseek-ai/dsh-official-bundles'
 import { createPluginProfile } from '../src/project-manager.ts'
 
 type Row = { id?: string; name?: string; disabled?: unknown; config?: Record<string, unknown> }
@@ -38,6 +39,14 @@ it('disables every row that reports usage to or calls DeepSeek', () => {
     expect(row, id).toBeDefined()
     expect(row?.disabled, id).toBe(true)
   }
+})
+
+it('hides every optional bundle DeepSeek ships, so the Plugins page cannot switch one on', () => {
+  const hidden = desktopRows().find(entry => entry.id === 'plugin-manager')?.config?.['hiddenBundles']
+  const deepseek = OPTIONAL_BUNDLES.filter(name => !name.startsWith('@deepseek-ai/dsh-casper-'))
+  expect(deepseek.length).toBeGreaterThan(0)
+  expect(hidden).toEqual(expect.arrayContaining(deepseek))
+  expect(hidden).not.toContain('@deepseek-ai/dsh-casper-chrome-bundle')
 })
 
 it('uploads no Session logs unless the user opts in', () => {

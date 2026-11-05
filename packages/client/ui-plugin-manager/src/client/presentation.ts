@@ -54,6 +54,7 @@ const CODE_KEYS = {
   'already-installed': 'reasonAlreadyInstalled',
   'ambiguous-install': 'reasonAmbiguousInstall',
   'not-bundle': 'reasonNotBundle',
+  'not-offered': 'reasonNotOffered',
   'not-removable': 'reasonNotRemovable',
   'stop-profile': 'reasonStopProfile',
   'bundle-in-use': 'reasonBundleInUse',
