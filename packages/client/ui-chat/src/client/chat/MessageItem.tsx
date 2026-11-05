@@ -57,6 +57,8 @@ function failureMessage(
   if (code === 'INTERRUPTED') return t('message.failure.interrupted')
   if (code === 'ACCOUNT_SIGN_IN_REQUIRED') return t('message.failure.accountSignInRequired')
   if (code === 'QUOTA' || code === 'ACCOUNT_QUOTA') return t('message.failure.quota')
+  // An unregistered provider means no usable model: point at where one is added.
+  if (code === 'NO_ADAPTER') return t('message.failure.noModel')
   return code === 'AUTH' ? t('message.failure.auth') : message
 }
 
