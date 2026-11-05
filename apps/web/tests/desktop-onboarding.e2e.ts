@@ -18,6 +18,7 @@ import { REPO_ROOT, saveFailureShot, ZH_BROWSER_LOCALE } from './support.ts'
 
 const MODE = webSnapshotMode()
 const EXPECTED = fileURLToPath(new URL('./expected/desktop-onboarding', import.meta.url))
+const DEEPSEEK_ACCOUNT_OVERLAY = fileURLToPath(new URL('./deepseek-account.overlay.yml', import.meta.url))
 const NS = 'ui-settings-account'
 const INITIAL = { version: 1, step: 'welcome', purpose: null, process: null, completion: null, usage: 'compact', developerTools: false }
 const ACCOUNT_ASSET = /\/plugins\/@deepseek-ai\/dsh-client-ui-settings-account\/assets\/onboarding-[a-z-]+-[0-9a-f]{12}\.(?:svg|webp)$/
@@ -85,7 +86,8 @@ describe.skipIf(MODE === 'record')('web e2e: App-only desktop onboarding', () =>
     origin = `http://127.0.0.1:${address.port}`
     const overlay = join(root, 'account.patch.yml')
     await writeFile(overlay, `- id: deepseek-account\n  config:\n    platformOrigin: ${origin}\n    allowLoopbackHttp: true\n`)
-    scaffold = await launchWebScaffold({ deepSeekMissingCredential: true, extraOverlayPath: overlay })
+    // The shipped Casper profile disables the DeepSeek account and its onboarding; this scenario composes them back.
+    scaffold = await launchWebScaffold({ deepSeekMissingCredential: true, extraOverlayPath: [DEEPSEEK_ACCOUNT_OVERLAY, overlay] })
     await scaffold.ctx.credentials.modifyRecord(credentialKey('deepseek-account-platform', 'default'), async () => ({
       kind: 'grant', payload: { version: 1, issuer: origin, token: 'onboarding-fixture-token' },
     }))

@@ -8,14 +8,14 @@ import { acknowledgeReloadConnectionLoss, captureStableAria, compareOrRefreshGol
 import { saveFailureShot } from './support.ts'
 
 const languages = [
-  ['es', 'es-MX', 'Menú de cuenta', 'Configuración', 'Complementos', 'Idioma', 'Español'],
-  ['fr', 'fr-CA', 'Menu du compte', 'Paramètres', 'Plugins', 'Langue', 'Français'],
-  ['de', 'de-DE', 'Kontomenü', 'Einstellungen', 'Plugins', 'Sprache', 'Deutsch'],
-  ['ru', 'ru-RU', 'Меню аккаунта', 'Настройки', 'Плагины', 'Язык', 'Русский'],
-  ['pt', 'pt-BR', 'Menu da conta', 'Configurações', 'Plug-ins', 'Idioma', 'Português'],
+  ['es', 'es-MX', 'Configuración', 'Complementos', 'Idioma', 'Español'],
+  ['fr', 'fr-CA', 'Paramètres', 'Plugins', 'Langue', 'Français'],
+  ['de', 'de-DE', 'Einstellungen', 'Plugins', 'Sprache', 'Deutsch'],
+  ['ru', 'ru-RU', 'Настройки', 'Плагины', 'Язык', 'Русский'],
+  ['pt', 'pt-BR', 'Configurações', 'Plug-ins', 'Idioma', 'Português'],
 ] as const
 
-it.each(languages)('selects %s from the browser, localizes metadata and persists an explicit choice', async (id, tag, accountMenu, settings, plugins, language, label) => {
+it.each(languages)('selects %s from the browser, localizes metadata and persists an explicit choice', async (id, tag, settings, plugins, language, label) => {
   const resources: { scaffold?: WebScaffold; browser?: Browser } = {}
   onTestFinished(async () => {
     try { await resources.browser?.close() } finally { await resources.scaffold?.close() }
@@ -36,8 +36,7 @@ it.each(languages)('selects %s from the browser, localizes metadata and persists
   await panel.getByText(metadata.meta.description, { exact: true }).waitFor()
   await compareOrRefreshGolden(fileURLToPath(new URL(`./expected/additional-locales/${id}.expected.md`, import.meta.url)),
     await captureStableAria(page, `[data-plugin-panel] li:has-text(${JSON.stringify(metadata.meta.title)})`, scaffold.workspaceCwd), webSnapshotMode())
-  await page.getByRole('button', { name: accountMenu, exact: true }).click()
-  await page.getByRole('menuitem', { name: settings, exact: true }).click()
+  await page.getByRole('button', { name: settings, exact: true }).click()
   const dialog = page.getByRole('dialog', { name: settings, exact: true })
   await dialog.getByText(language, { exact: true }).waitFor()
   await dialog.getByRole('button', { name: label, exact: true }).waitFor()

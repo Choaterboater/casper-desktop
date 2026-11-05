@@ -11,10 +11,12 @@ import {
 import { openSettings, connectFreshWorkspaceZh, saveFailureShot, ZH_BROWSER_LOCALE } from './support.ts'
 
 const EXPECTED = fileURLToPath(new URL('./expected/deepseek-messages-settings/', import.meta.url))
+// The shipped Casper profile disables the DeepSeek account onboarding; these scenarios compose it back.
+const DEEPSEEK_ACCOUNT_OVERLAY = fileURLToPath(new URL('./deepseek-account.overlay.yml', import.meta.url))
 
 it.each([{ name: 'Chromium', engine: chromium }, { name: 'WebKit', engine: webkit }])(
   'keeps a foreign model drag from editing another provider input in $name', async ({ engine }) => {
-    const scaffold = await launchWebScaffold({ deepSeekMissingCredential: true })
+    const scaffold = await launchWebScaffold({ deepSeekMissingCredential: true, extraOverlayPath: DEEPSEEK_ACCOUNT_OVERLAY })
     let browser: Browser | undefined
     try {
       browser = await engine.launch()
@@ -58,7 +60,7 @@ describe.skipIf(webSnapshotMode() === 'record')('web e2e: DeepSeek Messages sett
   let tripwire: ReturnType<typeof watchConsole>
 
   beforeAll(async () => {
-    scaffold = await launchWebScaffold({ deepSeekMissingCredential: true })
+    scaffold = await launchWebScaffold({ deepSeekMissingCredential: true, extraOverlayPath: DEEPSEEK_ACCOUNT_OVERLAY })
     browser = await chromium.launch()
     page = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: ZH_BROWSER_LOCALE })
     tripwire = watchConsole(page)

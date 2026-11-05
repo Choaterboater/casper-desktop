@@ -28,7 +28,8 @@ describe.skipIf(MODE === 'record')('web e2e: another usable provider ends first-
   let tripwire: ReturnType<typeof watchConsole>
 
   beforeAll(async () => {
-    scaffold = await launchWebScaffold({ deepSeekMissingCredential: true })
+    // The shipped Casper profile disables the DeepSeek account onboarding; this scenario composes it back.
+    scaffold = await launchWebScaffold({ deepSeekMissingCredential: true, extraOverlayPath: fileURLToPath(new URL('./deepseek-account.overlay.yml', import.meta.url)) })
     browser = await chromium.launch()
     // The scenario asserts the shipped Chinese copy, so the browser asks for it.
     page = await browser.newPage({ viewport: { width: 1440, height: 960 }, locale: ZH_BROWSER_LOCALE })

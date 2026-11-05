@@ -475,6 +475,9 @@ function assertLeanChildRecord(agent: Agent): void {
 const EXPECTED_TOOLS = [
   'ask_user_question',
   'bash',
+  'check_list',
+  'check_record',
+  'check_replay',
   'create_goal',
   'edit',
   'exit_plan_mode',
@@ -518,6 +521,19 @@ const EXPECTED_TOOLS = [
  * dependency.
  */
 const RIPGREP_TOOLS = ['glob', 'grep']
+
+/**
+ * Casper's Web profile inserts the `network` stdio MCP server. Its
+ * `mcp__<server>__*` tools and the shared resource trio exist only after the
+ * external server process (`uvx casper-network-mcp`) starts,
+ * so their presence depends on the host and is excluded from the fixed rosters.
+ * @param name - Registered tool name.
+ * @returns Whether the name comes from a shipped Casper MCP server.
+ */
+function isCasperMcpTool(name: string): boolean {
+  return /^mcp__network__/.test(name)
+    || ['list_mcp_resources', 'list_mcp_resource_templates', 'read_mcp_resource'].includes(name)
+}
 
 let scaffold: WebScaffold | undefined
 
@@ -598,7 +614,7 @@ it('assembles the shipped Web transport, catalog, guidance, and defaults', async
     }
   `)
   // Directory and conditional Team tools are global; presets supply the remaining registrations.
-  expect(ctx.tools.schemas().map(schema => schema.name)).toEqual([
+  expect(ctx.tools.schemas().map(schema => schema.name).filter(name => !isCasperMcpTool(name))).toEqual([
     'working_directory', 'team_task_create', 'team_task_list', 'team_task_get', 'team_task_update',
   ])
   const handle = await ctx.agents.create({
@@ -606,7 +622,7 @@ it('assembles the shipped Web transport, catalog, guidance, and defaults', async
     setup: agentCtx => ctx.agentPresets.mount(agentCtx).then(() => undefined),
   })
   try {
-    const names = ctx.tools.schemas(handle.agent).map(schema => schema.name).sort()
+    const names = ctx.tools.schemas(handle.agent).map(schema => schema.name).filter(name => !isCasperMcpTool(name)).sort()
     expect(names.filter(name => !RIPGREP_TOOLS.includes(name))).toEqual(EXPECTED_TOOLS)
     // The packaged ripgrep binary ships with the dependency, so the pair is a
     // fixed roster member on every host.

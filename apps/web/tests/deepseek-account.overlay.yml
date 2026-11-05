@@ -1,0 +1,13 @@
+# Loader overlay for scenarios whose subject is the DeepSeek account sign-in UI.
+# The shipped Casper Web profile disables these rows so it makes no DeepSeek
+# account traffic (packages/bundle/web-app/cordis.patch.yml); scenarios of the
+# account menu, its sign-in flow, and the surfaces it contributes to compose
+# them back so that code stays covered.
+- id: deepseek-account
+  disabled: false
+- id: llm-deepseek-account
+  disabled: false
+- id: account-controller
+  disabled: false
+- id: ui-settings-account
+  disabled: false

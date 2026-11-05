@@ -25,7 +25,16 @@ export interface ProviderSignInProps {
   t: (key: keyof typeof en) => string
   /** Disables every control while the card is busy. */
   disabled?: boolean
+  /**
+   * Omits the flow's `api-key` method because the card's own API key field
+   * stores that credential; the field then renders only for the remaining
+   * methods, or for sign-out while a sign-in is stored.
+   */
+  keyFieldShown?: boolean
 }
+
+/** The pi-ai login method that collects an API key through its own prompt. */
+const API_KEY_METHOD = 'api-key'
 
 type Prompt = Extract<AuthorizationEventView, { type: 'prompt' }>
 
@@ -60,7 +69,10 @@ export function ProviderSignIn(props: ProviderSignInProps): ReactNode {
     return () => { running.current?.abort() }
   }, [key])
 
-  if (entry === undefined || entry.methods.length === 0) return null
+  const methods = entry === undefined ? [] : props.keyFieldShown === true
+    ? entry.methods.filter(method => method.id !== API_KEY_METHOD)
+    : entry.methods
+  if (entry === undefined || (methods.length === 0 && !entry.signedIn)) return null
 
   const start = (method: string): void => {
     const controller = new AbortController()
@@ -118,7 +130,7 @@ export function ProviderSignIn(props: ProviderSignInProps): ReactNode {
         )
         : (
           <div className={styles['editorActions']}>
-            {entry.methods.map(method => (
+            {methods.map(method => (
               <button key={method.id} type="button" className={styles['primaryButton']} disabled={busy} onClick={() => { start(method.id) }}>
                 {method.label}
               </button>

@@ -58,6 +58,8 @@
       - option "xiaomi-token-plan-sgp"
       - option "zai"
       - option "zai-coding-cn"
+    - text: 登录
+    - button "OpenAI (ChatGPT Plus/Pro)"
     - group: 自定义设置
     - button "取消"
     - button "保存"

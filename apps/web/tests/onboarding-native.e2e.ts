@@ -13,6 +13,8 @@ import { openSettings, ZH_BROWSER_LOCALE, saveFailureShot } from './support.ts'
 const SNAPSHOT_DIR = fileURLToPath(new URL('./expected/onboarding-native', import.meta.url))
 const SIGNED_OUT_MENU_EXPECTED = join(SNAPSHOT_DIR, 'signed-out-menu.expected.md')
 const MODE = webSnapshotMode()
+// The shipped Casper profile disables the DeepSeek account sign-in; this scenario composes it back to cover its signed-out menu.
+const DEEPSEEK_ACCOUNT_OVERLAY = fileURLToPath(new URL('./deepseek-account.overlay.yml', import.meta.url))
 
 describe.skipIf(MODE === 'record').each([false, true])('web e2e: native credential onboarding (desktop marker: %s)', (desktop) => {
   let scaffold: WebScaffold
@@ -24,7 +26,9 @@ describe.skipIf(MODE === 'record').each([false, true])('web e2e: native credenti
     scaffold = await launchWebScaffold({
       deepSeekMissingCredential: true,
       welcomeNoticePending: true,
-      ...desktop ? {} : { extraOverlayPath: fileURLToPath(new URL('./fixtures/onboarding-native/cordis.patch.yml', import.meta.url)) },
+      extraOverlayPath: desktop
+        ? DEEPSEEK_ACCOUNT_OVERLAY
+        : [DEEPSEEK_ACCOUNT_OVERLAY, fileURLToPath(new URL('./fixtures/onboarding-native/cordis.patch.yml', import.meta.url))],
     })
     browser = await chromium.launch()
     page = await browser.newPage({ viewport: { width: 1440, height: 960 }, locale: ZH_BROWSER_LOCALE })

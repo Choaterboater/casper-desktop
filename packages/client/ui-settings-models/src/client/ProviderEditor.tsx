@@ -417,7 +417,11 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
     return (
       <>
         {nativeAuth?.oauth === true
-          ? <ProviderSignIn provider={props.provider} operations={operations} t={t} disabled={disabled} />
+          ? (
+            <ProviderSignIn
+              provider={props.provider} operations={operations} t={t} disabled={disabled} keyFieldShown={!keylessNativeAuth}
+            />
+          )
           : null}
         {keylessNativeAuth
           ? null

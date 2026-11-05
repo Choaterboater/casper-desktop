@@ -23,7 +23,7 @@ export const en = {
   interrupted: 'Creation interrupted. Try again.',
   unconfirmed: 'Result unconfirmed. Retry to check.',
   'invalid-location': 'Choose a location or describe it in up to 1,000 characters.',
-  'restart-required': 'The change is saved. Restart DSH to apply it.',
+  'restart-required': 'The change is saved. Restart Casper to apply it.',
   overridden: 'Another configuration overrides this change.', cancelled: 'Cancelled',
   applicationFailed: 'The last change did not apply. Check Plugins.',
   applicationCancelled: 'The last change was cancelled.',

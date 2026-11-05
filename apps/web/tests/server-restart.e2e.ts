@@ -26,6 +26,8 @@ class RestartableServer {
       join(REPO_ROOT, 'apps/cli/lib/bin.js'), '--profile', 'web',
       '--patch', fileURLToPath(new URL('./pin-browse-picker.overlay.yml', import.meta.url)),
       '--patch', fileURLToPath(new URL('./fixtures/restart-startup.overlay.yml', import.meta.url)),
+      // The fake model server stands in for DeepSeek, whose adapter Casper's shipped profile disables.
+      '--patch', fileURLToPath(new URL('./deepseek-provider.overlay.yml', import.meta.url)),
       '--no-open', '--port', String(port),
     ], {
       cwd: this.world,
