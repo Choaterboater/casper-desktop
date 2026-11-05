@@ -1,4 +1,4 @@
-/** Casper identity: publisher, upstream credit, website ghost and installer names. */
+/** Casper identity: publisher, upstream credit, website ghost, installer names, and the copied checks staying off. */
 
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
@@ -71,6 +71,16 @@ describe('Casper identity', () => {
     for (const path of [...installer.map(name => `apps/desktop/installer/assets/${name}`), 'packages/client/ui-chat/src/client/assets/running-whale@2x.png']) {
       const upstream = execFileSync('git', ['show', `${UPSTREAM}:${path}`], { cwd: root, maxBuffer: 16 * 1024 * 1024 })
       expect(digest(readFileSync(resolve(root, path))), path).not.toBe(digest(upstream))
+    }
+  })
+
+  // The copied checks re-run the project's tests after every edit: they cost tokens without catching more bugs,
+  // broke recorded web replays, and called passing checks "blocked by the sandbox".
+  it('keeps the copied Casper checks switched off in the Standard, Cordis and PTC modes', () => {
+    const row = /- id: casper-checks\n\s+name: '@deepseek-ai\/dsh-casper-checks'\n(?:\s+#[^\n]*\n)*\s+disabled: true\n/u
+    for (const mode of ['standard', 'cordis', 'ptc']) {
+      const path = `packages/bundle/web-app/presets/${mode}.patch.yml`
+      expect(read(path), path).toMatch(row)
     }
   })
 

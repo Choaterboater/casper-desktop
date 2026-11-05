@@ -8,8 +8,6 @@ Tokens prefixed with @ are paths the user explicitly referenced. Relative paths 
 
 Check the [exit code: N] marker on every bash result; investigate failures before moving on.
 
-Before editing, record the project's own checks (tests, lint, build) with check_record. After editing, replay them with check_replay; stale checks are replayed again before your turn ends. Report a check as passed only when its latest non-stale run passed. A check that is not run, stale, or never recorded has no verdict: say so instead of claiming success.
-
 Use the read tool — not shell commands like cat, sed, head, or tail — to inspect text files. Use offset and limit to read a line range or continue a large file.
 
 Read an existing file before overwriting it with write and prefer edit for targeted changes.
@@ -90,22 +88,6 @@ interface ToolArgsMap {
     sandbox_permissions?: "workspace-write" | "danger-full-access";
     /** Required with sandbox_permissions: one sentence for the user explaining why this exact command needs the wider access. Use the language of the user’s current request. */
     justification?: string;
-  } & Record<string, JsonValue>;
-  /** List recorded checks with their latest verdict and whether code changed since. */
-  check_list: Record<string, JsonValue>;
-  /** Record a project check (a shell command whose exit code 0 means pass), run it now as the baseline, and keep it for replay. Recording a name again replaces it. */
-  check_record: {
-    /** Short id, e.g. test, lint, build. */
-    name: string;
-    /** Shell command run in the working directory. */
-    command: string;
-    /** Optional deadline; a timeout is reported as not run. */
-    timeoutMs?: number;
-  } & Record<string, JsonValue>;
-  /** Replay recorded checks against the current code. Omit `name` to replay every check. */
-  check_replay: {
-    /** One recorded check; omit for all. */
-    name?: string;
   } & Record<string, JsonValue>;
   /** Create a persisted goal that keeps this session working across automatic continuation rounds. Use it when the direct human request is a long-running objective, even if the user did not say "goal"; not for single-turn work. */
   create_goal: {
@@ -385,33 +367,6 @@ interface ToolOutputMap {
       runnerFailed?: boolean;
     };
   };
-  check_list: ({
-    name: string;
-    command: string;
-    status: "passed" | "failed" | "not_run";
-    exitCode: number | null;
-    reason: "timed_out" | "signal" | "could_not_start" | "aborted" | null;
-    stale: boolean;
-    output: string;
-  })[];
-  check_record: {
-    name: string;
-    command: string;
-    status: "passed" | "failed" | "not_run";
-    exitCode: number | null;
-    reason: "timed_out" | "signal" | "could_not_start" | "aborted" | null;
-    stale: boolean;
-    output: string;
-  };
-  check_replay: ({
-    name: string;
-    command: string;
-    status: "passed" | "failed" | "not_run";
-    exitCode: number | null;
-    reason: "timed_out" | "signal" | "could_not_start" | "aborted" | null;
-    stale: boolean;
-    output: string;
-  })[];
   create_goal: {
     goal: null;
   } | {

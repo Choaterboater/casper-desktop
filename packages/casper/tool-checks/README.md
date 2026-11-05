@@ -21,7 +21,7 @@ After a top-level turn changes files, this plugin runs the project's own checks,
 <a id="use-this-package"></a>
 ## Use this package
 
-The Web and Desktop presets (`packages/bundle/web-app/presets/{standard,cordis,ptc}.patch.yml`) mount the plugin. It injects `tools`, `shell`, `systemPrompt`, `workingDirectory` and `fs`.
+The Web and Desktop presets (`packages/bundle/web-app/presets/{standard,cordis,ptc}.patch.yml`) list the plugin switched off (`disabled: true`): it re-runs the project's tests after every edit at extra token cost. A profile patch can turn it on for a preset by overriding its `casper-checks` row. It injects `tools`, `shell`, `systemPrompt`, `workingDirectory` and `fs`.
 
 | Field | Default | Meaning |
 |---|---|---|

@@ -6,8 +6,6 @@ Tokens prefixed with @ are paths the user explicitly referenced. Relative paths 
 
 Check the [exit code: N] marker on every bash result; investigate failures before moving on.
 
-Before editing, record the project's own checks (tests, lint, build) with check_record. After editing, replay them with check_replay; stale checks are replayed again before your turn ends. Report a check as passed only when its latest non-stale run passed. A check that is not run, stale, or never recorded has no verdict: say so instead of claiming success.
-
 Use the read tool — not shell commands like cat, sed, head, or tail — to inspect text files. Use offset and limit to read a line range or continue a large file.
 
 Read an existing file before overwriting it with write and prefer edit for targeted changes.
