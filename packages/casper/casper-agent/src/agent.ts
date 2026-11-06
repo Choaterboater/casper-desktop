@@ -19,6 +19,7 @@ import type {
 import { AgentModel, agentEvents } from '@deepseek-ai/dsh-agent'
 import { ReactLoopInbox } from '@deepseek-ai/dsh-agent-loop'
 import { getDshRuntimeVersion } from '@deepseek-ai/dsh-app-boot'
+import type {} from '@deepseek-ai/dsh-attachment'
 import type { LlmFailure } from '@deepseek-ai/dsh-llm'
 import { createScope } from '@deepseek-ai/dsh-scope'
 import type { Scope } from '@deepseek-ai/dsh-scope'
@@ -34,7 +35,7 @@ import type { AppToolsProfile, AppToolsServer } from './app-tools.ts'
 import type { Config } from './config.ts'
 import { CasperConnection, CasperError } from './connection.ts'
 import { answerPermission } from './permission.ts'
-import { carriesAttachments, promptBlocks } from './prompt.ts'
+import { hasPromptContent, promptContent } from './prompt.ts'
 import type { CasperSidecar } from './sidecar.ts'
 import { TurnWriter } from './turn.ts'
 
@@ -303,21 +304,28 @@ export class CasperAgent implements Agent {
     })
     let interrupted = true
     try {
-      if (carriesAttachments(claimed)) {
-        throw new CasperError('CASPER_TEXT_ONLY', 'Casper takes text only, so images and files were not sent. Send the request again as text.')
-      }
-      const blocks = promptBlocks(claimed)
-      if (blocks.length === 0) throw new CasperError('CASPER_TEXT_ONLY', 'Casper takes text prompts only.')
+      if (!hasPromptContent(claimed)) throw new CasperError('CASPER_EMPTY_PROMPT', 'The request is empty, so nothing was sent to Casper.')
       // The prompt and its turn are durable before Casper can change files.
       await this.flush(true)
       signal.throwIfAborted()
       const opened = await this.ensureConnection(signal)
       signal.throwIfAborted()
       connection = opened.connection
+      // Said at once: the conversation is new even when this turn sends nothing.
+      if (opened.fresh) writer.text(FRESH_CONVERSATION_NOTICE)
+      const content = await promptContent(claimed, { attachments: this.pluginCtx.get('attachments'), images: connection.acceptsImages, signal })
+      // A store may finish a read after a Stop; the prompt is then not sent.
+      signal.throwIfAborted()
+      if (!content.readable) {
+        const pictures = !connection.acceptsImages && claimed.some(message => message.content.some(block => block.type === 'image'))
+        throw new CasperError('CASPER_EMPTY_PROMPT', pictures
+          ? 'This Casper can\'t take pictures, and the request has no words. Update Casper to send pictures.'
+          : 'The attachments could not be read, and the request has no words, so nothing was sent to Casper.')
+      }
       this.updateFailure = undefined
       this.sink = { connection, writer, signal }
-      if (opened.fresh) writer.text(FRESH_CONVERSATION_NOTICE)
-      const stopReason = await this.promptUntilSettled(connection, blocks, signal)
+      for (const note of content.notes) writer.text(note)
+      const stopReason = await this.promptUntilSettled(connection, content.blocks, signal)
       const failure = this.takeUpdateFailure()
       /* v8 ignore next -- see record(). */
       if (failure !== undefined) throw failure

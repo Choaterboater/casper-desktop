@@ -1,10 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { Buffer } from 'node:buffer'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import type { Agent } from '@deepseek-ai/dsh-agent'
+import AttachmentStore, { AttachmentId } from '@deepseek-ai/dsh-attachment'
+import type { FileAttachmentRef, ImageAttachmentLimits, ImageAttachmentRef, StoredImageAttachment } from '@deepseek-ai/dsh-attachment'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { UserQuestionError } from '@deepseek-ai/dsh-user-questions'
 import { CasperAgent, FRESH_CONVERSATION_NOTICE } from '../src/agent.ts'
 import { FORK_UNSUPPORTED } from '../src/factory.ts'
+import { TEXT_ONLY_PICTURE } from '../src/prompt.ts'
 import { boot, eventsOf, filesText, prompt, turnEnds } from './harness.ts'
 import { alive, fakeCasper, gate, waitFor } from './support.ts'
 import type { FakeCasper, FakeScript } from './support.ts'
@@ -21,6 +26,47 @@ async function setup(script: FakeScript, overrides: Overrides = {}, answer?: Ans
   const fake = fakeCasper(script)
   cleanups.push(() => { fake.remove() })
   const host = await boot(fake, overrides, answer, questions)
+  cleanups.push(() => host.ctx.fiber.dispose())
+  return { fake, host }
+}
+
+/** Picture bytes the stand-in attachment store returns. */
+const PICTURE_BYTES = Uint8Array.of(137, 80, 78, 71)
+const PICTURE: ImageAttachmentRef = {
+  attachmentId: AttachmentId(`sha256:${'a'.repeat(64)}`), mediaType: 'image/png', bytes: 4, width: 1, height: 1, name: 'shot.png',
+}
+const NOTES: FileAttachmentRef = { attachmentId: AttachmentId(`sha256:${'b'.repeat(64)}`), name: 'notes.txt', bytes: 2048 }
+/** A file the stand-in store has no host copy of. */
+const UNSAVED: FileAttachmentRef = { attachmentId: AttachmentId(`sha256:${'c'.repeat(64)}`), name: 'gone.txt', bytes: 1 }
+const NOTES_HOST_PATH = join('/attachments', 'files', 'notes.txt')
+
+/** An attachment store that returns fixed picture bytes and keeps only `notes.txt` on the host. */
+class StandInAttachments extends AttachmentStore {
+  readonly imageLimits: ImageAttachmentLimits = {
+    maxImageBytes: 16, maxImagesPerMessage: 4, maxMessageImageBytes: 64, maxImagePixels: 4, maxImageDimension: 4, mediaTypes: ['image/png'],
+  }
+
+  validateImage(): Promise<void> {
+    return Promise.resolve()
+  }
+
+  saveImage(): Promise<ImageAttachmentRef> {
+    return Promise.resolve(PICTURE)
+  }
+
+  readImage(ref: ImageAttachmentRef): Promise<StoredImageAttachment> {
+    return Promise.resolve({ ref, data: PICTURE_BYTES })
+  }
+
+  override fileHostPath(ref: FileAttachmentRef): string | undefined {
+    return ref.name === NOTES.name ? NOTES_HOST_PATH : undefined
+  }
+}
+
+async function setupWithAttachments(script: FakeScript, store: typeof StandInAttachments = StandInAttachments) {
+  const fake = fakeCasper(script)
+  cleanups.push(() => { fake.remove() })
+  const host = await boot(fake, {}, undefined, true, async (ctx) => { await ctx.plugin(store) })
   cleanups.push(() => host.ctx.fiber.dispose())
   return { fake, host }
 }
@@ -219,31 +265,106 @@ describe('CasperAgent', { timeout: 60_000 }, () => {
     expect(agent.status).toBe('idle')
   })
 
-  it('refuses a prompt with no text without starting Casper', async () => {
+  it('refuses an empty prompt without starting Casper', async () => {
     const { fake, host } = await setup({ prompts: [] })
     const { agent } = await host.create('casper-blank')
-    agent.followup(prompt('   ', 'rpc-blank'))
-    await agent.whenIdle()
-    agent.followup(prompt('', 'rpc-image', [{ type: 'image', mimeType: 'image/png', data: 'aGk=' }] as never))
-    await agent.whenIdle()
-    expect(turnEnds(agent)).toMatchObject([
-      { kind: 'error', error: { code: 'CASPER_TEXT_ONLY', message: 'Casper takes text prompts only.' } },
-      { kind: 'error', error: { code: 'CASPER_TEXT_ONLY' } },
+    await run(agent, '   ')
+    expect(turnEnds(agent)).toEqual([
+      { kind: 'error', error: { code: 'CASPER_EMPTY_PROMPT', message: 'The request is empty, so nothing was sent to Casper.' } },
     ])
     expect(fake.pids()).toEqual([])
   })
 
-  it('refuses text sent with an image instead of running without the image', async () => {
-    const { fake, host } = await setup({ prompts: [] })
-    const { agent } = await host.create('casper-text-image')
-    agent.followup(prompt('', 'rpc-text-image', [
-      { type: 'text', text: 'fix the layout shown here' }, { type: 'image', mimeType: 'image/png', data: 'aGk=' },
-    ] as never))
+  it('sends a picture as an image block and a file as a link to its saved copy, in the order attached', async () => {
+    const { fake, host } = await setupWithAttachments({ prompts: [[{ text: 'It is disabled.\n' }]], promptCapabilities: { image: true } })
+    const { agent } = await host.create('casper-picture')
+    agent.followup(prompt('', 'rpc-picture', [
+      { type: 'text', text: 'Why is this button grey?' }, { type: 'image', attachment: PICTURE }, { type: 'file', attachment: NOTES },
+    ]))
     await agent.whenIdle()
-    expect(turnEnds(agent)).toEqual([{ kind: 'error', error: {
-      code: 'CASPER_TEXT_ONLY', message: 'Casper takes text only, so images and files were not sent. Send the request again as text.',
-    } }])
-    expect(fake.pids()).toEqual([])
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }])
+    expect(fake.calls('session/prompt')[0]?.params?.prompt).toEqual([
+      { type: 'text', text: 'Why is this button grey?' },
+      { type: 'image', mimeType: 'image/png', data: Buffer.from(PICTURE_BYTES).toString('base64') },
+      { type: 'resource_link', uri: pathToFileURL(NOTES_HOST_PATH).href, name: 'notes.txt', size: 2048 },
+    ])
+    const reply = eventsOf(agent).filter(event => event.type === 'assistant/message').at(-1)
+    expect(reply?.type === 'assistant/message' && reply.data.message.content).toEqual([{ type: 'text', text: 'It is disabled.\n\nReceipt: verified\n' }])
+  })
+
+  it('gives an older Casper a placeholder for a picture and tells the user it was not sent', async () => {
+    const { fake, host } = await setupWithAttachments({ prompts: [[{ text: 'Only words.\n' }]] })
+    const { agent } = await host.create('casper-old-picture')
+    agent.followup(prompt('', 'rpc-old-picture', [{ type: 'text', text: 'fix the layout shown here' }, { type: 'image', attachment: PICTURE }]))
+    await agent.whenIdle()
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }])
+    expect(fake.calls('session/prompt')[0]?.params?.prompt).toEqual([
+      { type: 'text', text: 'fix the layout shown here' }, { type: 'text', text: TEXT_ONLY_PICTURE },
+    ])
+    const reply = eventsOf(agent).filter(event => event.type === 'assistant/message').at(-1)
+    expect(reply?.type === 'assistant/message' && reply.data.message.content).toEqual([{ type: 'text', text:
+      'This Casper takes text only, so the picture was not sent. Update Casper to send pictures.\nOnly words.\n\nReceipt: verified\n' }])
+  })
+
+  it('sends nothing when only placeholders would remain', async () => {
+    const old = await setupWithAttachments({ prompts: [] })
+    const { agent } = await old.host.create('casper-only-placeholders')
+    agent.followup(prompt('', 'rpc-only-picture', [{ type: 'image', attachment: PICTURE }]))
+    await agent.whenIdle()
+    agent.followup(prompt('', 'rpc-only-unsaved-file', [{ type: 'file', attachment: UNSAVED }]))
+    await agent.whenIdle()
+    const current = await setup({ prompts: [], promptCapabilities: { image: true } })
+    const other = await current.host.create('casper-unreadable-picture')
+    other.agent.followup(prompt('', 'rpc-unreadable', [{ type: 'image', attachment: PICTURE }]))
+    await other.agent.whenIdle()
+    const unreadable = 'The attachments could not be read, and the request has no words, so nothing was sent to Casper.'
+    expect([...turnEnds(agent), ...turnEnds(other.agent)]).toEqual([
+      { kind: 'error', error: { code: 'CASPER_EMPTY_PROMPT', message: 'This Casper can\'t take pictures, and the request has no words. Update Casper to send pictures.' } },
+      { kind: 'error', error: { code: 'CASPER_EMPTY_PROMPT', message: unreadable } },
+      { kind: 'error', error: { code: 'CASPER_EMPTY_PROMPT', message: unreadable } },
+    ])
+    expect([...old.fake.calls('session/prompt'), ...current.fake.calls('session/prompt')]).toEqual([])
+  })
+
+  it('says Casper started a new conversation even when that turn then sends nothing', async () => {
+    const { fake, host } = await setupWithAttachments({ prompts: [[{ crash: 1 }], [{ text: 'ok\n' }]] })
+    const { agent } = await host.create('casper-fresh-picture')
+    await run(agent, 'first')
+    agent.followup(prompt('', 'rpc-fresh-picture', [{ type: 'image', attachment: PICTURE }]))
+    await agent.whenIdle()
+    await run(agent, 'third')
+    expect(fake.calls('session/load')).toHaveLength(1)
+    expect(turnEnds(agent)).toMatchObject([
+      { kind: 'error', error: { code: 'CASPER_EXITED' } },
+      { kind: 'error', error: { code: 'CASPER_EMPTY_PROMPT' } },
+      { kind: 'completed' },
+    ])
+    const texts = eventsOf(agent).flatMap(event => event.type === 'assistant/message'
+      ? event.data.message.content.flatMap(block => block.type === 'text' ? [block.text] : [])
+      : [])
+    expect(texts.filter(text => text.includes(FRESH_CONVERSATION_NOTICE))).toHaveLength(1)
+    expect(texts.at(-1)).toBe('ok\n\nReceipt: verified\n')
+  })
+
+  it('sends no prompt when the turn stops during a picture read, even when the read still finishes', async () => {
+    const read = Promise.withResolvers<undefined>()
+    let reading = false
+    // A store that ignores the signal and finishes the read after the Stop.
+    class LateAttachments extends StandInAttachments {
+      override async readImage(ref: ImageAttachmentRef): Promise<StoredImageAttachment> {
+        reading = true
+        await read.promise
+        return { ref, data: PICTURE_BYTES }
+      }
+    }
+    const { fake, host } = await setupWithAttachments({ prompts: [[{ text: 'never\n' }]], promptCapabilities: { image: true } }, LateAttachments)
+    const { agent } = await host.create('casper-stop-picture')
+    agent.followup(prompt('', 'rpc-stop-picture', [{ type: 'text', text: 'look' }, { type: 'image', attachment: PICTURE }]))
+    await waitFor(() => reading)
+    agent.cancel({ kind: 'user' })
+    read.resolve(undefined)
+    await agent.whenIdle()
+    expect(turnEnds(agent)).toEqual([{ kind: 'aborted', reason: { kind: 'user' } }])
     expect(fake.calls('session/prompt')).toEqual([])
   })
 

@@ -33,8 +33,8 @@ export type { CasperSessionRecord } from './sidecar.ts'
 export const name = 'casper-agent'
 
 /**
- * Services the factory and its Agents use; the Agent scope inherits them. `userQuestions`, `skills`, and
- * `profileContext` are read when present.
+ * Services the factory and its Agents use; the Agent scope inherits them. `userQuestions`, `skills`,
+ * `profileContext`, and `attachments` are read when present.
  */
 export const inject = ['agents', 'sessions', 'sessionProjections', 'sessionPersistence', 'subprocess', 'storageDomain', 'tools']
 

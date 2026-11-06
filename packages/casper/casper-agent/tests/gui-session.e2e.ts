@@ -4,8 +4,10 @@
  * is called.
  */
 
+import { Buffer } from 'node:buffer'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { afterEach, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
@@ -13,8 +15,10 @@ import Group from '@deepseek-ai/cordis-plugin-group'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
+import LocalAttachmentStore from '@deepseek-ai/dsh-attachment-local'
 import AgentPresetRegistry from '@deepseek-ai/dsh-agent-preset-registry'
 import type { SessionFollowFrame, SessionRequestId } from '@deepseek-ai/dsh-api-session-controller'
+import type { FileAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import type { SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import Storage from '@deepseek-ai/dsh-storage'
@@ -36,8 +40,12 @@ afterEach(async () => {
   for (const cleanup of cleanups.splice(0).reverse()) await cleanup()
 })
 
-/** Boot the Desktop-shaped Host: Casper is the default preset, Standard runs on agent-loop. */
-async function host(fake: FakeCasper) {
+/**
+ * Boot the Desktop-shaped Host: Casper is the default preset, Standard runs on agent-loop.
+ * @param fake - the stand-in Casper.
+ * @param mount - mounts further services, such as the attachment store, before the Session Controller.
+ */
+async function host(fake: FakeCasper, mount?: (ctx: Context) => Promise<void>) {
   const ctx = new Context()
   const asked: AskUserQuestionRequest[] = []
   const statuses: [SessionId, boolean][] = []
@@ -79,6 +87,7 @@ async function host(fake: FakeCasper) {
     },
   })
   await ctx.plugin(CasperAgentPlugin, fake.config())
+  await mount?.(ctx)
   // No Workspaces: a named blank Session is reused by identity alone.
   ctx.provide('workspaceRegistry', { get: () => undefined, list: () => [], archivedSessionIds: [] } as never)
   const remote = await createSessionTestRemote(ctx, { defaultModelSelection: () => ({ provider: 'test', model: 'test-model' }), cwd: fake.cwd })
@@ -189,4 +198,52 @@ it('runs a Casper Session from the GUI: stream, tools, approval, plan, receipt, 
   await waitFor(() => events(resumed).filter(event => event.type === 'turn/end').length === 3)
   expect(fake.calls('session/load').map(entry => entry.params?.sessionId)).toEqual(['conversation-gui'])
   expect(events(resumed).at(-1)).toMatchObject({ type: 'turn/end', data: { reason: { kind: 'completed' } } })
+}, 120_000)
+
+/** A 1x1 PNG, as the composer sends a pasted picture. */
+const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
+
+it('sends a picture and an uploaded file from the GUI to Casper through the real controller and attachment store', async () => {
+  const fake = fakeCasper({ prompts: [[{ text: 'It is blue.\n' }]], promptCapabilities: { image: true } })
+  cleanups.push(() => { fake.remove() })
+  const receipts = new Map<string, { readonly type: 'file'; readonly attachment: FileAttachmentRef }>()
+  const booted = await host(fake, async (ctx) => {
+    await ctx.plugin(LocalAttachmentStore, { dshHome: join(fake.root, 'dsh') })
+    // The upload service stages files the real store saved; the controller resolves and admits them.
+    ctx.provide('fileUploads', {
+      registerAgentResolver: () => () => {},
+      resolve: (_agent: Agent, receiptId: string) => receipts.get(receiptId),
+      bindPrompt: () => ({ commit: () => {}, [Symbol.dispose]: () => {} }),
+      retirePrompt: () => {},
+    } as never)
+  })
+  cleanups.push(() => booted.ctx.fiber.dispose())
+  const notes = await booted.ctx.attachments.admitEncodedFile({ data: Buffer.from('the notes\n').toString('base64'), name: 'notes.txt' })
+  receipts.set('receipt-notes', { type: 'file', attachment: notes })
+
+  const { sessionId } = ok(await booted.remote.create({ cwd: fake.cwd }))
+  const agent = booted.ctx.agents.get(sessionId)
+  ok(await booted.remote.prompt({
+    requestId: 'req-picture' as SessionRequestId, sessionId, mode: 'queue',
+    content: [
+      { type: 'text', text: 'What colour?' },
+      { type: 'image', mediaType: 'image/png', data: PNG },
+      { type: 'file', receiptId: 'receipt-notes' as never },
+    ],
+  }))
+  const sent = await waitFor(() => fake.calls('session/prompt')[0]?.params?.prompt as { type: string; mimeType?: string; data?: string; uri?: string; name?: string }[] | undefined)
+  await waitFor(() => events(agent).some(event => event.type === 'turn/end'))
+  expect(events(agent).at(-1)).toMatchObject({ type: 'turn/end', data: { reason: { kind: 'completed' } } })
+  expect(sent.map(block => block.type)).toEqual(['text', 'image', 'resource_link'])
+  const user = events(agent).find(event => event.type === 'user/message')
+  const picture = user?.type === 'user/message' ? user.data.content.find(block => block.type === 'image') : undefined
+  if (picture?.type !== 'image') throw new Error('the picture was not recorded')
+  // The image block holds the bytes the store kept for the recorded picture.
+  const stored = await booted.ctx.attachments.readImage(picture.attachment)
+  expect(sent[1]).toEqual({ type: 'image', mimeType: stored.ref.mediaType, data: Buffer.from(stored.data).toString('base64') })
+  // The link names the store's own copy of the uploaded file.
+  expect(sent[2]).toMatchObject({ type: 'resource_link', name: 'notes.txt' })
+  const linked = fileURLToPath(sent[2]?.uri ?? '')
+  expect(existsSync(linked)).toBe(true)
+  expect(readFileSync(linked, 'utf8')).toBe('the notes\n')
 }, 120_000)

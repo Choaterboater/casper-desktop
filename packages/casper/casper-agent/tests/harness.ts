@@ -49,9 +49,16 @@ export interface Booted {
  * @param overrides - plugin config overrides.
  * @param answer - the question answerer.
  * @param questions - whether the user-questions service is mounted.
+ * @param mount - mounts further services, such as an attachment store, before the Casper plugin.
  * @returns the booted Host.
  */
-export async function boot(fake: FakeCasper, overrides: Partial<Config> = {}, answer?: Answerer, questions = true): Promise<Booted> {
+export async function boot(
+  fake: FakeCasper,
+  overrides: Partial<Config> = {},
+  answer?: Answerer,
+  questions = true,
+  mount?: (ctx: Context) => Promise<void>,
+): Promise<Booted> {
   const ctx = new Context()
   const asked: AskUserQuestionRequest[] = []
   const statuses: Booted['statuses'] = []
@@ -77,6 +84,7 @@ export async function boot(fake: FakeCasper, overrides: Partial<Config> = {}, an
       inner.on('agent/error', ({ agent, error }) => { errors.push({ agent, error }) })
     },
   })
+  await mount?.(ctx)
   const casper = ctx.plugin(CasperAgentPlugin, fake.config(overrides))
   await casper
   return {

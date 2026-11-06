@@ -41,6 +41,7 @@ export interface FakeScript {
   readonly ignoreEof?: boolean
   readonly replay?: string[]
   readonly newSessionId?: string
+  readonly promptCapabilities?: { readonly image?: boolean; readonly audio?: boolean; readonly embeddedContext?: boolean }
 }
 
 /** A temporary folder holding the Session folder, the script, and the log. */

@@ -13,6 +13,7 @@ import {
   RequestError,
   type ClientConnection,
   type ContentBlock as AcpContentBlock,
+  type InitializeResponse,
   type McpServer,
   type RequestPermissionRequest,
   type RequestPermissionResponse,
@@ -37,11 +38,15 @@ const ACP_NOT_FOUND = -32002
  */
 const NO_SAVED_CONVERSATION = /no saved conversation/i
 
-/** Failure codes a Casper turn can end with. */
+/**
+ * Failure codes a Casper turn can end with. `CASPER_TEXT_ONLY` is no longer
+ * raised; it stays for `turn/end` records saved by earlier versions.
+ */
 export type CasperFailureCode =
   | 'CASPER_NOT_FOUND'
   | 'CASPER_START_FAILED'
   | 'CASPER_EXITED'
+  | 'CASPER_EMPTY_PROMPT'
   | 'CASPER_TEXT_ONLY'
   | `CASPER_RPC_${number}`
 
@@ -157,6 +162,7 @@ export class CasperConnection {
   private readonly exit: Promise<SubprocessOutcome | undefined>
   private connection: ClientConnection | undefined
   private sessionId: string | undefined
+  private initialized: InitializeResponse | undefined
   /** Updates are dropped while `session/load` replays the conversation the Session already holds. */
   private replaying = false
   private cancelSent = false
@@ -178,6 +184,11 @@ export class CasperConnection {
   /** Whether the process has exited or was terminated. */
   get dead(): boolean {
     return this.exitedState
+  }
+
+  /** Whether Casper's `initialize` reply set `promptCapabilities.image` to true, so prompts may carry image blocks. */
+  get acceptsImages(): boolean {
+    return this.initialized?.agentCapabilities?.promptCapabilities?.image === true
   }
 
   /**
@@ -340,7 +351,7 @@ export class CasperConnection {
         Readable.toWeb(child.stdout) as ReadableStream<Uint8Array>,
       ))
     const agent = this.connection.agent
-    await agent.request(methods.agent.initialize, {
+    this.initialized = await agent.request(methods.agent.initialize, {
       protocolVersion: PROTOCOL_VERSION,
       clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
     })

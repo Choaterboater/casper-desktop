@@ -13,6 +13,7 @@
     { "path": "../../core/agent" },
     { "path": "../../core/agent-loop" },
     { "path": "../../llm/llm" },
+    { "path": "../../attachment/attachment" },
     { "path": "../../core/scope" },
     { "path": "../../core/session" },
     { "path": "../../session/session-persistence" },

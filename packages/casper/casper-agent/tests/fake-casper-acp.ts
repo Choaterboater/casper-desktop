@@ -14,7 +14,8 @@
  *   (`--resume: no saved conversation in this workspace starts with "<id>". …`),
  *   or with `loadError` when set. `holdInitialize` names a file whose
  *   existence holds the initialize reply. `ignoreEof` keeps the process alive
- *   after stdin closes, until it is killed.
+ *   after stdin closes, until it is killed. `promptCapabilities` replaces the
+ *   `initialize` reply's (default: text only, as an older Casper).
  * - `FAKE_CASPER_LOG` — JSON lines appended for the start (argv, env names,
  *   PATH, cwd), every request and notification received, every permission
  *   answer, and stdin EOF. Tests poll this file.
@@ -93,6 +94,7 @@ interface Script {
   ignoreEof?: boolean
   replay?: string[]
   newSessionId?: string
+  promptCapabilities?: { image?: boolean; audio?: boolean; embeddedContext?: boolean }
 }
 
 const logFile = process.env.FAKE_CASPER_LOG ?? ''
@@ -269,7 +271,7 @@ createAcpAgent({ name: 'fake-casper' })
       protocolVersion: 1,
       agentCapabilities: {
         loadSession: true,
-        promptCapabilities: { image: false, audio: false, embeddedContext: false },
+        promptCapabilities: script.promptCapabilities ?? { image: false, audio: false, embeddedContext: false },
         mcpCapabilities: { http: false, sse: false },
       },
       agentInfo: { name: 'casper', title: 'Casper', version: '0.0.0-test' },

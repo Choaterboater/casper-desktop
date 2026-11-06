@@ -95,6 +95,15 @@ describe('CasperConnection', { timeout: 30_000 }, () => {
     expect(fake.calls('session/new')[0]?.params).toEqual({ cwd: fake.cwd, mcpServers: [] })
   })
 
+  it('takes pictures only when the initialize reply sets promptCapabilities.image to true', async () => {
+    const { fake, start } = await setup()
+    expect((await start()).connection.acceptsImages).toBe(false)
+    fake.script({ prompts: [], promptCapabilities: { image: true, audio: false, embeddedContext: true } })
+    expect((await start()).connection.acceptsImages).toBe(true)
+    fake.script({ prompts: [], promptCapabilities: {} })
+    expect((await start()).connection.acceptsImages).toBe(false)
+  })
+
   it('passes the app profile to Casper as DSH_PROFILE and DSH_PROFILE_DIR', async () => {
     const { fake, start } = await setup()
     await start({}, undefined, undefined, { profile: { name: 'desktop', dir: join(fake.root, 'profile') } })
