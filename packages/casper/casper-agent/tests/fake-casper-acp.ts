@@ -15,7 +15,10 @@
  *   or with `loadError` when set. `holdInitialize` names a file whose
  *   existence holds the initialize reply. `ignoreEof` keeps the process alive
  *   after stdin closes, until it is killed. `promptCapabilities` replaces the
- *   `initialize` reply's (default: text only, as an older Casper).
+ *   `initialize` reply's (default: text only, as an older Casper). `commands`
+ *   is sent as an `available_commands_update` right after the `session/new`
+ *   reply, and after the replayed chunks of a successful `session/load`
+ *   (before its reply, so it arrives while the client drops the replay).
  * - `FAKE_CASPER_LOG` — JSON lines appended for the start (argv, env names,
  *   PATH, cwd), every request and notification received, every permission
  *   answer, and stdin EOF. Tests poll this file.
@@ -30,7 +33,8 @@
  * hang: never replies), `{ crash }` (exits with that code),
  * `{ waitFile }` (waits until the file exists), `{ stderr }` (writes a
  * line to stderr), `{ fail }` (replies with a -32603 error), `{ image }` and
- * `{ thought }` (updates Casper does not send), `{ late: Step }` (played 50 ms
+ * `{ thought }` (updates Casper does not send), `{ commandsUpdate }` (sends
+ * that `available_commands_update` list), `{ late: Step }` (played 50 ms
  * after the reply), `{ exitAfterMs }` (exits with code 5 after that delay),
  * `{ mcp, args? }` (calls that tool on the first `mcpServers` entry with an
  * MCP 1.x client, carrying the current tool id as `casper/acpToolCallId`,
@@ -57,6 +61,7 @@ import {
   ndJsonStream,
   RequestError,
   type AgentContext,
+  type AvailableCommand,
   type McpServer,
   type PromptRequest,
   type PromptResponse,
@@ -100,6 +105,7 @@ interface Step {
   content?: (string | Record<string, unknown>)[]
   rawOutput?: unknown
   kind?: ToolKind
+  commandsUpdate?: AvailableCommand[]
 }
 
 /** A step's ACP fields beyond the id, status, and title. */
@@ -123,6 +129,7 @@ interface Script {
   replay?: string[]
   newSessionId?: string
   promptCapabilities?: { image?: boolean; audio?: boolean; embeddedContext?: boolean }
+  commands?: AvailableCommand[]
 }
 
 const logFile = process.env.FAKE_CASPER_LOG ?? ''
@@ -209,6 +216,7 @@ async function run(step: Step, params: PromptRequest, client: AgentContext, outc
     if (step.image === true) await update(client, { sessionUpdate: 'agent_message_chunk', content: { type: 'image', mimeType: 'image/png', data: 'aGk=' } })
     if (step.thought !== undefined) await update(client, { sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: step.thought } })
     if (step.text !== undefined) await update(client, { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: step.text } })
+    if (step.commandsUpdate !== undefined) await update(client, { sessionUpdate: 'available_commands_update', availableCommands: step.commandsUpdate })
     if (step.tool !== undefined) {
       const id = `casper-tool-${++steps}`
       await update(client, {
@@ -315,10 +323,13 @@ createAcpAgent({ name: 'fake-casper' })
       authMethods: [],
     }
   })
-  .onRequest(methods.agent.session.new, ({ params }) => {
+  .onRequest(methods.agent.session.new, ({ params, client }) => {
     log({ method: 'session/new', params, exposed: exposed(params.mcpServers) })
     mcpServers = params.mcpServers
     sessionId = script.newSessionId ?? randomUUID()
+    const availableCommands = script.commands
+    // Like Casper, the list follows the reply.
+    if (availableCommands !== undefined) setImmediate(() => { void update(client, { sessionUpdate: 'available_commands_update', availableCommands }) })
     return { sessionId }
   })
   .onRequest(methods.agent.session.load, async ({ params, client }) => {
@@ -330,6 +341,7 @@ createAcpAgent({ name: 'fake-casper' })
     sessionId = params.sessionId
     mcpServers = params.mcpServers
     for (const text of script.replay ?? []) await update(client, { sessionUpdate: 'user_message_chunk', content: { type: 'text', text } })
+    if (script.commands !== undefined) await update(client, { sessionUpdate: 'available_commands_update', availableCommands: script.commands })
     return {}
   })
   .onRequest(methods.agent.session.prompt, ({ params, client }) => {

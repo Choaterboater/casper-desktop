@@ -4,7 +4,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import type { RequestPermissionRequest, RequestPermissionResponse, SessionNotification, StopReason } from '@agentclientprotocol/sdk'
+import type { AvailableCommand, RequestPermissionRequest, RequestPermissionResponse, SessionNotification, StopReason } from '@agentclientprotocol/sdk'
 import type {
   Agent,
   AgentCancelCause,
@@ -20,6 +20,8 @@ import { AgentModel, agentEvents } from '@deepseek-ai/dsh-agent'
 import { ReactLoopInbox } from '@deepseek-ai/dsh-agent-loop'
 import { getDshRuntimeVersion } from '@deepseek-ai/dsh-app-boot'
 import type {} from '@deepseek-ai/dsh-attachment'
+import type {} from '@deepseek-ai/dsh-commands'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { LlmFailure } from '@deepseek-ai/dsh-llm'
 import { createScope } from '@deepseek-ai/dsh-scope'
 import type { Scope } from '@deepseek-ai/dsh-scope'
@@ -32,6 +34,8 @@ import type {} from '@deepseek-ai/dsh-user-questions'
 import { appReadRoots, isInstalled, selfAnchor } from './app-read.ts'
 import { startAppTools } from './app-tools.ts'
 import type { AppToolsProfile, AppToolsServer } from './app-tools.ts'
+import { casperCommandId, casperCommands } from './commands.ts'
+import type { CasperCommand, CasperCommandCache } from './commands.ts'
 import type { Config } from './config.ts'
 import { CasperConnection, CasperError } from './connection.ts'
 import { answerPermission } from './permission.ts'
@@ -100,6 +104,14 @@ export class CasperAgent implements Agent {
   /** First failure recording an update; it ends the turn as an error. */
   private updateFailure: Error | undefined
   private readonly asks = new Map<string, AbortController>()
+  /** The Casper commands this Agent offers in the command menu. */
+  private offered: readonly CasperCommand[]
+  /** The command registry once it is mounted; registrations made through it belong to this Agent's scope. */
+  private commandRegistry: Pick<Context, 'commands'> | undefined
+  /** Disposers of the current command registrations. */
+  private readonly commandOffs: (() => void)[] = []
+  /** Whether the factory published this Agent; commands are registered only from then on. */
+  private published = false
 
   /**
    * @param pluginCtx - the Casper plugin context whose services the Agent uses.
@@ -110,6 +122,7 @@ export class CasperAgent implements Agent {
    * @param lastTurn - the last turn number recorded in the Session.
    * @param config - the plugin config.
    * @param sidecar - the Session-to-conversation records.
+   * @param commandCache - the last command list Casper sent, offered until this Agent's Casper sends its own.
    */
   constructor(
     private readonly pluginCtx: Context,
@@ -120,6 +133,7 @@ export class CasperAgent implements Agent {
     lastTurn: number,
     private readonly config: Config,
     private readonly sidecar: CasperSidecar,
+    private readonly commandCache: CasperCommandCache,
   ) {
     this.dispatch = agentEvents(pluginCtx, this)
     this.scope = createScope(pluginCtx, this)
@@ -128,6 +142,16 @@ export class CasperAgent implements Agent {
     this.model = new AgentModel(readers.modelSelection, session, {})
     this.inbox = new ReactLoopInbox(readers.inbox, session, this.dispatch)
     this.lastTurn = lastTurn
+    this.offered = commandCache.read()
+    // The registry is optional: without one, Casper's commands are typed as prompt text.
+    this.ctx.inject(['commands'], (commandCtx) => {
+      this.commandRegistry = commandCtx
+      commandCtx.effect(() => () => {
+        this.commandRegistry = undefined
+        this.commandOffs.length = 0
+      }, 'casperAgent.commands()')
+      this.registerCommands()
+    })
   }
 
   get status(): AgentStatus {
@@ -382,6 +406,7 @@ export class CasperAgent implements Agent {
       profile,
       handlers: {
         update: (notification) => { this.receive(owner.connection, notification) },
+        commands: (list) => { this.offerCommands(list) },
         permission: params => this.permission(owner.connection, params),
       },
       appTools: this.config.appTools ? connection => this.startAppTools(connection, cwd, profile) : undefined,
@@ -418,6 +443,60 @@ export class CasperAgent implements Agent {
       record: (acpId, call) => { this.sinkFor(connection)?.writer.bridged(acpId, call) },
       onError: (error) => { this.pluginCtx.logger.debug(`casper agent "${this.id}": app tools: ${error.message}`) },
     })
+  }
+
+  /**
+   * Offer the commands of Casper's latest `available_commands_update`, replacing
+   * the earlier list, and keep them for the next Agent's menu.
+   * @param list - Casper's whole list.
+   */
+  private offerCommands(list: readonly AvailableCommand[]): void {
+    const commands = casperCommands(list)
+    if (JSON.stringify(commands) === JSON.stringify(this.offered)) return
+    this.offered = commands
+    this.registerCommands()
+    // A failed save costs only the next Agent's early menu; this one already changed.
+    this.commandCache.write(commands).catch((error: unknown) => {
+      this.pluginCtx.logger.warn(`casper agent "${this.id}": command list not saved: ${String(error)}`)
+    })
+  }
+
+  /**
+   * Offer the commands once the factory has published this Agent. Each
+   * registration emits `commands/change`, which makes every client repull its
+   * Sessions' menus, and a repull resumes a Session that is not live; an Agent
+   * whose creation fails therefore registers nothing, so it cannot start
+   * another round.
+   */
+  publishCommands(): void {
+    this.published = true
+    this.registerCommands()
+  }
+
+  /**
+   * Register the offered commands for this Agent only. A name that resolves to
+   * another command, such as the app's own `/permission`, `/export`, or
+   * `/feedback`, keeps that command. Each registration's line is sent to Casper
+   * as a prompt; clients that know the identity send the typed line instead.
+   */
+  private registerCommands(): void {
+    for (const off of this.commandOffs.splice(0)) off()
+    const registry = this.commandRegistry?.commands
+    if (registry === undefined || !this.published) return
+    for (const command of this.offered) {
+      // This Agent's own registrations were just removed, so any match belongs to another plugin.
+      if (registry.find(this, command.name) !== undefined) continue
+      this.commandOffs.push(registry.register({
+        definitionId: casperCommandId(command.name),
+        name: command.name,
+        description: command.description,
+        ...command.hint === undefined ? {} : { input: { hint: command.hint } },
+        handler: ({ rawInput }) => {
+          this.followup(createUserMessage({ content: [{ type: 'text', text: `/${command.name}${rawInput}` }], source: { kind: 'user' } }))
+          return { kind: 'success' }
+        },
+      }))
+    }
   }
 
   /** Forget the current connection and start killing it. */

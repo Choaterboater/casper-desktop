@@ -20,6 +20,7 @@ import type { Session } from '@deepseek-ai/dsh-session'
 import type { SessionHandle } from '@deepseek-ai/dsh-session-persistence'
 import type { ProjectionHandle } from '@deepseek-ai/dsh-session-projection'
 import { CasperAgent } from './agent.ts'
+import type { CasperCommandCache } from './commands.ts'
 import type { Config } from './config.ts'
 import type { CasperSidecar } from './sidecar.ts'
 
@@ -34,6 +35,8 @@ export interface CasperFactoryDependencies {
   readonly inbox: ProjectionHandle<InboxState>
   /** The Session-to-conversation records. */
   readonly sidecar: CasperSidecar
+  /** The last command list Casper sent. */
+  readonly commands: CasperCommandCache
 }
 
 /** One Session's write handle and the count of events already stored through it. */
@@ -83,7 +86,7 @@ export class CasperAgentFactory implements AgentFactory {
   /**
    * @param ctx - the Casper plugin context.
    * @param config - the plugin config.
-   * @param deps - projection handles and the sidecar.
+   * @param deps - projection handles, the sidecar, and the command cache.
    */
   constructor(
     private readonly ctx: Context,
@@ -200,6 +203,7 @@ export class CasperAgentFactory implements AgentFactory {
       this.ctx.agents.turnBoundaryOf(session).lastTurn,
       this.config,
       this.deps.sidecar,
+      this.deps.commands,
     )
 
     let ready = false
@@ -269,6 +273,7 @@ export class CasperAgentFactory implements AgentFactory {
           await this.ctx.agents.announce(agent, init.source, abort.signal)
           abort.signal.throwIfAborted()
           ready = true
+          agent.publishCommands()
           return { agent, dispose }
         } catch (error: unknown) {
           // A failed initialization keeps queued input for the next owner.

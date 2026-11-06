@@ -2,17 +2,20 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Buffer } from 'node:buffer'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
+import CommandRuntime, { CommandDefinitionId } from '@deepseek-ai/dsh-commands'
 import AttachmentStore, { AttachmentId } from '@deepseek-ai/dsh-attachment'
 import type { FileAttachmentRef, ImageAttachmentLimits, ImageAttachmentRef, StoredImageAttachment } from '@deepseek-ai/dsh-attachment'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { UserQuestionError } from '@deepseek-ai/dsh-user-questions'
 import { CasperAgent, FRESH_CONVERSATION_NOTICE } from '../src/agent.ts'
+import { CasperCommandCache } from '../src/commands.ts'
 import { FORK_UNSUPPORTED } from '../src/factory.ts'
 import { TEXT_ONLY_PICTURE } from '../src/prompt.ts'
 import { boot, eventsOf, filesText, prompt, turnEnds } from './harness.ts'
 import { alive, fakeCasper, gate, parsed, waitFor } from './support.ts'
-import type { FakeCasper, FakeScript } from './support.ts'
+import type { FakeCasper, FakeCommand, FakeScript } from './support.ts'
 
 const cleanups: (() => Promise<void> | void)[] = []
 afterEach(async () => {
@@ -660,5 +663,150 @@ describe('CasperAgent', { timeout: 60_000 }, () => {
     await run(agent, 'go')
     expect(turnEnds(agent)).toEqual([{ kind: 'error', error: { code: 'CASPER_START_FAILED', message: 'Casper needs a project folder for this session.' } }])
     expect(fake.pids()).toEqual([])
+  })
+})
+
+describe('Casper\'s commands in the command menu', { timeout: 60_000 }, () => {
+  const STATUS: FakeCommand = { name: 'status', description: 'Inspect project, model, auth and integrations' }
+  const REVIEW: FakeCommand = { name: 'review', description: 'Review your changes', input: { hint: '[branch|commit]' } }
+  const DIFF: FakeCommand = { name: 'diff', description: 'Show the changes', input: null }
+
+  /** A Host with the command registry and the app's own `/permission` and `/export`. */
+  async function setupMenu(script: FakeScript) {
+    const fake = fakeCasper(script)
+    cleanups.push(() => { fake.remove() })
+    const host = await boot(fake, {}, undefined, true, async (ctx) => {
+      await ctx.plugin(CommandRuntime)
+      await ctx.plugin({
+        name: 'app-commands',
+        inject: ['commands'],
+        apply: (inner: Context) => {
+          for (const name of ['permission', 'export']) {
+            inner.commands.register({ definitionId: CommandDefinitionId(`app/${name}`), name, description: `The app's ${name}`, handler: () => ({ kind: 'success' }) })
+          }
+        },
+      })
+    })
+    cleanups.push(() => host.ctx.fiber.dispose())
+    return { fake, host }
+  }
+
+  function menu(host: Awaited<ReturnType<typeof setupMenu>>['host'], agent: Agent): string[] {
+    return host.ctx.commands.list(agent).map(command => `${command.name} ${command.definitionId ?? ''} ${command.input?.hint ?? ''}`.trim())
+  }
+
+  function cached(host: { ctx: Context }): unknown {
+    return host.ctx.storageDomain.get('casper_agent_commands')?.global.get()
+  }
+
+  it('offers Casper\'s commands to its own Agent only, keeps the app\'s names, and sends a picked command to Casper', async () => {
+    const { fake, host } = await setupMenu({
+      commands: [
+        STATUS, REVIEW, { name: 'permission', description: 'Casper permissions' }, { name: 'export', description: 'Casper export' },
+        { name: 'model', description: 'Casper model' }, { name: 'file', description: 'Casper file' }, { name: 'Bad Name', description: 'not a name' },
+        { name: 'blank', description: '  ' }, { name: 'status', description: 'a second status' }, { name: 'hint', description: 'blank hint', input: { hint: ' ' } },
+      ],
+      prompts: [[{ text: 'ready\n' }], [{ text: 'status shown\n' }]],
+    })
+    const { agent } = await host.create('casper-menu')
+    const { agent: other } = await host.create('standard-session', 'standard')
+    expect(menu(host, agent)).toEqual(['export app/export', 'permission app/permission'])
+    await run(agent, 'hi')
+    await waitFor(() => menu(host, agent).length === 5)
+    expect(menu(host, agent)).toEqual([
+      'export app/export',
+      'hint @deepseek-ai/dsh-casper-agent/hint',
+      'permission app/permission',
+      'review @deepseek-ai/dsh-casper-agent/review [branch|commit]',
+      'status @deepseek-ai/dsh-casper-agent/status',
+    ])
+    expect(menu(host, other)).toEqual(['export app/export', 'permission app/permission'])
+    // A surface that executes the command instead of sending its line queues the line for Casper.
+    const executed = await host.ctx.commands.execute(agent, '/review  main', [], new AbortController().signal)
+    expect(executed?.result).toEqual({ kind: 'success' })
+    await waitFor(() => fake.calls('session/prompt').length === 2)
+    await agent.whenIdle()
+    expect(promptTexts(fake)).toEqual(['hi', '/review  main'])
+  })
+
+  it('replaces the list with Casper\'s next one, skips an unchanged one, and offers the last list before the next Agent starts Casper', async () => {
+    const { fake, host } = await setupMenu({
+      commands: [STATUS, REVIEW],
+      prompts: [[{ commandsUpdate: [DIFF, REVIEW] }, { text: 'one\n' }], [{ commandsUpdate: [DIFF, REVIEW] }, { text: 'two\n' }]],
+    })
+    const { agent } = await host.create('casper-menu-first')
+    await run(agent, 'first')
+    await waitFor(() => menu(host, agent).includes('diff @deepseek-ai/dsh-casper-agent/diff'))
+    expect(menu(host, agent)).toEqual([
+      'diff @deepseek-ai/dsh-casper-agent/diff', 'export app/export', 'permission app/permission',
+      'review @deepseek-ai/dsh-casper-agent/review [branch|commit]',
+    ])
+    await waitFor(() => JSON.stringify(cached(host)) === JSON.stringify({ commands: [
+      { name: 'diff', description: 'Show the changes' }, { name: 'review', description: 'Review your changes', hint: '[branch|commit]' },
+    ] }))
+    let changes = 0
+    host.ctx.on('commands/change', () => { changes += 1 })
+    await run(agent, 'second')
+    expect(changes).toBe(0)
+    const { agent: next } = await host.create('casper-menu-next')
+    await waitFor(() => menu(host, next).includes('diff @deepseek-ai/dsh-casper-agent/diff'))
+    expect(menu(host, next)).toEqual(menu(host, agent))
+    expect(fake.pids()).toHaveLength(1)
+  })
+
+  it('offers the cached list only once the Agent is published, so a creation that fails changes no menu', async () => {
+    const { fake, host } = await setupMenu({ commands: [STATUS], prompts: [[{ text: 'ok\n' }]] })
+    const { agent: first } = await host.create('casper-menu-cache')
+    await run(first, 'hi')
+    await waitFor(() => JSON.stringify(cached(host)) === JSON.stringify({ commands: [{ name: 'status', description: STATUS.description }] }))
+    // Every change makes each client repull its Sessions' menus, and a repull resumes a Session that is not live.
+    const live: boolean[] = []
+    host.ctx.on('commands/change', () => { live.push(host.ctx.agents.get(SessionId('casper-menu-late')) !== undefined) })
+    for (const id of ['casper-menu-refused', 'casper-menu-refused-again']) {
+      await expect(host.ctx.agents.create({
+        sessionId: SessionId(id), meta: { cwd: fake.cwd, agentPreset: 'casper' }, setup: () => { throw new Error('setup refused') },
+      })).rejects.toThrow('setup refused')
+    }
+    expect(live).toEqual([])
+    const { agent } = await host.create('casper-menu-late')
+    expect(menu(host, agent)).toContain('status @deepseek-ai/dsh-casper-agent/status')
+    expect(live).toEqual([true])
+  })
+
+  it('changes the menu even when the list cannot be saved', async () => {
+    const { host } = await setupMenu({ commands: [STATUS], prompts: [[{ text: 'ok\n' }], [{ commandsUpdate: [DIFF] }, { text: 'ok\n' }]] })
+    const { agent } = await host.create('casper-menu-unsaved')
+    await run(agent, 'hi')
+    await waitFor(() => JSON.stringify(cached(host)) === JSON.stringify({ commands: [{ name: 'status', description: STATUS.description }] }))
+    const global = host.ctx.storageDomain.get('casper_agent_commands')?.global
+    if (global === undefined) throw new Error('command cache is not open')
+    const set = vi.spyOn(global, 'set').mockRejectedValue(new Error('disk full'))
+    await run(agent, 'again')
+    await waitFor(() => set.mock.calls.length === 1)
+    await waitFor(() => menu(host, agent).includes('diff @deepseek-ai/dsh-casper-agent/diff'))
+    expect(menu(host, agent)).toEqual(['diff @deepseek-ai/dsh-casper-agent/diff', 'export app/export', 'permission app/permission'])
+    expect(cached(host)).toEqual({ commands: [{ name: 'status', description: STATUS.description }] })
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }, { kind: 'completed' }])
+    set.mockRestore()
+  })
+
+  it('keeps the list without a command registry, and a failed save does not fail the turn', async () => {
+    const { fake, host } = await setup({ commands: [STATUS], prompts: [[{ text: 'ok\n' }], [{ commandsUpdate: [DIFF] }, { text: 'ok\n' }]] })
+    const { agent } = await host.create('casper-no-menu')
+    await run(agent, 'hi')
+    await waitFor(() => JSON.stringify(cached(host)) === JSON.stringify({ commands: [{ name: 'status', description: STATUS.description }] }))
+    const global = host.ctx.storageDomain.get('casper_agent_commands')?.global
+    if (global === undefined) throw new Error('command cache is not open')
+    const set = vi.spyOn(global, 'set').mockRejectedValueOnce(new Error('disk full'))
+    await run(agent, 'again')
+    await waitFor(() => set.mock.calls.length === 1)
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }, { kind: 'completed' }])
+    expect(fake.pids()).toHaveLength(1)
+    // Another Agent sending the list already stored writes nothing.
+    const domain = host.ctx.storageDomain.get('casper_agent_commands')
+    if (domain === undefined) throw new Error('command cache is not open')
+    await new CasperCommandCache(domain as never).write([{ name: 'status', description: STATUS.description }])
+    expect(set.mock.calls).toHaveLength(1)
+    set.mockRestore()
   })
 })

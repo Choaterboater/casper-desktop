@@ -11,6 +11,7 @@ import {
   ndJsonStream,
   PROTOCOL_VERSION,
   RequestError,
+  type AvailableCommand,
   type ClientConnection,
   type ContentBlock as AcpContentBlock,
   type InitializeResponse,
@@ -71,6 +72,13 @@ export interface CasperConnectionHandlers {
    * @param notification - the update and its session id.
    */
   update(notification: SessionNotification): void
+  /**
+   * Receive Casper's whole command list from an `available_commands_update`,
+   * which never reaches {@link update}. Called during a `session/load` replay too,
+   * since Casper sends the list right after opening a conversation.
+   * @param commands - the commands Casper offers, without leading slashes.
+   */
+  commands(commands: readonly AvailableCommand[]): void
   /**
    * Answer one `session/request_permission`.
    * @param params - Casper's request.
@@ -343,7 +351,9 @@ export class CasperConnection {
     }
     this.connection = createAcpClient({ name: 'casper-desktop' })
       .onNotification(methods.client.session.update, ({ params }) => {
-        if (!this.replaying) options.handlers.update(params)
+        // The command list is the conversation's current state, not history, so a replay keeps it.
+        if (params.update.sessionUpdate === 'available_commands_update') options.handlers.commands(params.update.availableCommands)
+        else if (!this.replaying) options.handlers.update(params)
       })
       .onRequest(methods.client.session.requestPermission, ({ params }) => options.handlers.permission(params))
       .connect(ndJsonStream(

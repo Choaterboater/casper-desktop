@@ -24,6 +24,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { WeakMapWithValues } from '@deepseek-ai/dsh-util-values'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 import { rankByName } from '@deepseek-ai/dsh-client-ui-primitives'
+import { isPromptCommand } from '@deepseek-ai/dsh-commands/builtin'
 import type {
   CandidateRequest, ClientSessionContext, CommandClaim, PickOutcome, InputTriggerCandidate, InputTriggerPick,
   SubmitAttachment, SubmitEnvelope, SubmitOutcome,
@@ -35,6 +36,12 @@ import { PopupSelectController } from './popup.ts'
 import { builtinRowFace, sectionRows } from './presentation.ts'
 import { claimToken } from './resolution.ts'
 import type { TokenSegment } from './popup.ts'
+
+/**
+ * How long `commands/change` events are gathered into one catalog repull.
+ * An agent that registers a whole command list sends one event per command.
+ */
+export const COMMANDS_CHANGE_GATHER_MS = 50
 
 declare module '@deepseek-ai/dsh-api-session-controller/client' {
   interface SessionReferenceSourceMap {
@@ -122,7 +129,14 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
       matchEnter: (session, line, signal, envelope) => this.matchEnter(session, line, signal, envelope),
       warm: (session) => { this.directory.warm(session.sessionId) },
     }), 'command: slash source')
-    ctx.remote.$on('commands/change', () => { this.directory.invalidateAll() })
+    let repull: ReturnType<typeof setTimeout> | undefined
+    ctx.remote.$on('commands/change', () => {
+      repull ??= setTimeout(() => {
+        repull = undefined
+        this.directory.invalidateAll()
+      }, COMMANDS_CHANGE_GATHER_MS)
+    })
+    ctx.effect(() => () => { clearTimeout(repull) }, 'command: gathered repull')
     // A preset switch changes which commands one session's agent resolves and
     // registers nothing globally. Drop that key's old composition before
     // prewarming so a newly opened menu waits for the replacement catalog.
@@ -225,8 +239,11 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
     const list = await this.directory.ensureReady(session.sessionId, req.signal)
     const rows: InputTriggerCandidate[] = []
     const seen = new Set<string>()
+    // The agent reads a prompt command only at the start of the prompt, so a mid-sentence menu leaves them out.
+    const leadingOnly = new Set<string>()
     for (const c of list) {
       seen.add(c.name)
+      if (isPromptCommand(c)) leadingOnly.add(c.name)
       rows.push({
         name: c.name,
         ...(builtinRowFace(c, this.t) ?? { description: c.description }),
@@ -245,11 +262,14 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
         ...(contribution.icon === undefined ? {} : { icon: contribution.icon }),
       })
     }
-    const visible = rows.filter(c => req.position === 'leading' || c.hint === undefined)
+    const visible = rows.filter(c => req.position === 'leading' || (c.hint === undefined && !leadingOnly.has(c.name)))
     return req.query === '' ? sectionRows(visible, this.t) : rankByName(visible, req.query)
   }
 
-  /** Decision table, menu column: contribution/decorated-host → popup or action; host input → claim; host bare → detached execute. */
+  /**
+   * Decision table, menu column: contribution/decorated-host → popup or action; prompt command → its text;
+   * host input → claim; host bare → detached execute.
+   */
   private dispatch(pick: InputTriggerPick): PickOutcome {
     const name = pick.candidate.name
     const contribution = this.live.contributions.get(name)
@@ -259,6 +279,8 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
     }
     const desc = this.directory.resolve(pick.session.sessionId, name)
     if (desc === undefined) return undefined // snapshot swapped between menu and pick → miss
+    // The agent reads a prompt command from the prompt itself: insert its line for the user to send.
+    if (isPromptCommand(desc)) return { text: desc.input === undefined ? `/${desc.name}` : `/${desc.name} ` }
     // A decoration replaces the HOST row's bare invocation with its popup or
     // action; it decorates only a resolvable host command (checked above),
     // never manufactures one, and never touches the argument claim below.
@@ -291,12 +313,12 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
     return this.claimOf(session, token)
   }
 
-  /** The host leadingInput claim a token names in the hot catalog; popup and action kinds never claim. */
+  /** The host leadingInput claim a token names in the hot catalog; popup, action, and prompt commands never claim. */
   private claimOf(session: ClientSessionContext, token: string): CommandClaim | undefined {
     if (!token.startsWith('/')) return undefined
     if (this.live.contributions.has(token.slice(1))) return undefined
     const desc = this.directory.resolve(session.sessionId, token.slice(1))
-    if (desc === undefined || desc.input === undefined) return undefined
+    if (desc === undefined || desc.input === undefined || isPromptCommand(desc)) return undefined
     return this.leadingClaim(desc, session, token.slice(1))
   }
 
@@ -315,6 +337,7 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
    *
    * A typed token is resolved through the localized claim tokens, so a line
    * written as `/计划` reaches the `plan` descriptor and executes as `/plan`.
+   * A prompt command answers undefined, so the line is sent as the prompt.
    */
   private async matchEnter(
     session: ClientSessionContext,
@@ -341,7 +364,8 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
     }
     await this.directory.ensureReady(session.sessionId, signal)
     const desc = this.directory.resolve(session.sessionId, typedName)
-    if (desc === undefined) return undefined
+    // A prompt command's line, attachments included, goes to the agent as an ordinary prompt.
+    if (desc === undefined || isPromptCommand(desc)) return undefined
     const name = desc.name
     const canonical = `/${name}${trimmed.slice(token.length)}`
     // Bare enter on a decorated host command opens its popup; an argued line

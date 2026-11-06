@@ -19,7 +19,7 @@ import { IconGoalOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ClientSessionContext, ConsumeTokenRequest, InputTriggerPick, InputTriggerSource, SubmitAttachment } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type { CommandContribution, CommandDecoration, PopupSelectSpec, SelectOption } from '../src/client/contract.ts'
 import type { CommandDescriptor } from '../src/client/directory.ts'
-import { CommandUiRuntime } from '../src/client/service.ts'
+import { COMMANDS_CHANGE_GATHER_MS, CommandUiRuntime } from '../src/client/service.ts'
 import { en, zh, type CommandKey } from '../src/client/locales.ts'
 
 const sid = (k: string): SessionId => k as SessionId
@@ -810,6 +810,66 @@ describe('matchEnter (enter column)', () => {
   })
 })
 
+describe('prompt commands (a command the agent reads from the prompt)', () => {
+  const signal = () => new AbortController().signal
+  const PROMPT_CMDS: CommandDescriptor[] = [
+    { definitionId: CommandDefinitionId('@deepseek-ai/dsh-casper-agent/status'), name: 'status', description: 'Inspect project, model, auth and integrations' },
+    { definitionId: CommandDefinitionId('@deepseek-ai/dsh-casper-agent/review'), name: 'review', description: 'A read-only reviewer looks at your changes', input: { hint: '[branch|commit]' } },
+  ]
+  const promptBench = () => bench({ commands: () => Promise.resolve({ commands: PROMPT_CMDS }) })
+
+  it('lists them with their own description and hint', async () => {
+    const { source } = await promptBench()
+    const rows = await source.candidates(proj('s1'), req('rev'))
+    expect(rows).toEqual([expect.objectContaining({ name: 'review', description: 'A read-only reviewer looks at your changes', hint: '[branch|commit]' })])
+  })
+
+  it('leaves them out of a mid-sentence menu, where the agent would not read them as commands', async () => {
+    const { source } = await bench({ commands: () => Promise.resolve({ commands: [...PROMPT_CMDS, ...S1_CMDS] }) })
+    const leading = (await source.candidates(proj('s1'), req('', 'leading'))).map(row => row.name)
+    expect(leading).toEqual(expect.arrayContaining(['status', 'review']))
+    const inline = (await source.candidates(proj('s1'), req('', 'inline'))).map(row => row.name)
+    expect(inline).not.toContain('status')
+    expect(inline).not.toContain('review')
+    expect(inline.length).toBeGreaterThan(0)
+    expect(await source.candidates(proj('s1'), req('st', 'inline'))).toEqual([])
+  })
+
+  it('a menu pick inserts the command text, with a trailing space only when it takes input; nothing executes', async () => {
+    const { command, source, warm, executeCalls } = await promptBench()
+    const run = vi.fn()
+    command.decorate({ name: 'status', available: () => true, ui: { kind: 'action', run } })
+    await warm(proj('s1'))
+    expect(menuPick(source, 'status', proj('s1'))).toEqual({ text: '/status' })
+    expect(menuPick(source, 'review', proj('s1'))).toEqual({ text: '/review ' })
+    await Promise.resolve()
+    expect(run).not.toHaveBeenCalled()
+    expect(executeCalls).toEqual([])
+  })
+
+  it('Space makes no claim and a reloaded chip restores none', async () => {
+    const { source, warm } = await promptBench()
+    await warm(proj('s1'))
+    expect(source.matchSpace!(proj('s1'), '/review')).toBeUndefined()
+    expect(source.matchSpace!(proj('s1'), '/status')).toBeUndefined()
+    await expect(source.matchClaim!(proj('s1'), '/review', signal())).resolves.toBeUndefined()
+  })
+
+  it('Enter leaves the line to the prompt, bare, argued, or with attachments, and ignores a decoration', async () => {
+    const { command, source, warm, executeCalls } = await promptBench()
+    const run = vi.fn()
+    command.decorate({ name: 'status', available: () => true, ui: { kind: 'action', run } })
+    await warm(proj('s1'))
+    for (const line of ['/status', '/review', '/review main', '/status now']) {
+      await expect(source.matchEnter!(proj('s1'), line, signal(), { attachments: 0 })).resolves.toBeUndefined()
+    }
+    await expect(source.matchEnter!(proj('s1'), '/review', signal(), { attachments: 2 })).resolves.toBeUndefined()
+    await Promise.resolve()
+    expect(run).not.toHaveBeenCalled()
+    expect(executeCalls).toEqual([])
+  })
+})
+
 describe('matchEnter envelope policy (images)', () => {
   const signal = () => new AbortController().signal
   const IMG_CMDS: CommandDescriptor[] = [
@@ -1148,9 +1208,26 @@ describe('directory invalidation events', () => {
     })
     await warm(proj('s1'))
     remote.emit('commands/change', [])
-    await new Promise(resolve => setTimeout(resolve, 0))
-    expect(source.matchSpace!(proj('s1'), '/fresh')).not.toBeUndefined()
+    await vi.waitFor(() => { expect(source.matchSpace!(proj('s1'), '/fresh')).not.toBeUndefined() })
     expect(source.matchSpace!(proj('s1'), '/goal')).toBeUndefined()
+  })
+
+  it('gathers a burst of commands/change into one repull per session', async () => {
+    let round = 0
+    const { warm, remote, listCalls } = await bench({
+      commands: () => {
+        round += 1
+        return Promise.resolve({ commands: round <= 2 ? S1_CMDS : [{ name: 'fresh', description: '' }] })
+      },
+    })
+    await warm(proj('s1'))
+    await warm(proj('s2'))
+    expect(listCalls).toHaveLength(2)
+    // An agent registering 40 commands after removing 40 sends 80 events.
+    for (let event = 0; event < 80; event += 1) remote.emit('commands/change', [])
+    await vi.waitFor(() => { expect(listCalls).toHaveLength(4) })
+    await new Promise(resolve => setTimeout(resolve, COMMANDS_CHANGE_GATHER_MS * 2))
+    expect(listCalls.map(call => call.sessionId)).toEqual([sid('s1'), sid('s2'), sid('s1'), sid('s2')])
   })
 
   it('agent-preset/selected drops and repulls the recomposed session while leaving others served', async () => {

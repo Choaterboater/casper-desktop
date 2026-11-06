@@ -15,11 +15,11 @@
   en: 76368b6b1da79c80
   zh: 52384aee991ac542
 /deepseek-ai-dsh-casper-agent/use-this-package:
-  en: e0054c0b234908e0
-  zh: f3621cbebdc7c087
+  en: 4ccd530794956bbf
+  zh: 5db8407190b2feb1
 /deepseek-ai-dsh-casper-agent/understand-the-implementation:
-  en: b2213a15c0d0aed3
-  zh: 6c8a29e5106c88b6
+  en: 6627b46c06269352
+  zh: a984d5ef9e8b9f1f
 /deepseek-ai-dsh-casper-agent/understand-the-implementation/turns-and-events:
   en: acc13f41a75d619d
   zh: 138565de6f2a0ce1
@@ -29,6 +29,9 @@
 /deepseek-ai-dsh-casper-agent/understand-the-implementation/approvals:
   en: 5baff1027c2d9b24
   zh: f37bfaa6ead75864
+/deepseek-ai-dsh-casper-agent/understand-the-implementation/casper-s-commands:
+  en: 58865a92d1222361
+  zh: d6cb5539b6e6e1d6
 /deepseek-ai-dsh-casper-agent/understand-the-implementation/process-lifetime-and-resume:
   en: c842b0b8e34652a1
   zh: a7fd7d34d4500c25
@@ -42,8 +45,8 @@
   en: 99237c3b88b098af
   zh: da166b221288cd59
 /deepseek-ai-dsh-casper-agent/known-limitations-and-deferred-work:
-  en: e683915ec5570851
-  zh: fb0ce546fa2e72cf
+  en: 2aeecd2d14fe0a33
+  zh: 5a2ae3428ba16d5d
 /deepseek-ai-dsh-casper-agent/known-limitations-and-deferred-work/dev-note:
   en: 8cd6e2f500ea491d
   zh: a4d91e1770ec518a

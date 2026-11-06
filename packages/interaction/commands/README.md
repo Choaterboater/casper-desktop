@@ -61,7 +61,7 @@ A command may declare `input.attachments` to accept composer images and generic 
 
 An interactive adapter calls `execute(agent, line, attachments, signal)` with the exact receiving agent, the full command line, and the submission's ordered attachments. It returns the settled `CommandExecution` — the normalized result plus its lifecycle `commandId` — or `undefined` for invalid syntax or an unknown name. `list(agent)` and `find(agent, name)` serve discovery after agent-scoped shadowing.
 
-The stateless `@deepseek-ai/dsh-commands/builtin` entry shares first-party identity, English/Chinese input tokens, and descriptor resolution across Host and Client adapters. `builtinCommandName()` identifies the definition independently of its registered name; `resolveCommand()` preserves exact-name priority and follows aliases by definition ID. Adapters choose their supported subset; the registry itself continues to accept arbitrary definitions.
+The stateless `@deepseek-ai/dsh-commands/builtin` entry shares first-party identity, English/Chinese input tokens, and descriptor resolution across Host and Client adapters. `builtinCommandName()` identifies the definition independently of its registered name; `resolveCommand()` preserves exact-name priority and follows aliases by definition ID. `isPromptCommand()` marks a definition whose ID starts with `PROMPT_COMMAND_ID_PREFIX` (`@deepseek-ai/dsh-casper-agent/`): the Session's agent reads that command from the prompt, so a client sends the typed line as a prompt instead of executing it. Adapters choose their supported subset; the registry itself continues to accept arbitrary definitions.
 
 ### Cancellation
 

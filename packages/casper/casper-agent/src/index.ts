@@ -13,6 +13,7 @@ import type {} from '@deepseek-ai/dsh-session-persistence'
 import type {} from '@deepseek-ai/dsh-storage-domain'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-tools'
+import { openCommandCache } from './commands.ts'
 import { Config } from './config.ts'
 import { CasperAgentFactory } from './factory.ts'
 import { casperRoute } from './route.ts'
@@ -23,6 +24,8 @@ export { CasperAgent, FRESH_CONVERSATION_NOTICE } from './agent.ts'
 export type { CasperAgentReaders } from './agent.ts'
 export { CasperAgentFactory, FORK_UNSUPPORTED } from './factory.ts'
 export type { CasperFactoryDependencies } from './factory.ts'
+export { CasperCommandCache, casperCommandId, casperCommands, casperCommandsDomain, openCommandCache } from './commands.ts'
+export type { CasperCommand } from './commands.ts'
 export { CasperConnection, CasperError, casperArgv, casperEnv } from './connection.ts'
 export type { CasperConnectionHandlers, CasperConnectionOptions, CasperFailureCode, CasperStarted } from './connection.ts'
 export { casperRoute } from './route.ts'
@@ -34,7 +37,7 @@ export const name = 'casper-agent'
 
 /**
  * Services the factory and its Agents use; the Agent scope inherits them. `userQuestions`, `skills`,
- * `profileContext`, and `attachments` are read when present.
+ * `profileContext`, `attachments`, and `commands` are read when present.
  */
 export const inject = ['agents', 'sessions', 'sessionProjections', 'sessionPersistence', 'subprocess', 'storageDomain', 'tools']
 
@@ -48,10 +51,12 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   const modelSelection = await ctx.sessionProjections.register(modelSelectionProjectionDefinition)
   const inbox = await ctx.sessionProjections.register(inboxProjectionDefinition)
   const sidecar = await openSidecar(ctx.storageDomain)
-  const factory = new CasperAgentFactory(ctx, config, { modelSelection, inbox, sidecar })
+  const commands = await openCommandCache(ctx.storageDomain)
+  const factory = new CasperAgentFactory(ctx, config, { modelSelection, inbox, sidecar, commands })
   ctx.effect(() => async () => {
     await factory.dispose()
     await sidecar.close()
+    await commands.close()
   }, 'casperAgent.factory()')
   ctx.effect(() => ctx.agents.route(casperRoute(config.presets, factory)), 'casperAgent.route()')
 }

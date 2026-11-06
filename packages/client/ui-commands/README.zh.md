@@ -41,6 +41,10 @@ popupSelect 规格可提供 `searchLabels()`，在每次打开时解析占位文
 
 内置命令定义携带稳定的 `definitionId`。客户端按标识选择本地化标题、说明、图标和输入写法，修改宿主说明不会改变选择结果。没有匹配标识的同名覆盖保留自己的文案，也不获得内置别名。在任何界面语言下，中英文写法都通过同一个会话有效目录解析，草稿保留手输写法，提交使用宿主注册名。贡献项提供自己的 `label`、`description` 和 `icon`，每次生成候选项时读取。空查询按名称确定小节顺序，未列出的行排在「指令」末尾。
 
+### 提示命令
+
+`definitionId` 以 [`dsh-commands/builtin`](../../interaction/commands/README.zh.md) 中 `PROMPT_COMMAND_ID_PREFIX` 开头的 Host 命令，由会话的 Agent 直接从提示中读取；Casper Agent 就以这种方式注册 Casper 的命令。Agent 只在提示开头读取这类命令，因此句子中间打开的 `/` 菜单不列出它们。选择这类命令会插入 `/name`，命令声明了输入时后面带一个空格。空格不产生认领，装饰从不生效，Enter 不返回任何结果，因此输入的这一行连同附件会作为普通提示发送。该行保留 Agent 自己的描述。
+
 ### 带附件提交
 
 composer 携带图片或通用文件提交时，只有声明了 `input.attachments` 的宿主命令继续。其余命令路径都会抛出本地化的 `attachmentsUnsupported` 拒绝，以瞬态 toast 呈现，草稿与附件卡保持原位。处理器出错时保留相同草稿状态供用户重试。
@@ -55,7 +59,7 @@ composer 携带图片或通用文件提交时，只有声明了 `input.attachmen
 <details>
 <summary>实现细节——点击展开</summary>
 
-`src/client/contract.ts` 定义贡献项和装饰的注册接口，以及 `dismiss(name)`：它关闭该命令已打开的弹窗与确认对话框，中止待完成的选项加载，阻止晚到结果重新打开弹窗，并保留 composer 草稿。`CommandDirectory` 负责会话级协议缓存，并通过共享的 [`dsh-commands/builtin`](../../interaction/commands/README.zh.md) 库解析输入命令。Client 字典复用其中的中英文 token；`resolution.ts` 选择本地化的菜单输入写法。`matchSpace` 同步读取就绪缓存，`matchEnter` 等待缓存就绪，预热失败或取消时拒绝。转发的目录和连接事件使缓存失效。宿主执行匹配的命令后，本浏览器发布 `command/executed`，其他客户端只观察持久命令事件。`PopupSelectController` 负责弹窗状态，`PopupSelectView` 占据输入浮层。`presentation.ts` 负责行标题、图标和分节，展示与菜单输入辅助函数均留在插件内部。
+`src/client/contract.ts` 定义贡献项和装饰的注册接口，以及 `dismiss(name)`：它关闭该命令已打开的弹窗与确认对话框，中止待完成的选项加载，阻止晚到结果重新打开弹窗，并保留 composer 草稿。`CommandDirectory` 负责会话级协议缓存，并通过共享的 [`dsh-commands/builtin`](../../interaction/commands/README.zh.md) 库解析输入命令。Client 字典复用其中的中英文 token；`resolution.ts` 选择本地化的菜单输入写法。`matchSpace` 同步读取就绪缓存，`matchEnter` 等待缓存就绪，预热失败或取消时拒绝。转发的目录和连接事件使缓存失效；在第一个 `commands/change` 事件之后 `COMMANDS_CHANGE_GATHER_MS`（50 毫秒）内到达的事件只触发一次重新拉取，因为注册整份命令列表的 Agent 会为每条命令发送一个事件。宿主执行匹配的命令后，本浏览器发布 `command/executed`，其他客户端只观察持久命令事件。`PopupSelectController` 负责弹窗状态，`PopupSelectView` 占据输入浮层。`presentation.ts` 负责行标题、图标和分节，展示与菜单输入辅助函数均留在插件内部。
 
 每次命令目录拉取都要求客户端已持有该会话，并等待首次历史打开成功后才发送 `commands.list`。临时的 `commandCatalog` 引用持续持有会话，直到拉取结束。未被持有的会话或打开失败会直接拒绝，不发送 RPC，因此后台目录刷新不会重新打开已关闭的会话。刷新后以已认领命令开头的草稿经 `matchClaim` 钩子重建认领：它等待同一个目录就绪，只应答 `leadingInput` 认领，不调用也不执行任何东西。
 

@@ -42,6 +42,15 @@ export interface FakeScript {
   readonly replay?: string[]
   readonly newSessionId?: string
   readonly promptCapabilities?: { readonly image?: boolean; readonly audio?: boolean; readonly embeddedContext?: boolean }
+  /** Casper's command list, sent after `session/new` and during `session/load`. */
+  readonly commands?: readonly FakeCommand[]
+}
+
+/** One command the stand-in offers, in ACP's `available_commands_update` shape. */
+export interface FakeCommand {
+  readonly name: string
+  readonly description: string
+  readonly input?: { readonly hint: string } | null
 }
 
 /** A temporary folder holding the Session folder, the script, and the log. */

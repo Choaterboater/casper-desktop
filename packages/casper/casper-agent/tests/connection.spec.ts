@@ -3,7 +3,7 @@ import { chmodSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
-import type { SessionNotification } from '@agentclientprotocol/sdk'
+import type { AvailableCommand, SessionNotification } from '@agentclientprotocol/sdk'
 import { randomBytes } from 'node:crypto'
 import { appToolsEntry } from '../src/app-tools.ts'
 import type { AppToolsServer } from '../src/app-tools.ts'
@@ -25,8 +25,10 @@ async function setup(script: FakeScript = { prompts: [] }) {
   await ctx.plugin(LocalSubprocessRuntime)
   cleanups.push(() => { fake.remove() }, () => ctx.fiber.dispose())
   const updates: SessionNotification[] = []
+  const commands: AvailableCommand[][] = []
   const handlers: CasperConnectionHandlers = {
     update: (notification) => { updates.push(notification) },
+    commands: (list) => { commands.push([...list]) },
     permission: () => Promise.resolve({ outcome: { outcome: 'cancelled' } }),
   }
   const start = async (
@@ -40,7 +42,7 @@ async function setup(script: FakeScript = { prompts: [] }) {
     cleanups.push(() => started.connection.dispose())
     return started
   }
-  return { fake, ctx, updates, handlers, start }
+  return { fake, ctx, updates, commands, handlers, start }
 }
 
 /** A stand-in app tools server with a fresh token that records whether it was closed. */
@@ -161,6 +163,26 @@ describe('CasperConnection', { timeout: 30_000 }, () => {
     expect(started).toMatchObject({ acpSessionId: 'stored-1', reopened: true })
     expect(fake.calls('session/load')[0]?.params).toEqual({ sessionId: 'stored-1', cwd: fake.cwd, mcpServers: [] })
     expect(fake.calls('session/new')).toEqual([])
+    expect(updates).toEqual([])
+  })
+
+  it('hands Casper\'s command lists to their handler after session/new, during a load\'s replay, and mid-prompt', async () => {
+    const status = { name: 'status', description: 'Inspect project, model, auth and integrations' }
+    const review = { name: 'review', description: 'Review changes', input: { hint: '[branch|commit]' } }
+    const { start, updates, commands } = await setup({
+      prompts: [[{ commandsUpdate: [status] }, { text: 'done\n' }]], known: ['stored-1'], replay: ['earlier request'], commands: [status, review],
+    })
+    const fresh = await start()
+    await waitFor(() => commands.length === 1)
+    expect(commands).toEqual([[status, review]])
+    await fresh.connection.prompt([{ type: 'text', text: 'go' }])
+    expect(commands.at(-1)).toEqual([status])
+    expect(updates.map(entry => entry.update.sessionUpdate)).toEqual(['agent_message_chunk', 'agent_message_chunk'])
+    commands.length = 0
+    updates.length = 0
+    await start({}, 'stored-1')
+    // The replayed chunks are dropped, but the list sent with them is not.
+    expect(commands).toEqual([[status, review]])
     expect(updates).toEqual([])
   })
 

@@ -3,6 +3,7 @@ import { modelSelectionProjectionDefinition } from '@deepseek-ai/dsh-agent'
 import { inboxProjectionDefinition } from '@deepseek-ai/dsh-agent-loop'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { CasperAgent } from '../src/agent.ts'
+import { CasperCommandCache } from '../src/commands.ts'
 import { CasperAgentFactory } from '../src/factory.ts'
 import { CasperSidecar } from '../src/sidecar.ts'
 import { boot, eventsOf, prompt, turnEnds } from './harness.ts'
@@ -157,6 +158,7 @@ describe('CasperAgentFactory', { timeout: 60_000 }, () => {
       modelSelection: await host.ctx.sessionProjections.register(modelSelectionProjectionDefinition),
       inbox: await host.ctx.sessionProjections.register(inboxProjectionDefinition),
       sidecar: new CasperSidecar(domain as never),
+      commands: new CasperCommandCache(host.ctx.storageDomain.get('casper_agent_commands') as never),
     })
     await factory.dispose()
     await expect(factory.createAgent(host.ctx, { sessionId: SessionId('late-create') })).rejects.toThrow('not active')

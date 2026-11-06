@@ -24,7 +24,7 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-桌面端 profile 通过 `packages/bundle/web-app/cordis.patch.yml` 挂载本插件（条目 `casper-agent`，在桌面端以外和浏览器内预览中禁用），并在 `packages/bundle/web-app/presets/casper.patch.yml` 中声明 `casper` 预设。该预设挂载 `tool-todo`（用待办列表展示 Casper 的计划），以及应用工具所运行的条目：`tool-cordis`、`skill-filesystem`（使用 Cordis 预设的技能目录）、`tool-skill` 与 `tool-plugin-manager`；后者绑定应用已有的插件管理器，应用不带 profile 运行时关闭。检查插件与插件市场不会挂载。在桌面端，预设注册表的默认值为 `casper`；设置中保存的默认值仍然优先。本插件注入 `agents`、`sessions`、`sessionProjections`、`sessionPersistence`、`subprocess`、`storageDomain` 与 `tools`，并在挂载了 `userQuestions`、`skills`、`profileContext` 与 `attachments` 时使用它们。
+桌面端 profile 通过 `packages/bundle/web-app/cordis.patch.yml` 挂载本插件（条目 `casper-agent`，在桌面端以外和浏览器内预览中禁用），并在 `packages/bundle/web-app/presets/casper.patch.yml` 中声明 `casper` 预设。该预设挂载 `tool-todo`（用待办列表展示 Casper 的计划），以及应用工具所运行的条目：`tool-cordis`、`skill-filesystem`（使用 Cordis 预设的技能目录）、`tool-skill` 与 `tool-plugin-manager`；后者绑定应用已有的插件管理器，应用不带 profile 运行时关闭。检查插件与插件市场不会挂载。在桌面端，预设注册表的默认值为 `casper`；设置中保存的默认值仍然优先。本插件注入 `agents`、`sessions`、`sessionProjections`、`sessionPersistence`、`subprocess`、`storageDomain` 与 `tools`，并在挂载了 `userQuestions`、`skills`、`profileContext`、`attachments` 与 `commands` 时使用它们。
 
 | 字段 | 默认值 | 含义 |
 |---|---|---|
@@ -61,6 +61,7 @@ kind: "package-reference"
 | [`src/views.ts`](src/views.ts) | 把 Casper 的工具步骤记录为做同样事情的 Standard 工具：名称、参数、结果文本与 meta |
 | [`src/permission.ts`](src/permission.ts) | 把审批框变成用户问题，并把答案映射回去 |
 | [`src/sidecar.ts`](src/sidecar.ts) | Host 存储域 `casper_agent`，把每个会话映射到其 Casper 对话 |
+| [`src/commands.ts`](src/commands.ts) | 供 `/` 菜单使用的 Casper 命令，以及保存最后一份列表的 Host 存储域 `casper_agent_commands` |
 | [`src/app-tools.ts`](src/app-tools.ts) | 应用工具 MCP 服务器：监听、认证、工具列表，以及以 Casper Agent 身份运行的调用 |
 | [`src/app-read.ts`](src/app-read.ts) | `app_read_file`：对应用安装目录与 profile 目录的只读访问 |
 
@@ -105,6 +106,12 @@ Casper 在 `_meta.casper.tool` 中给每个步骤命名，其 `rawInput` 是模�
 ### 审批
 
 `session/request_permission` 变成一个 `ctx.userQuestions.ask` 问题，以 Casper 的选项为标签，拒绝项在前。选中一个标签即选择该选项。输入文本、未选择、问题失败或被中止，以及没有问题服务时，都回答 `cancelled`，Casper 将其视为“否”。当 Casper 自行关闭审批框或提示结束时，问题随之关闭。
+
+### Casper 的命令
+
+Casper 通过 `available_commands_update` 发送它的斜杠命令（包括用户自己的 `~/.casper/commands`），在打开对话之后立即发送，列表变化时再次发送；`session/load` 回放期间也会保留该列表。挂载了 `commands` 注册表时，每条命令只为本 Agent 注册，带有 Casper 的描述、输入提示与定义 id `@deepseek-ai/dsh-casper-agent/<name>`，因此它出现在该会话的 `/` 菜单中，而不出现在其他会话的菜单中。之后的列表替换之前的列表，未变化的列表不注册任何内容。注册表会拒绝的名称、输入框自己的 `model` 与 `file`、没有描述的命令，以及已经解析为其他命令的名称（例如应用的 `/permission`、`/export` 或 `/feedback`）都不会提供；该名称仍归应用的命令。
+
+该身份告诉客户端把这一行当作提示处理（[ui-commands](../../client/ui-commands/README.zh.md)）：选择命令会插入 `/name`，命令接受输入时带一个尾随空格；按 Enter 会把输入的这一行连同附件作为普通提示发送，由 Casper 作为它自己的命令运行。改为执行命令的界面会把同一行排入下一条提示。最后一份列表保存在 Host 存储域 `casper_agent_commands`（一条全局记录）中，每个新 Agent 在自己的 Casper 启动之前就提供它。Agent 只在发布之后才注册命令：每次注册都会让所有客户端重新拉取其 Session 的菜单，而重新拉取会恢复未运行的 Session，因此创建失败的 Agent 不注册任何命令。
 
 ### 进程生命周期与恢复
 
@@ -153,6 +160,7 @@ Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打�
 - 在打包的应用中，`app_read_file` 能读到每个已安装包的 `README.md`、`package.json` 与构建出的 `lib/*.js`、技能文件，以及 `ui-theme` 的 `lib/styles`。Desktop 运行时副本会去掉所有 `.d.ts`，各包不发布 `src/`，仓库的 `docs/` 也不在任何包中，因此那里无法读取 `lib/types`、`ui-sidebar` 的 `slots.ts`、`docs/cordis-tutorial` 与 `docs/web-styling.md`；插槽属性与主题令牌改由 `cordis_inspect_query` 获得。尚未随应用提供这些指南。
 - 审批使用通用问题卡片；没有固定的审批卡片或单独的“始终允许”呈现。
 - 引导消息作为下一条提示送达。
+- 在本应用中还没有任何 Casper 发送过命令列表之前，Casper 的命令不会出现在 `/` 菜单中，直到会话的第一条提示启动 Casper。
 - 拒绝 fork Casper 会话。
 - Headless、SDK 服务器、ACP 与 webhook 恢复不传预设，因此由它们重新打开的 Casper 会话运行在 agent-loop 上。
 - 未保存预设的定时任务在桌面端运行于 Casper，因为它们通过会话控制器以默认预设创建会话。
