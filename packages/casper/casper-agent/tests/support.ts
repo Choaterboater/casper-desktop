@@ -4,7 +4,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFi
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { SessionConfigOption } from '@agentclientprotocol/sdk'
+import type { SessionConfigOption, SessionModeState } from '@agentclientprotocol/sdk'
+import { DEFAULT_ACCESS_MODES } from '../src/access.ts'
 import type { Config } from '../src/config.ts'
 
 /** Absolute path of the stand-in `casper acp`. */
@@ -55,6 +56,12 @@ export interface FakeScript {
   readonly setExit?: number
   /** A set of one of these option ids is logged, then answered only once the named file exists. */
   readonly holdSet?: Readonly<Record<string, string>>
+  /** Casper's mode state in the `session/new` and `session/load` replies; `session/set_mode` changes it. */
+  readonly modes?: SessionModeState
+  /** `session/set_mode` fails with -32603 and this message. */
+  readonly setModeError?: string
+  /** Change the mode and send a `current_mode_update` during a `session/load` replay. */
+  readonly replayMode?: string
 }
 
 /** One command the stand-in offers, in ACP's `available_commands_update` shape. */
@@ -117,6 +124,7 @@ export function fakeCasper(script: FakeScript = { prompts: [] }): FakeCasper {
       killGraceMs: 2_000,
       stderrTailBytes: 4_096,
       appTools: false,
+      accessModes: { ...DEFAULT_ACCESS_MODES },
       ...overrides,
     }),
     remove: () => { rmSync(root, { recursive: true, force: true }) },
@@ -206,4 +214,21 @@ export function casperOptions(model = 'openai-codex/gpt-6.1-sol', effort = 'auto
       options: [{ value: 'read', name: 'Read only' }, { value: 'ask', name: 'Ask first' }, { value: 'full', name: 'Don\'t ask' }],
     },
   ]
+}
+
+/**
+ * Casper's mode state in the shape `casper acp` sends it next to its options.
+ * @param current - the current mode.
+ * @returns the mode state.
+ */
+export function casperModes(current = 'ask'): SessionModeState {
+  return {
+    currentModeId: current,
+    availableModes: [{ id: 'read', name: 'Read only' }, { id: 'ask', name: 'Ask first' }, { id: 'full', name: 'Don\'t ask' }],
+  }
+}
+
+/** Casper's model and effort options without its access option, as a Casper that offers only `modes` sends them. */
+export function optionsWithoutMode(): SessionConfigOption[] {
+  return casperOptions().filter(option => option.category !== 'mode')
 }

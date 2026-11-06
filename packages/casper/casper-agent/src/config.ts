@@ -4,6 +4,8 @@
  */
 
 import z from '@deepseek-ai/schemastery'
+import { ACCESS_MODE_IDS, DEFAULT_ACCESS_MODES } from './access.ts'
+import type { AccessModeId } from './access.ts'
 
 /** Deployment choices for driving Sessions through `casper acp`. */
 export interface Config {
@@ -34,6 +36,11 @@ export interface Config {
    * plugin_manager) as one MCP server on a 127.0.0.1 listener for each Casper process; false offers none.
    */
   appTools: boolean
+  /**
+   * The app's permission presets and the Casper access mode each sets: `read`, `ask`, or `full`. A preset the
+   * table does not list, the derived `custom`, and Auto set `ask`; a read-only sandbox always sets `read`.
+   */
+  accessModes: Record<string, AccessModeId>
 }
 
 /** Runtime schema for {@link Config}; the defaults keep teardown inside a 10 s host shutdown window. */
@@ -50,4 +57,5 @@ export const Config: z<Config> = z.object({
   killGraceMs: z.natural().min(1).default(5_000),
   stderrTailBytes: z.natural().min(1).default(4_096),
   appTools: z.boolean().default(true),
+  accessModes: z.dict(z.union(ACCESS_MODE_IDS as AccessModeId[])).default({ ...DEFAULT_ACCESS_MODES }),
 })

@@ -10,7 +10,7 @@ import type { AppToolsServer } from '../src/app-tools.ts'
 import { CasperConnection, CasperError, casperArgv, casperEnv, profileEnv } from '../src/connection.ts'
 import type { CasperConnectionHandlers, CasperConnectionOptions } from '../src/connection.ts'
 import type { Config } from '../src/config.ts'
-import { alive, casperOptions, fakeCasper, gate, waitFor } from './support.ts'
+import { alive, casperModes, casperOptions, fakeCasper, gate, optionsWithoutMode, waitFor } from './support.ts'
 import type { FakeScript } from './support.ts'
 
 const cleanups: (() => Promise<void> | void)[] = []
@@ -27,10 +27,12 @@ async function setup(script: FakeScript = { prompts: [] }) {
   const updates: SessionNotification[] = []
   const commands: AvailableCommand[][] = []
   const configs: SessionConfigOption[][] = []
+  const modes: string[] = []
   const handlers: CasperConnectionHandlers = {
     update: (notification) => { updates.push(notification) },
     commands: (list) => { commands.push([...list]) },
     config: (options) => { configs.push([...options]) },
+    mode: (modeId) => { modes.push(modeId) },
     permission: () => Promise.resolve({ outcome: { outcome: 'cancelled' } }),
   }
   const start = async (
@@ -44,7 +46,7 @@ async function setup(script: FakeScript = { prompts: [] }) {
     cleanups.push(() => started.connection.dispose())
     return started
   }
-  return { fake, ctx, updates, commands, configs, handlers, start }
+  return { fake, ctx, updates, commands, configs, modes, handlers, start }
 }
 
 /** A stand-in app tools server with a fresh token that records whether it was closed. */
@@ -226,6 +228,59 @@ describe('CasperConnection', { timeout: 30_000 }, () => {
     const busy = await connection.setConfigOption('effort', 'high').catch((error: unknown) => error)
     expect(busy).toMatchObject({ code: 'CASPER_RPC_-32603', message: 'Casper failed: Casper is working on a prompt; change the model or effort when it ends' })
     expect(connection.configOptions).toEqual(after)
+  })
+
+  it('keeps Casper\'s access mode, and hands a mode Casper changes itself to its handler once, during a replay too', async () => {
+    const { start, updates, modes } = await setup({
+      prompts: [[{ mode: 'full' }, { text: 'done\n' }]], known: ['stored-1'], configOptions: casperOptions(), modes: casperModes(), replayMode: 'read',
+    })
+    const fresh = await start()
+    expect(fresh.connection.accessMode).toBe('ask')
+    await fresh.connection.prompt([{ type: 'text', text: 'go' }])
+    // Casper reports its own change twice, as current_mode_update and in the option list; the handler hears it once.
+    expect(modes).toEqual(['full'])
+    expect(fresh.connection.accessMode).toBe('full')
+    expect(updates.map(entry => entry.update.sessionUpdate)).toEqual(['agent_message_chunk', 'agent_message_chunk'])
+    modes.length = 0
+    const loaded = await start({}, 'stored-1')
+    expect(modes).toEqual(['read'])
+    expect(loaded.connection.accessMode).toBe('read')
+    expect(updates).toHaveLength(2)
+  })
+
+  it('sets the access mode through Casper\'s mode option, else through session/set_mode, and stores it only once Casper takes it', async () => {
+    const withOption = await setup({ prompts: [], configOptions: casperOptions(), modes: casperModes() })
+    const first = await withOption.start()
+    await first.connection.setAccess('read')
+    expect(withOption.fake.calls('session/set_config_option').map(entry => entry.params)).toEqual([
+      { sessionId: first.acpSessionId, configId: 'mode', value: 'read' },
+    ])
+    expect(withOption.fake.calls('session/set_mode')).toEqual([])
+    expect(first.connection.accessMode).toBe('read')
+    // A client set is not echoed to the handler.
+    expect(withOption.modes).toEqual([])
+
+    const modesOnly = await setup({ prompts: [], configOptions: optionsWithoutMode(), modes: casperModes() })
+    const second = await modesOnly.start()
+    expect(second.connection.accessMode).toBe('ask')
+    await second.connection.setAccess('full')
+    expect(modesOnly.fake.calls('session/set_mode').map(entry => entry.params)).toEqual([{ sessionId: second.acpSessionId, modeId: 'full' }])
+    expect(second.connection.accessMode).toBe('full')
+    const unknown = await second.connection.setAccess('nope').catch((error: unknown) => error)
+    expect(unknown).toMatchObject({ code: 'CASPER_RPC_-32602', message: 'Casper failed: Unknown mode: nope (read, ask, full)' })
+    expect(second.connection.accessMode).toBe('full')
+
+    const refusing = await setup({ prompts: [], modes: casperModes(), setModeError: 'acp_access is off' })
+    const third = await refusing.start()
+    expect(await third.connection.setAccess('full').catch(codeOf)).toBe('CASPER_RPC_-32603')
+    expect(third.connection.accessMode).toBe('ask')
+
+    const older = await setup({ prompts: [] })
+    const fourth = await older.start()
+    expect(fourth.connection.accessMode).toBeUndefined()
+    const none = await fourth.connection.setAccess('read').catch((error: unknown) => error)
+    expect(codeOf(none)).toBe('CASPER_NO_ACCESS_MODES')
+    expect(older.fake.log().filter(entry => entry.method?.startsWith('session/set') === true)).toEqual([])
   })
 
   it('starts a fresh conversation only when Casper has no saved one', async () => {

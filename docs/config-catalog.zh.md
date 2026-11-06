@@ -479,7 +479,7 @@ export type Config = LocalConfig
 ## `@deepseek-ai/dsh-casper-agent`
 
 - `inject`: `agents` · `sessions` · `sessionProjections` · `sessionPersistence` · `subprocess` · `storageDomain` · `tools`
-- `source`: [`packages/casper/casper-agent/src/config.ts:9`](../packages/casper/casper-agent/src/config.ts)
+- `source`: [`packages/casper/casper-agent/src/config.ts:11`](../packages/casper/casper-agent/src/config.ts)
 
 ```ts config-catalog
 /** Deployment choices for driving Sessions through `casper acp`. */
@@ -511,7 +511,15 @@ export interface Config {
    * plugin_manager) as one MCP server on a 127.0.0.1 listener for each Casper process; false offers none.
    */
   appTools: boolean
+  /**
+   * The app's permission presets and the Casper access mode each sets: `read`, `ask`, or `full`. A preset the
+   * table does not list, the derived `custom`, and Auto set `ask`; a read-only sandbox always sets `read`.
+   */
+  accessModes: Record<string, AccessModeId>
 }
+
+/** Casper's access modes over ACP: Read only, Ask first, and Don't ask (`/permissions all`). */
+export type AccessModeId = 'read' | 'ask' | 'full'
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-casper-agent -->
 

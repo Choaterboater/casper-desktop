@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-本插件让 Casper agent 成为 `casper` 预设上会话的主 AI。`ctx.agents` 上的一条工厂路由让每个这样的会话由一个 `casper acp` 进程驱动，而不是 DeepSeek agent 循环。Casper 的文本、工具步骤、检查、计划与回执都成为普通会话事件，因此桌面端的对话记录、工具卡片、待办列表与停止按钮照常工作。Casper 的审批框以问题形式呈现给用户，模型选择器列出 Casper 的模型。每个进程还会通过一个私有 MCP 服务器获得应用自身的工具，用于检查应用和安装插件。桌面端的新会话默认使用此预设。
+本插件让 Casper agent 成为 `casper` 预设上会话的主 AI。`ctx.agents` 上的一条工厂路由让每个这样的会话由一个 `casper acp` 进程驱动，而不是 DeepSeek agent 循环。Casper 的文本、工具步骤、检查、计划与回执都成为普通会话事件，因此桌面端的对话记录、工具卡片、待办列表与停止按钮照常工作。审批框变成问题，权限控件设置 Casper 的模式，模型选择器列出 Casper 的模型。每个进程还会通过一个私有 MCP 服务器获得应用自身的工具，用于检查应用和安装插件。桌面端的新会话默认使用此预设。
 
 ## 目录
 
@@ -24,7 +24,7 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-桌面端 profile 通过 `packages/bundle/web-app/cordis.patch.yml` 挂载本插件（条目 `casper-agent`，在桌面端以外和浏览器内预览中禁用），并在 `packages/bundle/web-app/presets/casper.patch.yml` 中声明 `casper` 预设。该预设挂载 `tool-todo`（用待办列表展示 Casper 的计划），以及应用工具所运行的条目：`tool-cordis`、`skill-filesystem`（使用 Cordis 预设的技能目录）、`tool-skill` 与 `tool-plugin-manager`；后者绑定应用已有的插件管理器，应用不带 profile 运行时关闭。检查插件与插件市场不会挂载。在桌面端，预设注册表的默认值为 `casper`；设置中保存的默认值仍然优先。本插件注入 `agents`、`sessions`、`sessionProjections`、`sessionPersistence`、`subprocess`、`storageDomain` 与 `tools`，并在挂载了 `userQuestions`、`skills`、`profileContext`、`attachments` 与 `commands` 时使用它们。
+桌面端 profile 通过 `packages/bundle/web-app/cordis.patch.yml` 挂载本插件（条目 `casper-agent`，在桌面端以外和浏览器内预览中禁用），并在 `packages/bundle/web-app/presets/casper.patch.yml` 中声明 `casper` 预设。该预设挂载 `tool-todo`（用待办列表展示 Casper 的计划），以及应用工具所运行的条目：`tool-cordis`、`skill-filesystem`（使用 Cordis 预设的技能目录）、`tool-skill` 与 `tool-plugin-manager`；后者绑定应用已有的插件管理器，应用不带 profile 运行时关闭。检查插件与插件市场不会挂载。在桌面端，预设注册表的默认值为 `casper`；设置中保存的默认值仍然优先。本插件注入 `agents`、`sessions`、`sessionProjections`、`sessionPersistence`、`subprocess`、`storageDomain` 与 `tools`，并在挂载了 `userQuestions`、`skills`、`profileContext`、`attachments`、`commands`、`permissionPresets` 与 `sandboxPolicy` 时使用它们。
 
 | 字段 | 默认值 | 含义 |
 |---|---|---|
@@ -40,12 +40,13 @@ kind: "package-reference"
 | `killGraceMs` | `5000` | SIGTERM 与 SIGKILL 之间的宽限时间 |
 | `stderrTailBytes` | `4096` | 为失败信息保留的 Casper stderr 字节数 |
 | `appTools` | `true` | 向 Casper 提供应用工具；`false` 时发送空的 `mcpServers` 列表 |
+| `accessModes` | `{ read-only: read, workspace-write: ask, danger-full-access: full }` | 每个权限预设设置的[访问模式](#access-control)；不能列出 `custom` 与 `auto` |
 
 子进程不会收到 `DEEPSEEK_*` 或 `DSH_*` 名称，也不会收到 `env` 未列出的凭据类名称。唯一的例外是应用 profile：应用带 profile 运行时，Casper 会收到 `DSH_PROFILE` 与 `DSH_PROFILE_DIR`，使它构建的 bundle 能指明要安装到的 profile。
 
 会话在 Casper 预设上创建时即成为 Casper 会话。空白会话不能在 Casper 与其他预设之间切换：预设注册表以 `agent-preset/locked` 与 `newSession: true` 拒绝这种切换，模式选择器则改为在所选预设上开启新会话。已存储的会话由其记录的预设所选择的工厂恢复；未记录预设的会话仍使用 agent-loop。
 
-无法运行的轮次在 `turn/end` 上以错误结束：找不到命令时为 `CASPER_NOT_FOUND`，Casper 未能启动时为 `CASPER_START_FAILED`，轮次中途退出时为 `CASPER_EXITED`，提示中没有 Casper 能读取的内容时为 `CASPER_EMPTY_PROMPT`：没有文本、图片或文件，或只有无法发送的图片和文件（不会向 Casper 发送任何内容），达到 Casper 的轮次上限时为 `CASPER_TURN_LIMIT`，Casper 拒绝所选模型或推理等级时为 `CASPER_MODEL_UNAVAILABLE`（不发送提示），收到错误回复时为 `CASPER_RPC_<code>`。会话仍可使用；下一条提示会再次启动 Casper。`CASPER_TEXT_ONLY` 已不再产生，只出现在早期版本保存的轮次中。
+无法运行的轮次在 `turn/end` 上以错误结束：找不到命令时为 `CASPER_NOT_FOUND`，Casper 未能启动时为 `CASPER_START_FAILED`，轮次中途退出时为 `CASPER_EXITED`，提示中没有 Casper 能读取的内容时为 `CASPER_EMPTY_PROMPT`：没有文本、图片或文件，或只有无法发送的图片和文件（不会向 Casper 发送任何内容），达到 Casper 的轮次上限时为 `CASPER_TURN_LIMIT`，Casper 拒绝所选模型或推理等级时为 `CASPER_MODEL_UNAVAILABLE`（不发送提示），Casper 未接受仅可查看或工作区内修改时为 `CASPER_ACCESS_NOT_APPLIED`（不发送提示，或停止正在运行的提示），收到错误回复时为 `CASPER_RPC_<code>`。会话仍可使用；下一条提示会再次启动 Casper。`CASPER_TEXT_ONLY` 已不再产生，只出现在早期版本保存的轮次中。
 
 <a id="understand-the-implementation"></a>
 ## 理解实现
@@ -67,6 +68,7 @@ kind: "package-reference"
 | [`src/models.ts`](src/models.ts) | 把 Casper 的 `model` 与 `thought_level` 选项读成选择器的分组、推理等级与当前模型 |
 | [`src/model.ts`](src/model.ts) | `CasperModel`：Agent 的模型句柄，把选择交给 Casper 而不是 Host 目录 |
 | [`src/models-cache.ts`](src/models-cache.ts) | 保存最后一份模型列表的 Host 存储域 `casper_agent_models` |
+| [`src/access.ts`](src/access.ts) | 把权限预设映射为 Casper 的访问模式 |
 
 ### 轮次与事件
 
@@ -110,6 +112,15 @@ Casper 在 `_meta.casper.tool` 中给每个步骤命名，其 `rawInput` 是模�
 
 `session/request_permission` 变成一个 `ctx.userQuestions.ask` 问题，以 Casper 的选项为标签，拒绝项在前。选中一个标签即选择该选项。输入文本、未选择、问题失败或被中止，以及没有问题服务时，都回答 `cancelled`，Casper 将其视为“否”。当 Casper 自行关闭审批框或提示结束时，问题随之关闭。
 
+<a id="access-control"></a>
+### 访问权限
+
+输入框的权限控件（权限预设）设置 Casper 的访问模式。使用默认的 `accessModes` 时，「仅可查看」对应 `read`（Casper 阻止它能识别的每一项更改），「工作区内修改」对应 `ask`（Casper 平常的审批框），「完全权限」对应 `full`（Casper 的 `/permissions all`）。只读沙箱始终对应 `read`；派生的 `custom` 预设、Auto 以及映射表未列出的预设对应 `ask`，绝不对应 `full`。未挂载预设服务时不发送任何内容。
+
+模式通过 Casper 的 `mode` 配置项发送；Casper 只提供 `modes` 时改用 `session/set_mode`。它在每条提示之前、Casper 重启之后以及预设一变化时发送，提示运行期间也是如此；一次切换只发送一个请求。Casper 自己选择的模式，例如“本会话全部同意”或 `/permissions all`，会保留到预设再次变化，且从不改动该控件：只有用户本人的选择会设置预设。例外是「仅可查看」：Casper 一旦离开它，应用会再次设置。
+
+提示之前无法设置「仅可查看」或「工作区内修改」时，该轮以 `CASPER_ACCESS_NOT_APPLIED` 结束，不发送提示；没有模式的 Casper 照常以「工作区内修改」运行。提示运行期间无法设置时，提示停止，该轮同样以此结束；该轮仍在准备提示时（例如读取图片或设置模型期间）切换失败，该轮同样以此结束且不发送提示。无法设置「完全权限」时，回复中留下一条说明，Casper 照常询问。
+
 ### Casper 的命令
 
 Casper 通过 `available_commands_update` 发送它的斜杠命令（包括用户自己的 `~/.casper/commands`），在打开对话之后立即发送，列表变化时再次发送；`session/load` 回放期间也会保留该列表。挂载了 `commands` 注册表时，每条命令只为本 Agent 注册，带有 Casper 的描述、输入提示与定义 id `@deepseek-ai/dsh-casper-agent/<name>`，因此它出现在该会话的 `/` 菜单中，而不出现在其他会话的菜单中。之后的列表替换之前的列表，未变化的列表不注册任何内容。注册表会拒绝的名称、输入框自己的 `model` 与 `file`、没有描述的命令，以及已经解析为其他命令的名称（例如应用的 `/permission`、`/export` 或 `/feedback`）都不会提供；该名称仍归应用的命令。
@@ -146,7 +157,7 @@ Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打�
 
 每次调用都通过 `ctx.tools.execute` 运行，并以 Casper Agent 作为 `agent`，因此工具看到的会话、profile 与审批与在 DeepSeek 循环中相同。调用 id 是发起该调用的 Casper 步骤的会话调用 id，取自 `_meta["casper/acpToolCallId"]`；没有该字段的调用会得到新的 id。只有在 Casper 轮次运行期间才接受调用，并随轮次一起中止；轮次结束后到达的调用会得到说明这一点的错误。未完成的调用每 10 秒发送一次进度通知，使 Casper 的空闲计时器不会到期。结果中的文本块作为 MCP 文本传递；其他任何块（例如图片）会变成一行说明，如 `[image result not sent]`。
 
-`plugin_manager` 保留自己的规则：应用隐藏的 bundle 以 `not-offered` 拒绝，每个操作（包括 `install_bundle`）都像在 DeepSeek 循环中一样通过应用自己的审批卡片询问。`clientAsks` 告诉 Casper 该卡片就是关口，因此 Casper 不会为此服务器显示自己的变更框，它的自动回答也永远不会批准安装。
+`plugin_manager` 保留自己的规则：应用隐藏的 bundle 以 `not-offered` 拒绝，每个操作（包括 `install_bundle`）都像在 DeepSeek 循环中一样通过应用自己的审批卡片询问。`clientAsks` 告诉 Casper 该卡片就是关口，因此 Casper 不会为此服务器显示自己的变更框，它的自动回答也永远不会批准安装。在「完全权限」下应用的卡片不再询问，因此处于 `full` 模式的 Casper 会忽略 `clientAsks`，改用自己的框询问：无论哪种情况都只有一个框。
 
 `app_skill` 的描述在 1,000 个字符以内列出 Agent 可加载的技能，以 `cordis-plugin-development` 开头。加载的技能以一行说明开头，告诉 Casper 在其工作区中编写 bundle、用 `app_read_file` 读取技能文件，并使用它获得的 `DSH_PROFILE` 与 `DSH_PROFILE_DIR`；在已安装的应用中，这行说明还会指出那里的包没有 `lib/types`、`src` 与仓库文档，因此插槽属性与主题令牌取自 `cordis_inspect_query`。`app_read_file` 只读取存放应用已安装包的目录（本包之上最近的 `node_modules`；在源码检出中为其 `packages` 与 `docs` 目录）以及 profile 的 `node_modules`。路径以 `path.relative` 比较，真实路径离开该目录的符号链接会被拒绝。一次调用最多按行窗口返回 256 KB 文本；超过这一长度的单行会截取前 256 KB，说明中会注明，下一个窗口从它之后开始。SVG 以外的二进制文件得到一行说明，目录最多列出 500 项，超过 32 MB 的文件会被拒绝。
 
@@ -171,6 +182,7 @@ Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打�
 - 应用工具的结果只以文本形式到达 Casper：图片或其他非文本块会变成一行说明。目前提供的工具都不返回图片。
 - 在打包的应用中，`app_read_file` 能读到每个已安装包的 `README.md`、`package.json` 与构建出的 `lib/*.js`、技能文件，以及 `ui-theme` 的 `lib/styles`。Desktop 运行时副本会去掉所有 `.d.ts`，各包不发布 `src/`，仓库的 `docs/` 也不在任何包中，因此那里无法读取 `lib/types`、`ui-sidebar` 的 `slots.ts`、`docs/cordis-tutorial` 与 `docs/web-styling.md`；插槽属性与主题令牌改由 `cordis_inspect_query` 获得。尚未随应用提供这些指南。
 - 审批使用通用问题卡片；没有固定的审批卡片或单独的“始终允许”呈现。
+- Casper 自己选择的模式不会显示：权限控件仍显示预设。
 - 引导消息作为下一条提示送达。
 - 在本应用中还没有任何 Casper 发送过命令列表之前，Casper 的命令不会出现在 `/` 菜单中，直到会话的第一条提示启动 Casper。
 - 拒绝 fork Casper 会话。

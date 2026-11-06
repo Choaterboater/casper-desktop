@@ -12,12 +12,13 @@ import { SessionId } from '@deepseek-ai/dsh-session'
 import { UserQuestionError } from '@deepseek-ai/dsh-user-questions'
 import { CasperAgent, FRESH_CONVERSATION_NOTICE } from '../src/agent.ts'
 import { CasperCommandCache } from '../src/commands.ts'
+import { CasperConnection } from '../src/connection.ts'
 import { reportOf } from '../src/models.ts'
 import { CasperModelsCache } from '../src/models-cache.ts'
 import { FORK_UNSUPPORTED } from '../src/factory.ts'
 import { TEXT_ONLY_PICTURE } from '../src/prompt.ts'
-import { boot, eventsOf, filesText, prompt, turnEnds } from './harness.ts'
-import { alive, casperOptions, fakeCasper, gate, parsed, waitFor } from './support.ts'
+import { boot, eventsOf, filesText, mountPermissionPresets, prompt, turnEnds } from './harness.ts'
+import { alive, casperModes, casperOptions, fakeCasper, gate, optionsWithoutMode, parsed, waitFor } from './support.ts'
 import type { FakeCasper, FakeCommand, FakeScript } from './support.ts'
 
 const cleanups: (() => Promise<void> | void)[] = []
@@ -67,6 +68,20 @@ class StandInAttachments extends AttachmentStore {
   override fileHostPath(ref: FileAttachmentRef): string | undefined {
     return ref.name === NOTES.name ? NOTES_HOST_PATH : undefined
   }
+}
+
+/** A stand-in store whose picture read ignores the turn's signal and finishes only on `release`. */
+function heldPictureStore() {
+  const read = Promise.withResolvers<undefined>()
+  const state = { reading: false }
+  class HeldAttachments extends StandInAttachments {
+    override async readImage(ref: ImageAttachmentRef): Promise<StoredImageAttachment> {
+      state.reading = true
+      await read.promise
+      return { ref, data: PICTURE_BYTES }
+    }
+  }
+  return { store: HeldAttachments, reading: () => state.reading, release: () => { read.resolve(undefined) } }
 }
 
 async function setupWithAttachments(script: FakeScript, store: typeof StandInAttachments = StandInAttachments) {
@@ -353,22 +368,14 @@ describe('CasperAgent', { timeout: 60_000 }, () => {
   })
 
   it('sends no prompt when the turn stops during a picture read, even when the read still finishes', async () => {
-    const read = Promise.withResolvers<undefined>()
-    let reading = false
     // A store that ignores the signal and finishes the read after the Stop.
-    class LateAttachments extends StandInAttachments {
-      override async readImage(ref: ImageAttachmentRef): Promise<StoredImageAttachment> {
-        reading = true
-        await read.promise
-        return { ref, data: PICTURE_BYTES }
-      }
-    }
-    const { fake, host } = await setupWithAttachments({ prompts: [[{ text: 'never\n' }]], promptCapabilities: { image: true } }, LateAttachments)
+    const held = heldPictureStore()
+    const { fake, host } = await setupWithAttachments({ prompts: [[{ text: 'never\n' }]], promptCapabilities: { image: true } }, held.store)
     const { agent } = await host.create('casper-stop-picture')
     agent.followup(prompt('', 'rpc-stop-picture', [{ type: 'text', text: 'look' }, { type: 'image', attachment: PICTURE }]))
-    await waitFor(() => reading)
+    await waitFor(() => held.reading())
     agent.cancel({ kind: 'user' })
-    read.resolve(undefined)
+    held.release()
     await agent.whenIdle()
     expect(turnEnds(agent)).toEqual([{ kind: 'aborted', reason: { kind: 'user' } }])
     expect(fake.calls('session/prompt')).toEqual([])
@@ -1057,5 +1064,213 @@ describe('Casper\'s models in the model picker', { timeout: 60_000 }, () => {
     await expect(agent.model.own?.choose(OPUS)).rejects.toMatchObject({ code: 'CASPER_EXITED' })
     expect(current(host, agent)).toEqual({ ...SOL, reasoningEffort: 'auto' })
     expect(fake.pids()).toHaveLength(1)
+  })
+})
+
+describe('The access chip in a Casper session', { timeout: 60_000 }, () => {
+  async function setupChip(script: FakeScript) {
+    const fake = fakeCasper(script)
+    cleanups.push(() => { fake.remove() })
+    const host = await boot(fake, {}, undefined, true, mountPermissionPresets)
+    cleanups.push(() => host.ctx.fiber.dispose())
+    return { fake, host }
+  }
+
+  /** Pick a preset on the chip, as the app's `/permission` does. */
+  function chip(host: { ctx: Context }, agent: Agent, preset: string): void {
+    host.ctx.permissionPresets.set(agent.session, preset)
+  }
+
+  /** The access modes the app sent, through either set method. */
+  function accessSets(fake: FakeCasper): unknown[] {
+    return fake.log().flatMap((entry) => {
+      if (entry.method === 'session/set_mode') return [entry.params?.modeId]
+      if (entry.method === 'session/set_config_option' && entry.params?.configId === 'mode') return [entry.params.value]
+      return []
+    })
+  }
+
+  /** The methods Casper received after initialize, in order. */
+  function methodsOf(fake: FakeCasper): string[] {
+    return fake.log().flatMap(entry => entry.method === undefined || entry.method === 'initialize' ? [] : [entry.method])
+  }
+
+  function replyTexts(agent: Agent): string[] {
+    return eventsOf(agent).flatMap(event => event.type === 'assistant/message'
+      ? event.data.message.content.flatMap(block => block.type === 'text' ? [block.text] : [])
+      : [])
+  }
+
+  it('sends Read only before the first prompt and nothing more while the chip stays, and sends nothing for Workspace Write', async () => {
+    const { fake, host } = await setupChip({ configOptions: casperOptions(), modes: casperModes(), prompts: [[{ text: 'one\n' }], [{ text: 'two\n' }]] })
+    const { agent } = await host.create('casper-chip-read')
+    chip(host, agent, 'read-only')
+    await run(agent, 'first')
+    expect(methodsOf(fake)).toEqual(['session/new', 'session/set_config_option', 'session/prompt'])
+    expect(accessSets(fake)).toEqual(['read'])
+    await run(agent, 'second')
+    expect(accessSets(fake)).toEqual(['read'])
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }, { kind: 'completed' }])
+
+    const other = await host.create('casper-chip-default')
+    await run(other.agent, 'third')
+    expect(accessSets(fake)).toEqual(['read'])
+  })
+
+  it('sends a chip switch to a running prompt at once, and a custom chip with a read-only sandbox as Read only', async () => {
+    const fake = fakeCasper({ prompts: [] })
+    cleanups.push(() => { fake.remove() })
+    const hold = gate(fake, 'hold')
+    fake.script({ configOptions: optionsWithoutMode(), modes: casperModes(), prompts: [[{ waitFile: hold.path }, { text: 'one\n' }]] })
+    const host = await boot(fake, {}, undefined, true, mountPermissionPresets)
+    cleanups.push(() => host.ctx.fiber.dispose())
+    const { agent } = await host.create('casper-chip-live')
+    agent.followup(prompt('first'))
+    await waitFor(() => fake.calls('session/prompt').length === 1)
+    chip(host, agent, 'danger-full-access')
+    // Casper offers only modes here, so the switch goes as session/set_mode while the prompt runs.
+    await waitFor(() => fake.calls('session/set_mode').length === 1)
+    expect(accessSets(fake)).toEqual(['full'])
+    expect(agent.status).toBe('running')
+    hold.open()
+    await agent.whenIdle()
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }])
+    // Knobs that match no preset make the chip custom; its read-only sandbox is Read only, sent while Casper is idle.
+    agent.session.append('sandbox/mode', { mode: 'read-only' })
+    agent.session.append('approval/policy', { policy: 'never' })
+    expect(host.ctx.permissionPresets.current(agent.session)).toBe('custom')
+    await waitFor(() => accessSets(fake).length === 2)
+    expect(accessSets(fake)).toEqual(['full', 'read'])
+  })
+
+  it('keeps a mode Casper picks itself without moving the chip, and restores only Read only', async () => {
+    const { fake, host } = await setupChip({
+      configOptions: casperOptions(),
+      prompts: [[{ mode: 'full' }, { text: 'one\n' }], [{ text: 'two\n' }], [{ mode: 'ask' }, { text: 'three\n' }], [{ text: 'four\n' }]],
+    })
+    const { agent } = await host.create('casper-chip-own')
+    await run(agent, 'first')
+    // "Yes to everything this session" in Casper's own box: the chip stays, and nothing is sent back.
+    expect(host.ctx.permissionPresets.current(agent.session)).toBe('workspace-write')
+    await run(agent, 'second')
+    expect(accessSets(fake)).toEqual([])
+    chip(host, agent, 'read-only')
+    await waitFor(() => accessSets(fake).length === 1)
+    await run(agent, 'third')
+    // Casper left Read only on its own, so the app set it again.
+    await waitFor(() => accessSets(fake).length === 2)
+    expect(accessSets(fake)).toEqual(['read', 'read'])
+    await run(agent, 'fourth')
+    expect(accessSets(fake)).toEqual(['read', 'read'])
+    expect(turnEnds(agent).every(reason => (reason as { kind: string }).kind === 'completed')).toBe(true)
+  })
+
+  it('fails closed for Read only on a Casper without modes, and runs Workspace Write and a Full access note as usual', async () => {
+    const { fake, host } = await setupChip({ prompts: [[{ text: 'one\n' }], [{ text: 'two\n' }]] })
+    const { agent } = await host.create('casper-chip-older')
+    await run(agent, 'first')
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }])
+    chip(host, agent, 'read-only')
+    await run(agent, 'second')
+    expect(turnEnds(agent).at(-1)).toEqual({ kind: 'error', error: {
+      code: 'CASPER_ACCESS_NOT_APPLIED',
+      message: 'This Casper has no access modes, so Read only could not be set. Update Casper. Nothing was sent to Casper.',
+    } })
+    expect(promptTexts(fake)).toEqual(['first'])
+    chip(host, agent, 'danger-full-access')
+    await run(agent, 'third')
+    expect(turnEnds(agent).at(-1)).toEqual({ kind: 'completed' })
+    expect(promptTexts(fake)).toEqual(['first', 'third'])
+    expect(replyTexts(agent).at(-1)).toBe(
+      '[This Casper has no access modes, so Full access could not be set. Update Casper. Casper asks before changes as usual.]\ntwo\n\nReceipt: verified\n')
+  })
+
+  it('stops a running prompt when Read only cannot reach Casper, and leaves a note when Full access cannot', async () => {
+    const fake = fakeCasper({ prompts: [] })
+    cleanups.push(() => { fake.remove() })
+    const hold = gate(fake, 'hold')
+    fake.script({
+      configOptions: casperOptions(), setFails: { mode: 'acp_access is off.' },
+      prompts: [[{ waitFile: hold.path }, { text: 'one\n' }], [{ hang: true }]],
+    })
+    const host = await boot(fake, {}, undefined, true, mountPermissionPresets)
+    cleanups.push(() => host.ctx.fiber.dispose())
+    const { agent } = await host.create('casper-chip-refused')
+    agent.followup(prompt('first'))
+    await waitFor(() => fake.calls('session/prompt').length === 1)
+    chip(host, agent, 'danger-full-access')
+    // The note streams into the running reply.
+    await waitFor(() => JSON.stringify(host.frames.filter(entry => entry.agent === agent).map(entry => entry.frame)).includes('Full access'))
+    hold.open()
+    await agent.whenIdle()
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }])
+    expect(replyTexts(agent).join('')).toContain('[Casper did not switch to Full access: acp_access is off. Casper asks before changes as usual.]\n')
+    agent.followup(prompt('second'))
+    await waitFor(() => fake.calls('session/prompt').length === 2)
+    chip(host, agent, 'read-only')
+    await agent.whenIdle()
+    expect(fake.calls('session/cancel')).toHaveLength(1)
+    expect(turnEnds(agent).at(-1)).toEqual({ kind: 'error', error: {
+      code: 'CASPER_ACCESS_NOT_APPLIED', message: 'Casper did not switch to Read only: acp_access is off. The request was stopped.',
+    } })
+    // The turn's start retried Full access, then the chip's Read only was refused mid-prompt.
+    expect(accessSets(fake)).toEqual(['full', 'full', 'read'])
+  })
+
+  it('ends a turn whose chip switch fails while it prepares its prompt, and sends no prompt; Full access leaves a note', async () => {
+    /** A Casper that takes pictures, a picture read the test releases, and a watch on the app's access sets. */
+    async function preparing(script: FakeScript, id: string) {
+      const held = heldPictureStore()
+      const fake = fakeCasper({ ...script, promptCapabilities: { image: true } })
+      cleanups.push(() => { fake.remove() })
+      const host = await boot(fake, {}, undefined, true, async (ctx) => {
+        await mountPermissionPresets(ctx)
+        await ctx.plugin(held.store)
+      })
+      cleanups.push(() => host.ctx.fiber.dispose())
+      const { agent } = await host.create(id)
+      const setAccess = vi.spyOn(CasperConnection.prototype, 'setAccess')
+      cleanups.push(() => { setAccess.mockRestore() })
+      agent.followup(prompt('', `rpc-${id}`, [{ type: 'text', text: 'look' }, { type: 'image', attachment: PICTURE }]))
+      await waitFor(() => held.reading())
+      return { fake, host, agent, setAccess, release: held.release }
+    }
+
+    // A Casper without modes: Read only cannot be set while the picture is read.
+    const older = await preparing({ prompts: [[{ text: 'edited\n' }]] }, 'casper-chip-preparing')
+    chip(older.host, older.agent, 'read-only')
+    await waitFor(() => older.setAccess.mock.settledResults.length === 1)
+    older.release()
+    await older.agent.whenIdle()
+    expect(turnEnds(older.agent)).toEqual([{ kind: 'error', error: {
+      code: 'CASPER_ACCESS_NOT_APPLIED',
+      message: 'This Casper has no access modes, so Read only could not be set. Update Casper. Nothing was sent to Casper.',
+    } }])
+    expect(older.fake.calls('session/prompt')).toEqual([])
+    older.setAccess.mockRestore()
+
+    // A Casper that refuses Full access: the prompt runs with a note.
+    const refusing = await preparing({ configOptions: casperOptions(), setFails: { mode: 'acp_access is off.' }, prompts: [[{ text: 'asked\n' }]] }, 'casper-chip-preparing-full')
+    chip(refusing.host, refusing.agent, 'danger-full-access')
+    await waitFor(() => refusing.setAccess.mock.settledResults.length === 1)
+    refusing.release()
+    await refusing.agent.whenIdle()
+    expect(turnEnds(refusing.agent)).toEqual([{ kind: 'completed' }])
+    expect(replyTexts(refusing.agent).at(-1)).toBe('[Casper did not switch to Full access: acp_access is off. Casper asks before changes as usual.]\nasked\n\nReceipt: verified\n')
+  })
+
+  it('ends the turn CASPER_EXITED when Casper exits on an access switch, and starts it again for the next prompt', async () => {
+    const { fake, host } = await setupChip({ configOptions: casperOptions(), setExit: 3, prompts: [[{ text: 'one\n' }], [{ text: 'two\n' }]] })
+    const { agent } = await host.create('casper-chip-exit')
+    await run(agent, 'first')
+    const [pid] = fake.pids()
+    chip(host, agent, 'read-only')
+    // The switch reaches the idle Casper at once, which exits on it.
+    await waitFor(() => pid !== undefined && !alive(pid))
+    await run(agent, 'second')
+    expect(fake.pids()).toHaveLength(2)
+    expect(turnEnds(agent).at(-1)).toMatchObject({ kind: 'error', error: { code: 'CASPER_EXITED' } })
+    expect(accessSets(fake)).toEqual(['read', 'read'])
+    expect(promptTexts(fake)).toEqual(['first'])
   })
 })

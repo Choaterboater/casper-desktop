@@ -26,7 +26,12 @@
  *   with code `setExit` when set, and answers only once the file
  *   `holdSet[configId]` exists when set.
  *   `replayConfig` also sends the list as a `config_option_update` among the
- *   replayed chunks of a successful `session/load`.
+ *   replayed chunks of a successful `session/load`. `modes` is the mode state
+ *   of the same replies; `session/set_mode` (logged) sets a listed mode, refuses
+ *   another with -32602, and fails with -32603 and `setModeError` when set. A
+ *   set of the `mode` option or of the mode changes both. `replayMode` changes
+ *   the mode and sends a `current_mode_update` among the replayed chunks of a
+ *   successful `session/load`.
  * - `FAKE_CASPER_LOG` — JSON lines appended for the start (argv, env names,
  *   PATH, cwd), every request and notification received, every permission
  *   answer, and stdin EOF. Tests poll this file.
@@ -43,7 +48,10 @@
  * line to stderr), `{ fail }` (replies with a -32603 error), `{ image }` and
  * `{ thought }` (updates Casper does not send), `{ commandsUpdate }` (sends
  * that `available_commands_update` list), `{ configUpdate }` (replaces the
- * option list and sends it as a `config_option_update`), `{ late: Step }` (played 50 ms
+ * option list and sends it as a `config_option_update`), `{ mode }` (Casper
+ * changes its own access mode, as "Yes to everything this session" does: a
+ * `current_mode_update`, then a `config_option_update` when it has a `mode`
+ * option), `{ late: Step }` (played 50 ms
  * after the reply), `{ exitAfterMs }` (exits with code 5 after that delay),
  * `{ mcp, args? }` (calls that tool on the first `mcpServers` entry with an
  * MCP 1.x client, carrying the current tool id as `casper/acpToolCallId`,
@@ -76,6 +84,7 @@ import {
   type PromptResponse,
   type RequestPermissionResponse,
   type SessionConfigOption,
+  type SessionModeState,
   type SessionUpdate,
   type StopReason,
   type ToolKind,
@@ -117,6 +126,7 @@ interface Step {
   kind?: ToolKind
   commandsUpdate?: AvailableCommand[]
   configUpdate?: SessionConfigOption[]
+  mode?: string
 }
 
 /** A step's ACP fields beyond the id, status, and title. */
@@ -146,6 +156,9 @@ interface Script {
   replayConfig?: boolean
   setExit?: number
   holdSet?: Record<string, string>
+  modes?: SessionModeState
+  setModeError?: string
+  replayMode?: string
 }
 
 const logFile = process.env.FAKE_CASPER_LOG ?? ''
@@ -201,6 +214,19 @@ let cancel: ((reason: StopReason) => void) | undefined
 let ignoreCancel = false
 /** This process's options; a set changes them. */
 let configOptions: SessionConfigOption[] | undefined = script.configOptions
+/** This process's mode state; a set changes it. */
+let modes: SessionModeState | undefined = script.modes
+
+/** Change the access mode in both the `mode` option and the mode state. */
+function setModeTo(modeId: string): void {
+  if (modes !== undefined) modes = { ...modes, currentModeId: modeId }
+  configOptions = configOptions?.map(item => item.category === 'mode' && item.type === 'select' ? { ...item, currentValue: modeId } : item)
+}
+
+/** The fields of a `session/new` or `session/load` reply beyond the id. */
+function opened(): Record<string, unknown> {
+  return { ...configOptions === undefined ? {} : { configOptions }, ...modes === undefined ? {} : { modes } }
+}
 
 /** The listed values of one select option, groups flattened. */
 function valuesOf(option: SessionConfigOption): string[] {
@@ -244,6 +270,11 @@ async function run(step: Step, params: PromptRequest, client: AgentContext, outc
     if (step.configUpdate !== undefined) {
       configOptions = step.configUpdate
       await update(client, { sessionUpdate: 'config_option_update', configOptions: step.configUpdate })
+    }
+    if (step.mode !== undefined) {
+      setModeTo(step.mode)
+      await update(client, { sessionUpdate: 'current_mode_update', currentModeId: step.mode })
+      if (configOptions?.some(item => item.category === 'mode') === true) await update(client, { sessionUpdate: 'config_option_update', configOptions })
     }
     if (step.tool !== undefined) {
       const id = `casper-tool-${++steps}`
@@ -358,7 +389,7 @@ createAcpAgent({ name: 'fake-casper' })
     const availableCommands = script.commands
     // Like Casper, the list follows the reply.
     if (availableCommands !== undefined) setImmediate(() => { void update(client, { sessionUpdate: 'available_commands_update', availableCommands }) })
-    return { sessionId, ...configOptions === undefined ? {} : { configOptions } }
+    return { sessionId, ...opened() }
   })
   .onRequest(methods.agent.session.load, async ({ params, client }) => {
     log({ method: 'session/load', params, exposed: exposed(params.mcpServers) })
@@ -371,7 +402,11 @@ createAcpAgent({ name: 'fake-casper' })
     for (const text of script.replay ?? []) await update(client, { sessionUpdate: 'user_message_chunk', content: { type: 'text', text } })
     if (script.commands !== undefined) await update(client, { sessionUpdate: 'available_commands_update', availableCommands: script.commands })
     if (script.replayConfig === true && configOptions !== undefined) await update(client, { sessionUpdate: 'config_option_update', configOptions })
-    return configOptions === undefined ? {} : { configOptions }
+    if (script.replayMode !== undefined) {
+      setModeTo(script.replayMode)
+      await update(client, { sessionUpdate: 'current_mode_update', currentModeId: script.replayMode })
+    }
+    return opened()
   })
   .onRequest(methods.agent.session.prompt, ({ params, client }) => {
     log({ method: 'session/prompt', params })
@@ -392,8 +427,18 @@ createAcpAgent({ name: 'fake-casper' })
       throw new RequestError(-32602, `Casper can't use ${String(params.value)}: it is not one of your signed-in models. Pick one from the list.`)
     }
     const { value } = params
+    if (option.category === 'mode') setModeTo(value)
     configOptions = (configOptions ?? []).map(item => item.id === params.configId && item.type === 'select' ? { ...item, currentValue: value } : item)
     return { configOptions }
+  })
+  .onRequest(methods.agent.session.setMode, ({ params }) => {
+    log({ method: 'session/set_mode', params })
+    if (script.setModeError !== undefined) throw new RequestError(-32603, script.setModeError)
+    if (modes?.availableModes.some(mode => mode.id === params.modeId) !== true) {
+      throw new RequestError(-32602, `Unknown mode: ${params.modeId} (read, ask, full)`)
+    }
+    setModeTo(params.modeId)
+    return {}
   })
   .onNotification(methods.agent.session.cancel, ({ params }) => {
     log({ method: 'session/cancel', params })

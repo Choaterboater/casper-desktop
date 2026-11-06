@@ -11,8 +11,8 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import { TurnWriter } from '../src/turn.ts'
 import { CasperAgent } from '../src/agent.ts'
-import { boot, eventsOf, prompt, turnEnds } from './harness.ts'
-import { fakeCasper } from './support.ts'
+import { boot, eventsOf, mountPermissionPresets, prompt, turnEnds } from './harness.ts'
+import { casperModes, casperOptions, fakeCasper } from './support.ts'
 
 const cleanups: (() => Promise<void> | void)[] = []
 afterEach(async () => {
@@ -183,5 +183,35 @@ describe('a Casper turn read back from the stored log', { timeout: 60_000 }, () 
     // Resuming only appends its own marker after the stored events.
     expect(eventsOf(resumed).map(event => event.type).slice(0, written.length)).toEqual(written)
     expect(turnEnds(resumed)).toEqual([{ kind: 'completed' }])
+  })
+
+  it('sends a Read only chip saved before a restart to the new Casper before its first prompt', async () => {
+    const fake = fakeCasper({ configOptions: casperOptions(), modes: casperModes(), prompts: [[{ text: 'one\n' }], [{ text: 'two\n' }]] })
+    cleanups.push(() => { fake.remove() })
+    const first = await boot(fake, {}, undefined, true, mountPermissionPresets)
+    const { agent } = await first.create('casper-chip-reload')
+    agent.followup(prompt('first'))
+    await agent.whenIdle()
+    await first.ctx.fiber.dispose()
+    // The chip is switched while no Casper runs: the stored Session keeps it.
+    const offline = await boot(fake, {}, undefined, true, mountPermissionPresets)
+    const reopened = (await offline.ctx.agents.resume({ resumeSessionId: SessionId('casper-chip-reload'), agentPreset: 'casper' })).agent
+    offline.ctx.permissionPresets.set(reopened.session, 'read-only')
+    await offline.ctx.sessions.flush(reopened.session)
+    await offline.ctx.fiber.dispose()
+
+    const second = await boot(fake, {}, undefined, true, mountPermissionPresets)
+    cleanups.push(() => second.ctx.fiber.dispose())
+    const resumed = (await second.ctx.agents.resume({ resumeSessionId: SessionId('casper-chip-reload'), agentPreset: 'casper' })).agent
+    expect(second.ctx.permissionPresets.current(resumed.session)).toBe('read-only')
+    resumed.followup(prompt('second'))
+    await resumed.whenIdle()
+    const [, pid] = fake.pids()
+    const methods = fake.log().filter(entry => entry.pid === pid && entry.method !== undefined && entry.method !== 'initialize')
+      .map(entry => [entry.method, entry.params?.configId, entry.params?.value])
+    expect(methods).toEqual([
+      ['session/load', undefined, undefined], ['session/set_config_option', 'mode', 'read'], ['session/prompt', undefined, undefined],
+    ])
+    expect(turnEnds(resumed).at(-1)).toEqual({ kind: 'completed' })
   })
 })

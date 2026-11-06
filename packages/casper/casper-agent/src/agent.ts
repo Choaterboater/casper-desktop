@@ -24,6 +24,9 @@ import type {} from '@deepseek-ai/dsh-attachment'
 import type {} from '@deepseek-ai/dsh-commands'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { LlmFailure } from '@deepseek-ai/dsh-llm'
+import { CUSTOM_PRESET } from '@deepseek-ai/dsh-permission-presets'
+// Type-only: the `sandbox/mode` event the access chip writes, and `ctx.sandboxPolicy`.
+import type {} from '@deepseek-ai/dsh-sandbox-policy'
 import { createScope } from '@deepseek-ai/dsh-scope'
 import type { Scope } from '@deepseek-ai/dsh-scope'
 import { appendPluginRecord } from '@deepseek-ai/dsh-session'
@@ -33,6 +36,8 @@ import type {} from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-user-questions'
+import { ACCESS_MODE_LABELS, accessModeFor } from './access.ts'
+import type { AccessModeId } from './access.ts'
 import { appReadRoots, isInstalled, selfAnchor } from './app-read.ts'
 import { startAppTools } from './app-tools.ts'
 import type { AppToolsProfile, AppToolsServer } from './app-tools.ts'
@@ -67,6 +72,19 @@ interface PromptSink {
   readonly connection: CasperConnection
   readonly writer: TurnWriter
   readonly signal: AbortSignal
+  /**
+   * Stop the prompt so the turn ends with `error` instead of Casper's reply.
+   * @param error - the turn's error.
+   */
+  stop(error: CasperError): void
+}
+
+/** The outcome of bringing Casper's access mode to the chip's. */
+interface AccessSync {
+  /** The mode the chip asks for. */
+  readonly wanted: AccessModeId
+  /** Why Casper is not in that mode, when it is not. */
+  readonly failure?: unknown
 }
 
 type Phase =
@@ -119,6 +137,14 @@ export class CasperAgent implements Agent {
   private published = false
   /** Reader of Casper's reported models and a pick not yet applied. */
   private readonly models: () => AgentModelsState
+  /** Access syncs run one at a time, in the order the chip changed. */
+  private accessChain: Promise<unknown> = Promise.resolve()
+  /** Whether a live sync waits in the chain; one preset switch writes several events, and one sync covers them all. */
+  private liveAccessQueued = false
+  /** The access mode this app last set on each connection; a mode Casper picks itself is kept until the chip changes. */
+  private readonly accessSet = new WeakMap<CasperConnection, AccessModeId>()
+  /** A chip switch that failed while no prompt was open, kept for a turn that is preparing its prompt. */
+  private lateAccess: AccessSync | undefined
 
   /**
    * @param pluginCtx - the Casper plugin context whose services the Agent uses.
@@ -161,6 +187,12 @@ export class CasperAgent implements Agent {
         this.commandOffs.length = 0
       }, 'casperAgent.commands()')
       this.registerCommands()
+    })
+    // The access chip: a preset, sandbox, or approval switch reaches a running Casper at once, even mid-prompt.
+    this.ctx.on('session/event', (subject, event) => {
+      /* v8 ignore next -- agent-scoped dispatch delivers only this Agent's Session; the check keeps it so under a shared scope. */
+      if (subject !== this.session) return
+      if (event.type === 'permission/preset' || event.type === 'sandbox/mode' || event.type === 'approval/policy') this.queueLiveAccess()
     })
   }
 
@@ -349,6 +381,9 @@ export class CasperAgent implements Agent {
       connection = opened.connection
       // Said at once: the conversation is new even when this turn sends nothing.
       if (opened.fresh) writer.text(FRESH_CONVERSATION_NOTICE)
+      // Access goes first: it is the safety step.
+      const accessNote = await this.applyAccess(connection)
+      signal.throwIfAborted()
       // A pick made before Casper started or while it was busy reaches Casper before the prompt does.
       await this.applyWanted(connection, signal)
       signal.throwIfAborted()
@@ -361,10 +396,28 @@ export class CasperAgent implements Agent {
           ? 'This Casper can\'t take pictures, and the request has no words. Update Casper to send pictures.'
           : 'The attachments could not be read, and the request has no words, so nothing was sent to Casper.')
       }
+      // A chip switch that failed after the access step counts as if it failed during the prompt.
+      const lateNote = this.lateAccessNote()
       this.updateFailure = undefined
-      this.sink = { connection, writer, signal }
+      const stopper = new AbortController()
+      const promptSignal = AbortSignal.any([signal, stopper.signal])
+      this.sink = {
+        connection, writer, signal: promptSignal,
+        stop: (error) => {
+          this.updateFailure ??= error
+          stopper.abort({ kind: 'user' } satisfies AgentCancelCause)
+        },
+      }
+      if (accessNote !== undefined) writer.text(accessNote)
+      if (lateNote !== undefined) writer.text(lateNote)
       for (const note of content.notes) writer.text(note)
-      const stopReason = await this.promptUntilSettled(connection, content.blocks, signal)
+      let stopReason: StopReason
+      try {
+        stopReason = await this.promptUntilSettled(connection, content.blocks, promptSignal)
+      } catch (error: unknown) {
+        // A prompt stopped because the chip's mode could not reach Casper ends with that error.
+        throw this.takeUpdateFailure() ?? error
+      }
       const failure = this.takeUpdateFailure()
       /* v8 ignore next -- see record(). */
       if (failure !== undefined) throw failure
@@ -423,6 +476,8 @@ export class CasperAgent implements Agent {
         update: (notification) => { this.receive(owner.connection, notification) },
         commands: (list) => { this.offerCommands(list) },
         config: () => { if (owner.connection !== undefined && owner.connection === this.connection) this.report(owner.connection) },
+        // Casper's own mode change is kept, never copied to the chip; only Read only is restored.
+        mode: () => { if (owner.connection !== undefined && owner.connection === this.connection) this.queueLiveAccess() },
         permission: params => this.permission(owner.connection, params),
       },
       appTools: this.config.appTools ? connection => this.startAppTools(connection, cwd, profile) : undefined,
@@ -652,6 +707,130 @@ export class CasperAgent implements Agent {
     return current == null ? this.config.model ?? DEFAULT_MODEL_LABEL : `${current.provider}/${current.model}`
   }
 
+  /**
+   * The Casper access mode the chip asks for.
+   * @returns the mode, or undefined when the app mounts no permission presets.
+   */
+  private wantedAccess(): AccessModeId | undefined {
+    const presets = this.pluginCtx.get('permissionPresets')
+    if (presets === undefined) return undefined
+    const preset = presets.current(this.session)
+    // The derived custom preset has no bundle; the sandbox policy owns the Session's mode.
+    const sandbox = preset === CUSTOM_PRESET
+      ? this.pluginCtx.get('sandboxPolicy')?.resolve({ session: this.session }).mode
+      : presets.resolve(preset).sandbox
+    return accessModeFor(preset, sandbox, this.config.accessModes)
+  }
+
+  /** Run one access job after the ones queued before it. */
+  private queueAccess<T>(job: () => Promise<T>): Promise<T> {
+    const run = this.accessChain.then(job)
+    this.accessChain = run.catch(
+      /* v8 ignore next -- each caller observes its own job's failure; syncs report theirs as values. */
+      () => {},
+    )
+    return run
+  }
+
+  /**
+   * Bring Casper's access mode to the chip's. A mode is sent only when the chip
+   * asks for another one than this app last set on the connection, so a mode
+   * Casper picks itself (such as "Yes to everything this session") is kept,
+   * except that Read only is always restored. A Casper without modes asks as
+   * usual, so Ask first needs nothing sent to it.
+   * @param connection - the live connection.
+   * @returns the wanted mode and any failure, or undefined when the app mounts no permission presets.
+   */
+  private async syncAccess(connection: CasperConnection): Promise<AccessSync | undefined> {
+    const wanted = this.wantedAccess()
+    if (wanted === undefined) return undefined
+    const set = this.accessSet.get(connection) ?? connection.accessMode ?? 'ask'
+    if (set === wanted && (wanted !== 'read' || connection.accessMode === 'read')) {
+      this.accessSet.set(connection, wanted)
+      return { wanted }
+    }
+    try {
+      await connection.setAccess(wanted)
+    } catch (error: unknown) {
+      return { wanted, failure: error }
+    }
+    this.accessSet.set(connection, wanted)
+    return { wanted }
+  }
+
+  /**
+   * Bring Casper's access to the chip's before a prompt, after any switch queued earlier.
+   * @param connection - the live connection.
+   * @returns a note for the turn when Full access could not be set; Casper then asks as usual.
+   * @throws CasperError `CASPER_ACCESS_NOT_APPLIED` when Read only or Ask first could not be set, `CASPER_EXITED` when Casper exits.
+   */
+  private async applyAccess(connection: CasperConnection): Promise<string | undefined> {
+    const sync = await this.queueAccess(() => this.syncAccess(connection))
+    // This sync read the chip after every switch queued before it, so an earlier failure no longer counts.
+    this.lateAccess = undefined
+    return accessOutcome(sync)
+  }
+
+  /**
+   * Take a chip switch that failed after the turn's access step, while its
+   * prompt was not yet sent. A sync on an earlier connection fails as an exit,
+   * which is not kept.
+   * @returns a note when Full access could not be set.
+   * @throws CasperError `CASPER_ACCESS_NOT_APPLIED` when Read only or Ask first could not be set.
+   */
+  private lateAccessNote(): string | undefined {
+    const late = this.lateAccess
+    this.lateAccess = undefined
+    return accessOutcome(late)
+  }
+
+  /**
+   * Send a chip switch to the running Casper at once. When Read only or Ask
+   * first cannot be set during a prompt, the prompt stops and the turn ends
+   * `CASPER_ACCESS_NOT_APPLIED`; Full access that cannot be set leaves a note.
+   * A failure while no prompt is open is kept, so a turn that is still
+   * preparing its prompt ends the same way instead of sending it. Without a
+   * running Casper the next turn sends it.
+   */
+  private queueLiveAccess(): void {
+    if (this.liveAccessQueued) return
+    this.liveAccessQueued = true
+    this.queueAccess(async () => {
+      // The chip is read when the sync starts, so it covers every switch queued before.
+      this.liveAccessQueued = false
+      const connection = this.connection
+      if (connection === undefined || connection.dead) return
+      const sync = await this.syncAccess(connection)
+      if (sync?.failure === undefined) {
+        // The chip's mode is set now, so a switch that failed before no longer stops a prompt.
+        this.lateAccess = undefined
+        return
+      }
+      const { wanted, failure } = sync
+      const text = accessFailureText(wanted, failure)
+      this.pluginCtx.logger.debug(`casper agent "${this.id}": ${text}`)
+      // An exit ends the prompt on its own.
+      if (failure instanceof CasperError && failure.code === 'CASPER_EXITED') return
+      const sink = this.sinkFor(connection)
+      if (sink === undefined) {
+        // A turn still preparing its prompt reads it before sending.
+        this.lateAccess = sync
+        return
+      }
+      this.record(() => {
+        if (wanted === 'full') {
+          sink.writer.text(`\n[${text} Casper asks before changes as usual.]\n`)
+          return
+        }
+        sink.writer.text(`\n[${text} The request was stopped.]\n`)
+        sink.stop(new CasperError('CASPER_ACCESS_NOT_APPLIED', `${text} The request was stopped.`, { cause: failure }))
+      })
+    }).catch(
+      /* v8 ignore next -- the chip's preset is read only after the presets service is ready. */
+      (error: unknown) => { this.pluginCtx.logger.warn(`casper agent "${this.id}": access not synced: ${String(error)}`) },
+    )
+  }
+
   /** Forget the current connection and start killing it. */
   private dropConnection(connection: CasperConnection): void {
     this.connection = undefined
@@ -778,6 +957,37 @@ function samePick(left: ModelSelection | null, right: ModelSelection): boolean {
 function errorText(error: unknown): string {
   /* v8 ignore next -- a pick fails with an Error: its own refusal or the connection's. */
   return error instanceof Error ? error.message : String(error)
+}
+
+/**
+ * Words for an access mode Casper did not take.
+ * @param wanted - the mode the chip asks for.
+ * @param failure - why it was not set.
+ * @returns one sentence.
+ */
+function accessFailureText(wanted: AccessModeId, failure: unknown): string {
+  const label = ACCESS_MODE_LABELS[wanted]
+  if (failure instanceof CasperError && failure.code === 'CASPER_NO_ACCESS_MODES') {
+    return `This Casper has no access modes, so ${label} could not be set. Update Casper.`
+  }
+  // An error reply carries Casper's own words as its cause.
+  const words = failure instanceof CasperError && failure.cause instanceof Error ? failure.cause.message : errorText(failure)
+  return `Casper did not switch to ${label}: ${words.replace(/\.$/, '')}.`
+}
+
+/**
+ * What the turn does about an access sync: nothing when the mode is set, a
+ * note when Full access could not be set, and an error otherwise.
+ * @param sync - the sync, or undefined when the app mounts no permission presets.
+ * @returns the note, if any.
+ * @throws CasperError `CASPER_ACCESS_NOT_APPLIED` when Read only or Ask first could not be set, `CASPER_EXITED` when Casper exited.
+ */
+function accessOutcome(sync: AccessSync | undefined): string | undefined {
+  if (sync?.failure === undefined) return undefined
+  const { wanted, failure } = sync
+  if (failure instanceof CasperError && failure.code === 'CASPER_EXITED') throw failure
+  if (wanted === 'full') return `[${accessFailureText(wanted, failure)} Casper asks before changes as usual.]\n`
+  throw new CasperError('CASPER_ACCESS_NOT_APPLIED', `${accessFailureText(wanted, failure)} Nothing was sent to Casper.`, { cause: failure })
 }
 
 /** Structured failure of a turn. */

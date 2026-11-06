@@ -17,6 +17,8 @@ import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-j
 import Storage from '@deepseek-ai/dsh-storage'
 import * as StorageDomain from '@deepseek-ai/dsh-storage-domain'
 import * as StorageJson from '@deepseek-ai/dsh-storage-json'
+import PermissionPresetService from '@deepseek-ai/dsh-permission-presets'
+import SandboxPolicyService from '@deepseek-ai/dsh-sandbox-policy'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import UserQuestionService from '@deepseek-ai/dsh-user-questions'
 import type { AskUserQuestionAnswer, AskUserQuestionRequest } from '@deepseek-ai/dsh-user-questions'
@@ -136,4 +138,24 @@ export function filesText(dir: string): string {
     text += statSync(path).isDirectory() ? filesText(path) : readFileSync(path, 'utf8')
   }
   return text
+}
+
+/**
+ * Mount the app's permission presets (the access chip) with the Desktop table
+ * and the sandbox policy, over a stand-in confining shell and approval service.
+ * @param ctx - the Host context.
+ * @returns resolution once the presets service is ready.
+ */
+export async function mountPermissionPresets(ctx: Context): Promise<void> {
+  const refuse = (): never => { throw new Error('Casper agent tests run no app shell') }
+  ctx.provide('shell', { sandboxMode: 'workspace-write', resolve: refuse, run: refuse, start: refuse })
+  ctx.provide('approval', { config: { policy: 'ask' } })
+  await ctx.plugin(SandboxPolicyService, { mode: 'workspace-write' })
+  await ctx.plugin(PermissionPresetService, {
+    presets: {
+      'read-only': { sandbox: 'read-only', approval: 'ask' },
+      'workspace-write': { sandbox: 'workspace-write', approval: 'ask' },
+      'danger-full-access': { sandbox: 'danger-full-access', approval: 'never' },
+    },
+  })
 }

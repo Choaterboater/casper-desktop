@@ -19,6 +19,7 @@ import {
   type RequestPermissionRequest,
   type RequestPermissionResponse,
   type SessionConfigOption,
+  type SessionModeState,
   type SessionNotification,
   type StopReason,
 } from '@agentclientprotocol/sdk'
@@ -50,6 +51,8 @@ export type CasperFailureCode =
   | 'CASPER_EXITED'
   | 'CASPER_EMPTY_PROMPT'
   | 'CASPER_MODEL_UNAVAILABLE'
+  | 'CASPER_NO_ACCESS_MODES'
+  | 'CASPER_ACCESS_NOT_APPLIED'
   | 'CASPER_TEXT_ONLY'
   | `CASPER_RPC_${number}`
 
@@ -88,6 +91,14 @@ export interface CasperConnectionHandlers {
    * @param options - the model, effort, and other options Casper offers now.
    */
   config(options: readonly SessionConfigOption[]): void
+  /**
+   * Receive Casper's access mode when Casper changes it itself, from a
+   * `current_mode_update` or a changed `mode` option in a `config_option_update`;
+   * the connection has stored it already. A mode the client set is not echoed.
+   * Called during a `session/load` replay too.
+   * @param modeId - the mode Casper is in now, such as `read`, `ask`, or `full`.
+   */
+  mode(modeId: string): void
   /**
    * Answer one `session/request_permission`.
    * @param params - Casper's request.
@@ -181,6 +192,9 @@ export class CasperConnection {
   private sessionId: string | undefined
   private initialized: InitializeResponse | undefined
   private options_: readonly SessionConfigOption[] | undefined
+  private modes_: SessionModeState | undefined
+  /** Casper's current access mode; undefined for a Casper that offers no modes. */
+  private mode_: string | undefined
   /** Updates are dropped while `session/load` replays the conversation the Session already holds. */
   private replaying = false
   private cancelSent = false
@@ -216,6 +230,15 @@ export class CasperConnection {
    */
   get configOptions(): readonly SessionConfigOption[] | undefined {
     return this.options_
+  }
+
+  /**
+   * Casper's current access mode, from its `mode` option or `modes`, kept up to
+   * date by Casper's updates and by {@link setAccess}; undefined for a Casper
+   * that offers neither.
+   */
+  get accessMode(): string | undefined {
+    return this.mode_
   }
 
   /**
@@ -311,7 +334,30 @@ export class CasperConnection {
       this.requireConnection().agent.request(methods.agent.session.setConfigOption, { sessionId: this.requireSession(), configId, value }),
     )
     this.options_ = reply.configOptions
+    this.mode_ = modeOf(reply.configOptions, this.modes_)
     return reply.configOptions
+  }
+
+  /**
+   * Set Casper's access mode: through its `mode` option when it offers one,
+   * otherwise through `session/set_mode` when it offers `modes`. The mode is
+   * stored only after Casper accepts it.
+   * @param modeId - `read`, `ask`, or `full`.
+   * @throws CasperError `CASPER_NO_ACCESS_MODES` when Casper offers neither, `CASPER_EXITED` when it
+   *   exits first, `CASPER_RPC_<code>` for an error reply.
+   */
+  async setAccess(modeId: string): Promise<void> {
+    const option = modeOption(this.options_)
+    if (option !== undefined) {
+      await this.setConfigOption(option.id, modeId)
+    } else if (this.modes_ !== undefined) {
+      const sessionId = this.requireSession()
+      await this.request(this.requireConnection().agent.request(methods.agent.session.setMode, { sessionId, modeId }))
+    } else {
+      throw new CasperError('CASPER_NO_ACCESS_MODES', 'This Casper has no access modes. Update Casper to use the access control.')
+    }
+    if (this.modes_ !== undefined) this.modes_ = { ...this.modes_, currentModeId: modeId }
+    this.mode_ = modeId
   }
 
   /** Ask Casper to stop the prompt in flight; sent at most once per prompt. */
@@ -375,6 +421,10 @@ export class CasperConnection {
         else if (update.sessionUpdate === 'config_option_update') {
           this.options_ = update.configOptions
           options.handlers.config(update.configOptions)
+          this.casperMode(modeOf(update.configOptions, undefined))
+        } else if (update.sessionUpdate === 'current_mode_update') {
+          if (this.modes_ !== undefined) this.modes_ = { ...this.modes_, currentModeId: update.currentModeId }
+          this.casperMode(update.currentModeId)
         } else if (!this.replaying) options.handlers.update(params)
       })
       .onRequest(methods.client.session.requestPermission, ({ params }) => options.handlers.permission(params))
@@ -392,7 +442,7 @@ export class CasperConnection {
       this.replaying = true
       try {
         const loaded = await agent.request(methods.agent.session.load, { sessionId: stored, cwd: options.cwd, mcpServers })
-        this.options_ = loaded.configOptions ?? undefined
+        this.keepOptions(loaded)
         this.sessionId = stored
         return { acpSessionId: stored, reopened: true }
       } catch (error: unknown) {
@@ -405,9 +455,23 @@ export class CasperConnection {
       }
     }
     const created = await agent.request(methods.agent.session.new, { cwd: options.cwd, mcpServers })
-    this.options_ = created.configOptions ?? undefined
+    this.keepOptions(created)
     this.sessionId = created.sessionId
     return { acpSessionId: created.sessionId, reopened: false }
+  }
+
+  /** Keep the options and modes of a `session/new` or `session/load` reply. */
+  private keepOptions(reply: { configOptions?: SessionConfigOption[] | null; modes?: SessionModeState | null }): void {
+    this.options_ = reply.configOptions ?? undefined
+    this.modes_ = reply.modes ?? undefined
+    this.mode_ = modeOf(this.options_, this.modes_)
+  }
+
+  /** Store a mode Casper reports itself and tell the handler when it changed. */
+  private casperMode(modeId: string | undefined): void {
+    if (modeId === undefined || modeId === this.mode_) return
+    this.mode_ = modeId
+    this.options.handlers.mode(modeId)
   }
 
   /** Start the app tools server, if configured, and return the `mcpServers` list that offers it. */
@@ -517,6 +581,25 @@ export class CasperConnection {
     const tail = this.stderrTail()
     return tail === '' ? message : `${message}\n${tail}`
   }
+}
+
+/**
+ * Read the access mode from Casper's `mode` option, else from its `modes`.
+ * @param options - Casper's option list.
+ * @param modes - Casper's mode state.
+ * @returns the current mode id, or undefined when Casper offers neither.
+ */
+function modeOf(options: readonly SessionConfigOption[] | undefined, modes: SessionModeState | undefined): string | undefined {
+  return modeOption(options)?.currentValue ?? modes?.currentModeId
+}
+
+/**
+ * Find Casper's access option: the select option of category `mode`.
+ * @param options - Casper's option list.
+ * @returns the option, or undefined when Casper offers none.
+ */
+function modeOption(options: readonly SessionConfigOption[] | undefined): Extract<SessionConfigOption, { type: 'select' }> | undefined {
+  return options?.find((item): item is Extract<SessionConfigOption, { type: 'select' }> => item.category === 'mode' && item.type === 'select')
 }
 
 /**
