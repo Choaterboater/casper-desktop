@@ -8,11 +8,14 @@ import type { PlanEntry, ToolCall, ToolCallUpdate } from '@agentclientprotocol/s
 import type { AssistantStreamFrame } from '@deepseek-ai/dsh-agent'
 import { AssistantStreamAttempt } from '@deepseek-ai/dsh-agent-loop'
 import { createAssistantMessage, createToolResultMessage } from '@deepseek-ai/dsh-llm'
-import type { ToolCallId } from '@deepseek-ai/dsh-llm'
+import type { ContentBlock, ToolCallId } from '@deepseek-ai/dsh-llm'
 import { TOOL_OUTCOME_UNKNOWN } from '@deepseek-ai/dsh-session'
 import type { Session, SessionSeq } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-tool-todo'
+import type { BridgedCall } from './app-tools.ts'
 import { toolCallText } from './permission.ts'
+import { standardCall, standardResult } from './views.ts'
+import type { Json, StandardView } from './views.ts'
 
 /** Provider name recorded on Casper's assistant messages. */
 export const CASPER_PROVIDER = 'casper'
@@ -45,6 +48,17 @@ interface OpenCall {
   readonly callSeq: SessionSeq
   readonly step: number
   question: boolean
+  /** How a Casper tool step was recorded; undefined for checks and approval boxes. */
+  readonly view: StandardView | undefined
+  /** The app tool's own result, when the step ran one through the app tools server. */
+  bridged: BridgedCall | undefined
+}
+
+/** One `tool/result` to append. */
+interface ResultBody {
+  readonly content: ContentBlock[]
+  readonly isError: boolean
+  readonly meta?: Json | undefined
 }
 
 /**
@@ -65,6 +79,8 @@ export class TurnWriter {
   private openText: { index: number; text: string } | undefined
   private blockIndex = 0
   private readonly openCalls = new Map<string, OpenCall>()
+  /** App tool results that arrived before their step's `tool_call`. */
+  private readonly earlyBridged = new Map<string, BridgedCall>()
   private buffered: string[] = []
 
   /** @param options - the Session, frame publisher, positions, counters, and id mapping. */
@@ -100,18 +116,41 @@ export class TurnWriter {
   }
 
   /**
-   * Record a `tool_call` update. A call that arrives already completed or
-   * failed (a Casper check) is closed at once.
+   * Record a `tool_call` update. A running step is recorded as the Standard
+   * tool it maps to ({@link standardCall}); a call that arrives already
+   * completed or failed (a Casper check) is `casper_check` and closed at once,
+   * and a pending one (an approval box) is `casper_approval`.
    * @param call - the ACP tool call.
    */
   toolCall(call: ToolCall): void {
     const terminal = call.status === 'completed' || call.status === 'failed'
-    const name = terminal ? 'casper_check' : call.status === 'pending' ? 'casper_approval' : toolName(call.rawInput, call.kind)
-    this.startCall(call.toolCallId, name, callArguments(call))
+    if (!terminal && call.status !== 'pending') {
+      const view = standardCall(call)
+      this.startCall(call.toolCallId, view.name, view.arguments, view)
+      return
+    }
+    this.startCall(call.toolCallId, terminal ? 'casper_check' : 'casper_approval', callArguments(call.title, call.content), undefined)
     if (terminal) {
       const output = call.rawOutput === undefined ? '' : `\n${JSON.stringify(call.rawOutput)}`
-      this.finishCall(call.toolCallId, call.status === 'failed', `${call.title}${output}`)
+      const failed = call.status === 'failed'
+      this.finishCall(call.toolCallId, open => textResult(`${call.title}${output}`, failed && !open.question))
     }
+  }
+
+  /**
+   * Keep the app tool's own result for the Casper step that ran it; the
+   * step's final update is then recorded with that result and its `meta`, so
+   * the step's card is the app tool's own.
+   * @param acpId - the ACP tool call id of the step.
+   * @param call - the app tool, its arguments, and its result.
+   */
+  bridged(acpId: string, call: BridgedCall): void {
+    const open = this.openCalls.get(acpId)
+    if (open === undefined) {
+      this.earlyBridged.set(acpId, call)
+      return
+    }
+    open.bridged = call
   }
 
   /**
@@ -125,20 +164,31 @@ export class TurnWriter {
       open.question = true
       return
     }
-    this.startCall(call.toolCallId, 'casper_approval', callArguments({ title: call.title ?? '', content: call.content }))
+    this.startCall(call.toolCallId, 'casper_approval', callArguments(call.title ?? '', call.content), undefined)
     const started = this.openCalls.get(call.toolCallId)
     if (started !== undefined) started.question = true
   }
 
   /**
-   * Record a `tool_call_update`; only a completed or failed status closes the call.
+   * Record a `tool_call_update`; only a completed or failed status closes the
+   * call. A tool step's result is the Standard one ({@link standardResult}),
+   * or the app tool's own when the step ran one; an approval box keeps
+   * Casper's words, and its refusal is not an error.
    * @param update - the ACP tool call update.
    */
   toolUpdate(update: ToolCallUpdate): void {
     if (update.status !== 'completed' && update.status !== 'failed') return
-    const text = toolCallText(update.content)
-      ?? (update.rawOutput === undefined ? update.status : JSON.stringify(update.rawOutput))
-    this.finishCall(update.toolCallId, update.status === 'failed', text)
+    const failed = update.status === 'failed'
+    this.finishCall(update.toolCallId, (open) => {
+      const bridged = open.bridged?.result
+      if (bridged !== undefined) return { content: bridged.content, isError: bridged.isError, meta: bridged.meta }
+      if (open.view === undefined || open.question) {
+        const text = toolCallText(update.content) ?? (update.rawOutput === undefined ? '' : JSON.stringify(update.rawOutput))
+        return textResult(text, failed && !open.question)
+      }
+      const result = standardResult(open.view, update)
+      return { ...textResult(result.text, result.isError), meta: result.meta }
+    })
   }
 
   /**
@@ -159,8 +209,9 @@ export class TurnWriter {
   close(interrupted: boolean): void {
     const open = [...this.openCalls.values()]
     this.openCalls.clear()
+    this.earlyBridged.clear()
     for (const call of open) {
-      this.appendResult(call, true, OPEN_CALL_RESULT, { name: 'ToolOutcomeUnknownError', code: TOOL_OUTCOME_UNKNOWN })
+      this.appendResult(call, textResult(OPEN_CALL_RESULT, true), { name: 'ToolOutcomeUnknownError', code: TOOL_OUTCOME_UNKNOWN })
     }
     if (this.buffered.length > 0) {
       const waiting = this.buffered
@@ -216,7 +267,7 @@ export class TurnWriter {
     this.blockIndex = 0
   }
 
-  private startCall(acpId: string, name: string, args: string): void {
+  private startCall(acpId: string, name: string, args: string, view: StandardView | undefined): void {
     if (this.openCalls.has(acpId)) return
     const callId = this.options.callId(acpId)
     if (this.committed && this.openCalls.size === 0) this.nextStep()
@@ -241,42 +292,40 @@ export class TurnWriter {
     const callSeq = this.options.session.append('tool/call', {
       turn: this.options.turn, step: this.currentStep, callId, name, arguments: args,
     }).seq
-    this.openCalls.set(acpId, { callId, callSeq, step: this.currentStep, question: false })
+    const bridged = this.earlyBridged.get(acpId)
+    this.earlyBridged.delete(acpId)
+    this.openCalls.set(acpId, { callId, callSeq, step: this.currentStep, question: false, view, bridged })
   }
 
-  private finishCall(acpId: string, failed: boolean, text: string): void {
+  private finishCall(acpId: string, resultOf: (open: OpenCall) => ResultBody): void {
     const open = this.openCalls.get(acpId)
     if (open === undefined) return
     this.openCalls.delete(acpId)
-    const isError = failed && !open.question
-    this.appendResult(open, isError, text, isError ? { name: 'CasperToolFailed', code: 'CASPER_TOOL_FAILED' } : undefined)
+    const result = resultOf(open)
+    this.appendResult(open, result, result.isError ? { name: 'CasperToolFailed', code: 'CASPER_TOOL_FAILED' } : undefined)
     if (this.openCalls.size > 0 || this.buffered.length === 0) return
     const waiting = this.buffered
     this.buffered = []
     for (const chunk of waiting) this.text(chunk)
   }
 
-  private appendResult(open: OpenCall, isError: boolean, text: string, error: { name: string; code: string } | undefined): void {
+  private appendResult(open: OpenCall, result: ResultBody, error: { name: string; code: string } | undefined): void {
     this.options.session.append('tool/result', {
       turn: this.options.turn,
       step: open.step,
-      message: createToolResultMessage({ callId: open.callId, content: [{ type: 'text', text }], isError }),
+      message: createToolResultMessage({ callId: open.callId, content: result.content, isError: result.isError }),
       ...error === undefined ? {} : { error },
+      ...result.meta === undefined ? {} : { meta: result.meta },
     }, { surfaceOp: 'append', sourceEventSeqs: [open.callSeq] })
   }
 }
 
-/** Tool name shown on the card; the `casper_` prefix keeps Casper calls off built-in keyed views. */
-function toolName(rawInput: unknown, kind: ToolCall['kind']): string {
-  const tool: unknown = typeof rawInput === 'object' && rawInput !== null ? Reflect.get(rawInput, 'tool') : undefined
-  const base = typeof tool === 'string' && tool !== '' ? tool : kind ?? 'tool'
-  return `casper_${base.toLowerCase().replaceAll(/[^a-z0-9_]/g, '_')}`
+function textResult(text: string, isError: boolean): ResultBody {
+  return { content: [{ type: 'text', text }], isError }
 }
 
-/** JSON arguments of a Casper call: its title, raw input, and preview text. */
-function callArguments(call: Pick<ToolCall, 'title' | 'rawInput' | 'content'> | { title: string; content?: ToolCallUpdate['content'] }): string {
-  const rawInput: unknown = 'rawInput' in call ? call.rawInput : undefined
-  const input = typeof rawInput === 'object' && rawInput !== null && !Array.isArray(rawInput) ? rawInput : {}
-  const preview = toolCallText(call.content)
-  return JSON.stringify({ title: call.title, ...input, ...preview === undefined ? {} : { preview } })
+/** JSON arguments of a check or approval box: its title and preview text. */
+function callArguments(title: string, content: ToolCallUpdate['content']): string {
+  const preview = toolCallText(content)
+  return JSON.stringify({ title, ...preview === undefined ? {} : { preview } })
 }

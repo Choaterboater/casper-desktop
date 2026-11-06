@@ -24,7 +24,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { SkillRegistry } from '@deepseek-ai/dsh-skill'
-import type { ToolsService } from '@deepseek-ai/dsh-tools'
+import type { ToolResult, ToolsService } from '@deepseek-ai/dsh-tools'
 import { readAppFile, READ_MAX_LINES } from './app-read.ts'
 
 /** Name Casper gets the app's server under; Casper prefixes it with `acp-`. */
@@ -71,6 +71,26 @@ const BRIDGED: readonly BridgedTool[] = [
   { mcp: 'cordis_inspect_query', dsh: 'cordis_inspect_query', readOnly: true, pin: true, guide: false },
   { mcp: 'cordis_inspect_list', dsh: 'cordis_inspect_list', readOnly: true, pin: false, guide: true },
 ]
+
+/**
+ * The app tool name a served MCP tool runs under.
+ * @param mcp - the MCP tool name Casper called.
+ * @returns the app tool's name (`app_read_file` keeps its own), or undefined for a tool this server does not serve.
+ */
+export function dshNameOf(mcp: string): string | undefined {
+  const tool = BRIDGED.find(entry => entry.mcp === mcp)
+  return tool === undefined ? undefined : tool.dsh ?? tool.mcp
+}
+
+/** One app tool call the server ran for a Casper step. */
+export interface BridgedCall {
+  /** The app tool that ran. */
+  readonly name: string
+  /** The arguments it ran with, as JSON. */
+  readonly arguments: string
+  /** The app tool's own result, `meta` included. */
+  readonly result: ToolResult
+}
 
 const READ_FILE_DESCRIPTION = 'Read a text file, or list a folder, inside this desktop app\'s installed packages or the profile\'s installed bundles, '
   + 'including skill files and packageDir folders inside app.asar that shell commands cannot open. path is absolute; offset and limit count lines.'
@@ -120,6 +140,13 @@ export interface AppToolsOptions {
    * @returns the id Casper's step is recorded under.
    */
   readonly callId: (acpId: string) => ToolCallId
+  /**
+   * Receive the app tool's own result for the Casper step that made the call,
+   * so the step's card shows it as the DeepSeek loop would.
+   * @param acpId - the ACP tool call id of the step.
+   * @param call - the app tool, its arguments, and its result.
+   */
+  readonly record: (acpId: string, call: BridgedCall) => void
   /**
    * Receive an out-of-band server failure; never sees the token.
    * @param error - the failure.
@@ -276,6 +303,7 @@ async function mcpServer(options: AppToolsOptions, version: string): Promise<Mcp
       const result = batch.results[0]?.result
       /* v8 ignore next -- an executor returns one result per call. */
       if (result === undefined) return errorResult(`${tool.mcp} returned no result.`)
+      if (acpId !== undefined) options.record(acpId, { name: dsh, arguments: JSON.stringify(args), result })
       const content = mcpContent(result.content)
       if (tool.mcp === 'app_skill' && !result.isError) content.unshift({ type: 'text', text: skillPreface(options.profile, options.installed) })
       return { content, isError: result.isError }

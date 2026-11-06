@@ -120,6 +120,14 @@ export async function waitFor<T>(check: () => T | undefined | false, timeoutMs =
 }
 
 /**
+ * Parse JSON text for a test to compare; the value is left untyped.
+ * @param text - the JSON text, such as a recorded call's arguments.
+ */
+export function parsed(text: string): unknown {
+  return JSON.parse(text)
+}
+
+/**
  * Whether a process is still running.
  * @param pid - the process id.
  * @returns true while signal 0 reaches it.

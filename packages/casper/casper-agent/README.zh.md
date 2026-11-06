@@ -58,6 +58,7 @@ kind: "package-reference"
 | [`src/agent.ts`](src/agent.ts) | `CasperAgent`：收件箱、阶段、每轮一条提示、取消与进程重启 |
 | [`src/connection.ts`](src/connection.ts) | 一个 `casper acp` 进程：查找、启动、ACP 客户端、`session/new` 或 `session/load`、提示、取消与释放 |
 | [`src/turn.ts`](src/turn.ts) | 把 Casper 的更新写成步骤、助手消息、工具调用、结果与待办列表 |
+| [`src/views.ts`](src/views.ts) | 把 Casper 的工具步骤记录为做同样事情的 Standard 工具：名称、参数、结果文本与 meta |
 | [`src/permission.ts`](src/permission.ts) | 把审批框变成用户问题，并把答案映射回去 |
 | [`src/sidecar.ts`](src/sidecar.ts) | Host 存储域 `casper_agent`，把每个会话映射到其 Casper 对话 |
 | [`src/app-tools.ts`](src/app-tools.ts) | 应用工具 MCP 服务器：监听、认证、工具列表，以及以 Casper Agent 身份运行的调用 |
@@ -70,14 +71,36 @@ kind: "package-reference"
 | Casper 更新 | 会话事件 |
 |---|---|
 | `agent_message_chunk` 文本 | 实时 `agent/assistant-stream` 帧，最终落为 `assistant/message` |
-| `tool_call` | 该步骤带工具调用块的 `assistant/message`，随后是名为 `casper_<tool>` 的 `tool/call`；其后的文本开启新步骤 |
+| `tool_call` | 该步骤带工具调用块的 `assistant/message`，随后是带 Standard 工具名称与参数的 `tool/call`，或名为 `casper_<tool>`（见[工具卡片](#tool-cards)）；其后的文本开启新步骤 |
 | 该步骤其他调用仍未结束时的 `tool_call` | 同一步骤中另一条只含该调用块的 `assistant/message`，随后是它的 `tool/call`，因此存储的每个调用都已声明，会话可以重新打开 |
-| `tool_call_update` 完成或失败 | `tool/result`；失败的工具是错误结果，被拒绝的审批不是 |
+| `tool_call_update` 完成或失败 | 带 Standard 结果文本与 meta 的 `tool/result`，从不只写状态词；已运行的 shell 步骤记录其退出码且不是错误，其他失败的步骤是错误，被拒绝的审批不是 |
+| 仍在进行中的 `tool_call_update` | 不写入任何内容：调用保持打开，已提出的审批框仍在等待回答 |
 | 检查 `tool_call`（已完成或已失败） | 立即写入名为 `casper_check` 的 `tool/call` 及其结果 |
 | `plan` | 带完整列表的 `todo/write` |
 | 提示结束（停止、退出或回复）时仍未结束的调用 | 在 `step/end` 之前写入带 `TOOL_OUTCOME_UNKNOWN` 的错误 `tool/result`，与 agent-loop 对失败步骤的记录一致 |
 
 回执是最后一个文本块，因此它结束最后一条助手消息。提示回复只有在其之前收到的所有更新都写入后才会完成。停止会发送 `session/cancel` 并以中止结束该轮；若 Casper 在 `cancelGraceMs` 内未回复则被结束。工具调用 id 带有每个进程随机的前缀，因此重启后的 Casper 的 id 不会并入先前的卡片。
+
+<a id="tool-cards"></a>
+### 工具卡片
+
+Casper 在 `_meta.casper.tool` 中给每个步骤命名，其 `rawInput` 是模型自己的参数。会话把该步骤记录为做同样事情的 Standard 工具，因此由 Standard 的卡片绘制：编辑与写入用差异卡片，shell 步骤用终端卡片，以及读取预览、搜索卡片与网页卡片。只发送 `rawInput` `{tool, target}` 的旧版 Casper 按这两个字段映射。
+
+| Casper 工具 | 记录为 | 参数 | 结果 |
+|---|---|---|---|
+| `edit` | `edit` | `file_path`、第一处编辑的 `old_string` 与 `new_string`，有多处时还有 `edits`，按 pi 的 edit 接受的每种形式读取；Casper 用同一个占位文本隐藏两侧时，`old_string` 为 `<not shown: the text it replaced>` | Casper 的文字，或 `Edited <path> (+a −r)`；meta `path` 与 `diffs` |
+| `write` | `write` | `file_path`、`content` | Casper 的文字，或 `Created` 或 `Updated <path>`；meta `operation`、`path` 与 `diffs`，新文件的 `diffs` 为空 |
+| `bash`、`powershell` | `bash`、`pwsh` | `command`、`description`（Casper 给出的，否则为命令的第一行）、`timeoutMs` | 去掉围栏的输出，退出码 N 不为 0 时其后为 `[exit code: N]` |
+| `read` | `read` | `file_path`、`offset`、`limit` | 整个窗口都读出，或 Casper 精确计数了其行数时（窗口在文件结尾之前停止时即如此），为文件信封，带 meta `path`、`offset`、`lines`、`totalLines` 与 `lang`；否则只有文本 |
+| `grep` | `grep` | `pattern`、`path`、`include`（只保留 Standard 接受的 glob） | meta `shape: matches`、`files`、`total`、`truncated` |
+| `find`、`ls` | `glob` | `pattern`（`ls` 为 `*`）、`path` | meta `shape: paths`、`paths`、`total`、`truncated` |
+| `web_search` | `web_search` | `queries` | meta `sources`、`truncated`、`answer` |
+| `web_fetch` | `web_fetch` | `url` | meta `url`、`statusCode`、`truncated` |
+| [应用工具](#app-tools) | 应用工具自己的名称 | MCP 参数；经 `call_capability` 调用时为其携带的 `arguments` | 应用工具自己的结果与 meta |
+| 其他 MCP 工具 | `casper_mcp` | `title`、输入与 `preview` | Casper 的文字 |
+| 其他任何工具 | `casper_<tool>`；工具名已以 `casper_` 开头时（如 `casper_check`）沿用其原名 | `title`、输入与 `preview` | Casper 的文字，或其原始输出的 JSON |
+
+已运行的 shell 步骤无论退出码为何都不是错误。其他失败的步骤是错误，内容为 Casper 的文字；Casper 未发送文字时为 `Casper reported that this step failed.`。只有 Casper 报告了绝对路径时才记录 meta 路径，因此该轮的交付物会列出其编辑与写入产生的文件。结果形状不符合预期的步骤保留 Casper 的文本且不带 meta，显示为普通卡片。
 
 ### 审批
 
@@ -87,6 +110,7 @@ kind: "package-reference"
 
 Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打开会话。`session/new` 之后，对话 id 会在发送提示前存入 sidecar。之后的进程用 `session/load` 重新打开它，并丢弃回放的更新，因为会话已经保存了历史；只有 Casper 的“没有已保存对话”回复（`-32002`，消息中含不区分大小写的 "no saved conversation"）会开启新对话，且该轮以一行说明开头，即使该轮随后什么也没有发送。Casper 只在第一次回复后保存对话，因此进程在此之前就停止的对话会以这种方式重新开始。其他加载失败会结束该轮并保留记录。释放时关闭 stdin，等待 `exitGraceMs`，然后终止进程，符合桌面端 10 秒的 Host 退出时限。恢复会像 agent-loop 一样修复中断的轮次，且不启动进程。
 
+<a id="app-tools"></a>
 ### 应用工具
 
 每个 `casper acp` 进程都有一个专属的 MCP 服务器，在 `initialize` 之后启动，并作为 `session/new` 与 `session/load` 中唯一的 `mcpServers` 条目提供：`type: "http"`，名称 `app`，URL `http://127.0.0.1:<port>/mcp/<pathId>`，一个 `Authorization: Bearer <token>` 请求头，以及 `_meta: {"casper/clientAsks": true}`。路径 id（16 个随机字节）与令牌（32 个随机字节）为每个进程新生成，只在 ACP 管道内传递；它们不会出现在 argv、env、stderr、日志或会话事件中。监听器只绑定 `127.0.0.1`，并按顺序检查每个请求：路径不对为 404，`Host` 不是 `127.0.0.1:<port>` 为 403，带有任何 `Origin` 请求头为 403，令牌不匹配（以恒定时间比较）为 401。进程退出、被终止或被释放时监听器关闭，因此重启后的 Casper 会得到新的路径与令牌，旧的随即失效。
@@ -122,7 +146,8 @@ Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打�
 
 - `initialize` 回复未设置 `promptCapabilities.image` 的 Casper 会收到占位文本，而不是每张图片。
 - 模型选择器不会更改 Casper 的模型，模型标记在用户选择之前保持为空；`model` 与 `effort` 属于部署配置。
-- 推理、工具输出、差异、token 用量与费用都不会显示，因为 Casper 不发送它们；`session/load` 的回放也不显示。
+- 推理、token 用量与费用都不会显示，因为 Casper 不发送它们；`session/load` 的回放也不显示。
+- 正在运行的 shell 步骤在结束前不显示输出。
 - 只有应用工具服务器会传给 Casper；应用中配置的 MCP 服务器不会。
 - 应用工具的结果只以文本形式到达 Casper：图片或其他非文本块会变成一行说明。目前提供的工具都不返回图片。
 - 在打包的应用中，`app_read_file` 能读到每个已安装包的 `README.md`、`package.json` 与构建出的 `lib/*.js`、技能文件，以及 `ui-theme` 的 `lib/styles`。Desktop 运行时副本会去掉所有 `.d.ts`，各包不发布 `src/`，仓库的 `docs/` 也不在任何包中，因此那里无法读取 `lib/types`、`ui-sidebar` 的 `slots.ts`、`docs/cordis-tutorial` 与 `docs/web-styling.md`；插槽属性与主题令牌改由 `cordis_inspect_query` 获得。尚未随应用提供这些指南。

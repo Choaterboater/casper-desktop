@@ -11,7 +11,7 @@ import { CasperAgent, FRESH_CONVERSATION_NOTICE } from '../src/agent.ts'
 import { FORK_UNSUPPORTED } from '../src/factory.ts'
 import { TEXT_ONLY_PICTURE } from '../src/prompt.ts'
 import { boot, eventsOf, filesText, prompt, turnEnds } from './harness.ts'
-import { alive, fakeCasper, gate, waitFor } from './support.ts'
+import { alive, fakeCasper, gate, parsed, waitFor } from './support.ts'
 import type { FakeCasper, FakeScript } from './support.ts'
 
 const cleanups: (() => Promise<void> | void)[] = []
@@ -381,6 +381,59 @@ describe('CasperAgent', { timeout: 60_000 }, () => {
     expect(fake.log().filter(entry => entry.event === 'answer').map(entry => entry.outcome)).toEqual([{ outcome: 'selected', optionId: '1' }])
     const result = eventsOf(agent).find(event => event.type === 'tool/result')
     expect(result?.type === 'tool/result' && result.data.message).toMatchObject({ isError: false, content: [{ type: 'text', text: '→ Yes, this once' }] })
+  })
+
+  it('keeps a box open and the write path alone on an in-progress update', async () => {
+    let flushes = (): number => 0
+    let flushesAtAsk = -1
+    let flushesAfter = -1
+    let abortedWhileOpen: boolean | undefined
+    const { fake, host } = await setup({ prompts: [[{
+      permission: 'Run it?', during: [{ toolUpdate: 'box', content: ['still deciding'] }, { tool: 'bash', target: 'ls' }],
+    }, { toolEnd: 1 }]] }, {}, async (request) => {
+      flushesAtAsk = flushes()
+      // The second tool's call is recorded only after the box's in-progress update was received.
+      await waitFor(() => eventsOf(request.agent!).filter(event => event.type === 'tool/call').length === 2)
+      flushesAfter = flushes()
+      abortedWhileOpen = request.signal?.aborted
+      return { answers: [{ id: request.questions[0]?.id ?? '', selected: ['Yes, this once'] }] }
+    })
+    const flush = vi.spyOn(host.ctx.sessions, 'flush')
+    flushes = () => flush.mock.calls.length
+    const { agent } = await host.create('casper-box-progress')
+    await run(agent, 'go')
+    expect(abortedWhileOpen).toBe(false)
+    // Only the second tool's call flushed while the box was open.
+    expect(flushesAfter - flushesAtAsk).toBe(1)
+    expect(fake.log().filter(entry => entry.event === 'answer').map(entry => entry.outcome)).toEqual([{ outcome: 'selected', optionId: '2' }])
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }])
+  })
+
+  it('records a current Casper\'s steps as Standard tools with their output', async () => {
+    const path = (name: string) => `/work/project/${name}`
+    const { host } = await setup({ prompts: [[
+      {
+        tool: 'edit', kind: 'edit', rawInput: { path: 'sum.js', edits: [{ oldText: 'a - b', newText: 'a + b' }] },
+        meta: { tool: 'edit', target: 'sum.js' }, locations: [{ path: path('sum.js') }],
+      },
+      { toolEnd: 1, content: [{ type: 'diff', path: path('sum.js'), oldText: 'return a - b', newText: 'return a + b' }], rawOutput: { added: 1, removed: 1 } },
+      { tool: 'bash', rawInput: { command: 'node sum.js' }, meta: { tool: 'bash', description: 'Run the sum' } },
+      { toolEnd: 2, ok: false, content: ['```text\n5\n```'], rawOutput: { exitCode: 3, truncated: false } },
+    ]] })
+    const { agent } = await host.create('casper-standard-steps')
+    await run(agent, 'fix sum.js')
+    const calls = eventsOf(agent).flatMap(event => event.type === 'tool/call' ? [[event.data.name, parsed(event.data.arguments)]] : [])
+    expect(calls).toEqual([
+      ['edit', { file_path: 'sum.js', old_string: 'a - b', new_string: 'a + b' }],
+      ['bash', { command: 'node sum.js', description: 'Run the sum' }],
+    ])
+    const results = eventsOf(agent).flatMap(event => event.type === 'tool/result' ? [event.data] : [])
+    expect(results[0]).toMatchObject({
+      message: { isError: false, content: [{ type: 'text', text: 'Edited sum.js (+1 −1)' }] },
+      meta: { path: path('sum.js'), diffs: [{ path: path('sum.js'), oldText: 'return a - b', newText: 'return a + b' }] },
+    })
+    expect(results[1]).toMatchObject({ message: { isError: false, content: [{ type: 'text', text: '5\n[exit code: 3]' }] } })
+    expect(results[1]?.error).toBeUndefined()
   })
 
   it('answers cancelled when the question fails, and when the turn stops while asking', async () => {

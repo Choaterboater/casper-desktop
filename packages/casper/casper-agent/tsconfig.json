@@ -24,6 +24,7 @@
     { "path": "../../interaction/user-questions" },
     { "path": "../../boot/app-boot" },
     { "path": "../../skill/skill" },
-    { "path": "../../core/tools" }
+    { "path": "../../core/tools" },
+    { "path": "../../util/code-language" }
   ]
 }

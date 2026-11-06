@@ -4,7 +4,9 @@ import type { AssistantStreamFrame } from '@deepseek-ai/dsh-agent'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import type { BridgedCall } from '../src/app-tools.ts'
 import { OPEN_CALL_RESULT, TurnWriter } from '../src/turn.ts'
+import { STEP_FAILED } from '../src/views.ts'
 
 /** A writer on turn 1, step 1 over a fresh Session, with counters a test can share across writers. */
 function setup(counters = { attempt: 0, revision: 0 }, session = Session.create(SessionId('turn-writer'))) {
@@ -68,14 +70,16 @@ describe('TurnWriter', () => {
     expect(first?.data.step).toBe(1)
     expect(first?.data.message.content).toEqual([
       { type: 'text', text: 'Looking.' },
-      { type: 'tool-call', id: 'casper:epoch:casper-tool-1', name: 'casper_bash', arguments: JSON.stringify({ title: 'bash casper-tool-1', tool: 'bash', target: 'casper-tool-1' }) },
+      { type: 'tool-call', id: 'casper:epoch:casper-tool-1', name: 'bash', arguments: JSON.stringify({ command: 'casper-tool-1', description: 'casper-tool-1' }) },
     ])
     expect(second?.data).toMatchObject({ step: 2, message: { content: [{ type: 'text', text: 'Done.' }] } })
     const call = ofType(events(), 'tool/call')[0]
     const result = ofType(events(), 'tool/result')[0]
-    expect(call?.data).toMatchObject({ turn: 1, step: 1, callId: 'casper:epoch:casper-tool-1', name: 'casper_bash' })
-    expect(result?.data.message).toMatchObject({ toolCallId: 'casper:epoch:casper-tool-1', isError: false, content: [{ type: 'text', text: 'completed' }] })
+    expect(call?.data).toMatchObject({ turn: 1, step: 1, callId: 'casper:epoch:casper-tool-1', name: 'bash' })
+    // An older Casper's step that sent no output shows none, never the bare status word.
+    expect(result?.data.message).toMatchObject({ toolCallId: 'casper:epoch:casper-tool-1', isError: false, content: [{ type: 'text', text: '' }] })
     expect(result?.data.error).toBeUndefined()
+    expect(result?.data.meta).toBeUndefined()
     expect(result?.sourceEventSeqs).toEqual([call?.seq])
     expect(frames.filter(frame => frame.type === 'start').map(frame => frame.type === 'start' && frame.step)).toEqual([1, 2])
   })
@@ -100,7 +104,7 @@ describe('TurnWriter', () => {
       ofType(events(), 'assistant/message').map(event => ({ kind: 'committed', eventType: 'assistant/message', seq: event.seq })),
     )
     const results = ofType(events(), 'tool/result').map(event => event.data)
-    expect(results[0]).toMatchObject({ message: { isError: true, content: [{ type: 'text', text: '{"exit":1}' }] }, error: { code: 'CASPER_TOOL_FAILED' } })
+    expect(results[0]).toMatchObject({ message: { isError: true, content: [{ type: 'text', text: STEP_FAILED }] }, error: { code: 'CASPER_TOOL_FAILED' } })
     expect(results[1]?.message.content).toEqual([{ type: 'text', text: 'ok' }])
     expect(results[2]?.message).toMatchObject({ isError: false, content: [{ type: 'text', text: 'Check test: npm test\n{"status":"pass","exit":0}' }] })
     expect(ofType(events(), 'tool/call')[2]?.data.name).toBe('casper_check')
@@ -133,7 +137,7 @@ describe('TurnWriter', () => {
     ])
     const [first, second, third] = ofType(events(), 'assistant/message')
     expect(first?.data.message.content).toMatchObject([{ type: 'tool-call', id: 'casper:epoch:casper-tool-1' }])
-    expect(second?.data).toMatchObject({ step: 1, message: { content: [{ type: 'tool-call', id: 'casper:epoch:casper-tool-2', name: 'casper_bash' }] } })
+    expect(second?.data).toMatchObject({ step: 1, message: { content: [{ type: 'tool-call', id: 'casper:epoch:casper-tool-2', name: 'bash' }] } })
     expect(second?.data.message.content).toHaveLength(1)
     expect(third?.data.message.content).toEqual([{ type: 'text', text: 'waiting' }])
   })
@@ -198,12 +202,19 @@ describe('TurnWriter', () => {
     writer.toolUpdate({ toolCallId: 'casper-approval-2', status: 'completed', content: [{ type: 'content', content: { type: 'text', text: '→ Yes, this once' } }] })
     writer.question({ toolCallId: 'casper-approval-3' })
     writer.toolUpdate({ toolCallId: 'casper-approval-3', status: 'failed' })
+    writer.question({ toolCallId: 'casper-approval-4' })
+    writer.toolUpdate({ toolCallId: 'casper-approval-4', status: 'failed', rawOutput: { answer: 'no answer' } })
     writer.close(false)
     expect(ofType(events(), 'tool/call').map(event => event.data)).toMatchObject([
       { name: 'casper_approval', arguments: JSON.stringify({ title: 'Reach 192.0.2.10?' }) },
       { name: 'casper_approval', arguments: JSON.stringify({ title: '' }) },
+      { name: 'casper_approval', arguments: JSON.stringify({ title: '' }) },
     ])
-    expect(ofType(events(), 'tool/result').map(event => event.data.message.isError)).toEqual([false, false])
+    expect(ofType(events(), 'tool/result').map(event => [event.data.message.isError, event.data.message.content])).toEqual([
+      [false, [{ type: 'text', text: '→ Yes, this once' }]],
+      [false, [{ type: 'text', text: '' }]],
+      [false, [{ type: 'text', text: '{"answer":"no answer"}' }]],
+    ])
   })
 
   it('names calls by kind when Casper sends no tool name', () => {
@@ -217,6 +228,83 @@ describe('TurnWriter', () => {
     writer.close(false)
     expect(ofType(events(), 'tool/call').map(event => event.data.name)).toEqual(['casper_fetch', 'casper_web_search_', 'casper_tool'])
     expect(JSON.parse(ofType(events(), 'tool/call')[0]?.data.arguments ?? '{}')).toEqual({ title: 'Web fetch' })
+  })
+
+  it('records an edit as Standard\'s edit with the patch hunks as its meta diffs', () => {
+    const { open, events } = setup()
+    const writer = open(1)
+    writer.toolCall({
+      toolCallId: 'casper-tool-1', title: 'edit src/sum.js', kind: 'edit', status: 'in_progress',
+      rawInput: { path: 'src/sum.js', edits: [{ oldText: 'a - b', newText: 'a + b' }] },
+      locations: [{ path: '/work/project/src/sum.js' }],
+      _meta: { casper: { tool: 'edit', target: 'src/sum.js' } },
+    })
+    writer.toolUpdate({
+      toolCallId: 'casper-tool-1', status: 'completed', rawOutput: { path: 'src/sum.js', added: 1, removed: 1 },
+      content: [
+        { type: 'diff', path: '/work/project/src/sum.js', oldText: 'one\na - b', newText: 'one\na + b' },
+        { type: 'diff', path: '/work/project/src/sum.js', oldText: null, newText: '// sum' },
+      ],
+    })
+    writer.close(false)
+    const call = ofType(events(), 'tool/call')[0]
+    expect(call?.data).toMatchObject({ name: 'edit', arguments: JSON.stringify({ file_path: 'src/sum.js', old_string: 'a - b', new_string: 'a + b' }) })
+    expect(ofType(events(), 'tool/result')[0]?.data).toMatchObject({
+      message: { isError: false, content: [{ type: 'text', text: 'Edited src/sum.js (+1 −1)' }] },
+      meta: {
+        path: '/work/project/src/sum.js',
+        diffs: [
+          { path: '/work/project/src/sum.js', oldText: 'one\na - b', newText: 'one\na + b' },
+          { path: '/work/project/src/sum.js', oldText: null, newText: '// sum' },
+        ],
+      },
+    })
+  })
+
+  it('records a shell step that exited 3 as a completed command, as Standard does', () => {
+    const { open, events } = setup()
+    const writer = open(1)
+    writer.toolCall({ toolCallId: 'casper-tool-1', title: 'bash', kind: 'execute', status: 'in_progress', rawInput: { command: 'exit 3' }, _meta: { casper: { tool: 'bash' } } })
+    writer.toolUpdate({ toolCallId: 'casper-tool-1', status: 'failed', rawOutput: { exitCode: 3 }, content: [{ type: 'content', content: { type: 'text', text: '```\nbye\n```' } }] })
+    writer.close(false)
+    const result = ofType(events(), 'tool/result')[0]?.data
+    expect(result?.message).toMatchObject({ isError: false, content: [{ type: 'text', text: 'bye\n[exit code: 3]' }] })
+    expect(result?.error).toBeUndefined()
+  })
+
+  it('records a bridged app call under the app tool\'s name with the app tool\'s own result', () => {
+    const { open, events } = setup()
+    const writer = open(1)
+    const bridged = (meta: unknown): BridgedCall => ({
+      name: 'plugin_manager', arguments: '{"action":"list_plugins"}',
+      result: { content: [{ type: 'text', text: 'two plugins' }], isError: false, meta: { plugins: 2, of: meta } as never },
+    })
+    const appCall = (id: string): ToolCall => ({
+      toolCallId: id, title: 'plugin_manager', kind: 'other', status: 'in_progress', rawInput: { action: 'list_plugins' },
+      _meta: { casper: { tool: 'mcp', mcp: { server: 'acp-app', tool: 'plugin_manager' } } },
+    })
+    writer.toolCall(appCall('casper-tool-1'))
+    writer.bridged('casper-tool-1', bridged('after'))
+    writer.toolUpdate({ toolCallId: 'casper-tool-1', status: 'completed', content: [{ type: 'content', content: { type: 'text', text: 'Casper\'s copy' } }] })
+    // The app's result can reach the writer before Casper's own tool_call.
+    writer.bridged('casper-tool-2', bridged('before'))
+    writer.toolCall(appCall('casper-tool-2'))
+    writer.toolUpdate({ toolCallId: 'casper-tool-2', status: 'completed' })
+    // A result for a step that never starts is dropped at the end of the prompt.
+    writer.bridged('casper-tool-9', bridged('never'))
+    writer.close(false)
+    expect(ofType(events(), 'tool/call').map(event => [event.data.name, event.data.arguments])).toEqual([
+      ['plugin_manager', '{"action":"list_plugins"}'], ['plugin_manager', '{"action":"list_plugins"}'],
+    ])
+    expect(ofType(events(), 'tool/result').map(event => [event.data.message.content, event.data.meta])).toEqual([
+      [[{ type: 'text', text: 'two plugins' }], { plugins: 2, of: 'after' }],
+      [[{ type: 'text', text: 'two plugins' }], { plugins: 2, of: 'before' }],
+    ])
+    const later = open(2)
+    later.toolCall(appCall('casper-tool-9'))
+    later.toolUpdate({ toolCallId: 'casper-tool-9', status: 'completed' })
+    later.close(false)
+    expect(ofType(events(), 'tool/result').at(-1)?.data.message.content).toEqual([{ type: 'text', text: '' }])
   })
 
   it('records a plan as the todo list', () => {

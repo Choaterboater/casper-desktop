@@ -20,9 +20,12 @@
  *   PATH, cwd), every request and notification received, every permission
  *   answer, and stdin EOF. Tests poll this file.
  *
- * Steps: `{ text }`, `{ tool, target? }` (starts the next tool id),
- * `{ toolEnd, ok }` (ends tool N), `{ check, status }`, `{ plan }`,
- * `{ permission, options, preview? }`, `{ receipt }`, `{ stop }`,
+ * Steps: `{ text }`, `{ tool, target? }` (starts the next tool id, with an
+ * older Casper's `rawInput: { tool, target }`), `{ toolEnd, ok }` (ends tool
+ * N), `{ toolUpdate }` (an in-progress update of tool N, or of the open box
+ * for `'box'`), `{ check, status }`, `{ plan }`, `{ permission, options,
+ * preview?, during? }` (`during` steps play while the box waits for its
+ * answer), `{ receipt }`, `{ stop }`,
  * `{ hang: true }` (waits for session/cancel), `{ ignoreCancel: true }` (with
  * hang: never replies), `{ crash }` (exits with that code),
  * `{ waitFile }` (waits until the file exists), `{ stderr }` (writes a
@@ -32,6 +35,10 @@
  * `{ mcp, args? }` (calls that tool on the first `mcpServers` entry with an
  * MCP 1.x client, carrying the current tool id as `casper/acpToolCallId`,
  * and logs `{ event: 'mcp', name, result, server }`, `server` being the answered serverInfo).
+ * A `tool`, `toolEnd`, or `toolUpdate` step also takes the fields a current
+ * Casper sends: `rawInput` (the model's arguments, replacing the older
+ * shape), `meta` (sent as `_meta.casper`), `locations`, `content` (plain
+ * strings become text content), `rawOutput`, and `kind`.
  * `replay` lists
  * user chunks sent during a successful `session/load`.
  *
@@ -56,6 +63,7 @@ import {
   type RequestPermissionResponse,
   type SessionUpdate,
   type StopReason,
+  type ToolKind,
 } from '@agentclientprotocol/sdk'
 
 interface Step {
@@ -84,6 +92,26 @@ interface Step {
   exitAfterMs?: number
   mcp?: string
   args?: Record<string, unknown>
+  toolUpdate?: number | 'box'
+  during?: Step[]
+  rawInput?: Record<string, unknown>
+  meta?: Record<string, unknown>
+  locations?: { path: string; line?: number }[]
+  content?: (string | Record<string, unknown>)[]
+  rawOutput?: unknown
+  kind?: ToolKind
+}
+
+/** A step's ACP fields beyond the id, status, and title. */
+function wire(step: Step): Record<string, unknown> {
+  return {
+    ...step.meta === undefined ? {} : { _meta: { casper: step.meta } },
+    ...step.locations === undefined ? {} : { locations: step.locations },
+    ...step.content === undefined
+      ? {}
+      : { content: step.content.map(item => typeof item === 'string' ? { type: 'content', content: { type: 'text', text: item } } : item) },
+    ...step.rawOutput === undefined ? {} : { rawOutput: step.rawOutput },
+  }
 }
 
 interface Script {
@@ -185,12 +213,19 @@ async function run(step: Step, params: PromptRequest, client: AgentContext, outc
       const id = `casper-tool-${++steps}`
       await update(client, {
         sessionUpdate: 'tool_call', toolCallId: id, title: step.target === undefined ? step.tool : `${step.tool} ${step.target}`,
-        kind: step.tool === 'bash' ? 'execute' : 'other', status: 'in_progress',
-        rawInput: { tool: step.tool, ...step.target === undefined ? {} : { target: step.target } },
+        kind: step.kind ?? (step.tool === 'bash' ? 'execute' : 'other'), status: 'in_progress',
+        rawInput: step.rawInput ?? { tool: step.tool, ...step.target === undefined ? {} : { target: step.target } },
+        ...wire(step),
       })
     }
+    if (step.toolUpdate !== undefined) {
+      const toolCallId = step.toolUpdate === 'box' ? `casper-approval-${boxes}` : `casper-tool-${step.toolUpdate}`
+      await update(client, { sessionUpdate: 'tool_call_update', toolCallId, status: 'in_progress', ...wire(step) })
+    }
     if (step.toolEnd !== undefined) {
-      await update(client, { sessionUpdate: 'tool_call_update', toolCallId: `casper-tool-${step.toolEnd}`, status: step.ok === false ? 'failed' : 'completed' })
+      await update(client, {
+        sessionUpdate: 'tool_call_update', toolCallId: `casper-tool-${step.toolEnd}`, status: step.ok === false ? 'failed' : 'completed', ...wire(step),
+      })
     }
     if (step.check !== undefined) {
       await update(client, {
@@ -214,7 +249,9 @@ async function run(step: Step, params: PromptRequest, client: AgentContext, outc
       let picked: (typeof options)[number] | undefined
       try {
         const request = { sessionId: params.sessionId, toolCall, options }
-        const result = await client.request<RequestPermissionResponse>(methods.client.session.requestPermission, request)
+        const asked = client.request<RequestPermissionResponse>(methods.client.session.requestPermission, request)
+        for (const meanwhile of step.during ?? []) await run(meanwhile, params, client, outcome)
+        const result = await asked
         picked = result.outcome.outcome === 'selected'
           ? options.find(option => result.outcome.outcome === 'selected' && option.optionId === result.outcome.optionId)
           : undefined

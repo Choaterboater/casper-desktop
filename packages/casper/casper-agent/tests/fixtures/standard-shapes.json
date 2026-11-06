@@ -1,0 +1,303 @@
+[
+  {
+    "case": "edit",
+    "name": "edit",
+    "args": {
+      "file_path": "src/sum.js",
+      "old_string": "  return a - b",
+      "new_string": "  return a + b"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Edited src/sum.js (+1 −1)"
+        }
+      ],
+      "isError": false,
+      "meta": {
+        "path": "/work/project/src/sum.js",
+        "diffs": [
+          {
+            "path": "/work/project/src/sum.js",
+            "oldText": "function sum(a, b) {\n  return a - b\n}",
+            "newText": "function sum(a, b) {\n  return a + b\n}"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "case": "write a new file",
+    "name": "write",
+    "args": {
+      "file_path": "notes.txt",
+      "content": "the code word is PLUM\n"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Created notes.txt (+1 −0)"
+        }
+      ],
+      "isError": false,
+      "meta": {
+        "operation": "create",
+        "path": "/work/project/notes.txt",
+        "diffs": []
+      }
+    }
+  },
+  {
+    "case": "write over a file",
+    "name": "write",
+    "args": {
+      "file_path": "src/sum.js",
+      "content": "function sum(a, b) {\n  return a + b\n}\n"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Updated src/sum.js (+1 −1)"
+        }
+      ],
+      "isError": false,
+      "meta": {
+        "operation": "update",
+        "path": "/work/project/src/sum.js",
+        "diffs": [
+          {
+            "path": "/work/project/src/sum.js",
+            "oldText": "function sum(a, b) {\n  return a - b\n}\n",
+            "newText": "function sum(a, b) {\n  return a + b\n}\n"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "case": "bash",
+    "name": "bash",
+    "args": {
+      "command": "node test.js",
+      "description": "Run the sum test",
+      "timeoutMs": 30000
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "ok 1 sum"
+        }
+      ],
+      "isError": false
+    }
+  },
+  {
+    "case": "bash exit 3",
+    "name": "bash",
+    "args": {
+      "command": "node -e \"console.log(2 + 3); process.exit(3)\"",
+      "description": "Print the sum and exit 3"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "5\n[exit code: 3]"
+        }
+      ],
+      "isError": false
+    }
+  },
+  {
+    "case": "powershell",
+    "name": "pwsh",
+    "args": {
+      "command": "Get-ChildItem",
+      "description": "Get-ChildItem"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "sum.js"
+        }
+      ],
+      "isError": false
+    }
+  },
+  {
+    "case": "read",
+    "name": "read",
+    "args": {
+      "file_path": "src/sum.js",
+      "offset": 1,
+      "limit": 3
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "<path>src/sum.js</path>\n<type>file</type>\n<content>\n1: function sum(a, b) {\n2:   return a + b\n3: }\n\n(End of file - total 3 lines)\n</content>"
+        }
+      ],
+      "isError": false,
+      "meta": {
+        "path": "/work/project/src/sum.js",
+        "offset": 1,
+        "lines": [
+          {
+            "number": 1,
+            "text": "function sum(a, b) {"
+          },
+          {
+            "number": 2,
+            "text": "  return a + b"
+          },
+          {
+            "number": 3,
+            "text": "}"
+          }
+        ],
+        "totalLines": 3,
+        "lang": "js"
+      }
+    }
+  },
+  {
+    "case": "grep",
+    "name": "grep",
+    "args": {
+      "pattern": "sum",
+      "include": "*.js"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "src/sum.js:1: function sum(a, b) {"
+        }
+      ],
+      "isError": false,
+      "meta": {
+        "shape": "matches",
+        "files": [
+          {
+            "path": "src/sum.js",
+            "matches": [
+              {
+                "lineNumber": 1,
+                "line": "function sum(a, b) {"
+              }
+            ]
+          }
+        ],
+        "total": 1,
+        "truncated": false
+      }
+    }
+  },
+  {
+    "case": "find",
+    "name": "glob",
+    "args": {
+      "pattern": "*.js",
+      "path": "src"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "src/sum.js"
+        }
+      ],
+      "isError": false,
+      "meta": {
+        "shape": "paths",
+        "paths": [
+          "src/sum.js"
+        ],
+        "total": 1,
+        "truncated": false
+      }
+    }
+  },
+  {
+    "case": "ls",
+    "name": "glob",
+    "args": {
+      "pattern": "*",
+      "path": "."
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "notes.txt\nsrc/"
+        }
+      ],
+      "isError": false,
+      "meta": {
+        "shape": "paths",
+        "paths": [
+          "notes.txt",
+          "src/"
+        ],
+        "total": 2,
+        "truncated": false
+      }
+    }
+  },
+  {
+    "case": "web_search",
+    "name": "web_search",
+    "args": {
+      "queries": [
+        "node assert docs"
+      ]
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "1. Assert | Node.js documentation\nhttps://nodejs.org/api/assert.html"
+        }
+      ],
+      "isError": false,
+      "meta": {
+        "sources": [
+          {
+            "url": "https://nodejs.org/api/assert.html",
+            "title": "Assert | Node.js documentation",
+            "snippet": "The node:assert module provides assertion functions."
+          }
+        ],
+        "truncated": false
+      }
+    }
+  },
+  {
+    "case": "web_fetch",
+    "name": "web_fetch",
+    "args": {
+      "url": "https://example.com/"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Example Domain\nThis domain is for use in documentation examples."
+        }
+      ],
+      "isError": false,
+      "meta": {
+        "url": "https://example.com/",
+        "statusCode": 200,
+        "truncated": false
+      }
+    }
+  }
+]

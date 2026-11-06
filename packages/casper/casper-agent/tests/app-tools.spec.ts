@@ -15,6 +15,7 @@ import type { ToolBatchInput, ToolExecution } from '@deepseek-ai/dsh-tools'
 import {
   appToolsEntry,
   DESCRIPTION_MAX,
+  dshNameOf,
   INSTALLED_NOTE,
   mcpContent,
   PLUGIN_SKILL,
@@ -23,7 +24,7 @@ import {
   startAppTools,
   TURN_OVER,
 } from '../src/app-tools.ts'
-import type { AppToolsOptions, AppToolsServer } from '../src/app-tools.ts'
+import type { AppToolsOptions, AppToolsServer, BridgedCall } from '../src/app-tools.ts'
 import { boot } from './harness.ts'
 import { fakeCasper } from './support.ts'
 
@@ -105,6 +106,7 @@ async function serve(agent: Agent, ctx: Awaited<ReturnType<typeof host>>['ctx'],
     installed: false,
     turn: () => open.signal,
     callId: acpId => ToolCallId(`casper:test:${acpId}`),
+    record: () => {},
     onError: () => {},
     ...overrides,
   })
@@ -257,10 +259,11 @@ describe('app tools over MCP', { timeout: 60_000 }, () => {
     expect((await mcp.listTools()).tools.map(tool => tool.name)).toEqual(['app_skill', 'app_read_file', 'cordis_inspect_query', 'cordis_inspect_list'])
   })
 
-  it('runs a call as the Casper Agent under the mapped call id, with no log', async () => {
+  it('runs a call as the Casper Agent under the mapped call id, with no log, and hands its result to the step', async () => {
     const { ctx, agent, seen } = await host()
     const execute = vi.spyOn(ctx.tools, 'execute')
-    const mcp = await client(await serve(agent, ctx))
+    const recorded: [string, BridgedCall][] = []
+    const mcp = await client(await serve(agent, ctx, { record: (...call) => { recorded.push(call) } }))
     const result = await mcp.callTool({
       name: 'cordis_inspect_query',
       arguments: { platform: 'client', provider: 'Slots', method: 'listSubTree' },
@@ -276,15 +279,26 @@ describe('app tools over MCP', { timeout: 60_000 }, () => {
     expect(input.log).toBeUndefined()
     expect(input.toolSet).toBeUndefined()
     expect(input.calls[0]).toMatchObject({ type: 'tool-call', id: 'casper:test:casper-tool-3', name: 'cordis_inspect_query' })
+    expect(recorded.map(([id, call]) => [id, call.name, call.arguments])).toEqual([
+      ['casper-tool-3', 'cordis_inspect_query', JSON.stringify({ platform: 'client', provider: 'Slots', method: 'listSubTree' })],
+    ])
+    expect(recorded[0]?.[1].result).toMatchObject({ content: [{ type: 'text', text: 'queried listSubTree' }], isError: false })
   })
 
-  it('gives a call without a Casper call id a fresh id of its own', async () => {
+  it('names each served tool after the app tool it runs', () => {
+    expect(['app_skill', 'plugin_manager', 'app_read_file', 'cordis_inspect_query', 'cordis_inspect_list', 'other'].map(dshNameOf))
+      .toEqual(['skill', 'plugin_manager', 'app_read_file', 'cordis_inspect_query', 'cordis_inspect_list', undefined])
+  })
+
+  it('gives a call without a Casper call id a fresh id of its own, and records no step result for it', async () => {
     const { ctx, agent, seen } = await host()
-    const mcp = await client(await serve(agent, ctx))
+    const recorded: unknown[] = []
+    const mcp = await client(await serve(agent, ctx, { record: (...call) => { recorded.push(call) } }))
     await mcp.callTool({ name: 'cordis_inspect_list', arguments: {} })
     await mcp.callTool({ name: 'cordis_inspect_list', arguments: {} })
     expect(seen.map(entry => entry.exec.callId)).toEqual([expect.stringMatching(/^casper-app:/), expect.stringMatching(/^casper-app:/)])
     expect(seen[0]?.exec.callId).not.toBe(seen[1]?.exec.callId)
+    expect(recorded).toEqual([])
   })
 
   it('refuses every call while no Casper turn is open', async () => {

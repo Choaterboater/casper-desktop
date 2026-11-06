@@ -7,7 +7,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { ToolExecution } from '@deepseek-ai/dsh-tools'
 import { TURN_OVER } from '../src/app-tools.ts'
 import { boot, eventsOf, prompt } from './harness.ts'
-import { fakeCasper, waitFor } from './support.ts'
+import { fakeCasper, parsed, waitFor } from './support.ts'
 import type { FakeLogEntry, FakeScript } from './support.ts'
 
 /** The app's runtime version in these tests; no package carries it, so a fallback cannot pass for it. */
@@ -65,9 +65,9 @@ const QUERY = { platform: 'client', provider: 'Slots', method: 'listSubTree' }
 describe('app tools in a Casper Session', { timeout: 60_000 }, () => {
   it('runs Casper\'s call as the Casper Agent under the call id of the step that made it, on a server named with the app version', async () => {
     const { fake, booted, seen } = await host({ prompts: [[
-      { tool: 'cordis_inspect_query', target: 'Slots' },
+      { tool: 'cordis_inspect_query', target: 'Slots', rawInput: QUERY, meta: { tool: 'mcp', mcp: { server: 'acp-app', tool: 'cordis_inspect_query' } } },
       { mcp: 'cordis_inspect_query', args: QUERY },
-      { toolEnd: 1 },
+      { toolEnd: 1, content: ['Casper\'s own copy of the output'] },
     ]] })
     const { agent } = await booted.create('casper-app-call')
     agent.followup(prompt('show the slots'))
@@ -81,6 +81,11 @@ describe('app tools in a Casper Session', { timeout: 60_000 }, () => {
     expect(seen[0]?.callId).toBe(recorded[0])
     expect(seen[0]?.callId).toMatch(/^casper:[0-9a-f]{8}:casper-tool-1$/)
     expect(call?.server).toEqual({ name: 'dsh-desktop', version: RUNTIME_VERSION })
+    // The step is recorded as the app tool, with the app tool's own result.
+    const named = eventsOf(agent).flatMap(event => event.type === 'tool/call' ? [[event.data.name, parsed(event.data.arguments)]] : [])
+    expect(named).toEqual([['cordis_inspect_query', QUERY]])
+    const result = eventsOf(agent).find(event => event.type === 'tool/result')
+    expect(result?.type === 'tool/result' && result.data.message.content).toEqual([{ type: 'text', text: 'queried listSubTree' }])
     const [entry] = offered(fake)
     expect(JSON.stringify(eventsOf(agent))).not.toContain(entry?.token)
   })

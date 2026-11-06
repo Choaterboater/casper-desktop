@@ -415,6 +415,7 @@ export class CasperAgent implements Agent {
       installed: isInstalled(selfAnchor()),
       turn: () => this.sinkFor(connection)?.signal,
       callId: acpId => connection.toolCallId(acpId),
+      record: (acpId, call) => { this.sinkFor(connection)?.writer.bridged(acpId, call) },
       onError: (error) => { this.pluginCtx.logger.debug(`casper agent "${this.id}": app tools: ${error.message}`) },
     })
   }
@@ -464,6 +465,8 @@ export class CasperAgent implements Agent {
           void this.flush()
           return
         case 'tool_call_update':
+          // Only a final update closes the step; an in-progress one leaves an open box and the write path alone.
+          if (update.status !== 'completed' && update.status !== 'failed') return
           this.asks.get(update.toolCallId)?.abort()
           sink.writer.toolUpdate(update)
           void this.flush()

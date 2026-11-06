@@ -58,6 +58,7 @@ A turn that cannot run ends with an error on `turn/end`: `CASPER_NOT_FOUND` when
 | [`src/agent.ts`](src/agent.ts) | `CasperAgent`: inbox, phases, one prompt per turn, cancel, and process restart |
 | [`src/connection.ts`](src/connection.ts) | One `casper acp` process: lookup, spawn, ACP client, `session/new` or `session/load`, prompt, cancel, and disposal |
 | [`src/turn.ts`](src/turn.ts) | Writes Casper's updates as steps, assistant messages, tool calls, results, and the todo list |
+| [`src/views.ts`](src/views.ts) | Records a Casper tool step under the Standard tool that does the same job: its name, arguments, result text, and meta |
 | [`src/permission.ts`](src/permission.ts) | Turns an approval box into a user question and maps the answer back |
 | [`src/sidecar.ts`](src/sidecar.ts) | Host storage domain `casper_agent` mapping each Session to its Casper conversation |
 | [`src/app-tools.ts`](src/app-tools.ts) | The app tools MCP server: listener, auth, tool list, and calls run as the Casper Agent |
@@ -70,14 +71,36 @@ Each turn claims the queued input and appends `turn/start`, `step/start`, and th
 | Casper update | Session events |
 |---|---|
 | `agent_message_chunk` text | live `agent/assistant-stream` frames, settled as `assistant/message` |
-| `tool_call` | the step's `assistant/message` with a tool-call block, then `tool/call` named `casper_<tool>`; the next text opens a new step |
+| `tool_call` | the step's `assistant/message` with a tool-call block, then `tool/call` with the Standard tool's name and arguments, or `casper_<tool>` (see [Tool cards](#tool-cards)); the next text opens a new step |
 | `tool_call` while other calls of the step are open | another `assistant/message` in the same step holding only that call's block, then its `tool/call`, so every stored call is advertised and the Session reopens |
-| `tool_call_update` completed or failed | `tool/result`; a failed tool is an error result, a refused approval is not |
+| `tool_call_update` completed or failed | `tool/result` with the Standard result text and meta, never a bare status word; a shell step that ran records its exit code and is not an error, any other failed step is, and a refused approval is not |
+| `tool_call_update` still in progress | nothing: the call stays open and an asked approval box stays asked |
 | check `tool_call` (already completed or failed) | `tool/call` named `casper_check` and its result at once |
 | `plan` | `todo/write` with the whole list |
 | a call still open when the prompt ends (Stop, exit, or reply) | an error `tool/result` with `TOOL_OUTCOME_UNKNOWN`, as agent-loop records for a failed step, before `step/end` |
 
 The receipt is the last text chunk, so it ends the final assistant message. A prompt reply resolves only after every update received before it has been written. Stop sends `session/cancel` and ends the turn as aborted; Casper is killed when it has not replied within `cancelGraceMs`. Tool call ids carry a random per-process prefix, so a restarted Casper's ids never fold into earlier cards.
+
+<a id="tool-cards"></a>
+### Tool cards
+
+Casper names each step in `_meta.casper.tool`, and its `rawInput` holds the model's own arguments. The Session records the step under the Standard tool that does the same job, so Standard's cards draw it: the diff card for edits and writes, the terminal card for shell steps, the read preview, the search card, and the web card. An older Casper that sends only `rawInput` `{tool, target}` is mapped from those two fields.
+
+| Casper tool | Recorded as | Arguments | Result |
+|---|---|---|---|
+| `edit` | `edit` | `file_path`, the first edit's `old_string` and `new_string`, and `edits` when there are several, read from each form pi's edit takes; when Casper hides both sides behind one placeholder, `old_string` is `<not shown: the text it replaced>` | Casper's words, or `Edited <path> (+a −r)`; meta `path` and `diffs` |
+| `write` | `write` | `file_path`, `content` | Casper's words, or `Created` or `Updated <path>`; meta `operation`, `path`, and `diffs`, empty for a new file |
+| `bash`, `powershell` | `bash`, `pwsh` | `command`, `description` (Casper's, else the command's first line), `timeoutMs` | the output without its fence, then `[exit code: N]` unless N is 0 |
+| `read` | `read` | `file_path`, `offset`, `limit` | the file envelope with meta `path`, `offset`, `lines`, `totalLines`, and `lang` when the window was read whole or Casper counted its lines, as it does for a window that stops before the end of the file; otherwise the text alone |
+| `grep` | `grep` | `pattern`, `path`, `include` (only a glob Standard accepts) | meta `shape: matches`, `files`, `total`, `truncated` |
+| `find`, `ls` | `glob` | `pattern` (`*` for `ls`), `path` | meta `shape: paths`, `paths`, `total`, `truncated` |
+| `web_search` | `web_search` | `queries` | meta `sources`, `truncated`, `answer` |
+| `web_fetch` | `web_fetch` | `url` | meta `url`, `statusCode`, `truncated` |
+| an [app tool](#app-tools) | the app tool's own name | the MCP arguments; for a call through `call_capability`, the `arguments` it carries | the app tool's own result and meta |
+| another MCP tool | `casper_mcp` | `title`, the input, and `preview` | Casper's words |
+| any other tool | `casper_<tool>`, or the tool's own name when it already starts with `casper_`, such as `casper_check` | `title`, the input, and `preview` | Casper's words, or its raw output as JSON |
+
+A shell step that ran is never an error, whatever its exit code. Any other failed step is an error with Casper's words, or `Casper reported that this step failed.` when it sent none. A meta path is recorded only when Casper reports an absolute one, so the turn's deliverables list the files its edits and writes produced. A step whose result does not have the expected shape keeps Casper's text with no meta, which draws the plain card.
 
 ### Approvals
 
@@ -87,6 +110,7 @@ The receipt is the last text chunk, so it ends the final assistant message. A pr
 
 Casper starts at a Session's first prompt, so a missing command never blocks opening a Session. After `session/new`, the conversation id is stored in the sidecar before the prompt is sent. A later process reopens it with `session/load` and drops the replayed updates, since the Session already holds the history; only Casper's no-saved-conversation reply (`-32002` whose message contains "no saved conversation" in any letter case) starts a fresh conversation, and that turn opens with a line saying so, even when it then sends nothing. Casper saves a conversation only after its first reply, so a conversation whose process stopped before then starts fresh this way. Another load failure ends the turn and keeps the record. Disposal closes stdin, waits `exitGraceMs`, then terminates the process, which fits Desktop's 10 second host exit. Resume repairs an interrupted turn like agent-loop and starts no process.
 
+<a id="app-tools"></a>
 ### App tools
 
 Each `casper acp` process gets one MCP server of its own, started after `initialize` and offered in `session/new` and `session/load` as the only `mcpServers` entry: `type: "http"`, name `app`, URL `http://127.0.0.1:<port>/mcp/<pathId>`, an `Authorization: Bearer <token>` header, and `_meta: {"casper/clientAsks": true}`. The path id (16 random bytes) and token (32 random bytes) are made fresh for each process and travel only inside the ACP pipe; they are not in argv, env, stderr, logs, or Session events. The listener binds `127.0.0.1` only and checks each request in order: wrong path is 404, a `Host` other than `127.0.0.1:<port>` is 403, any `Origin` header is 403, and a token that does not match (compared in constant time) is 401. It closes when the process exits, is terminated, or is disposed, so a restarted Casper gets a new path and token and the old ones stop working.
@@ -122,7 +146,8 @@ The plugin sends no model request, so it has no cache effect; Casper's own reque
 
 - A Casper whose `initialize` reply does not set `promptCapabilities.image` gets a placeholder instead of each picture.
 - The model picker does not change Casper's model, and the model badge stays empty until the user picks one; `model` and `effort` are deployment config.
-- Reasoning, tool output, diffs, token usage, and cost are not shown, because Casper sends none of them; `session/load` replays are not shown.
+- Reasoning, token usage, and cost are not shown, because Casper sends none of them; `session/load` replays are not shown.
+- A running shell step shows no output until it ends.
 - Only the app tools server is passed to Casper; the app's configured MCP servers are not.
 - App tool results reach Casper as text only: an image or other non-text block becomes a note. None of the served tools returns an image today.
 - In a packaged app `app_read_file` reaches each installed package's `README.md`, `package.json` and built `lib/*.js`, the skill files, and `ui-theme`'s `lib/styles`. The Desktop runtime copy drops every `.d.ts`, packages publish no `src/`, and the repository's `docs/` ship in no package, so `lib/types`, `ui-sidebar`'s `slots.ts`, `docs/cordis-tutorial` and `docs/web-styling.md` cannot be read there; slot props and theme tokens come from `cordis_inspect_query` instead. Shipping those guides with the app is not done.
