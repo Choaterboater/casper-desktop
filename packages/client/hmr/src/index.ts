@@ -3,7 +3,8 @@
  * stat-polls every graph row's client bundle (polling by design: network mounts
  * deliver no inotify events), reports changes through
  * `clientModules.rebuilt(id)`, and serves the `/plugins/events` SSE channel
- * broadcasting graph/rebuilt frames to the browser half (src/client/).
+ * broadcasting graph/rebuilt frames to the browser half (src/client/), with a
+ * keep-alive comment so an idle stream outlives transport idle limits.
  * The Web composition mounts this transport for live graph updates;
  * a development rebuild watcher also supplies bundle changes.
  */
@@ -30,10 +31,17 @@ export const inject = ['clientModules', 'webServer']
 export interface Config {
   /** Bundle stat-poll interval in milliseconds (default 500, the build-side watcher's polling default). */
   pollIntervalMs?: number
+  /**
+   * Interval in milliseconds of the comment line `/plugins/events` writes to every open stream (default 30 s).
+   * It keeps the stream under idle limits between the Host and the page: the desktop shell carries it through
+   * Node fetch, which drops a response body silent for 300 s.
+   */
+  heartbeatMs?: number
 }
 
 export const Config: z<Config> = z.object({
   pollIntervalMs: z.number().step(1).min(1).default(500),
+  heartbeatMs: z.number().step(1).min(1).default(30_000),
 })
 
 /** Serialize one frame as an SSE data line. */
@@ -192,12 +200,17 @@ export function apply(ctx: Context, config: Config): void {
         connect(res)
       },
     })
+    const heartbeat = setInterval(() => {
+      for (const res of connections) res.write(': keep-alive\n\n')
+    }, config.heartbeatMs as number)
+    heartbeat.unref()
     const unsubscribeGraph = ctx.clientModules.onGraphChanged(publishGraph)
     const unsubscribe = ctx.clientModules.onRebuilt((id, rev) => {
       const line = sseData({ type: 'rebuilt', id, rev })
       for (const res of connections) res.write(line)
     })
     return () => {
+      clearInterval(heartbeat)
       unsubscribeGraph()
       unsubscribe()
       disposeRoute()

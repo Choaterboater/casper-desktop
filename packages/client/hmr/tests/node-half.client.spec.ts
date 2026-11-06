@@ -89,19 +89,44 @@ function fakeHttpServer(routes: WebRoute[]): WebServer {
   return fake as WebServer
 }
 
-async function mount(clientModuleHost: FakeHost, webServer: WebServer) {
+async function mount(clientModuleHost: FakeHost, webServer: WebServer, heartbeatMs?: number) {
   const ctx = new Context()
   ctx.provide('clientModules', clientModuleHost)
   ctx.provide('webServer', webServer)
   const fiber = ctx.plugin(
     { inject: [...inject], Config, apply },
-    { pollIntervalMs: POLL_MS },
+    heartbeatMs === undefined ? { pollIntervalMs: POLL_MS } : { pollIntervalMs: POLL_MS, heartbeatMs },
   )
   await fiber.await()
   return fiber
 }
 
 describe('hmr node half', () => {
+  it('keeps an idle events stream alive until it closes or the plugin stops', async () => {
+    // The desktop shell carries this stream through Node fetch, which drops a body silent for 300 s.
+    const routes: WebRoute[] = []
+    const fiber = await mount(fakeClientModuleHost(new Map()), fakeHttpServer(routes), POLL_MS)
+    const connect = async () => {
+      const lines: string[] = []
+      const response = Object.assign(new EventEmitter(), {
+        writeHead: vi.fn(), write: (line: string) => { lines.push(line) },
+        destroy: vi.fn(), end: vi.fn(),
+      })
+      await routes[0]!.handler({ method: 'GET' } as IncomingMessage, response as unknown as ServerResponse)
+      return { lines, response }
+    }
+    const idle = await connect()
+    const closing = await connect()
+    expect(idle.lines).toHaveLength(2)
+    closing.response.emit('close')
+    await vi.waitFor(() => { expect(idle.lines.slice(2)).toContain(': keep-alive\n\n') }, { timeout: 3_000 })
+    expect(closing.lines).toHaveLength(2)
+    await fiber.dispose()
+    const written = idle.lines.length
+    await new Promise(resolve => setTimeout(resolve, POLL_MS * 4))
+    expect(idle.lines).toHaveLength(written)
+  })
+
   it('watches graph bundles, ignores map-only changes, and unwatches on dispose', async () => {
     const bundle = join(dir, 'a.js')
     writeFileSync(bundle, 'v1')
