@@ -18,13 +18,19 @@ import type {
 } from '@deepseek-ai/dsh-agent'
 import { AgentModel, agentEvents } from '@deepseek-ai/dsh-agent'
 import { ReactLoopInbox } from '@deepseek-ai/dsh-agent-loop'
+import { getDshRuntimeVersion } from '@deepseek-ai/dsh-app-boot'
 import type { LlmFailure } from '@deepseek-ai/dsh-llm'
 import { createScope } from '@deepseek-ai/dsh-scope'
 import type { Scope } from '@deepseek-ai/dsh-scope'
 import type { Session, SessionId, TurnEndReason, UserMessage } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-persistence'
+import type {} from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-subprocess'
+import type {} from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-user-questions'
+import { appReadRoots, isInstalled, selfAnchor } from './app-read.ts'
+import { startAppTools } from './app-tools.ts'
+import type { AppToolsProfile, AppToolsServer } from './app-tools.ts'
 import type { Config } from './config.ts'
 import { CasperConnection, CasperError } from './connection.ts'
 import { answerPermission } from './permission.ts'
@@ -357,16 +363,20 @@ export class CasperAgent implements Agent {
     const cwd = this.session.header.cwd
     if (cwd === undefined) throw new CasperError('CASPER_START_FAILED', 'Casper needs a project folder for this session.')
     const stored = this.sidecar.read(this.id, cwd)
+    const context = this.pluginCtx.get('profileContext')
+    const profile = context === undefined ? undefined : { name: context.name, dir: context.dir }
     // Updates count only while this connection is the Agent's current one.
     const owner: { connection?: CasperConnection } = {}
     const started = await CasperConnection.start({
       subprocess: this.pluginCtx.subprocess,
       config: this.config,
       cwd,
+      profile,
       handlers: {
         update: (notification) => { this.receive(owner.connection, notification) },
         permission: params => this.permission(owner.connection, params),
       },
+      appTools: this.config.appTools ? connection => this.startAppTools(connection, cwd, profile) : undefined,
     }, stored?.acpSessionId, signal)
     owner.connection = started.connection
     try {
@@ -377,6 +387,28 @@ export class CasperAgent implements Agent {
     }
     this.connection = started.connection
     return { connection: started.connection, fresh: stored !== undefined && !started.reopened }
+  }
+
+  /**
+   * Serve the app's plugin tools to one connection. A call runs as this Agent
+   * only while that connection's prompt is open, under the call id of the
+   * Casper step that made it.
+   */
+  private startAppTools(connection: CasperConnection, cwd: string, profile: AppToolsProfile | undefined): Promise<AppToolsServer> {
+    return startAppTools({
+      tools: this.pluginCtx.tools,
+      skills: this.pluginCtx.get('skills'),
+      agent: this,
+      cwd,
+      profile,
+      // The desktop app ships the dsh runtime of its own version.
+      version: getDshRuntimeVersion(),
+      roots: appReadRoots(selfAnchor(), profile?.dir),
+      installed: isInstalled(selfAnchor()),
+      turn: () => this.sinkFor(connection)?.signal,
+      callId: acpId => connection.toolCallId(acpId),
+      onError: (error) => { this.pluginCtx.logger.debug(`casper agent "${this.id}": app tools: ${error.message}`) },
+    })
   }
 
   /** Forget the current connection and start killing it. */

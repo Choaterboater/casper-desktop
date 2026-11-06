@@ -21,6 +21,12 @@ export interface FakeLogEntry {
   readonly cwd?: string
   readonly outcome?: { outcome: string; optionId?: string }
   readonly error?: string
+  readonly profile?: { name?: string; dir?: string }
+  readonly exposed?: { argv: boolean; env: boolean }
+  readonly name?: string
+  readonly result?: { content?: { type: string; text?: string }[]; isError?: boolean }
+  /** The serverInfo the app's MCP server answered with. */
+  readonly server?: { name?: string; version?: string }
 }
 
 /** One step of the stand-in's prompt script; see `fake-casper-acp.ts`. */
@@ -89,6 +95,7 @@ export function fakeCasper(script: FakeScript = { prompts: [] }): FakeCasper {
       exitGraceMs: 2_000,
       killGraceMs: 2_000,
       stderrTailBytes: 4_096,
+      appTools: false,
       ...overrides,
     }),
     remove: () => { rmSync(root, { recursive: true, force: true }) },

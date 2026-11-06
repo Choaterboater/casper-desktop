@@ -4,8 +4,11 @@ import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import type { SessionNotification } from '@agentclientprotocol/sdk'
-import { CasperConnection, CasperError, casperArgv, casperEnv } from '../src/connection.ts'
-import type { CasperConnectionHandlers } from '../src/connection.ts'
+import { randomBytes } from 'node:crypto'
+import { appToolsEntry } from '../src/app-tools.ts'
+import type { AppToolsServer } from '../src/app-tools.ts'
+import { CasperConnection, CasperError, casperArgv, casperEnv, profileEnv } from '../src/connection.ts'
+import type { CasperConnectionHandlers, CasperConnectionOptions } from '../src/connection.ts'
 import type { Config } from '../src/config.ts'
 import { alive, fakeCasper, gate, waitFor } from './support.ts'
 import type { FakeScript } from './support.ts'
@@ -26,13 +29,29 @@ async function setup(script: FakeScript = { prompts: [] }) {
     update: (notification) => { updates.push(notification) },
     permission: () => Promise.resolve({ outcome: { outcome: 'cancelled' } }),
   }
-  const start = async (overrides: Partial<Config> = {}, stored?: string, signal = new AbortController().signal) => {
-    const options = { subprocess: ctx.subprocess, config: fake.config(overrides), cwd: fake.cwd, handlers }
+  const start = async (
+    overrides: Partial<Config> = {},
+    stored?: string,
+    signal = new AbortController().signal,
+    extra: Partial<CasperConnectionOptions> = {},
+  ) => {
+    const options = { subprocess: ctx.subprocess, config: fake.config(overrides), cwd: fake.cwd, handlers, ...extra }
     const started = await CasperConnection.start(options, stored, signal)
     cleanups.push(() => started.connection.dispose())
     return started
   }
   return { fake, ctx, updates, handlers, start }
+}
+
+/** A stand-in app tools server with a fresh token that records whether it was closed. */
+function stubServer(): AppToolsServer & { closed: () => boolean } {
+  let closed = false
+  return {
+    url: `http://127.0.0.1:9/mcp/${randomBytes(16).toString('base64url')}`,
+    token: randomBytes(32).toString('base64url'),
+    close: () => { closed = true; return Promise.resolve() },
+    closed: () => closed,
+  }
 }
 
 function codeOf(error: unknown): string | undefined {
@@ -43,6 +62,11 @@ describe('casperArgv and casperEnv', () => {
   it('appends model and effort only when configured', () => {
     expect(casperArgv('/bin/casper', { args: ['acp'] })).toEqual(['/bin/casper', 'acp'])
     expect(casperArgv('/bin/casper', { args: ['acp'], model: 'm', effort: 'e' })).toEqual(['/bin/casper', 'acp', '--model', 'm', '--effort', 'e'])
+  })
+
+  it('gives the profile name and folder only when the app has a profile', () => {
+    expect(profileEnv({ name: 'desktop', dir: '/profiles/desktop' })).toEqual({ DSH_PROFILE: 'desktop', DSH_PROFILE_DIR: '/profiles/desktop' })
+    expect(profileEnv(undefined)).toEqual({})
   })
 
   it('removes every ambient DEEPSEEK_ name and keeps configured entries', () => {
@@ -69,6 +93,57 @@ describe('CasperConnection', { timeout: 30_000 }, () => {
     expect(launch?.envNames?.filter(name => /^(DEEPSEEK_|DSH_)/i.test(name))).toEqual([])
     expect(fake.calls('initialize')[0]?.params).toMatchObject({ clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false } })
     expect(fake.calls('session/new')[0]?.params).toEqual({ cwd: fake.cwd, mcpServers: [] })
+  })
+
+  it('passes the app profile to Casper as DSH_PROFILE and DSH_PROFILE_DIR', async () => {
+    const { fake, start } = await setup()
+    await start({}, undefined, undefined, { profile: { name: 'desktop', dir: join(fake.root, 'profile') } })
+    expect(fake.log().find(entry => entry.event === 'start')?.profile).toEqual({ name: 'desktop', dir: join(fake.root, 'profile') })
+  })
+
+  it('offers the app tools server in session/new and session/load, never in argv, env, or stderr', async () => {
+    const { fake, start } = await setup({ prompts: [], known: ['stored-1'] })
+    const servers: ReturnType<typeof stubServer>[] = []
+    const appTools = (): Promise<AppToolsServer> => { const server = stubServer(); servers.push(server); return Promise.resolve(server) }
+    const fresh = await start({}, undefined, undefined, { appTools })
+    const reopened = await start({}, 'stored-1', undefined, { appTools })
+    expect(servers).toHaveLength(2)
+    const [first, second] = servers
+    expect(fake.calls('session/new')[0]?.params).toEqual({ cwd: fake.cwd, mcpServers: [appToolsEntry(first ?? stubServer())] })
+    expect(fake.calls('session/load')[0]?.params).toEqual({ sessionId: 'stored-1', cwd: fake.cwd, mcpServers: [appToolsEntry(second ?? stubServer())] })
+    expect(first?.token).not.toBe(second?.token)
+    expect(first?.url).not.toBe(second?.url)
+    for (const entry of [...fake.calls('session/new'), ...fake.calls('session/load')]) expect(entry.exposed).toEqual({ argv: false, env: false })
+    for (const { connection } of [fresh, reopened]) {
+      for (const server of servers) expect(connection.stderrTail()).not.toContain(server.token)
+    }
+  })
+
+  it('closes the app tools server on dispose, on terminate, and when Casper exits', async () => {
+    const { fake, start } = await setup({ prompts: [[{ crash: 3 }]] })
+    const servers: ReturnType<typeof stubServer>[] = []
+    const appTools = (): Promise<AppToolsServer> => { const server = stubServer(); servers.push(server); return Promise.resolve(server) }
+    const disposed = await start({}, undefined, undefined, { appTools })
+    expect(servers[0]?.closed()).toBe(false)
+    await disposed.connection.dispose()
+    expect(servers[0]?.closed()).toBe(true)
+    const terminated = await start({}, undefined, undefined, { appTools })
+    terminated.connection.terminate()
+    expect(servers[1]?.closed()).toBe(true)
+    const crashed = await start({}, undefined, undefined, { appTools })
+    await crashed.connection.prompt([{ type: 'text', text: 'go' }]).catch(() => {})
+    await waitFor(() => servers[2]?.closed())
+    expect(fake.calls('session/new')).toHaveLength(3)
+  })
+
+  it('fails the start and closes a server whose process stopped while the server started', async () => {
+    const { start } = await setup()
+    const server = stubServer()
+    const failure = await start({}, undefined, undefined, {
+      appTools: (connection) => { connection.terminate(); return Promise.resolve(server) },
+    }).catch((error: unknown) => error)
+    expect(codeOf(failure)).toBe('CASPER_START_FAILED')
+    expect(server.closed()).toBe(true)
   })
 
   it('reopens a stored conversation and drops its replayed updates', async () => {

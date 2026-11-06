@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-This plugin makes the Casper agent the main AI for Sessions on the `casper` preset. It registers a factory route on `ctx.agents`, so those Sessions are driven by one `casper acp` process each instead of the DeepSeek agent loop; every other Session keeps agent-loop. Casper's text, tool steps, checks, plan, and receipt become ordinary Session events, so the Desktop transcript, tool cards, todo list, and Stop work unchanged. Casper's approval boxes reach the user as questions with Casper's own choices. Desktop starts new Sessions on this preset by default.
+This plugin makes the Casper agent the main AI for Sessions on the `casper` preset. A factory route on `ctx.agents` drives each such Session with one `casper acp` process instead of the DeepSeek agent loop. Casper's text, tool steps, checks, plan, and receipt become ordinary Session events, so the Desktop transcript, tool cards, todo list, and Stop work unchanged. Casper's approval boxes reach the user as questions. Each process also gets the app's own tools over a private MCP server, to inspect the app and install plugins. Desktop starts new Sessions on this preset by default.
 
 ## Table of Contents
 
@@ -24,7 +24,7 @@ This plugin makes the Casper agent the main AI for Sessions on the `casper` pres
 <a id="use-this-package"></a>
 ## Use this package
 
-The Desktop profile mounts the plugin from `packages/bundle/web-app/cordis.patch.yml` (row `casper-agent`, disabled outside Desktop and in the in-browser preview) and declares the `casper` preset in `packages/bundle/web-app/presets/casper.patch.yml`. The preset mounts only `tool-todo`, which shows Casper's plan as the todo list. On Desktop the preset registry's default is `casper`; a default saved in Settings still wins. The plugin injects `agents`, `sessions`, `sessionProjections`, `sessionPersistence`, `subprocess`, and `storageDomain`, and uses `userQuestions` when it is mounted.
+The Desktop profile mounts the plugin from `packages/bundle/web-app/cordis.patch.yml` (row `casper-agent`, disabled outside Desktop and in the in-browser preview) and declares the `casper` preset in `packages/bundle/web-app/presets/casper.patch.yml`. The preset mounts `tool-todo`, which shows Casper's plan as the todo list, and the rows the app tools run: `tool-cordis`, `skill-filesystem` (with the Cordis preset's skill folders), `tool-skill`, and `tool-plugin-manager`, which binds the app's existing plugin manager and is off when the app runs without a profile. The Checks plugin and the plugin market are not mounted. On Desktop the preset registry's default is `casper`; a default saved in Settings still wins. The plugin injects `agents`, `sessions`, `sessionProjections`, `sessionPersistence`, `subprocess`, `storageDomain`, and `tools`, and uses `userQuestions`, `skills`, and `profileContext` when they are mounted.
 
 | Field | Default | Meaning |
 |---|---|---|
@@ -39,8 +39,9 @@ The Desktop profile mounts the plugin from `packages/bundle/web-app/cordis.patch
 | `exitGraceMs` | `2500` | Wait for Casper to exit after stdin closes |
 | `killGraceMs` | `5000` | Grace between SIGTERM and SIGKILL |
 | `stderrTailBytes` | `4096` | Bytes of Casper's stderr kept for failure messages |
+| `appTools` | `true` | Offer the app tools to Casper; `false` sends an empty `mcpServers` list |
 
-The child never receives `DEEPSEEK_*` or `DSH_*` names, or credential-shaped names that `env` does not list.
+The child never receives `DEEPSEEK_*` or `DSH_*` names, or credential-shaped names that `env` does not list. The one exception is the app profile: when the app runs with a profile, Casper gets `DSH_PROFILE` and `DSH_PROFILE_DIR`, so a bundle it builds can name the profile it installs into.
 
 A Session becomes Casper when it is created on a Casper preset. A blank Session cannot switch between Casper and another preset: the preset registry refuses that switch with `agent-preset/locked` and `newSession: true`, and the mode picker starts a new Session on the chosen preset instead. A stored Session is resumed by the factory its recorded preset selects; a Session that records no preset stays on agent-loop.
 
@@ -59,6 +60,8 @@ A turn that cannot run ends with an error on `turn/end`: `CASPER_NOT_FOUND` when
 | [`src/turn.ts`](src/turn.ts) | Writes Casper's updates as steps, assistant messages, tool calls, results, and the todo list |
 | [`src/permission.ts`](src/permission.ts) | Turns an approval box into a user question and maps the answer back |
 | [`src/sidecar.ts`](src/sidecar.ts) | Host storage domain `casper_agent` mapping each Session to its Casper conversation |
+| [`src/app-tools.ts`](src/app-tools.ts) | The app tools MCP server: listener, auth, tool list, and calls run as the Casper Agent |
+| [`src/app-read.ts`](src/app-read.ts) | `app_read_file`: read-only access to the app's install and profile folders |
 
 ### Turns and events
 
@@ -84,10 +87,30 @@ The receipt is the last text chunk, so it ends the final assistant message. A pr
 
 Casper starts at a Session's first prompt, so a missing command never blocks opening a Session. After `session/new`, the conversation id is stored in the sidecar before the prompt is sent. A later process reopens it with `session/load` and drops the replayed updates, since the Session already holds the history; only Casper's no-saved-conversation reply (`-32002` whose message contains "no saved conversation" in any letter case) starts a fresh conversation, and that turn opens with a line saying so. Casper saves a conversation only after its first reply, so a conversation whose process stopped before then starts fresh this way. Another load failure ends the turn and keeps the record. Disposal closes stdin, waits `exitGraceMs`, then terminates the process, which fits Desktop's 10 second host exit. Resume repairs an interrupted turn like agent-loop and starts no process.
 
+### App tools
+
+Each `casper acp` process gets one MCP server of its own, started after `initialize` and offered in `session/new` and `session/load` as the only `mcpServers` entry: `type: "http"`, name `app`, URL `http://127.0.0.1:<port>/mcp/<pathId>`, an `Authorization: Bearer <token>` header, and `_meta: {"casper/clientAsks": true}`. The path id (16 random bytes) and token (32 random bytes) are made fresh for each process and travel only inside the ACP pipe; they are not in argv, env, stderr, logs, or Session events. The listener binds `127.0.0.1` only and checks each request in order: wrong path is 404, a `Host` other than `127.0.0.1:<port>` is 403, any `Origin` header is 403, and a token that does not match (compared in constant time) is 401. It closes when the process exits, is terminated, or is disposed, so a restarted Casper gets a new path and token and the old ones stop working.
+
+The server speaks MCP Streamable HTTP as `dsh-desktop`, with the app's dsh runtime version as its version, and sends no instructions. It keeps no MCP session, so it answers a GET for a notice stream with 405 and states `tools.listChanged: false`. It lists only the tools the Casper Agent can see, in this order, which is the order Casper takes pins in:
+
+| MCP tool | Runs | Marked |
+|---|---|---|
+| `app_skill` | dsh `skill` | read-only, pinned |
+| `plugin_manager` | dsh `plugin_manager` | pinned |
+| `app_read_file` | this package's reader | read-only, pinned |
+| `cordis_inspect_query` | dsh `cordis_inspect_query` | read-only, pinned |
+| `cordis_inspect_list` | dsh `cordis_inspect_list` | read-only |
+
+Every call runs through `ctx.tools.execute` with the Casper Agent as `agent`, so the tool sees the same Session, profile, and approvals as in the DeepSeek loop. The call id is the Session call id of the Casper step that made the call, taken from `_meta["casper/acpToolCallId"]`; a call without one gets a fresh id. A call is accepted only while a Casper turn runs and is aborted with it; a call that arrives after the turn gets an error that says so. A pending call sends a progress notification every 10 seconds so Casper's idle timer does not expire. A result's text blocks pass through as MCP text; any other block, such as an image, becomes a one-line note like `[image result not sent]`.
+
+`plugin_manager` keeps its own rules: bundles the app hides are refused as `not-offered`, and each action, `install_bundle` included, asks with the app's own approval card as it does in the DeepSeek loop. `clientAsks` tells Casper that card is the gate, so Casper shows no change box of its own for this server and its automatic answers never approve an install.
+
+`app_skill`'s description names the skills the Agent can load, starting with `cordis-plugin-development`, within 1,000 characters. A loaded skill opens with a line telling Casper to write bundles in its workspace, read the skill's files with `app_read_file`, and use the `DSH_PROFILE` and `DSH_PROFILE_DIR` it was given; in an installed app the line adds that packages there have no `lib/types` or `src` and no repository docs, so slot props and theme tokens come from `cordis_inspect_query`. `app_read_file` reads only under the folder holding the app's installed packages (the nearest `node_modules` above this package; in a source checkout, its `packages` and `docs` folders) and the profile's `node_modules`. Paths are compared with `path.relative`, and a symlink whose real path leaves the folder is refused. One call returns at most 256 KB of text in a line window; a single line longer than that is cut to its first 256 KB, the note says so, and the next window starts after it. A binary file other than SVG gets a one-line note, a folder lists at most 500 entries, and a file over 32 MB is refused.
+
 <a id="model-experience"></a>
 ## Model Experience
 
-None, as the Casper process builds its own model requests and this plugin adds nothing to any DeepSeek request.
+None, as the Casper process builds its own model requests and this plugin adds nothing to any DeepSeek request. The app tools' names, descriptions, and results do reach Casper's own requests.
 
 #### KV Cache effect
 
@@ -100,7 +123,9 @@ The plugin sends no model request, so it has no cache effect; Casper's own reque
 - Prompts carry text only; a turn whose input carries an image or file ends with `CASPER_TEXT_ONLY` without sending its text.
 - The model picker does not change Casper's model, and the model badge stays empty until the user picks one; `model` and `effort` are deployment config.
 - Reasoning, tool output, diffs, token usage, and cost are not shown, because Casper sends none of them; `session/load` replays are not shown.
-- The app's MCP servers are not passed to Casper; Casper uses only its own.
+- Only the app tools server is passed to Casper; the app's configured MCP servers are not.
+- App tool results reach Casper as text only: an image or other non-text block becomes a note. None of the served tools returns an image today.
+- In a packaged app `app_read_file` reaches each installed package's `README.md`, `package.json` and built `lib/*.js`, the skill files, and `ui-theme`'s `lib/styles`. The Desktop runtime copy drops every `.d.ts`, packages publish no `src/`, and the repository's `docs/` ship in no package, so `lib/types`, `ui-sidebar`'s `slots.ts`, `docs/cordis-tutorial` and `docs/web-styling.md` cannot be read there; slot props and theme tokens come from `cordis_inspect_query` instead. Shipping those guides with the app is not done.
 - Approvals use the generic question card; there is no fixed approval card or separate Allow-always presentation.
 - Steering is delivered as the next prompt.
 - Forking a Casper Session is refused.

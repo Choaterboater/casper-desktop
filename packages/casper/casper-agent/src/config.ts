@@ -29,6 +29,11 @@ export interface Config {
   killGraceMs: number
   /** Bytes of Casper's stderr kept for start and exit failure messages. */
   stderrTailBytes: number
+  /**
+   * Offer Casper the app's plugin tools (Cordis inspection, the app's skills, file reads inside the app, and
+   * plugin_manager) as one MCP server on a 127.0.0.1 listener for each Casper process; false offers none.
+   */
+  appTools: boolean
 }
 
 /** Runtime schema for {@link Config}; the defaults keep teardown inside a 10 s host shutdown window. */
@@ -44,4 +49,5 @@ export const Config: z<Config> = z.object({
   exitGraceMs: z.natural().min(1).default(2_500),
   killGraceMs: z.natural().min(1).default(5_000),
   stderrTailBytes: z.natural().min(1).default(4_096),
+  appTools: z.boolean().default(true),
 })

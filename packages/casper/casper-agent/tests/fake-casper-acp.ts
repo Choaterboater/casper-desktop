@@ -27,7 +27,10 @@
  * `{ waitFile }` (waits until the file exists), `{ stderr }` (writes a
  * line to stderr), `{ fail }` (replies with a -32603 error), `{ image }` and
  * `{ thought }` (updates Casper does not send), `{ late: Step }` (played 50 ms
- * after the reply), `{ exitAfterMs }` (exits with code 5 after that delay).
+ * after the reply), `{ exitAfterMs }` (exits with code 5 after that delay),
+ * `{ mcp, args? }` (calls that tool on the first `mcpServers` entry with an
+ * MCP 1.x client, carrying the current tool id as `casper/acpToolCallId`,
+ * and logs `{ event: 'mcp', name, result, server }`, `server` being the answered serverInfo).
  * `replay` lists
  * user chunks sent during a successful `session/load`.
  *
@@ -37,12 +40,16 @@
 import { randomUUID } from 'node:crypto'
 import { appendFileSync, existsSync, readFileSync } from 'node:fs'
 import { Readable, Writable } from 'node:stream'
+import { Client } from '@modelcontextprotocol/sdk/client/index.js'
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
 import {
   agent as createAcpAgent,
   methods,
   ndJsonStream,
   RequestError,
   type AgentContext,
+  type McpServer,
   type PromptRequest,
   type PromptResponse,
   type RequestPermissionResponse,
@@ -74,6 +81,8 @@ interface Step {
   thought?: string
   late?: Step
   exitAfterMs?: number
+  mcp?: string
+  args?: Record<string, unknown>
 }
 
 interface Script {
@@ -121,9 +130,18 @@ log({
   envNames: Object.keys(process.env).sort(),
   path: process.env.PATH ?? '',
   cwd: process.cwd(),
+  profile: { name: process.env.DSH_PROFILE, dir: process.env.DSH_PROFILE_DIR },
 })
 
+/** Whether any offered header value also reached this process's argv or environment. */
+function exposed(servers: McpServer[]): { argv: boolean; env: boolean } {
+  const values = servers.flatMap(server => 'headers' in server ? server.headers.map(header => header.value.replace(/^Bearer /, '')) : [])
+  const found = (text: string | undefined): boolean => values.some(value => value !== '' && text?.includes(value) === true)
+  return { argv: process.argv.some(found), env: Object.values(process.env).some(found) }
+}
+
 let sessionId: string | undefined
+let mcpServers: McpServer[] = []
 let steps = 0
 let boxes = 0
 let cancel: ((reason: StopReason) => void) | undefined
@@ -208,6 +226,7 @@ async function run(step: Step, params: PromptRequest, client: AgentContext, outc
         content: [{ type: 'content', content: { type: 'text', text: `→ ${picked?.name ?? 'No (no answer)'}` } }],
       })
     }
+    if (step.mcp !== undefined) await callMcp(step.mcp, step.args ?? {})
     if (step.waitFile !== undefined) await until(step.waitFile)
     if (step.stderr !== undefined) process.stderr.write(`${step.stderr}\n`)
     if (step.fail !== undefined) throw new RequestError(-32603, step.fail)
@@ -219,6 +238,26 @@ async function run(step: Step, params: PromptRequest, client: AgentContext, outc
       outcome.stop = await new Promise<StopReason>((resolve) => { cancel = resolve })
       outcome.receipt = 'cancelled'
     }
+  }
+}
+
+/** Call one tool on the app's MCP server the way Casper's MCP client does. */
+async function callMcp(name: string, args: Record<string, unknown>): Promise<void> {
+  const server = mcpServers[0]
+  if (server === undefined || !('type' in server) || server.type !== 'http') {
+    log({ event: 'mcp', name, error: 'no http MCP server offered' })
+    return
+  }
+  const headers = Object.fromEntries(server.headers.map(header => [header.name, header.value]))
+  const client = new Client({ name: 'fake-casper', version: '0.0.0' })
+  try {
+    await client.connect(new StreamableHTTPClientTransport(new URL(server.url), { requestInit: { headers } }) as Transport)
+    const result = await client.callTool({ name, arguments: args, _meta: { 'casper/acpToolCallId': `casper-tool-${steps}` } })
+    log({ event: 'mcp', name, result, server: client.getServerVersion() })
+  } catch (error: unknown) {
+    log({ event: 'mcp', name, error: String(error) })
+  } finally {
+    await client.close()
   }
 }
 
@@ -238,17 +277,19 @@ createAcpAgent({ name: 'fake-casper' })
     }
   })
   .onRequest(methods.agent.session.new, ({ params }) => {
-    log({ method: 'session/new', params })
+    log({ method: 'session/new', params, exposed: exposed(params.mcpServers) })
+    mcpServers = params.mcpServers
     sessionId = script.newSessionId ?? randomUUID()
     return { sessionId }
   })
   .onRequest(methods.agent.session.load, async ({ params, client }) => {
-    log({ method: 'session/load', params })
+    log({ method: 'session/load', params, exposed: exposed(params.mcpServers) })
     if (!savedConversations().includes(params.sessionId)) {
       throw new RequestError(-32002, script.loadError
         ?? `--resume: no saved conversation in this workspace starts with "${params.sessionId}". Run casper /resume to list them.`)
     }
     sessionId = params.sessionId
+    mcpServers = params.mcpServers
     for (const text of script.replay ?? []) await update(client, { sessionUpdate: 'user_message_chunk', content: { type: 'text', text } })
     return {}
   })

@@ -13,6 +13,7 @@ import {
   RequestError,
   type ClientConnection,
   type ContentBlock as AcpContentBlock,
+  type McpServer,
   type RequestPermissionRequest,
   type RequestPermissionResponse,
   type SessionNotification,
@@ -21,6 +22,8 @@ import {
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { SubprocessExecutableNotFoundError } from '@deepseek-ai/dsh-subprocess'
 import type { SubprocessHandle, SubprocessOutcome, SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
+import { appToolsEntry } from './app-tools.ts'
+import type { AppToolsServer } from './app-tools.ts'
 import type { Config } from './config.ts'
 
 /** ACP error code Casper uses for an unknown or unloadable session. */
@@ -81,6 +84,15 @@ export interface CasperConnectionOptions {
   readonly cwd: string
   /** Receivers for updates and permission requests. */
   readonly handlers: CasperConnectionHandlers
+  /** The app's profile; Casper's shell gets it as `DSH_PROFILE` and `DSH_PROFILE_DIR`. */
+  readonly profile?: { readonly name: string; readonly dir: string } | undefined
+  /**
+   * Start the app tools server this connection offers Casper; omitted offers none.
+   * The server closes when the process exits, is terminated, or the connection is disposed.
+   * @param connection - the connection being opened, for its call id mapping.
+   * @returns the running server.
+   */
+  readonly appTools?: ((connection: CasperConnection) => Promise<AppToolsServer>) | undefined
 }
 
 /** A started connection and the Casper conversation it holds. */
@@ -122,6 +134,16 @@ export function casperEnv(configured: Readonly<Record<string, string>>, ambient:
 }
 
 /**
+ * The profile entries of Casper's environment. They are explicit spawn
+ * entries, so they pass the subprocess scrub of `DSH_*` names.
+ * @param profile - the app's profile, when it has one.
+ * @returns `DSH_PROFILE` and `DSH_PROFILE_DIR`, or nothing without a profile.
+ */
+export function profileEnv(profile: CasperConnectionOptions['profile']): Record<string, string> {
+  return profile === undefined ? {} : { DSH_PROFILE: profile.name, DSH_PROFILE_DIR: profile.dir }
+}
+
+/**
  * One `casper acp` process. The process starts with {@link CasperConnection.start};
  * any exit marks the connection dead and rejects the prompt in flight. Tool
  * call ids carry a per-connection epoch so a restarted process cannot reuse a
@@ -138,15 +160,18 @@ export class CasperConnection {
   /** Updates are dropped while `session/load` replays the conversation the Session already holds. */
   private replaying = false
   private cancelSent = false
+  private appTools: AppToolsServer | undefined
+  /** Set once the app tools must stay closed: a server started later is closed at once. */
+  private appToolsClosed = false
 
   private constructor(
     private readonly child: SubprocessHandle,
     private readonly options: CasperConnectionOptions,
   ) {
     this.exit = child.done.then(
-      (outcome) => { this.exitedState = true; return outcome },
+      (outcome) => { this.exited(); return outcome },
       /* v8 ignore next -- done rejects only for a spawn or provider failure, which leaves no exit facts. */
-      () => { this.exitedState = true; return undefined },
+      () => { this.exited(); return undefined },
     )
   }
 
@@ -186,7 +211,7 @@ export class CasperConnection {
         cwd: options.cwd,
         stdio: { stdin: 'pipe', stdout: 'pipe', stderr: { maxBytes: config.stderrTailBytes } },
         graceMs: config.killGraceMs,
-        env: casperEnv(config.env),
+        env: { ...profileEnv(options.profile), ...casperEnv(config.env) },
       })
     } catch (error: unknown) {
       throw new CasperError('CASPER_START_FAILED', `Casper could not start: ${errorText(error)}`, { cause: error })
@@ -261,9 +286,10 @@ export class CasperConnection {
     sent.catch(() => {})
   }
 
-  /** Start termination without waiting for the exit; the subprocess service escalates to SIGKILL. */
+  /** Start termination without waiting for the exit; the subprocess service escalates to SIGKILL. The app tools close. */
   terminate(): void {
     this.exitedState = true
+    this.revokeAppTools()
     this.child.terminate()
   }
 
@@ -284,6 +310,7 @@ export class CasperConnection {
         await this.child.waitForExit().catch(unobservable)
       }
       this.exitedState = true
+      await this.closeAppTools()
       this.connection?.close()
     })())
   }
@@ -317,10 +344,11 @@ export class CasperConnection {
       protocolVersion: PROTOCOL_VERSION,
       clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
     })
+    const mcpServers = await this.openAppTools()
     if (stored !== undefined) {
       this.replaying = true
       try {
-        await agent.request(methods.agent.session.load, { sessionId: stored, cwd: options.cwd, mcpServers: [] })
+        await agent.request(methods.agent.session.load, { sessionId: stored, cwd: options.cwd, mcpServers })
         this.sessionId = stored
         return { acpSessionId: stored, reopened: true }
       } catch (error: unknown) {
@@ -332,9 +360,42 @@ export class CasperConnection {
         this.replaying = false
       }
     }
-    const created = await agent.request(methods.agent.session.new, { cwd: options.cwd, mcpServers: [] })
+    const created = await agent.request(methods.agent.session.new, { cwd: options.cwd, mcpServers })
     this.sessionId = created.sessionId
     return { acpSessionId: created.sessionId, reopened: false }
+  }
+
+  /** Start the app tools server, if configured, and return the `mcpServers` list that offers it. */
+  private async openAppTools(): Promise<McpServer[]> {
+    if (this.options.appTools === undefined) return []
+    const server = await this.options.appTools(this)
+    if (this.appToolsClosed) {
+      await server.close()
+      throw new Error('the Casper process stopped while its app tools started')
+    }
+    this.appTools = server
+    return [appToolsEntry(server)]
+  }
+
+  /** Close the app tools server for good; later requests fail. */
+  private async closeAppTools(): Promise<void> {
+    this.appToolsClosed = true
+    await this.appTools?.close()
+  }
+
+  /** Mark the process gone and revoke the app tools. */
+  private exited(): void {
+    this.exitedState = true
+    this.revokeAppTools()
+  }
+
+  /** Close the app tools server without waiting. */
+  private revokeAppTools(): void {
+    this.closeAppTools().catch(
+      /* v8 ignore start -- closing an HTTP listener fails only when it never listened; nothing is left to revoke. */
+      (error: unknown) => { void error },
+      /* v8 ignore stop */
+    )
   }
 
   private async raceStart<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {

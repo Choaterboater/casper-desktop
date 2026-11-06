@@ -12,6 +12,7 @@ import { inboxProjectionDefinition } from '@deepseek-ai/dsh-agent-loop'
 import type {} from '@deepseek-ai/dsh-session-persistence'
 import type {} from '@deepseek-ai/dsh-storage-domain'
 import type {} from '@deepseek-ai/dsh-subprocess'
+import type {} from '@deepseek-ai/dsh-tools'
 import { Config } from './config.ts'
 import { CasperAgentFactory } from './factory.ts'
 import { casperRoute } from './route.ts'
@@ -31,8 +32,11 @@ export type { CasperSessionRecord } from './sidecar.ts'
 /** Cordis plugin name. */
 export const name = 'casper-agent'
 
-/** Services the factory and its Agents use; the Agent scope inherits them. `userQuestions` is read when present. */
-export const inject = ['agents', 'sessions', 'sessionProjections', 'sessionPersistence', 'subprocess', 'storageDomain']
+/**
+ * Services the factory and its Agents use; the Agent scope inherits them. `userQuestions`, `skills`, and
+ * `profileContext` are read when present.
+ */
+export const inject = ['agents', 'sessions', 'sessionProjections', 'sessionPersistence', 'subprocess', 'storageDomain', 'tools']
 
 /**
  * Register the Casper factory route.

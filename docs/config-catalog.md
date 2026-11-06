@@ -476,7 +476,7 @@ export type Config = LocalConfig
 
 ## `@deepseek-ai/dsh-casper-agent`
 
-- `inject`: `agents` · `sessions` · `sessionProjections` · `sessionPersistence` · `subprocess` · `storageDomain`
+- `inject`: `agents` · `sessions` · `sessionProjections` · `sessionPersistence` · `subprocess` · `storageDomain` · `tools`
 - `source`: [`packages/casper/casper-agent/src/config.ts:9`](../packages/casper/casper-agent/src/config.ts)
 
 ```ts config-catalog
@@ -504,6 +504,11 @@ export interface Config {
   killGraceMs: number
   /** Bytes of Casper's stderr kept for start and exit failure messages. */
   stderrTailBytes: number
+  /**
+   * Offer Casper the app's plugin tools (Cordis inspection, the app's skills, file reads inside the app, and
+   * plugin_manager) as one MCP server on a 127.0.0.1 listener for each Casper process; false offers none.
+   */
+  appTools: boolean
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-casper-agent -->
@@ -592,13 +597,19 @@ export interface ConnectionRecoveryConfig {
 ## `@deepseek-ai/dsh-client-hmr`
 
 - `inject`: `clientModules` · `webServer`
-- `source`: [`packages/client/hmr/src/index.ts:30`](../packages/client/hmr/src/index.ts)
+- `source`: [`packages/client/hmr/src/index.ts:31`](../packages/client/hmr/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config, validated by the same-named schemastery schema. */
 export interface Config {
   /** Bundle stat-poll interval in milliseconds (default 500, the build-side watcher's polling default). */
   pollIntervalMs?: number
+  /**
+   * Interval in milliseconds of the comment line `/plugins/events` writes to every open stream (default 30 s).
+   * It keeps the stream under idle limits between the Host and the page: the desktop shell carries it through
+   * Node fetch, which drops a response body silent for 300 s.
+   */
+  heartbeatMs?: number
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-client-hmr -->

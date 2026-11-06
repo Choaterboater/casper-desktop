@@ -106,14 +106,37 @@ it('looks Casper up on PATH, then the installer folders, and falls back to the b
   expect(lookup([join(home, '.local', 'bin', exe), join('/opt/tools', exe)], '/opt/tools')).toBe(join('/opt/tools', exe))
 })
 
-it('declares the Casper preset with the todo list only, on Desktop only', () => {
+it('declares the Casper preset with the todo list and the plugin kit, on Desktop only', () => {
   const row = desktopRows().find(entry => entry.id === 'preset-casper')
   expect(row?.config?.['id']).toBe('casper')
-  const plugins = row?.config?.['plugins'] as { id?: string }[] | undefined
-  expect(plugins?.map(plugin => plugin.id)).toEqual(['tool-todo'])
+  const plugins = row?.config?.['plugins'] as Row[] | undefined
+  expect(plugins?.map(plugin => [plugin.id, plugin.name])).toEqual([
+    ['tool-todo', '@deepseek-ai/dsh-tool-todo'],
+    ['tool-cordis', '@deepseek-ai/dsh-tool-cordis'],
+    ['skill-filesystem', '@deepseek-ai/dsh-skill-filesystem'],
+    ['tool-skill', '@deepseek-ai/dsh-tool-skill'],
+    ['tool-plugin-manager', '@deepseek-ai/dsh-plugin-manager/tools'],
+  ])
   const disabled = expression(row?.disabled)
   expect(evaluate(disabled ?? '', profileCtx('desktop'))).toBe(false)
   expect(evaluate(disabled ?? '', profileCtx('web'))).toBe(true)
+})
+
+it('gives the Casper preset the agent-preset skills and the profile\'s plugin manager, and no Casper checks', () => {
+  const rows = desktopRows()
+  const plugins = rows.find(entry => entry.id === 'preset-casper')?.config?.['plugins'] as Row[] | undefined
+  const of = (id: string): Row | undefined => plugins?.find(plugin => plugin.id === id)
+  const dirs = of('skill-filesystem')?.config?.['customSkillDirs'] as unknown[] | undefined
+  expect(dirs?.map(expression)).toEqual([expect.stringContaining("resolve('@deepseek-ai/dsh-agent-preset/package.json')), 'skills')")])
+  const cordisDirs = (rows.find(entry => entry.id === 'preset-cordis')?.config?.['plugins'] as Row[] | undefined)
+    ?.find(plugin => plugin.id === 'skill-filesystem')?.config?.['customSkillDirs'] as unknown[] | undefined
+  expect(dirs?.map(expression)).toEqual(cordisDirs?.map(expression))
+  const manager = expression(of('tool-plugin-manager')?.disabled) ?? ''
+  expect(evaluate(manager, profileCtx('desktop'))).toBe(false)
+  expect(evaluate(manager, { get: () => undefined })).toBe(true)
+  // The rows serve plugin_manager from the profile's existing plugin-manager service, whose hidden bundles stay refused.
+  expect(rows.find(entry => entry.id === 'plugin-manager')?.config?.['hiddenBundles']).toContain('@deepseek-ai/dsh-experimental-plugin-market-bundle')
+  expect(plugins?.some(plugin => plugin.name === '@deepseek-ai/dsh-casper-checks' || plugin.name === '@deepseek-ai/dsh-plugin-market/tools')).toBe(false)
 })
 
 it('starts new Sessions on Casper on Desktop and on Standard elsewhere', () => {
