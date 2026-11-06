@@ -143,6 +143,8 @@ export class SessionCommandController {
 
   /**
    * Validate and record one Session model selection; save the default in the background.
+   * An Agent that chooses its own models (`agent.model.own`) checks, records, and
+   * applies the pick itself, without the Host catalog or the saved default.
    * @param request - Session identity and requested model selection.
    * @returns the normalized selection recorded for the Session, without waiting for default persistence.
    */
@@ -150,7 +152,6 @@ export class SessionCommandController {
     const agent = await this.resolveAgent(request.sessionId)
     return this.agents.serializeImageAdmission(agent, async () => {
       try {
-        await this.requireModel(request)
         const selected: AgentModelSelection = {
           provider: request.provider,
           model: request.model,
@@ -158,6 +159,9 @@ export class SessionCommandController {
             ? {}
             : { reasoningEffort: ReasoningEffortId(request.reasoningEffort) }),
         }
+        const own = agent.model.own
+        if (own !== undefined) return { selected: { ...await own.choose(selected) } }
+        await this.requireModel(request)
         await this.ctx.llm.resolveCallConfig(selected)
         agent.model.select(selected)
         void this.ctx.agentDefaultModel.saveSelection(selected).catch((error: unknown) => {
@@ -313,7 +317,8 @@ export class SessionCommandController {
     const hasImage = admission.content.some(part => part.type === 'image')
     const admit = async (): Promise<SessionPromptValue> => {
       try {
-        if (hasImage) {
+        // An Agent with its own models decides what its model can see.
+        if (hasImage && agent.model.own === undefined) {
           const current = agent.model.current()
           if (current !== undefined) {
             const model = await this.ctx.llm.resolveModelInfo(current.provider, current.model)

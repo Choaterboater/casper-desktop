@@ -9,6 +9,7 @@ import type { UserMessage } from '@deepseek-ai/dsh-llm/types'
 // Type-only: the Workspace registry's archive-admission family map this registry merges `turn` into.
 import type {} from '@deepseek-ai/dsh-workspace/types'
 import type { OptionalSessionSeq, SessionId, SessionSeq } from '@deepseek-ai/dsh-session/types'
+import type { SessionProjectionSummaryExcluded } from '@deepseek-ai/dsh-session-projection/types'
 import type { TypertContext, TypertLookup } from '@deepseek-ai/dsh-typert-protocol'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 
@@ -97,7 +98,68 @@ declare module '@deepseek-ai/dsh-session-projection/types' {
   interface SessionProjectionMap {
     /** Recorded model selection for the next model step and the latest request. */
     modelSelection: ModelSelectionProjection
+    /**
+     * The models an Agent that chooses its own models offers, or null for an
+     * Agent that uses the Host model catalog. Excluded from Session summaries.
+     */
+    agentModels: SessionProjectionSummaryExcluded<AgentModelsProjection> | null
   }
+}
+
+/** One reasoning effort an Agent-offered model takes. */
+export interface AgentModelEffort {
+  /** Value a selection carries as `reasoningEffort`. */
+  readonly id: string
+  /** Display name. */
+  readonly name: string
+  /** Optional one-line explanation. */
+  readonly description?: string
+}
+
+/** One model an Agent offers inside its provider group. */
+export interface AgentModelEntry {
+  /** Provider-owned model id, the selection's `model`. */
+  readonly id: string
+  /** Display name. */
+  readonly name: string
+  /** Why the model cannot be used now, or another note the Agent attaches. */
+  readonly description?: string
+  /** Efforts the Agent takes for this model; absent when it offers none. */
+  readonly reasoning?: {
+    readonly efforts: readonly AgentModelEffort[]
+    /** Effort the Agent picks by itself, when it lists one. */
+    readonly defaultEffort?: string
+  }
+}
+
+/** One provider and the models an Agent offers from it, in the Agent's order. */
+export interface AgentModelGroup {
+  /** Provider route, the selection's `provider`. */
+  readonly id: string
+  /** Display name. */
+  readonly name: string
+  /** The provider's models. */
+  readonly models: readonly AgentModelEntry[]
+}
+
+/** What an Agent that chooses its own models last reported in its models record. */
+export interface AgentModelsReport {
+  /** Offered models by provider. */
+  readonly groups: readonly AgentModelGroup[]
+  /** The model the Agent uses now, or null when it has none. */
+  readonly current: ModelSelection | null
+  /** Whether the Agent's own process sent the list; false for a list seeded before it started. */
+  readonly started: boolean
+}
+
+/** Client view of the `agentModels` fold: the reported list, with a selection not yet applied as current. */
+export interface AgentModelsProjection {
+  /** Offered models by provider. */
+  readonly groups: readonly AgentModelGroup[]
+  /** A recorded selection the Agent has not reported yet, else the Agent's current model. */
+  readonly current: ModelSelection | null
+  /** Whether the Agent's own process sent the list. */
+  readonly started: boolean
 }
 
 declare module '@deepseek-ai/dsh-session/types' {

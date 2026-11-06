@@ -902,6 +902,48 @@ describe('Web session model selection', () => {
     })
     await ctx.fiber.dispose()
   })
+
+  it('hands a pick to an Agent with its own models, without the catalog, the saved default, or the image check', async () => {
+    const { ctx, agent, sessionId } = await harness()
+    registerTextOnly(ctx)
+    const saved: unknown[] = []
+    const listModels = vi.spyOn(ctx.llm, 'listModels')
+    const choose = vi.fn((selection: { provider: string; model: string }) => selection.model === 'gone'
+      ? Promise.reject(new Error('Casper can\'t use own/gone: pick another model.'))
+      : Promise.resolve({ ...selection }))
+    const select = vi.fn()
+    Object.assign(agent, { model: { current: () => ({ provider: 'text-only', model: 'plain' }), select, own: { choose } } })
+    ctx.provide('attachments', Object.setPrototypeOf({
+      saveImages: () => Promise.resolve([{ attachmentId: 'saved-image', mediaType: 'image/png', bytes: 1, width: 1, height: 1 }]),
+    }, AttachmentStore.prototype) as never)
+    const followup = vi.fn()
+    Object.assign(agent, { followup })
+    const remote = await createSessionTestRemote(ctx, {
+      defaultModelSelection: () => ({ provider: 'deepseek-official', model: 'deepseek-chat' }),
+      saveDefaultModelSelection: (selection) => { saved.push(selection); return Promise.resolve() },
+      cwd: '/tmp',
+    })
+
+    const picked = expectValue(await remote.selectModel(request({
+      sessionId, provider: 'own', model: 'org/model', reasoningEffort: 'high',
+    })))
+    expect(picked.selected).toEqual({ provider: 'own', model: 'org/model', reasoningEffort: 'high' })
+    expect(choose).toHaveBeenCalledWith({ provider: 'own', model: 'org/model', reasoningEffort: 'high' })
+    expect(await remote.selectModel(request({ sessionId, provider: 'own', model: 'gone' }))).toMatchObject({
+      ok: false,
+      error: { code: 'session/model-unavailable', message: 'Casper can\'t use own/gone: pick another model.', details: { provider: 'own', model: 'gone' } },
+    })
+    expect(listModels).not.toHaveBeenCalled()
+    expect(select).not.toHaveBeenCalled()
+    expect(saved).toEqual([])
+
+    // The text-only current model does not refuse the picture: the Agent decides.
+    expectValue(await remote.prompt(promptRequest({
+      sessionId, mode: 'queue', content: [{ type: 'image', mediaType: 'image/png', data: 'AQ==' }],
+    })))
+    expect(followup).toHaveBeenCalledOnce()
+    await ctx.fiber.dispose()
+  })
 })
 
 it('initializes the account model without reasoning metadata and rejects an empty account catalog', async () => {

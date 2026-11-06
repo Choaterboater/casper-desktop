@@ -10,13 +10,14 @@ import type {
   AgentCancelCause,
   AgentEventDispatch,
   AgentOptions,
+  AgentModelsState,
   AgentStatus,
   CancelOptions,
   InboxState,
   InboxTarget,
-  ModelSelectionProjectionState,
+  ModelSelection,
 } from '@deepseek-ai/dsh-agent'
-import { AgentModel, agentEvents } from '@deepseek-ai/dsh-agent'
+import { AGENT_MODELS_RECORD, agentEvents } from '@deepseek-ai/dsh-agent'
 import { ReactLoopInbox } from '@deepseek-ai/dsh-agent-loop'
 import { getDshRuntimeVersion } from '@deepseek-ai/dsh-app-boot'
 import type {} from '@deepseek-ai/dsh-attachment'
@@ -25,6 +26,7 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { LlmFailure } from '@deepseek-ai/dsh-llm'
 import { createScope } from '@deepseek-ai/dsh-scope'
 import type { Scope } from '@deepseek-ai/dsh-scope'
+import { appendPluginRecord } from '@deepseek-ai/dsh-session'
 import type { Session, SessionId, TurnEndReason, UserMessage } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-persistence'
 import type {} from '@deepseek-ai/dsh-skill'
@@ -38,6 +40,9 @@ import { casperCommandId, casperCommands } from './commands.ts'
 import type { CasperCommand, CasperCommandCache } from './commands.ts'
 import type { Config } from './config.ts'
 import { CasperConnection, CasperError } from './connection.ts'
+import { CasperModel } from './model.ts'
+import { effortState, reportOf, valueOf } from './models.ts'
+import type { CasperModelsCache } from './models-cache.ts'
 import { answerPermission } from './permission.ts'
 import { hasPromptContent, promptContent } from './prompt.ts'
 import type { CasperSidecar } from './sidecar.ts'
@@ -51,8 +56,8 @@ const DEFAULT_MODEL_LABEL = 'casper'
 
 /** Projection readers the factory passes to each Agent. */
 export interface CasperAgentReaders {
-  /** Current model selection. */
-  readonly modelSelection: () => ModelSelectionProjectionState
+  /** Casper's reported models and a pick not yet applied. */
+  readonly agentModels: () => AgentModelsState
   /** Current queued and claimed input. */
   readonly inbox: () => InboxState
 }
@@ -88,7 +93,7 @@ function cancelCauseOf(signal: AbortSignal): AgentCancelCause | undefined {
  * The process starts at the first prompt and restarts after an exit.
  */
 export class CasperAgent implements Agent {
-  readonly model: AgentModel
+  readonly model: CasperModel
   readonly inbox: ReactLoopInbox
   /** The Agent-scoped registration boundary; the factory unwinds it after the driver stops. */
   readonly scope: Scope
@@ -112,6 +117,8 @@ export class CasperAgent implements Agent {
   private readonly commandOffs: (() => void)[] = []
   /** Whether the factory published this Agent; commands are registered only from then on. */
   private published = false
+  /** Reader of Casper's reported models and a pick not yet applied. */
+  private readonly models: () => AgentModelsState
 
   /**
    * @param pluginCtx - the Casper plugin context whose services the Agent uses.
@@ -123,6 +130,7 @@ export class CasperAgent implements Agent {
    * @param config - the plugin config.
    * @param sidecar - the Session-to-conversation records.
    * @param commandCache - the last command list Casper sent, offered until this Agent's Casper sends its own.
+   * @param modelsCache - where the model list Casper sends is kept for the next Session's picker.
    */
   constructor(
     private readonly pluginCtx: Context,
@@ -134,12 +142,14 @@ export class CasperAgent implements Agent {
     private readonly config: Config,
     private readonly sidecar: CasperSidecar,
     private readonly commandCache: CasperCommandCache,
+    private readonly modelsCache: CasperModelsCache,
   ) {
     this.dispatch = agentEvents(pluginCtx, this)
     this.scope = createScope(pluginCtx, this)
     this.ctx = this.scope.ctx
-    // No fallback route: the badge shows a model only after the user picks one.
-    this.model = new AgentModel(readers.modelSelection, session, {})
+    this.models = readers.agentModels
+    // Casper's own models: a pick is checked against Casper's list and applied to Casper.
+    this.model = new CasperModel(readers.agentModels, session, selection => this.chooseModel(selection))
     this.inbox = new ReactLoopInbox(readers.inbox, session, this.dispatch)
     this.lastTurn = lastTurn
     this.offered = commandCache.read()
@@ -316,6 +326,7 @@ export class CasperAgent implements Agent {
     onStep(1)
     for (const message of claimed) this.session.append('user/message', message, { surfaceOp: 'append' })
     let connection: CasperConnection | undefined
+    const label = (): string => this.modelLabel()
     const writer: TurnWriter = new TurnWriter({
       session: this.session,
       emit: (frame) => { this.dispatch.emit('agent/assistant-stream', { frame }) },
@@ -323,7 +334,8 @@ export class CasperAgent implements Agent {
       step: 1,
       nextAttempt: () => ++this.attempts,
       nextRevision: () => ++this.revision,
-      model: this.config.model ?? DEFAULT_MODEL_LABEL,
+      // Read when each message is recorded, so a model Casper reports mid-turn labels the messages after it.
+      get model() { return label() },
       callId: acpId => (connection as CasperConnection).toolCallId(acpId),
     })
     let interrupted = true
@@ -337,6 +349,9 @@ export class CasperAgent implements Agent {
       connection = opened.connection
       // Said at once: the conversation is new even when this turn sends nothing.
       if (opened.fresh) writer.text(FRESH_CONVERSATION_NOTICE)
+      // A pick made before Casper started or while it was busy reaches Casper before the prompt does.
+      await this.applyWanted(connection, signal)
+      signal.throwIfAborted()
       const content = await promptContent(claimed, { attachments: this.pluginCtx.get('attachments'), images: connection.acceptsImages, signal })
       // A store may finish a read after a Stop; the prompt is then not sent.
       signal.throwIfAborted()
@@ -407,6 +422,7 @@ export class CasperAgent implements Agent {
       handlers: {
         update: (notification) => { this.receive(owner.connection, notification) },
         commands: (list) => { this.offerCommands(list) },
+        config: () => { if (owner.connection !== undefined && owner.connection === this.connection) this.report(owner.connection) },
         permission: params => this.permission(owner.connection, params),
       },
       appTools: this.config.appTools ? connection => this.startAppTools(connection, cwd, profile) : undefined,
@@ -419,6 +435,7 @@ export class CasperAgent implements Agent {
       throw new CasperError('CASPER_START_FAILED', `Casper's conversation could not be recorded: ${String(error)}`, { cause: error })
     }
     this.connection = started.connection
+    this.report(started.connection)
     return { connection: started.connection, fresh: stored !== undefined && !started.reopened }
   }
 
@@ -497,6 +514,142 @@ export class CasperAgent implements Agent {
         },
       }))
     }
+  }
+
+  /**
+   * Check a user's pick against Casper's list, record it, and apply it at once
+   * when Casper is running and idle; otherwise the next turn applies it before
+   * its prompt.
+   * @param selection - the pick.
+   * @returns the recorded pick; an effort the model does not offer efforts for is dropped.
+   * @throws Error when Casper does not list the model or effort; CasperError `CASPER_MODEL_UNAVAILABLE` when Casper refuses it.
+   */
+  private async chooseModel(selection: Readonly<ModelSelection>): Promise<ModelSelection> {
+    const { reported } = this.models()
+    if (reported === null) throw new Error('Casper lists its models once it starts. Send your first message.')
+    const label = `${selection.provider}/${selection.model}`
+    const entry = reported.groups.find(group => group.id === selection.provider)?.models.find(model => model.id === selection.model)
+    if (entry === undefined) throw new Error(`Casper can't use ${label}: it is not one of your signed-in models. Pick one from the list.`)
+    const efforts = entry.reasoning?.efforts.map(effort => effort.id) ?? []
+    const effort = selection.reasoningEffort
+    if (effort !== undefined && efforts.length > 0 && !efforts.includes(effort)) {
+      throw new Error(`${label} has no effort ${effort}. Choose: ${efforts.join(', ')}`)
+    }
+    const picked: ModelSelection = {
+      provider: selection.provider,
+      model: selection.model,
+      ...effort === undefined || efforts.length === 0 ? {} : { reasoningEffort: effort },
+    }
+    this.model.select(picked)
+    const connection = this.connection
+    if (this.active === undefined && connection !== undefined && !connection.dead && this.models().wanted !== null) {
+      await this.runMaintenance(signal => this.applyWanted(connection, signal))
+    }
+    return picked
+  }
+
+  /**
+   * Send the recorded pick to Casper as `session/set_config_option` for the
+   * model, then the effort, and report Casper's list afterwards, which
+   * settles the pick. A pick recorded while the sets run is sent next, so the
+   * last pick wins. ACP cannot cancel a set, so a stop kills Casper and keeps
+   * the pick for the next Casper.
+   * @param connection - the live connection.
+   * @param signal - stops the sets.
+   * @throws CasperError `CASPER_MODEL_UNAVAILABLE` when Casper does not take the pick, `CASPER_EXITED` when it exits;
+   *   the stop's error when stopped.
+   */
+  private async applyWanted(connection: CasperConnection, signal: AbortSignal): Promise<void> {
+    for (;;) {
+      const { wanted } = this.models()
+      if (wanted === null) return
+      try {
+        await this.sendPick(connection, wanted, signal)
+      } catch (error: unknown) {
+        if (signal.aborted) throw error
+        // A newer pick replaces the one Casper refused.
+        if (!samePick(this.models().wanted, wanted)) continue
+        this.report(connection, true)
+        if (error instanceof CasperError && error.code === 'CASPER_EXITED') throw error
+        // An error reply carries Casper's own words as its cause.
+        const words = error instanceof CasperError && error.cause instanceof Error ? error.cause.message : errorText(error)
+        throw new CasperError('CASPER_MODEL_UNAVAILABLE', `Casper can't use ${wanted.provider}/${wanted.model}: ${words}. Pick another model.`, { cause: error })
+      }
+      if (samePick(this.models().wanted, wanted)) {
+        this.report(connection, true)
+        return
+      }
+    }
+  }
+
+  /** Send one pick's model, then its effort, when Casper's differ. */
+  private async sendPick(connection: CasperConnection, wanted: ModelSelection, signal: AbortSignal): Promise<void> {
+    const current = reportOf(connection.configOptions).current
+    if (current?.provider !== wanted.provider || current.model !== wanted.model) {
+      const value = valueOf(connection.configOptions, wanted)
+      if (value === undefined) throw new Error('it is not one of the models this Casper offers')
+      await this.setUntilStopped(connection, 'model', value, signal)
+    }
+    const effort = effortState(connection.configOptions)
+    if (wanted.reasoningEffort !== undefined && effort !== undefined && effort.current !== wanted.reasoningEffort) {
+      await this.setUntilStopped(connection, 'effort', wanted.reasoningEffort, signal)
+    }
+  }
+
+  /** Set one option; a stop before Casper answers kills Casper, which has no cancel for a set. */
+  private async setUntilStopped(connection: CasperConnection, configId: string, value: string, signal: AbortSignal): Promise<void> {
+    signal.throwIfAborted()
+    const sent = connection.setConfigOption(configId, value)
+    const stopped = Promise.withResolvers<'stopped'>()
+    const onAbort = (): void => { stopped.resolve('stopped') }
+    signal.addEventListener('abort', onAbort, { once: true })
+    try {
+      if (await Promise.race([sent, stopped.promise]) !== 'stopped') return
+    } finally {
+      signal.removeEventListener('abort', onAbort)
+    }
+    sent.catch(() => {
+      // Casper is being killed; its answer no longer counts.
+    })
+    this.dropConnection(connection)
+    throw new Error('the model pick was stopped', { cause: signal.reason })
+  }
+
+  /**
+   * Record Casper's current option list as its models record when it changed, and
+   * keep it for the next Session's picker. While a pick waits to be applied,
+   * only the apply itself reports (`settle`), so a list Casper sends meanwhile
+   * does not drop the pick.
+   * @param connection - the connection whose options are read.
+   * @param settle - report even an unchanged list, which settles the pick.
+   */
+  private report(connection: CasperConnection, settle = false): void {
+    const state = this.models()
+    if (!settle && state.wanted !== null) return
+    const options = connection.configOptions
+    // A Casper without options keeps the list the Session already shows.
+    if (options === undefined && (!settle || state.reported === null)) return
+    const report = options === undefined && state.reported !== null ? state.reported : reportOf(options)
+    if (state.wanted === null && JSON.stringify(state.reported) === JSON.stringify(report)) return
+    try {
+      appendPluginRecord(this.session, AGENT_MODELS_RECORD, report)
+    } catch (error: unknown) {
+      /* v8 ignore start -- an append fails only when the Session is closed under the Agent. */
+      this.pluginCtx.logger.warn(`casper agent "${this.id}": model list not recorded: ${String(error)}`)
+      return
+      /* v8 ignore stop */
+    }
+    if (options === undefined) return
+    // A failed save costs only the next Session's early picker.
+    this.modelsCache.write({ groups: report.groups, current: report.current }).catch((error: unknown) => {
+      this.pluginCtx.logger.warn(`casper agent "${this.id}": model list not saved: ${String(error)}`)
+    })
+  }
+
+  /** The `provider/model` Casper last reported, recorded on assistant messages. */
+  private modelLabel(): string {
+    const current = this.models().reported?.current
+    return current == null ? this.config.model ?? DEFAULT_MODEL_LABEL : `${current.provider}/${current.model}`
   }
 
   /** Forget the current connection and start killing it. */
@@ -615,6 +768,16 @@ function turnEndFor(stopReason: StopReason): TurnEndReason {
     default:
       return { kind: 'error', error: { code: `CASPER_STOP_${stopReason.toUpperCase()}`, message: `Casper stopped: ${stopReason}.` } }
   }
+}
+
+/** Whether two picks name the same model and effort. */
+function samePick(left: ModelSelection | null, right: ModelSelection): boolean {
+  return left?.provider === right.provider && left.model === right.model && left.reasoningEffort === right.reasoningEffort
+}
+
+function errorText(error: unknown): string {
+  /* v8 ignore next -- a pick fails with an Error: its own refusal or the connection's. */
+  return error instanceof Error ? error.message : String(error)
 }
 
 /** Structured failure of a turn. */

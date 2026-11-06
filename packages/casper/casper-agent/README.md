@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-This plugin makes the Casper agent the main AI for Sessions on the `casper` preset. A factory route on `ctx.agents` drives each such Session with one `casper acp` process instead of the DeepSeek agent loop. Casper's text, tool steps, checks, plan, and receipt become ordinary Session events, so the Desktop transcript, tool cards, todo list, and Stop work unchanged. Casper's approval boxes reach the user as questions. Each process also gets the app's own tools over a private MCP server, to inspect the app and install plugins. Desktop starts new Sessions on this preset by default.
+This plugin makes the Casper agent the main AI for Sessions on the `casper` preset. A factory route on `ctx.agents` drives each with one `casper acp` process instead of the DeepSeek agent loop. Casper's text, tool steps, checks, plan, and receipt become ordinary Session events, so the Desktop transcript, tool cards, todo list, and Stop work unchanged. Casper's approval boxes reach the user as questions, and the model picker lists Casper's models. Each process also gets the app's tools over a private MCP server, to inspect the app and install plugins. Desktop starts new Sessions on this preset by default.
 
 ## Table of Contents
 
@@ -31,8 +31,8 @@ The Desktop profile mounts the plugin from `packages/bundle/web-app/cordis.patch
 | `presets` | `['casper']` | Presets whose Sessions Casper drives |
 | `command` | `casper` | Casper executable; the Desktop row looks it up on PATH, `~/.local/bin`, `~/.bun/bin`, `/opt/homebrew/bin`, and `/usr/local/bin` |
 | `args` | `['acp']` | Arguments that start Casper's ACP server |
-| `model` | unset | Passed as `--model`; unset keeps Casper's own default |
-| `effort` | unset | Passed as `--effort`; unset keeps Casper's own default |
+| `model` | unset | Start model, passed as `--model`; unset keeps Casper's own default. The [model picker](#model-picker) changes it per Session |
+| `effort` | unset | Start effort, passed as `--effort`; unset keeps Casper's own default. The model picker changes it per Session |
 | `env` | `{}` | Child environment added after the subprocess scrub; the Desktop row passes a PATH that leads with bun's folders and `OPENROUTER_API_KEY` when set |
 | `startTimeoutMs` | `30000` | Limit for `initialize` plus `session/new` or `session/load` |
 | `cancelGraceMs` | `5000` | Wait for the prompt reply after Stop before Casper is killed |
@@ -45,7 +45,7 @@ The child never receives `DEEPSEEK_*` or `DSH_*` names, or credential-shaped nam
 
 A Session becomes Casper when it is created on a Casper preset. A blank Session cannot switch between Casper and another preset: the preset registry refuses that switch with `agent-preset/locked` and `newSession: true`, and the mode picker starts a new Session on the chosen preset instead. A stored Session is resumed by the factory its recorded preset selects; a Session that records no preset stays on agent-loop.
 
-A turn that cannot run ends with an error on `turn/end`: `CASPER_NOT_FOUND` when the command cannot be found, `CASPER_START_FAILED` when Casper does not start, `CASPER_EXITED` when it exits mid-turn, `CASPER_EMPTY_PROMPT` for a prompt with nothing Casper can read: no text, picture, or file, or only pictures and files that could not be sent (nothing is sent to Casper), `CASPER_TURN_LIMIT` at Casper's turn limit, and `CASPER_RPC_<code>` for an error reply. The Session stays usable; the next prompt starts Casper again. `CASPER_TEXT_ONLY` is no longer raised; it appears only in turns saved by earlier versions.
+A turn that cannot run ends with an error on `turn/end`: `CASPER_NOT_FOUND` when the command cannot be found, `CASPER_START_FAILED` when Casper does not start, `CASPER_EXITED` when it exits mid-turn, `CASPER_EMPTY_PROMPT` for a prompt with nothing Casper can read: no text, picture, or file, or only pictures and files that could not be sent (nothing is sent to Casper), `CASPER_TURN_LIMIT` at Casper's turn limit, `CASPER_MODEL_UNAVAILABLE` when Casper refuses the picked model or effort (no prompt is sent), and `CASPER_RPC_<code>` for an error reply. The Session stays usable; the next prompt starts Casper again. `CASPER_TEXT_ONLY` is no longer raised; it appears only in turns saved by earlier versions.
 
 <a id="understand-the-implementation"></a>
 ## Understand the implementation
@@ -64,6 +64,9 @@ A turn that cannot run ends with an error on `turn/end`: `CASPER_NOT_FOUND` when
 | [`src/commands.ts`](src/commands.ts) | Casper's commands for the `/` menu, and host storage domain `casper_agent_commands` keeping the last list |
 | [`src/app-tools.ts`](src/app-tools.ts) | The app tools MCP server: listener, auth, tool list, and calls run as the Casper Agent |
 | [`src/app-read.ts`](src/app-read.ts) | `app_read_file`: read-only access to the app's install and profile folders |
+| [`src/models.ts`](src/models.ts) | Reads Casper's `model` and `thought_level` options as the picker's groups, efforts, and current model |
+| [`src/model.ts`](src/model.ts) | `CasperModel`: the Agent's model handle, which hands picks to Casper instead of the Host catalog |
+| [`src/models-cache.ts`](src/models-cache.ts) | Host storage domain `casper_agent_models` keeping the last model list |
 
 ### Turns and events
 
@@ -113,6 +116,15 @@ Casper sends its slash commands, the user's own `~/.casper/commands` included, i
 
 The identity tells clients to treat the line as a prompt ([ui-commands](../../client/ui-commands/README.md)): picking a command inserts `/name`, with a trailing space when it takes input, and Enter sends the typed line, attachments included, as an ordinary prompt that Casper runs as its own command. A surface that executes the command instead queues the same line as the next prompt. The last list is kept in the host storage domain `casper_agent_commands` (one global record), and each new Agent offers it before its own Casper starts. An Agent registers its commands only once it is published: each registration makes every client repull its Sessions' menus, and a repull resumes a Session that is not live, so an Agent whose creation fails registers nothing.
 
+<a id="model-picker"></a>
+### Model picker
+
+Casper sends its options in the `session/new` and `session/load` replies and again in `config_option_update`. The option of category `model` is the model list, grouped by provider, and each model lists the efforts it takes in `_meta.casper.efforts`; the option of category `thought_level` is the effort and names those values. An older Casper that sends no `_meta.casper.efforts` gives its current model the effort option's values. Casper's `mode` option is not read here. Each changed list is recorded as the plugin record `plugin:casper-agent/models`, which an app build without this package keeps and skips, so it still opens the Session. The `agentModels` projection skips a malformed record and gives the composer badge and `/model` the list, Casper's current model and effort, and whether Casper itself sent them ([ui-model-selection](../../client/ui-model-selection/README.md#agent-offered-models)). Messages are labelled with the model Casper reported.
+
+A pick goes to the Agent, not the Host catalog: it is checked against Casper's list, recorded as `model/selection`, and sent with `session/set_config_option` (`model` first, then `effort` when it differs). A pick for a model Casper does not list, or an effort its model does not take, is refused at once; a model with no efforts takes none. While Casper is idle the pick is sent at once and no prompt is sent. A pick made during a prompt, or before Casper starts, is sent at the start of the next turn, before the prompt. When Casper refuses it, the turn ends `CASPER_MODEL_UNAVAILABLE` with Casper's words and no prompt, and the badge shows Casper's model again. A pick made while an earlier one is being sent is sent next, so the last pick wins. ACP cannot cancel a set, so a Stop while Casper has not answered one kills Casper; the pick stays and reaches the next Casper before its first prompt. A model Casper changes itself, such as with its own `/model`, moves the badge and labels the messages after it.
+
+A new Session shows the list kept in the host storage domain `casper_agent_models` (one global record) until its own Casper starts, with `model` from the config as its current model when set; before any Casper has sent a list, the picker says Casper lists its models once it starts. A resumed Session keeps what its history recorded. A Session created before this list was recorded refuses a pick until its Casper starts.
+
 ### Process lifetime and resume
 
 Casper starts at a Session's first prompt, so a missing command never blocks opening a Session. After `session/new`, the conversation id is stored in the sidecar before the prompt is sent. A later process reopens it with `session/load` and drops the replayed updates, since the Session already holds the history; only Casper's no-saved-conversation reply (`-32002` whose message contains "no saved conversation" in any letter case) starts a fresh conversation, and that turn opens with a line saying so, even when it then sends nothing. Casper saves a conversation only after its first reply, so a conversation whose process stopped before then starts fresh this way. Another load failure ends the turn and keeps the record. Disposal closes stdin, waits `exitGraceMs`, then terminates the process, which fits Desktop's 10 second host exit. Resume repairs an interrupted turn like agent-loop and starts no process.
@@ -152,7 +164,7 @@ The plugin sends no model request, so it has no cache effect; Casper's own reque
 <a id="known-limitations-and-deferred-work"></a>
 
 - A Casper whose `initialize` reply does not set `promptCapabilities.image` gets a placeholder instead of each picture.
-- The model picker does not change Casper's model, and the model badge stays empty until the user picks one; `model` and `effort` are deployment config.
+- A pick is checked against the list Casper last sent; a model Casper later finds signed out is refused when the pick is sent.
 - Reasoning, token usage, and cost are not shown, because Casper sends none of them; `session/load` replays are not shown.
 - A running shell step shows no output until it ends.
 - Only the app tools server is passed to Casper; the app's configured MCP servers are not.
@@ -178,7 +190,6 @@ The plugin sends no model request, so it has no cache effect; Casper's own reque
 
 This Dev Note is working context for maintainers: open questions and undecided directions. It is explicitly non-authoritative — shipped behavior and limits live in the sections above and in the package code.
 
-- **Model choice** — driving Casper's model from the GUI picker would restart Casper with `--model` and reopen the conversation with `session/load`.
 - **Approval card** — a composer adapter could render Casper's boxes with the shared approval card once Casper's option kinds map onto its fixed actions.
 - **Checks plugin** — `packages/casper/tool-checks` can be removed from the Standard preset once Casper Sessions are proven live.
 

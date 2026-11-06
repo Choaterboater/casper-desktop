@@ -1,9 +1,9 @@
 /**
- * Verify that only experimental packages call `appendPluginRecord` from production source.
+ * Verify that only experimental and Casper packages call `appendPluginRecord` from production source.
  *
  * `appendPluginRecord` in `@deepseek-ai/dsh-session` appends an ignorable `plugin:` record that the
  * experimental persistence catalogue lists and that a Session format migration keeps only on a best-effort
- * basis. Experimental packages may rely on that; a release package must declare its events instead.
+ * basis. Experimental and Casper packages may rely on that; another release package must declare its events instead.
  * The owning module and test files, which exercise the operation, are exempt, as is the published
  * dependency policy, which names the function to classify the export without calling it.
  *
@@ -23,7 +23,7 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { relative, resolve } from 'node:path'
 import ts from 'typescript'
-import { collectPluginRecords } from './plugin-record-catalog.ts'
+import { CASPER_PREFIX, collectPluginRecords } from './plugin-record-catalog.ts'
 import { faceConfigs } from './ts-project.ts'
 
 const root = resolve(import.meta.dirname, '..')
@@ -36,6 +36,21 @@ export const OWNER_FILE = 'packages/core/session/src/index.ts'
 
 /** Production source under this prefix may call the restricted function. */
 export const EXPERIMENTAL_PREFIX = 'packages/experimental/'
+
+/**
+ * Production source under this prefix may call it too: Casper's agent keeps app-only state in records,
+ * which an app build without Casper's packages retains and skips.
+ */
+export { CASPER_PREFIX }
+
+/**
+ * Whether production source under a file's path may write plugin records.
+ * @param file - repository-relative path, in POSIX separators.
+ * @returns whether the file lies under the experimental or the Casper prefix.
+ */
+function isRecordWriterSource(file: string): boolean {
+  return file.startsWith(EXPERIMENTAL_PREFIX) || file.startsWith(CASPER_PREFIX)
+}
 
 /** This gate and its spec name the restricted function to find it. */
 const GATE_FILES: ReadonlySet<string> = new Set([
@@ -103,10 +118,10 @@ export function isTestFile(file: string): boolean {
 /**
  * Whether a file may reference the restricted function.
  * @param file - repository-relative path, in POSIX separators.
- * @returns whether the file is experimental source, the owner, a test, this gate, or the dependency policy.
+ * @returns whether the file is experimental or Casper source, the owner, a test, this gate, or the dependency policy.
  */
 export function isAdmittedCaller(file: string): boolean {
-  return file.startsWith(EXPERIMENTAL_PREFIX) || file === OWNER_FILE || isTestFile(file) || GATE_FILES.has(file)
+  return isRecordWriterSource(file) || file === OWNER_FILE || isTestFile(file) || GATE_FILES.has(file)
     || file === DEPENDENCY_POLICY_FILE
 }
 
@@ -153,7 +168,7 @@ function declaresRestrictedFunction(source: string): boolean {
 /**
  * Check a source corpus and return its unadmitted references.
  * @param files - repository-relative path, in POSIX separators, to contents.
- * @returns every reference outside experimental source, the owner, tests, and this gate.
+ * @returns every reference outside experimental and Casper source, the owner, tests, and this gate.
  * @throws when the corpus lacks the owner's exported declaration or any experimental or release
  *   package source, because the gate would then pass by checking the wrong files.
  */
@@ -177,14 +192,14 @@ export function checkPluginRecordCallers(files: ReadonlyMap<string, string>): Pl
  * The compiler reads production sources only, so test map augmentations cannot widen the writer.
  * @param repoRoot - checkout holding the compiler face and record declarations.
  * @param files - tracked and unignored repository sources.
- * @returns compiler errors in experimental production consumers, including undeclared write keys.
+ * @returns compiler errors in experimental and Casper production consumers, including undeclared write keys.
  */
 export function checkDeclaredPluginRecordWrites(
   repoRoot: string,
   files: ReadonlyMap<string, string>,
 ): PluginRecordCaller[] {
   const declared = new Set(collectPluginRecords(repoRoot).map(record => record.name))
-  const candidates = [...files.keys()].filter(file => file.startsWith(EXPERIMENTAL_PREFIX) && !isTestFile(file)
+  const candidates = [...files.keys()].filter(file => isRecordWriterSource(file) && !isTestFile(file)
     && findPluginRecordReferences(file, files.get(file) ?? '').length > 0)
   if (candidates.length === 0) return []
   const remaining = new Set(candidates)
@@ -276,7 +291,7 @@ function main(): void {
   const files = readRepositorySources()
   const callers = [...checkPluginRecordCallers(files), ...checkDeclaredPluginRecordWrites(root, files)]
   if (callers.length === 0) {
-    console.log('verify-plugin-record-callers: production callers are experimental and record keys are catalogued.')
+    console.log('verify-plugin-record-callers: production callers are experimental or Casper and record keys are catalogued.')
     return
   }
   console.error('verify-plugin-record-callers: invalid production record callers.\n')

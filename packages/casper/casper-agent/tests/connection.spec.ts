@@ -3,14 +3,14 @@ import { chmodSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
-import type { AvailableCommand, SessionNotification } from '@agentclientprotocol/sdk'
+import type { AvailableCommand, SessionConfigOption, SessionNotification } from '@agentclientprotocol/sdk'
 import { randomBytes } from 'node:crypto'
 import { appToolsEntry } from '../src/app-tools.ts'
 import type { AppToolsServer } from '../src/app-tools.ts'
 import { CasperConnection, CasperError, casperArgv, casperEnv, profileEnv } from '../src/connection.ts'
 import type { CasperConnectionHandlers, CasperConnectionOptions } from '../src/connection.ts'
 import type { Config } from '../src/config.ts'
-import { alive, fakeCasper, gate, waitFor } from './support.ts'
+import { alive, casperOptions, fakeCasper, gate, waitFor } from './support.ts'
 import type { FakeScript } from './support.ts'
 
 const cleanups: (() => Promise<void> | void)[] = []
@@ -26,9 +26,11 @@ async function setup(script: FakeScript = { prompts: [] }) {
   cleanups.push(() => { fake.remove() }, () => ctx.fiber.dispose())
   const updates: SessionNotification[] = []
   const commands: AvailableCommand[][] = []
+  const configs: SessionConfigOption[][] = []
   const handlers: CasperConnectionHandlers = {
     update: (notification) => { updates.push(notification) },
     commands: (list) => { commands.push([...list]) },
+    config: (options) => { configs.push([...options]) },
     permission: () => Promise.resolve({ outcome: { outcome: 'cancelled' } }),
   }
   const start = async (
@@ -42,7 +44,7 @@ async function setup(script: FakeScript = { prompts: [] }) {
     cleanups.push(() => started.connection.dispose())
     return started
   }
-  return { fake, ctx, updates, commands, handlers, start }
+  return { fake, ctx, updates, commands, configs, handlers, start }
 }
 
 /** A stand-in app tools server with a fresh token that records whether it was closed. */
@@ -184,6 +186,46 @@ describe('CasperConnection', { timeout: 30_000 }, () => {
     // The replayed chunks are dropped, but the list sent with them is not.
     expect(commands).toEqual([[status, review]])
     expect(updates).toEqual([])
+  })
+
+  it('keeps Casper\'s options from session/new and session/load, and hands option updates to their handler during a replay too', async () => {
+    const opus = casperOptions('claude-subscription/claude-opus-5-5')
+    const { start, updates, configs } = await setup({
+      prompts: [[{ configUpdate: opus }, { text: 'done\n' }]], known: ['stored-1'], configOptions: casperOptions(), replayConfig: true,
+    })
+    const fresh = await start()
+    expect(fresh.connection.configOptions).toEqual(casperOptions())
+    await fresh.connection.prompt([{ type: 'text', text: 'go' }])
+    expect(configs).toEqual([opus])
+    expect(fresh.connection.configOptions).toEqual(opus)
+    expect(updates.map(entry => entry.update.sessionUpdate)).toEqual(['agent_message_chunk', 'agent_message_chunk'])
+    configs.length = 0
+    const loaded = await start({}, 'stored-1')
+    expect(configs).toEqual([casperOptions()])
+    expect(loaded.connection.configOptions).toEqual(casperOptions())
+    expect(updates).toHaveLength(2)
+  })
+
+  it('offers no options for a Casper whose replies carry none', async () => {
+    const { start } = await setup({ prompts: [], known: ['stored-1'] })
+    expect((await start()).connection.configOptions).toBeUndefined()
+    expect((await start({}, 'stored-1')).connection.configOptions).toBeUndefined()
+  })
+
+  it('sets an option, keeps the list Casper replies with, and maps a refusal to its RPC code without changing the list', async () => {
+    const { fake, start } = await setup({ prompts: [], configOptions: casperOptions(), setFails: { effort: 'Casper is working on a prompt; change the model or effort when it ends' } })
+    const { connection, acpSessionId } = await start()
+    const after = await connection.setConfigOption('model', 'claude-subscription/claude-opus-5-5')
+    expect(fake.calls('session/set_config_option').map(entry => entry.params)).toEqual([
+      { sessionId: acpSessionId, configId: 'model', value: 'claude-subscription/claude-opus-5-5' },
+    ])
+    expect(after).toEqual(casperOptions('claude-subscription/claude-opus-5-5'))
+    expect(connection.configOptions).toEqual(after)
+    const unlisted = await connection.setConfigOption('model', 'openai-codex/gone').catch((error: unknown) => error)
+    expect(codeOf(unlisted)).toBe('CASPER_RPC_-32602')
+    const busy = await connection.setConfigOption('effort', 'high').catch((error: unknown) => error)
+    expect(busy).toMatchObject({ code: 'CASPER_RPC_-32603', message: 'Casper failed: Casper is working on a prompt; change the model or effort when it ends' })
+    expect(connection.configOptions).toEqual(after)
   })
 
   it('starts a fresh conversation only when Casper has no saved one', async () => {

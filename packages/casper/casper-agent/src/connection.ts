@@ -18,6 +18,7 @@ import {
   type McpServer,
   type RequestPermissionRequest,
   type RequestPermissionResponse,
+  type SessionConfigOption,
   type SessionNotification,
   type StopReason,
 } from '@agentclientprotocol/sdk'
@@ -48,6 +49,7 @@ export type CasperFailureCode =
   | 'CASPER_START_FAILED'
   | 'CASPER_EXITED'
   | 'CASPER_EMPTY_PROMPT'
+  | 'CASPER_MODEL_UNAVAILABLE'
   | 'CASPER_TEXT_ONLY'
   | `CASPER_RPC_${number}`
 
@@ -79,6 +81,13 @@ export interface CasperConnectionHandlers {
    * @param commands - the commands Casper offers, without leading slashes.
    */
   commands(commands: readonly AvailableCommand[]): void
+  /**
+   * Receive Casper's whole option list from a `config_option_update`, which
+   * never reaches {@link update}; the connection has stored it already. Called
+   * during a `session/load` replay too.
+   * @param options - the model, effort, and other options Casper offers now.
+   */
+  config(options: readonly SessionConfigOption[]): void
   /**
    * Answer one `session/request_permission`.
    * @param params - Casper's request.
@@ -171,6 +180,7 @@ export class CasperConnection {
   private connection: ClientConnection | undefined
   private sessionId: string | undefined
   private initialized: InitializeResponse | undefined
+  private options_: readonly SessionConfigOption[] | undefined
   /** Updates are dropped while `session/load` replays the conversation the Session already holds. */
   private replaying = false
   private cancelSent = false
@@ -197,6 +207,15 @@ export class CasperConnection {
   /** Whether Casper's `initialize` reply set `promptCapabilities.image` to true, so prompts may carry image blocks. */
   get acceptsImages(): boolean {
     return this.initialized?.agentCapabilities?.promptCapabilities?.image === true
+  }
+
+  /**
+   * The option list of Casper's latest `session/new` or `session/load` reply,
+   * `config_option_update`, or `session/set_config_option` reply; undefined for
+   * a Casper that offers none.
+   */
+  get configOptions(): readonly SessionConfigOption[] | undefined {
+    return this.options_
   }
 
   /**
@@ -275,25 +294,24 @@ export class CasperConnection {
   async prompt(prompt: AcpContentBlock[]): Promise<StopReason> {
     const sessionId = this.requireSession()
     this.cancelSent = false
-    const exited = this.exit.then((): never => { throw new Error('the Casper process exited') })
-    exited.catch(() => {
-      // An exit after the reply needs no observer.
-    })
-    let stopReason: StopReason
-    try {
-      stopReason = (await Promise.race([
-        this.requireConnection().agent.request(methods.agent.session.prompt, { sessionId, prompt }),
-        exited,
-      ])).stopReason
-    } catch (error: unknown) {
-      if (error instanceof RequestError) {
-        throw new CasperError(`CASPER_RPC_${error.code}`, `Casper failed: ${error.message}`, { cause: error })
-      }
-      // An exit or a closed protocol stream: report the exit facts once they arrive.
-      throw this.exitError(await this.exitWithin(this.options.config.killGraceMs))
-    }
+    const { stopReason } = await this.request(this.requireConnection().agent.request(methods.agent.session.prompt, { sessionId, prompt }))
     await drainInbound()
     return stopReason
+  }
+
+  /**
+   * Set one of Casper's session options and keep the list it replies with.
+   * @param configId - the option, such as `model` or `effort`.
+   * @param value - one of the option's listed values.
+   * @returns the whole list after the change.
+   * @throws CasperError `CASPER_EXITED` when the process exits first, `CASPER_RPC_<code>` for an error reply.
+   */
+  async setConfigOption(configId: string, value: string): Promise<readonly SessionConfigOption[]> {
+    const reply = await this.request(
+      this.requireConnection().agent.request(methods.agent.session.setConfigOption, { sessionId: this.requireSession(), configId, value }),
+    )
+    this.options_ = reply.configOptions
+    return reply.configOptions
   }
 
   /** Ask Casper to stop the prompt in flight; sent at most once per prompt. */
@@ -352,8 +370,12 @@ export class CasperConnection {
     this.connection = createAcpClient({ name: 'casper-desktop' })
       .onNotification(methods.client.session.update, ({ params }) => {
         // The command list is the conversation's current state, not history, so a replay keeps it.
-        if (params.update.sessionUpdate === 'available_commands_update') options.handlers.commands(params.update.availableCommands)
-        else if (!this.replaying) options.handlers.update(params)
+        const { update } = params
+        if (update.sessionUpdate === 'available_commands_update') options.handlers.commands(update.availableCommands)
+        else if (update.sessionUpdate === 'config_option_update') {
+          this.options_ = update.configOptions
+          options.handlers.config(update.configOptions)
+        } else if (!this.replaying) options.handlers.update(params)
       })
       .onRequest(methods.client.session.requestPermission, ({ params }) => options.handlers.permission(params))
       .connect(ndJsonStream(
@@ -369,7 +391,8 @@ export class CasperConnection {
     if (stored !== undefined) {
       this.replaying = true
       try {
-        await agent.request(methods.agent.session.load, { sessionId: stored, cwd: options.cwd, mcpServers })
+        const loaded = await agent.request(methods.agent.session.load, { sessionId: stored, cwd: options.cwd, mcpServers })
+        this.options_ = loaded.configOptions ?? undefined
         this.sessionId = stored
         return { acpSessionId: stored, reopened: true }
       } catch (error: unknown) {
@@ -382,6 +405,7 @@ export class CasperConnection {
       }
     }
     const created = await agent.request(methods.agent.session.new, { cwd: options.cwd, mcpServers })
+    this.options_ = created.configOptions ?? undefined
     this.sessionId = created.sessionId
     return { acpSessionId: created.sessionId, reopened: false }
   }
@@ -417,6 +441,23 @@ export class CasperConnection {
       (error: unknown) => { void error },
       /* v8 ignore stop */
     )
+  }
+
+  /** Race one request against the process exit; an error reply becomes `CASPER_RPC_<code>`, an exit `CASPER_EXITED`. */
+  private async request<T>(sent: Promise<T>): Promise<T> {
+    const exited = this.exit.then((): never => { throw new Error('the Casper process exited') })
+    exited.catch(() => {
+      // An exit after the reply needs no observer.
+    })
+    try {
+      return await Promise.race([sent, exited])
+    } catch (error: unknown) {
+      if (error instanceof RequestError) {
+        throw new CasperError(`CASPER_RPC_${error.code}`, `Casper failed: ${error.message}`, { cause: error })
+      }
+      // An exit or a closed protocol stream: report the exit facts once they arrive.
+      throw this.exitError(await this.exitWithin(this.options.config.killGraceMs))
+    }
   }
 
   private async raceStart<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {

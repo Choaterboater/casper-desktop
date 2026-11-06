@@ -12,6 +12,7 @@ import { afterEach, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Group from '@deepseek-ai/cordis-plugin-group'
+import { AGENT_MODELS_RECORD } from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
@@ -143,7 +144,8 @@ it('runs a Casper Session from the GUI: stream, tools, approval, plan, receipt, 
   ok(await first.remote.prompt({ requestId: 'req-fix' as SessionRequestId, sessionId, mode: 'queue', content: [{ type: 'text', text: 'Fix the bug' }] }))
   await waitFor(() => events(agent).some(event => event.type === 'turn/end'))
   await agent?.whenIdle()
-  const types = events(agent).map(event => event.type).filter(type => !type.startsWith('agent/inbox') && type !== 'agent-preset/selected')
+  const types = events(agent).map((event): string => event.type)
+    .filter(type => !type.startsWith('agent/inbox') && type !== 'agent-preset/selected' && type !== AGENT_MODELS_RECORD)
   expect(types).toEqual([
     'turn/start', 'step/start', 'user/message', 'assistant/message', 'tool/call', 'tool/result', 'step/end',
     'step/start', 'assistant/message', 'tool/call', 'tool/result', 'step/end',

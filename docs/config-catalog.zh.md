@@ -490,9 +490,9 @@ export interface Config {
   command: string
   /** Arguments that start Casper's ACP server. */
   args: string[]
-  /** Casper model passed as `--model` after `args`; unset keeps Casper's own default. */
+  /** Start model passed as `--model` after `args`; unset keeps Casper's own default. The model picker changes it per Session. */
   model?: string
-  /** Casper effort passed as `--effort` after `args`; unset keeps Casper's own default. */
+  /** Start effort passed as `--effort` after `args`; unset keeps Casper's own default. The model picker changes it per Session. */
   effort?: string
   /** Child environment entries merged after the subprocess scrub, so a listed key reaches Casper. */
   env: Record<string, string>

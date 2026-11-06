@@ -3,8 +3,10 @@
  * The /model popup and composer seat combine one shared Host catalog with the
  * Session's durable selection projection, then submit through the same
  * selectModel call. A switch made in either entry updates this shared state.
+ * A Session whose Agent offers its own models (a non-null `agentModels` view)
+ * shows that list instead of the Host catalog.
  */
-import type { ModelSelectionProjection } from '@deepseek-ai/dsh-agent/types'
+import type { AgentModelsProjection, ModelSelectionProjection } from '@deepseek-ai/dsh-agent/types'
 import type { TrackProductEvent } from '@deepseek-ai/dsh-client-product-analytics/client'
 import type {
   ModelCatalogFailure, ModelProviderGroup, ModelSelection,
@@ -33,6 +35,8 @@ export interface ModelDirectoryState {
   pending: ModelSelection | null
   /** Whole-request or selection failure text; null when none. */
   error: string | null
+  /** Present when the Session's Agent offers its own models; `started` once the Agent itself sent them. */
+  agent?: { readonly started: boolean }
 }
 
 /** One session's shared directory controller; disposed with the session scope. */
@@ -47,6 +51,7 @@ export class ModelDirectory {
   private disposed = false
   private readonly unsubscribeCatalog: () => void
   private readonly unsubscribeSelection: () => void
+  private readonly unsubscribeOffered: () => void
 
   /**
    * @param sessions - the session wire face (captured from the plugin's root connection).
@@ -54,6 +59,7 @@ export class ModelDirectory {
    * @param available - whether this session may use Agent-bound model RPCs.
    * @param catalog - Host-generation catalog shared by every Session.
    * @param projected - durable model selection projected from Session history.
+   * @param offered - the Agent's own model list projected from Session history; null for Host-catalog Agents.
    * @param isBlank - whether this Session has no first message yet.
    * @param track - desktop-only callback after a successful user selection.
    */
@@ -63,21 +69,24 @@ export class ModelDirectory {
     private readonly available: () => boolean,
     private readonly catalog: ModelCatalogDirectory,
     private readonly projected: ObservableSnapshot<unknown>,
+    private readonly offered: ObservableSnapshot<unknown>,
     private readonly isBlank: () => boolean,
     private readonly track?: TrackProductEvent,
   ) {
     this.unsubscribeCatalog = catalog.store.subscribe(() => { this.syncInputs() })
     this.unsubscribeSelection = projected.subscribe(() => { this.syncInputs() })
+    this.unsubscribeOffered = offered.subscribe(() => { this.syncInputs() })
     this.syncInputs()
   }
 
   /**
-   * Ensure the Host generation's shared available catalog is loaded.
+   * Ensure the Host generation's shared available catalog is loaded; a Session
+   * whose Agent offers its own models needs no catalog.
    * @returns the fresh directory value.
    */
   async load(): Promise<ModelDirectoryState> {
     this.assertAvailable()
-    await this.catalog.load()
+    if (agentModelsView(this.offered.getSnapshot()) === null) await this.catalog.load()
     this.syncInputs()
     return this.store.getSnapshot()
   }
@@ -92,8 +101,8 @@ export class ModelDirectory {
   async select(selection: ModelSelection): Promise<RemoteResult<void>> {
     this.assertAvailable()
     const previous = this.store.getSnapshot().current
-    const previousEffort = previous?.reasoningEffort ?? (previous === null ? undefined : this.catalog.reasoningFor(previous)?.defaultEffort)
-    const nextEffort = selection.reasoningEffort ?? this.catalog.reasoningFor(selection)?.defaultEffort
+    const previousEffort = previous?.reasoningEffort ?? (previous === null ? undefined : this.reasoningFor(previous)?.defaultEffort)
+    const nextEffort = selection.reasoningEffort ?? this.reasoningFor(selection)?.defaultEffort
     const generation = ++this.generation
     this.store.update((s) => { s.status = 'selecting'; s.pending = selection; s.error = null })
     const result = await this.sessions.selectModel({
@@ -145,8 +154,17 @@ export class ModelDirectory {
   /** Scope teardown: late settlements lose write access to the store. */
   dispose(): void {
     this.disposed = true
+    this.unsubscribeOffered()
     this.unsubscribeSelection()
     this.unsubscribeCatalog()
+  }
+
+  /** Reasoning metadata of one model: from the Agent's own list, else the Host catalog. */
+  private reasoningFor(selection: ModelSelection): ModelProviderGroup['models'][number]['reasoning'] {
+    const offered = agentModelsView(this.offered.getSnapshot())
+    if (offered === null) return this.catalog.reasoningFor(selection)
+    return offered.groups.find(group => group.id === selection.provider)
+      ?.models.find(model => model.id === selection.model)?.reasoning
   }
 
   private assertAvailable(): void {
@@ -157,6 +175,11 @@ export class ModelDirectory {
 
   private syncInputs(): void {
     if (this.disposed) return
+    const offered = agentModelsView(this.offered.getSnapshot())
+    if (offered !== null) {
+      this.syncOffered(offered)
+      return
+    }
     const catalog = this.catalog.store.getSnapshot()
     const projected = modelSelectionProjection(this.projected.getSnapshot())
     const intended = projected?.next ?? catalog.value?.default
@@ -193,6 +216,47 @@ export class ModelDirectory {
       error: null,
     })
   }
+
+  /** State from the Agent's own list: no catalog, no failures; the Agent refuses what it cannot use. */
+  private syncOffered(offered: AgentModelsProjection): void {
+    const { current, groups } = offered
+    const reasoning = current === null ? undefined : this.reasoningFor(current)
+    const effort = current?.reasoningEffort ?? reasoning?.defaultEffort
+    const retainedEffort = effort === undefined ? undefined
+      : reasoning?.efforts.find(level => level.id === effort)?.name ?? effort
+    const snapshot = this.store.getSnapshot()
+    this.store.set({
+      current,
+      ...retainedEffort === undefined ? {} : { retainedEffort },
+      routable: current === null ? null : groups.some(group => group.id === current.provider
+        && group.models.some(model => model.id === current.model)),
+      groups,
+      failures: [],
+      status: snapshot.status === 'selecting' ? 'selecting' : 'ready',
+      pending: snapshot.pending,
+      error: null,
+      agent: { started: offered.started },
+    })
+  }
+}
+
+/**
+ * The text an empty model list shows: the Agent's own words when it offers its models.
+ * @param state - one directory snapshot.
+ * @returns the `model` dictionary key.
+ */
+export function emptyModelsKey(state: Pick<ModelDirectoryState, 'agent'>): 'empty.models' | 'empty.agentNotStarted' | 'empty.agentModels' {
+  if (state.agent === undefined) return 'empty.models'
+  return state.agent.started ? 'empty.agentModels' : 'empty.agentNotStarted'
+}
+
+/**
+ * Read the Agent's own model list.
+ * @param value - the `agentModels` projection face's value.
+ * @returns the list, or null when the Agent uses the Host catalog.
+ */
+function agentModelsView(value: unknown): AgentModelsProjection | null {
+  return value === undefined || value === null ? null : value as AgentModelsProjection
 }
 
 function modelSelectionProjection(value: unknown): ModelSelectionProjection | undefined {

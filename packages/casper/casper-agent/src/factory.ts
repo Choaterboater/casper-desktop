@@ -4,24 +4,28 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import { AGENT_MODELS_RECORD } from '@deepseek-ai/dsh-agent'
 import type {
   AgentFactory,
   AgentHandle,
+  AgentModelsReport,
+  AgentModelsState,
   AgentOptions,
   AgentSetup,
   CreateAgentOptions,
   InboxState,
-  ModelSelectionProjectionState,
   ResumeAgentOptions,
   SessionStartSource,
 } from '@deepseek-ai/dsh-agent'
-import { interruptedTurnClosers, SessionLogOffset, SessionPreparation } from '@deepseek-ai/dsh-session'
+import { appendPluginRecord, interruptedTurnClosers, SessionLogOffset, SessionPreparation } from '@deepseek-ai/dsh-session'
 import type { Session } from '@deepseek-ai/dsh-session'
 import type { SessionHandle } from '@deepseek-ai/dsh-session-persistence'
 import type { ProjectionHandle } from '@deepseek-ai/dsh-session-projection'
 import { CasperAgent } from './agent.ts'
 import type { CasperCommandCache } from './commands.ts'
 import type { Config } from './config.ts'
+import { withCurrent } from './models.ts'
+import type { CasperModelsCache } from './models-cache.ts'
 import type { CasperSidecar } from './sidecar.ts'
 
 /** Message of the error a fork of a Casper Session rejects with. */
@@ -29,14 +33,16 @@ export const FORK_UNSUPPORTED = 'Forking a Casper session is not supported yet.'
 
 /** Projection handles and storage the factory shares with every Agent. */
 export interface CasperFactoryDependencies {
-  /** The registered `modelSelection` projection. */
-  readonly modelSelection: ProjectionHandle<ModelSelectionProjectionState>
+  /** The registered `agentModels` projection. */
+  readonly agentModels: ProjectionHandle<AgentModelsState>
   /** The registered `inbox` projection, shared with agent-loop. */
   readonly inbox: ProjectionHandle<InboxState>
   /** The Session-to-conversation records. */
   readonly sidecar: CasperSidecar
   /** The last command list Casper sent. */
   readonly commands: CasperCommandCache
+  /** The last model list Casper sent. */
+  readonly models: CasperModelsCache
 }
 
 /** One Session's write handle and the count of events already stored through it. */
@@ -169,6 +175,13 @@ export class CasperAgentFactory implements AgentFactory {
     throwFailures(failures, 'casper agent factory disposal failed')
   }
 
+  /** The list a new Session shows before its Casper starts: the cached one, with the configured `--model` as current. */
+  private seed(): AgentModelsReport {
+    const cached = this.deps.models.read()
+    const report: AgentModelsReport = { groups: cached.groups, current: cached.current, started: false }
+    return this.config.model === undefined ? report : withCurrent(report, this.config.model)
+  }
+
   private assertAccepting(): void {
     if (!this.accepting) throw new Error('casper agent factory is not active')
   }
@@ -199,11 +212,12 @@ export class CasperAgentFactory implements AgentFactory {
     }
     const agent = new CasperAgent(
       this.ctx, id, init.agentOptions, session,
-      { modelSelection: this.deps.modelSelection.readerFor(session), inbox: this.deps.inbox.readerFor(session) },
+      { agentModels: this.deps.agentModels.readerFor(session), inbox: this.deps.inbox.readerFor(session) },
       this.ctx.agents.turnBoundaryOf(session).lastTurn,
       this.config,
       this.deps.sidecar,
       this.deps.commands,
+      this.deps.models,
     )
 
     let ready = false
@@ -264,6 +278,8 @@ export class CasperAgentFactory implements AgentFactory {
           abort.signal.throwIfAborted()
           detachSession = agent.ctx.sessions.enter(session)
           agent.ctx.sessions.announce(session)
+          // A new Session's picker offers the last list Casper sent, or the start value, until its own Casper reports.
+          if (init.source === 'startup') appendPluginRecord(session, AGENT_MODELS_RECORD, this.seed())
           const commit = await untilAborted(init.setup?.(agent.ctx, agent), abort.signal)
           abort.signal.throwIfAborted()
           commit?.commit()

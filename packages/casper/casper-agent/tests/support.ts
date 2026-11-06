@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFi
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import type { SessionConfigOption } from '@agentclientprotocol/sdk'
 import type { Config } from '../src/config.ts'
 
 /** Absolute path of the stand-in `casper acp`. */
@@ -44,6 +45,16 @@ export interface FakeScript {
   readonly promptCapabilities?: { readonly image?: boolean; readonly audio?: boolean; readonly embeddedContext?: boolean }
   /** Casper's command list, sent after `session/new` and during `session/load`. */
   readonly commands?: readonly FakeCommand[]
+  /** Casper's options in the `session/new` and `session/load` replies; a set changes them. */
+  readonly configOptions?: readonly SessionConfigOption[]
+  /** A set of one of these option ids fails with -32603 and the message. */
+  readonly setFails?: Readonly<Record<string, string>>
+  /** Also send the options as a `config_option_update` during a `session/load` replay. */
+  readonly replayConfig?: boolean
+  /** Exit with this code on any set. */
+  readonly setExit?: number
+  /** A set of one of these option ids is logged, then answered only once the named file exists. */
+  readonly holdSet?: Readonly<Record<string, string>>
 }
 
 /** One command the stand-in offers, in ACP's `available_commands_update` shape. */
@@ -159,4 +170,40 @@ export function alive(pid: number): boolean {
 export function gate(fake: FakeCasper, name: string): { path: string; open(): void; exists(): boolean } {
   const path = join(fake.root, name)
   return { path, open: () => { writeFileSync(path, 'go') }, exists: () => existsSync(path) }
+}
+
+/**
+ * Casper's model, effort, and access options in the shape `casper acp` sends them.
+ * @param model - the current model value.
+ * @param effort - the current effort value.
+ * @returns the option list.
+ */
+export function casperOptions(model = 'openai-codex/gpt-6.1-sol', effort = 'auto'): SessionConfigOption[] {
+  return [
+    {
+      id: 'model', name: 'Model', category: 'model', type: 'select', currentValue: model,
+      options: [
+        { group: 'openai-codex', name: 'openai-codex', options: [
+          { value: 'openai-codex/gpt-6.1-sol', name: 'GPT-6.1 Sol', _meta: { casper: { efforts: ['auto', 'low', 'medium', 'high'] } } },
+        ] },
+        { group: 'claude-subscription', name: 'Claude Code plan', options: [
+          { value: 'claude-subscription/claude-opus-5-5', name: 'Claude Opus 5.5', _meta: { casper: { efforts: ['auto', 'low', 'high'] } } },
+          { value: 'claude-subscription/vendor/small:free', name: 'Small', description: 'Sign in again to use this model', _meta: { casper: { efforts: [] } } },
+        ] },
+      ],
+    },
+    {
+      id: 'effort', name: 'Effort', category: 'thought_level', type: 'select', currentValue: effort,
+      options: [
+        { value: 'auto', name: 'Auto', description: 'classify each request' },
+        { value: 'low', name: 'Low', description: 'light reasoning' },
+        { value: 'medium', name: 'Medium', description: 'ordinary changes' },
+        { value: 'high', name: 'High', description: 'harder changes' },
+      ],
+    },
+    {
+      id: 'mode', name: 'Access', category: 'mode', type: 'select', currentValue: 'ask',
+      options: [{ value: 'read', name: 'Read only' }, { value: 'ask', name: 'Ask first' }, { value: 'full', name: 'Don\'t ask' }],
+    },
+  ]
 }

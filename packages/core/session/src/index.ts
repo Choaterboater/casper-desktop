@@ -476,8 +476,8 @@ let commitPluginRecord: (session: Session, type: PluginRecordType, data: unknown
  * basis, so a record holds plugin-owned state that its owner can lose without
  * changing how the rest of the log is interpreted.
  *
- * Only production source under `packages/experimental/` may call this
- * function; the `verify-plugin-record-callers` gate rejects any other
+ * Only production source under `packages/experimental/` or `packages/casper/`
+ * may call this function; the `verify-plugin-record-callers` gate rejects any other
  * production caller in this repository. Read records back with
  * {@link pluginRecordOf}.
  * @param session - the Session whose log receives the record.

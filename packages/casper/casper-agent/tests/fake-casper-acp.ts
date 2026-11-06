@@ -19,6 +19,14 @@
  *   is sent as an `available_commands_update` right after the `session/new`
  *   reply, and after the replayed chunks of a successful `session/load`
  *   (before its reply, so it arrives while the client drops the replay).
+ *   `configOptions` is the option list of the `session/new` and `session/load`
+ *   replies; `session/set_config_option` (logged like any request) sets a
+ *   listed value and replies with the whole list, refuses an unlisted one with
+ *   -32602, fails with -32603 and `setFails[configId]` when set, exits
+ *   with code `setExit` when set, and answers only once the file
+ *   `holdSet[configId]` exists when set.
+ *   `replayConfig` also sends the list as a `config_option_update` among the
+ *   replayed chunks of a successful `session/load`.
  * - `FAKE_CASPER_LOG` — JSON lines appended for the start (argv, env names,
  *   PATH, cwd), every request and notification received, every permission
  *   answer, and stdin EOF. Tests poll this file.
@@ -34,7 +42,8 @@
  * `{ waitFile }` (waits until the file exists), `{ stderr }` (writes a
  * line to stderr), `{ fail }` (replies with a -32603 error), `{ image }` and
  * `{ thought }` (updates Casper does not send), `{ commandsUpdate }` (sends
- * that `available_commands_update` list), `{ late: Step }` (played 50 ms
+ * that `available_commands_update` list), `{ configUpdate }` (replaces the
+ * option list and sends it as a `config_option_update`), `{ late: Step }` (played 50 ms
  * after the reply), `{ exitAfterMs }` (exits with code 5 after that delay),
  * `{ mcp, args? }` (calls that tool on the first `mcpServers` entry with an
  * MCP 1.x client, carrying the current tool id as `casper/acpToolCallId`,
@@ -66,6 +75,7 @@ import {
   type PromptRequest,
   type PromptResponse,
   type RequestPermissionResponse,
+  type SessionConfigOption,
   type SessionUpdate,
   type StopReason,
   type ToolKind,
@@ -106,6 +116,7 @@ interface Step {
   rawOutput?: unknown
   kind?: ToolKind
   commandsUpdate?: AvailableCommand[]
+  configUpdate?: SessionConfigOption[]
 }
 
 /** A step's ACP fields beyond the id, status, and title. */
@@ -130,6 +141,11 @@ interface Script {
   newSessionId?: string
   promptCapabilities?: { image?: boolean; audio?: boolean; embeddedContext?: boolean }
   commands?: AvailableCommand[]
+  configOptions?: SessionConfigOption[]
+  setFails?: Record<string, string>
+  replayConfig?: boolean
+  setExit?: number
+  holdSet?: Record<string, string>
 }
 
 const logFile = process.env.FAKE_CASPER_LOG ?? ''
@@ -183,6 +199,14 @@ let steps = 0
 let boxes = 0
 let cancel: ((reason: StopReason) => void) | undefined
 let ignoreCancel = false
+/** This process's options; a set changes them. */
+let configOptions: SessionConfigOption[] | undefined = script.configOptions
+
+/** The listed values of one select option, groups flattened. */
+function valuesOf(option: SessionConfigOption): string[] {
+  if (option.type !== 'select') return []
+  return option.options.flatMap(item => 'group' in item ? item.options : [item]).map(item => item.value)
+}
 
 async function update(client: AgentContext, item: SessionUpdate & Record<string, unknown>): Promise<void> {
   await client.notify(methods.client.session.update, { sessionId: sessionId ?? '', update: item })
@@ -217,6 +241,10 @@ async function run(step: Step, params: PromptRequest, client: AgentContext, outc
     if (step.thought !== undefined) await update(client, { sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: step.thought } })
     if (step.text !== undefined) await update(client, { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: step.text } })
     if (step.commandsUpdate !== undefined) await update(client, { sessionUpdate: 'available_commands_update', availableCommands: step.commandsUpdate })
+    if (step.configUpdate !== undefined) {
+      configOptions = step.configUpdate
+      await update(client, { sessionUpdate: 'config_option_update', configOptions: step.configUpdate })
+    }
     if (step.tool !== undefined) {
       const id = `casper-tool-${++steps}`
       await update(client, {
@@ -330,7 +358,7 @@ createAcpAgent({ name: 'fake-casper' })
     const availableCommands = script.commands
     // Like Casper, the list follows the reply.
     if (availableCommands !== undefined) setImmediate(() => { void update(client, { sessionUpdate: 'available_commands_update', availableCommands }) })
-    return { sessionId }
+    return { sessionId, ...configOptions === undefined ? {} : { configOptions } }
   })
   .onRequest(methods.agent.session.load, async ({ params, client }) => {
     log({ method: 'session/load', params, exposed: exposed(params.mcpServers) })
@@ -342,7 +370,8 @@ createAcpAgent({ name: 'fake-casper' })
     mcpServers = params.mcpServers
     for (const text of script.replay ?? []) await update(client, { sessionUpdate: 'user_message_chunk', content: { type: 'text', text } })
     if (script.commands !== undefined) await update(client, { sessionUpdate: 'available_commands_update', availableCommands: script.commands })
-    return {}
+    if (script.replayConfig === true && configOptions !== undefined) await update(client, { sessionUpdate: 'config_option_update', configOptions })
+    return configOptions === undefined ? {} : { configOptions }
   })
   .onRequest(methods.agent.session.prompt, ({ params, client }) => {
     log({ method: 'session/prompt', params })
@@ -350,6 +379,21 @@ createAcpAgent({ name: 'fake-casper' })
       log({ event: 'saved', sessionId: params.sessionId })
       return reply
     })
+  })
+  .onRequest(methods.agent.session.setConfigOption, async ({ params }) => {
+    log({ method: 'session/set_config_option', params })
+    if (script.setExit !== undefined) process.exit(script.setExit)
+    const hold = script.holdSet?.[params.configId]
+    if (hold !== undefined) await until(hold)
+    const failure = script.setFails?.[params.configId]
+    if (failure !== undefined) throw new RequestError(-32603, failure)
+    const option = configOptions?.find(item => item.id === params.configId)
+    if (option === undefined || typeof params.value !== 'string' || !valuesOf(option).includes(params.value)) {
+      throw new RequestError(-32602, `Casper can't use ${String(params.value)}: it is not one of your signed-in models. Pick one from the list.`)
+    }
+    const { value } = params
+    configOptions = (configOptions ?? []).map(item => item.id === params.configId && item.type === 'select' ? { ...item, currentValue: value } : item)
+    return { configOptions }
   })
   .onNotification(methods.agent.session.cancel, ({ params }) => {
     log({ method: 'session/cancel', params })

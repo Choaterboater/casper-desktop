@@ -301,6 +301,19 @@ describe('ModelSelect reasoning effort', () => {
     expect(screen.queryByRole('group', { name: '模型与推理等级' })).toBeNull()
   })
 
+  it('says why a Casper Session lists no models: before Casper starts, and when it has none', () => {
+    const directory = createSnapshotStore(state({ current: null, routable: null, groups: [], agent: { started: false } }))
+    render(<ModelSelect renderSlot={renderLabel} locked={false} available directory={directory} load={vi.fn()}
+      resolveText={resolveText} select={vi.fn()} t={t} />)
+    const trigger = screen.getByRole('button', { name: '请选择模型' })
+    fireEvent.click(trigger)
+    expect(screen.getByRole('status').textContent).toBe(zh['empty.agentNotStarted'])
+    act(() => { directory.update((snapshot) => { snapshot.agent = { started: true } }) })
+    expect(screen.getByRole('status').textContent).toBe(zh['empty.agentModels'])
+    expect(en['empty.agentNotStarted']).toBe('Casper lists its models once it starts. Send your first message.')
+    expect(en['empty.agentModels']).toBe('Casper has no models you\'re signed in to. Run casper /login in a terminal.')
+  })
+
   it.each(['model', 'provider'])('hides the saved id and effort when the selected %s disappears', (removed) => {
     const directory = createSnapshotStore(state({ retainedEffort: 'High' }))
     render(<ModelSelect renderSlot={renderLabel} locked={false} available directory={directory} load={vi.fn()}

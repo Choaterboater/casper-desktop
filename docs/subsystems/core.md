@@ -237,6 +237,22 @@ interface Model {
    */
   select(selection: Readonly<ModelSelection>): void
 
+  /**
+   * Present on an Agent that chooses among its own models instead of the Host
+   * model catalog; such an Agent publishes its list as the `agentModels`
+   * projection. Entry points hand a user's pick to `choose` instead of
+   * validating it against the catalog and saving it as the Host default.
+   */
+  readonly own?: {
+    /**
+     * Check a pick against the Agent's own list, record it, and apply it when the Agent can.
+     * @param selection - the pick.
+     * @returns the selection recorded.
+     * @throws Error when the Agent cannot use the pick; nothing is recorded.
+     */
+    choose(selection: Readonly<ModelSelection>): Promise<ModelSelection>
+  }
+
 }
 ```
 

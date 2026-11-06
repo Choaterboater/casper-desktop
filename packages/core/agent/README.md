@@ -53,6 +53,8 @@ Ordinary resume keeps the recorded choice. An entry point explicitly overriding 
 
 For scoped switch notices, call `installModelSelection(agentCtx)` from `dsh-agent` during Agent setup. The scope owns the listener and removes it on disposal.
 
+An Agent that runs its own models, such as Casper, sets `Model.own`. `session.selectModel` then hands the pick to `own.choose(selection)` and skips the Host catalog, the saved default, and the image check; a rejection becomes `session/model-unavailable`. Such an Agent records its list as the plugin record `AGENT_MODELS_RECORD` (`plugin:casper-agent/models`) and registers `agentModelsProjectionDefinition`, which skips a malformed record: the `agentModels` view is null until the first report, then holds the groups, `current` (a `model/selection` recorded after the report, else the reported model), and `started`. It is left out of Session summaries.
+
 ### Drive an agent's conversation
 
 The handle's methods route identified user-role messages into the agent's inbox. `followup()` queues an ordinary next-turn prompt and wakes the driver; `steer()` submits next-step input and wakes it; `inject()` adds model-facing context without waking the driver, so it lands in the next admitted step. `cancel(cause)` aborts the active activity and, unless `keepInbox` is set, clears pending work; `whenIdle()` resolves after the whole agent reaches quiescence.
@@ -116,6 +118,7 @@ The package is built on one separation: the public `Agent` surface and registry 
 | [`src/types.ts`](src/types.ts) | `AgentOptions`, cancellation causes, and inbox projection vocabulary |
 | [`src/dispatch.ts`](src/dispatch.ts) | `agentEvents` fused dispatcher and `assembleContextFor(agent)` |
 | [`src/model-selection.ts`](src/model-selection.ts) | `AgentModel`, its durable projection, and `installModelSelection` switch notices |
+| [`src/agent-models.ts`](src/agent-models.ts) | The `agentModels` projection of an Agent's own model list |
 | [`src/consumed-work.ts`](src/consumed-work.ts) | `foldConsumedWork(events)`: what the log's consumed work became |
 | [`src/archive-admission.ts`](src/archive-admission.ts) | The `turn` family of the Workspace registry's archive admission: a running turn and its user-cause cancel |
 

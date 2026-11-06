@@ -1,10 +1,17 @@
-/** Discover package-owned experimental Session records without adding persistence schema roots. */
+/** Discover package-owned experimental and Casper Session records without adding persistence schema roots. */
 
 import { globSync, readFileSync } from 'node:fs'
 import { resolve, sep } from 'node:path'
 import ts from 'typescript'
 import { experimentalPackageRecordNamespace } from './experimental-package-policy.ts'
 import { parseJsDoc, pointer, rawJsDoc, reportViolations } from './jsdoc.ts'
+
+/**
+ * Casper's own packages, admitted beside experimental packages: Casper's agent keeps app-only state
+ * in records, which an app build without Casper's packages retains and skips.
+ */
+export const CASPER_PREFIX = 'packages/casper/'
+const CASPER_PACKAGE_NAME_PREFIX = '@deepseek-ai/dsh-'
 
 const SESSION_PACKAGE = '@deepseek-ai/dsh-session'
 const SESSION_TYPES_MODULE = `${SESSION_PACKAGE}/types`
@@ -30,6 +37,19 @@ function packageName(source: string, root: string): string | undefined {
   const manifest: unknown = JSON.parse(readFileSync(resolve(root, source.split('/').slice(0, 3).join('/'), 'package.json'), 'utf8'))
   return typeof manifest === 'object' && manifest !== null && 'name' in manifest && typeof manifest.name === 'string'
     ? manifest.name : undefined
+}
+
+/**
+ * The record namespace of one declaring package.
+ * @param file - repository-relative declaration file.
+ * @param owner - the package's npm name.
+ * @returns the experimental capability suffix, or a Casper package's name without `@deepseek-ai/dsh-`;
+ *   undefined for any other package.
+ */
+function recordNamespace(file: string, owner: string): string | undefined {
+  if (file.startsWith('packages/experimental/')) return experimentalPackageRecordNamespace(owner)
+  if (!file.startsWith(CASPER_PREFIX) || !owner.startsWith(CASPER_PACKAGE_NAME_PREFIX)) return undefined
+  return owner.slice(CASPER_PACKAGE_NAME_PREFIX.length)
 }
 
 /** Print compact type syntax while preserving whitespace within literal values. */
@@ -94,9 +114,9 @@ export function collectPluginRecords(scanRoot: string): PluginRecordEntry[] {
         violations.push(`${where} must augment declare module '${SESSION_TYPES_MODULE}'.`)
         return
       }
-      const namespace = owner === undefined ? undefined : experimentalPackageRecordNamespace(owner)
-      if (!file.startsWith('packages/experimental/') || owner === undefined || namespace === undefined) {
-        violations.push(`${where} must belong to a package declared experimental by the package naming policy.`)
+      const namespace = owner === undefined ? undefined : recordNamespace(file, owner)
+      if (owner === undefined || namespace === undefined) {
+        violations.push(`${where} must belong to a package declared experimental by the package naming policy, or to a Casper package.`)
         return
       }
       const prefix = `plugin:${namespace}/`

@@ -12,12 +12,12 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-function props(enabled: boolean | undefined, selectTeamMode = vi.fn(async () => null as string | null), child?: 'addressed' | 'listed', requestedModel: boolean | 'loading' = false): TeamModeToggleProps {
+function props(enabled: boolean | undefined, selectTeamMode = vi.fn(async () => null as string | null), child?: 'addressed' | 'listed', requestedModel: boolean | 'loading' = false, agentModels: object | null | undefined = null): TeamModeToggleProps {
   return {
     sessionId: SessionId('root'),
     useSession: (select: (value: { subagent: object | null }) => unknown) => select({ subagent: child === 'addressed' ? {} : null }),
     useSessions: (select: (value: { byId: object }) => unknown) => select({ byId: child === 'listed' ? { root: { origin: 'subagent' } } : {} }),
-    useProjection: (key: string) => key === 'modelSelection'
+    useProjection: (key: string) => key === 'agentModels' ? agentModels : key === 'modelSelection'
       ? requestedModel === 'loading' ? undefined : { lastUsed: requestedModel ? { provider: 'mock', model: 'mock' } : null, next: { provider: 'mock', model: 'mock' } }
       : enabled === undefined ? undefined : { enabled, tasks: [] },
     locked: false, dismiss: vi.fn(), reportFailure: vi.fn(), selectTeamMode, requestDisableConfirmation: vi.fn(),
@@ -128,4 +128,14 @@ it.each(['addressed', 'listed'] as const)('hides the switch on a child Session (
   expect(screen.queryByRole('switch')).toBeNull()
   expect(useProjection).not.toHaveBeenCalled()
   expect(input.selectTeamMode).not.toHaveBeenCalled()
+})
+
+it('hides the switch when the Session\'s Agent picks its own models, and shows it while that view loads', () => {
+  const own = { groups: [], current: null, started: false }
+  const view = render(<TeamModeToggle {...props(false, undefined, undefined, false, own)} />)
+  expect(screen.queryByRole('switch')).toBeNull()
+  view.rerender(<TeamModeToggle {...props(true, undefined, undefined, false, { ...own, started: true })} />)
+  expect(screen.queryByRole('switch')).toBeNull()
+  view.rerender(<TeamModeToggle {...props(false, undefined, undefined, false, undefined)} />)
+  expect(screen.getByRole('switch').getAttribute('aria-checked')).toBe('false')
 })

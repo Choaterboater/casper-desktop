@@ -63,6 +63,11 @@ When another writer owns the Session, model-selection failures tell the user to 
 
 The session-scoped `conversation.input.model.options` list slot appends controls below model and reasoning selection. Owner props expose `locked`, `reportFailure(message)`, and `dismiss()`, which closes the menu and synchronously focuses its trigger before another overlay opens; contributions read their own projections and supply narrow commands. Enabled switch buttons participate in the menu’s keyboard navigation.
 
+<a id="agent-offered-models"></a>
+### Agent-offered models
+
+A Session whose Agent offers its own models, such as a [Casper Session](../../casper/casper-agent/README.md#model-picker), has a non-null `agentModels` projection. Both entries then show that list in place of the Host catalog, for that Session only: its groups, the Agent's current model and effort as the badge, and no catalog failures. The badge follows the projection, so a model the Agent changes itself shows at once. A pick still goes through `session.selectModel`; the Agent checks and applies it, and its refusal is shown like any other selection failure. A model the Agent no longer lists stays current but is marked not routable. When the list is empty, the composer menu says “Casper lists its models once it starts. Send your first message.” before the Agent first sent its list, and “Casper has no models you're signed in to. Run casper /login in a terminal.” after; `/model` shows the same text as its failure line.
+
 -----
 
 <a id="understand-the-implementation"></a>

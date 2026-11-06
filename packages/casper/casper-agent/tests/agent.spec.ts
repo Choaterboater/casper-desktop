@@ -7,14 +7,17 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import CommandRuntime, { CommandDefinitionId } from '@deepseek-ai/dsh-commands'
 import AttachmentStore, { AttachmentId } from '@deepseek-ai/dsh-attachment'
 import type { FileAttachmentRef, ImageAttachmentLimits, ImageAttachmentRef, StoredImageAttachment } from '@deepseek-ai/dsh-attachment'
+import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { UserQuestionError } from '@deepseek-ai/dsh-user-questions'
 import { CasperAgent, FRESH_CONVERSATION_NOTICE } from '../src/agent.ts'
 import { CasperCommandCache } from '../src/commands.ts'
+import { reportOf } from '../src/models.ts'
+import { CasperModelsCache } from '../src/models-cache.ts'
 import { FORK_UNSUPPORTED } from '../src/factory.ts'
 import { TEXT_ONLY_PICTURE } from '../src/prompt.ts'
 import { boot, eventsOf, filesText, prompt, turnEnds } from './harness.ts'
-import { alive, fakeCasper, gate, parsed, waitFor } from './support.ts'
+import { alive, casperOptions, fakeCasper, gate, parsed, waitFor } from './support.ts'
 import type { FakeCasper, FakeCommand, FakeScript } from './support.ts'
 
 const cleanups: (() => Promise<void> | void)[] = []
@@ -106,7 +109,7 @@ describe('CasperAgent', { timeout: 60_000 }, () => {
     await agent.whenIdle()
     expect(agent.status).toBe('idle')
     expect(types(agent)).toEqual([
-      'turn/start', 'step/start', 'user/message', 'assistant/message', 'tool/call', 'tool/result', 'step/end',
+      'plugin:casper-agent/models', 'turn/start', 'step/start', 'user/message', 'assistant/message', 'tool/call', 'tool/result', 'step/end',
       'step/start', 'assistant/message', 'tool/call', 'tool/result', 'todo/write', 'step/end',
       'step/start', 'assistant/message', 'step/end', 'turn/end',
     ])
@@ -162,7 +165,7 @@ describe('CasperAgent', { timeout: 60_000 }, () => {
     expect(fake.calls('session/cancel')).toHaveLength(1)
     // Casper's cancelled receipt waited for the open call, so it lands in a final step.
     expect(types(agent)).toEqual([
-      'turn/start', 'step/start', 'user/message', 'assistant/message', 'tool/call', 'tool/result', 'step/end',
+      'plugin:casper-agent/models', 'turn/start', 'step/start', 'user/message', 'assistant/message', 'tool/call', 'tool/result', 'step/end',
       'step/start', 'assistant/message', 'step/end', 'turn/end',
     ])
     const call = eventsOf(agent).find(event => event.type === 'tool/call')
@@ -808,5 +811,251 @@ describe('Casper\'s commands in the command menu', { timeout: 60_000 }, () => {
     await new CasperCommandCache(domain as never).write([{ name: 'status', description: STATUS.description }])
     expect(set.mock.calls).toHaveLength(1)
     set.mockRestore()
+  })
+})
+
+describe('Casper\'s models in the model picker', { timeout: 60_000 }, () => {
+  const SOL = { provider: 'openai-codex', model: 'gpt-6.1-sol' }
+  const OPUS = { provider: 'claude-subscription', model: 'claude-opus-5-5' }
+
+  function view(host: { ctx: Context }, agent: Agent): unknown {
+    return host.ctx.sessionProjections.snapshot(agent.session).values.agentModels
+  }
+
+  function current(host: { ctx: Context }, agent: Agent): unknown {
+    return (view(host, agent) as { current?: unknown } | null | undefined)?.current
+  }
+
+  function sets(fake: FakeCasper): unknown[] {
+    return fake.calls('session/set_config_option').map(entry => [entry.params?.configId, entry.params?.value])
+  }
+
+  /** The methods Casper received after initialize, in order. */
+  function methodsOf(fake: FakeCasper): string[] {
+    return fake.log().flatMap(entry => entry.method === undefined || entry.method === 'initialize' ? [] : [entry.method])
+  }
+
+  function labels(agent: Agent): unknown[] {
+    return eventsOf(agent).flatMap(event => event.type === 'assistant/message' ? [event.data.message.source] : [])
+  }
+
+  /** Keep Casper's list in the host cache, as an earlier Casper Session would have. */
+  async function cacheList(host: { ctx: Context }, options = casperOptions()): Promise<void> {
+    const domain = host.ctx.storageDomain.get('casper_agent_models')
+    if (domain === undefined) throw new Error('model cache is not open')
+    const { groups, current: model } = reportOf(options)
+    await new CasperModelsCache(domain as never).write({ groups, current: model })
+  }
+
+  it('reports Casper\'s models and labels its messages with the model it uses', async () => {
+    // Casper resends the same list mid-prompt, which records nothing new.
+    const { host } = await setup({ configOptions: casperOptions(), prompts: [[{ configUpdate: casperOptions() }, { text: 'hi\n' }]] })
+    const { agent } = await host.create('casper-models')
+    // No Casper has listed its models yet, so the picker says Casper lists them once it starts.
+    expect(view(host, agent)).toEqual({ groups: [], current: null, started: false })
+    await run(agent, 'hello')
+    expect(view(host, agent)).toEqual({ ...reportOf(casperOptions()), started: true })
+    expect(types(agent).filter(type => type === 'plugin:casper-agent/models')).toHaveLength(2)
+    expect(agent.model.current()).toEqual({ ...SOL, reasoningEffort: 'auto' })
+    expect(labels(agent).at(-1)).toMatchObject({ provider: 'casper', model: 'openai-codex/gpt-6.1-sol' })
+    await waitFor(() => JSON.stringify(host.ctx.storageDomain.get('casper_agent_models')?.global.get())
+      === JSON.stringify({ groups: reportOf(casperOptions()).groups, current: { ...SOL, reasoningEffort: 'auto' } }))
+  })
+
+  it('applies a pick at once while Casper is idle, without a prompt, and refuses a model or effort Casper does not list', async () => {
+    const { fake, host } = await setup({ configOptions: casperOptions(), prompts: [[{ text: 'one\n' }]] })
+    const { agent } = await host.create('casper-pick-idle')
+    await run(agent, 'first')
+    const own = agent.model.own
+    if (own === undefined) throw new Error('a Casper Agent chooses its own models')
+    expect(await own.choose({ ...OPUS, reasoningEffort: ReasoningEffortId('high') })).toEqual({ ...OPUS, reasoningEffort: 'high' })
+    expect(sets(fake)).toEqual([['model', 'claude-subscription/claude-opus-5-5'], ['effort', 'high']])
+    expect(fake.calls('session/prompt')).toHaveLength(1)
+    expect(current(host, agent)).toEqual({ ...OPUS, reasoningEffort: 'high' })
+    expect(types(agent).slice(-2)).toEqual(['model/selection', 'plugin:casper-agent/models'])
+    // The same pick again records and sends nothing.
+    await own.choose({ ...OPUS, reasoningEffort: ReasoningEffortId('high') })
+    expect(sets(fake)).toHaveLength(2)
+    // A new effort for the same model sends only the effort.
+    expect(await own.choose({ ...OPUS, reasoningEffort: ReasoningEffortId('low') })).toEqual({ ...OPUS, reasoningEffort: 'low' })
+    expect(sets(fake).slice(2)).toEqual([['effort', 'low']])
+    await expect(own.choose({ provider: 'openai-codex', model: 'gpt-gone' })).rejects.toThrow(
+      'Casper can\'t use openai-codex/gpt-gone: it is not one of your signed-in models. Pick one from the list.')
+    await expect(own.choose({ ...OPUS, reasoningEffort: ReasoningEffortId('medium') })).rejects.toThrow(
+      'claude-subscription/claude-opus-5-5 has no effort medium. Choose: auto, low, high')
+    // A model with no effort choices takes no effort.
+    expect(await own.choose({ provider: 'claude-subscription', model: 'vendor/small:free', reasoningEffort: ReasoningEffortId('high') }))
+      .toEqual({ provider: 'claude-subscription', model: 'vendor/small:free' })
+    expect(sets(fake).at(-1)).toEqual(['model', 'claude-subscription/vendor/small:free'])
+    expect(fake.calls('session/prompt')).toHaveLength(1)
+  })
+
+  it('sends a pick made before Casper starts ahead of the first prompt, and follows a model Casper changes itself', async () => {
+    const { fake, host } = await setup({
+      configOptions: casperOptions(),
+      prompts: [[
+        { text: 'switching\n' }, { tool: 'read', target: 'README.md' }, { toolEnd: 1 },
+        { configUpdate: casperOptions(`${SOL.provider}/${SOL.model}`, 'low') }, { text: 'switched\n' },
+      ]],
+    })
+    await cacheList(host)
+    const { agent } = await host.create('casper-pick-early')
+    expect(view(host, agent)).toEqual({ ...reportOf(casperOptions()), started: false })
+    await agent.model.own?.choose({ ...OPUS, reasoningEffort: ReasoningEffortId('high') })
+    expect(fake.pids()).toEqual([])
+    expect(current(host, agent)).toEqual({ ...OPUS, reasoningEffort: 'high' })
+    await run(agent, 'go')
+    expect(methodsOf(fake)).toEqual(['session/new', 'session/set_config_option', 'session/set_config_option', 'session/prompt'])
+    expect(sets(fake)).toEqual([['model', 'claude-subscription/claude-opus-5-5'], ['effort', 'high']])
+    // Casper's own /model mid-prompt moves the badge and labels the messages after it.
+    expect(current(host, agent)).toEqual({ ...SOL, reasoningEffort: 'low' })
+    expect(labels(agent).map(source => (source as { model: string }).model)).toEqual(['claude-subscription/claude-opus-5-5', 'openai-codex/gpt-6.1-sol'])
+  })
+
+  it('keeps a pick made during a prompt for the next turn, even when Casper changes its model meanwhile', async () => {
+    const fake = fakeCasper({ prompts: [] })
+    cleanups.push(() => { fake.remove() })
+    const hold = gate(fake, 'hold')
+    fake.script({
+      configOptions: casperOptions(),
+      prompts: [[{ waitFile: hold.path }, { configUpdate: casperOptions(undefined, 'low') }, { text: 'one\n' }], [{ text: 'two\n' }]],
+    })
+    const host = await boot(fake)
+    cleanups.push(() => host.ctx.fiber.dispose())
+    const { agent } = await host.create('casper-pick-busy')
+    agent.followup(prompt('first'))
+    await waitFor(() => fake.calls('session/prompt').length === 1)
+    await agent.model.own?.choose(OPUS)
+    expect(sets(fake)).toEqual([])
+    hold.open()
+    await agent.whenIdle()
+    expect(current(host, agent)).toEqual(OPUS)
+    await run(agent, 'second')
+    expect(methodsOf(fake).slice(-2)).toEqual(['session/set_config_option', 'session/prompt'])
+    expect(sets(fake)).toEqual([['model', 'claude-subscription/claude-opus-5-5']])
+    expect(current(host, agent)).toEqual({ ...OPUS, reasoningEffort: 'low' })
+  })
+
+  it('sends a pick made while an earlier one is being sent, even one Casper then refuses, so the last pick wins', async () => {
+    const fake = fakeCasper({ prompts: [] })
+    cleanups.push(() => { fake.remove() })
+    const holdModel = gate(fake, 'hold-model')
+    const holdEffort = gate(fake, 'hold-effort')
+    fake.script({
+      configOptions: casperOptions(),
+      holdSet: { model: holdModel.path, effort: holdEffort.path },
+      setFails: { effort: 'high is not offered now' },
+      prompts: [[{ text: 'one\n' }]],
+    })
+    const host = await boot(fake)
+    cleanups.push(() => host.ctx.fiber.dispose())
+    await cacheList(host)
+    const { agent } = await host.create('casper-pick-twice')
+    // In a turn: the second pick is sent after the first.
+    await agent.model.own?.choose(OPUS)
+    agent.followup(prompt('first'))
+    await waitFor(() => sets(fake).length === 1)
+    expect(await agent.model.own?.choose(SOL)).toEqual(SOL)
+    expect(current(host, agent)).toEqual(SOL)
+    holdModel.open()
+    await agent.whenIdle()
+    expect(methodsOf(fake)).toEqual(['session/new', 'session/set_config_option', 'session/set_config_option', 'session/prompt'])
+    expect(sets(fake)).toEqual([['model', 'claude-subscription/claude-opus-5-5'], ['model', 'openai-codex/gpt-6.1-sol']])
+    expect(current(host, agent)).toEqual({ ...SOL, reasoningEffort: 'auto' })
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }])
+    // While idle: Casper refuses the first pick's effort, and the second pick replaces it.
+    const first = agent.model.own?.choose({ ...OPUS, reasoningEffort: ReasoningEffortId('high') })
+    await waitFor(() => sets(fake).length === 4)
+    await agent.model.own?.choose(SOL)
+    holdEffort.open()
+    await first
+    expect(sets(fake).slice(2)).toEqual([['model', 'claude-subscription/claude-opus-5-5'], ['effort', 'high'], ['model', 'openai-codex/gpt-6.1-sol']])
+    expect(current(host, agent)).toEqual({ ...SOL, reasoningEffort: 'auto' })
+    expect(fake.calls('session/prompt')).toHaveLength(1)
+  })
+
+  it('kills a Casper that never answers a pick when the user stops it, and sends the pick to the next Casper', async () => {
+    const fake = fakeCasper({ prompts: [] })
+    cleanups.push(() => { fake.remove() })
+    const hold = gate(fake, 'hold-set')
+    fake.script({ configOptions: casperOptions(), holdSet: { model: hold.path }, prompts: [[{ text: 'one\n' }], [{ text: 'two\n' }]] })
+    const host = await boot(fake)
+    cleanups.push(() => host.ctx.fiber.dispose())
+    const { agent } = await host.create('casper-pick-hung')
+    await run(agent, 'first')
+    // Idle: the pick's own call fails, and Casper is killed.
+    const [idlePid] = fake.pids()
+    const idle = agent.model.own?.choose(OPUS).then(() => 'chosen', (error: unknown) => error)
+    await waitFor(() => sets(fake).length === 1)
+    agent.cancel({ kind: 'user' })
+    expect(await idle).toMatchObject({ message: 'the model pick was stopped' })
+    await waitFor(() => !alive(idlePid ?? 0))
+    await agent.whenIdle()
+    expect(current(host, agent)).toEqual(OPUS)
+    // In a turn: the turn ends aborted with no prompt sent, and Casper is killed.
+    agent.followup(prompt('second'))
+    await waitFor(() => sets(fake).length === 2)
+    const turnPid = fake.pids().at(-1)
+    agent.cancel({ kind: 'user' })
+    await agent.whenIdle()
+    await waitFor(() => !alive(turnPid ?? 0))
+    expect(turnEnds(agent).at(-1)).toEqual({ kind: 'aborted', reason: { kind: 'user' } })
+    expect(promptTexts(fake)).toEqual(['first'])
+    // Once Casper answers sets again, the next turn sends the pick first.
+    hold.open()
+    await run(agent, 'third')
+    expect(sets(fake)).toHaveLength(3)
+    expect(promptTexts(fake)).toEqual(['first', 'third'])
+    expect(turnEnds(agent).at(-1)).toEqual({ kind: 'completed' })
+    expect(current(host, agent)).toEqual({ ...OPUS, reasoningEffort: 'auto' })
+  })
+
+  it('ends the turn CASPER_MODEL_UNAVAILABLE without a prompt when Casper refuses a pick, and shows Casper\'s model again', async () => {
+    const refusal = 'claude-subscription is signed out: run casper /login'
+    const { fake, host } = await setup({ configOptions: casperOptions(), setFails: { model: refusal }, prompts: [[{ text: 'one\n' }], [{ text: 'two\n' }]] })
+    await cacheList(host)
+    const { agent } = await host.create('casper-pick-refused')
+    await agent.model.own?.choose(OPUS)
+    await run(agent, 'first')
+    const message = `Casper can't use claude-subscription/claude-opus-5-5: ${refusal}. Pick another model.`
+    expect(turnEnds(agent)).toEqual([{ kind: 'error', error: { code: 'CASPER_MODEL_UNAVAILABLE', message } }])
+    expect(fake.calls('session/prompt')).toEqual([])
+    expect(current(host, agent)).toEqual({ ...SOL, reasoningEffort: 'auto' })
+    // Refused while idle, the pick's own call fails with the same words.
+    await expect(agent.model.own?.choose(OPUS)).rejects.toMatchObject({ code: 'CASPER_MODEL_UNAVAILABLE', message })
+    expect(current(host, agent)).toEqual({ ...SOL, reasoningEffort: 'auto' })
+    await run(agent, 'second')
+    expect(turnEnds(agent).at(-1)).toEqual({ kind: 'completed' })
+    expect(promptTexts(fake)).toEqual(['second'])
+  })
+
+  it('keeps the list it showed for a Casper that offers no options, and refuses a pick it cannot send', async () => {
+    const { fake, host } = await setup({ prompts: [[{ text: 'one\n' }], [{ text: 'two\n' }]] })
+    await cacheList(host)
+    const { agent } = await host.create('casper-pick-older')
+    await agent.model.own?.choose(OPUS)
+    await run(agent, 'first')
+    expect(turnEnds(agent)).toEqual([{ kind: 'error', error: {
+      code: 'CASPER_MODEL_UNAVAILABLE',
+      message: 'Casper can\'t use claude-subscription/claude-opus-5-5: it is not one of the models this Casper offers. Pick another model.',
+    } }])
+    expect(view(host, agent)).toEqual({ ...reportOf(casperOptions()), started: false })
+    await run(agent, 'second')
+    expect(promptTexts(fake)).toEqual(['second'])
+    expect(view(host, agent)).toEqual({ ...reportOf(casperOptions()), started: false })
+  })
+
+  it('reports a Casper exit during a pick as an exit, and keeps the list when it cannot be saved', async () => {
+    const { fake, host } = await setup({ configOptions: casperOptions(), setExit: 3, prompts: [[{ text: 'one\n' }]] })
+    const { agent } = await host.create('casper-pick-exit')
+    const global = host.ctx.storageDomain.get('casper_agent_models')?.global
+    if (global === undefined) throw new Error('model cache is not open')
+    const set = vi.spyOn(global, 'set').mockRejectedValueOnce(new Error('disk full'))
+    await run(agent, 'first')
+    await waitFor(() => set.mock.calls.length === 1)
+    set.mockRestore()
+    await expect(agent.model.own?.choose(OPUS)).rejects.toMatchObject({ code: 'CASPER_EXITED' })
+    expect(current(host, agent)).toEqual({ ...SOL, reasoningEffort: 'auto' })
+    expect(fake.pids()).toHaveLength(1)
   })
 })

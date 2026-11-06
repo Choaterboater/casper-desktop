@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-本插件让 Casper agent 成为 `casper` 预设上会话的主 AI。`ctx.agents` 上的一条工厂路由让每个这样的会话由一个 `casper acp` 进程驱动，而不是 DeepSeek agent 循环。Casper 的文本、工具步骤、检查、计划与回执都成为普通会话事件，因此桌面端的对话记录、工具卡片、待办列表与停止按钮照常工作。Casper 的审批框以问题形式呈现给用户。每个进程还会通过一个私有 MCP 服务器获得应用自身的工具，用于检查应用和安装插件。桌面端的新会话默认使用此预设。
+本插件让 Casper agent 成为 `casper` 预设上会话的主 AI。`ctx.agents` 上的一条工厂路由让每个这样的会话由一个 `casper acp` 进程驱动，而不是 DeepSeek agent 循环。Casper 的文本、工具步骤、检查、计划与回执都成为普通会话事件，因此桌面端的对话记录、工具卡片、待办列表与停止按钮照常工作。Casper 的审批框以问题形式呈现给用户，模型选择器列出 Casper 的模型。每个进程还会通过一个私有 MCP 服务器获得应用自身的工具，用于检查应用和安装插件。桌面端的新会话默认使用此预设。
 
 ## 目录
 
@@ -31,8 +31,8 @@ kind: "package-reference"
 | `presets` | `['casper']` | 由 Casper 驱动其会话的预设 |
 | `command` | `casper` | Casper 可执行文件；桌面端条目在 PATH、`~/.local/bin`、`~/.bun/bin`、`/opt/homebrew/bin` 与 `/usr/local/bin` 中查找 |
 | `args` | `['acp']` | 启动 Casper ACP 服务器的参数 |
-| `model` | 未设置 | 以 `--model` 传入；未设置时沿用 Casper 自身的默认值 |
-| `effort` | 未设置 | 以 `--effort` 传入；未设置时沿用 Casper 自身的默认值 |
+| `model` | 未设置 | 起始模型，以 `--model` 传入；未设置时沿用 Casper 自身的默认值。[模型选择器](#model-picker)可按会话更改 |
+| `effort` | 未设置 | 起始推理等级，以 `--effort` 传入；未设置时沿用 Casper 自身的默认值。模型选择器可按会话更改 |
 | `env` | `{}` | 在子进程清理之后加入的子进程环境；桌面端条目传入以 bun 目录开头的 PATH，并在已设置时传入 `OPENROUTER_API_KEY` |
 | `startTimeoutMs` | `30000` | `initialize` 加上 `session/new` 或 `session/load` 的时限 |
 | `cancelGraceMs` | `5000` | 停止后等待提示回复的时间，超时则结束 Casper |
@@ -45,7 +45,7 @@ kind: "package-reference"
 
 会话在 Casper 预设上创建时即成为 Casper 会话。空白会话不能在 Casper 与其他预设之间切换：预设注册表以 `agent-preset/locked` 与 `newSession: true` 拒绝这种切换，模式选择器则改为在所选预设上开启新会话。已存储的会话由其记录的预设所选择的工厂恢复；未记录预设的会话仍使用 agent-loop。
 
-无法运行的轮次在 `turn/end` 上以错误结束：找不到命令时为 `CASPER_NOT_FOUND`，Casper 未能启动时为 `CASPER_START_FAILED`，轮次中途退出时为 `CASPER_EXITED`，提示中没有 Casper 能读取的内容时为 `CASPER_EMPTY_PROMPT`：没有文本、图片或文件，或只有无法发送的图片和文件（不会向 Casper 发送任何内容），达到 Casper 的轮次上限时为 `CASPER_TURN_LIMIT`，收到错误回复时为 `CASPER_RPC_<code>`。会话仍可使用；下一条提示会再次启动 Casper。`CASPER_TEXT_ONLY` 已不再产生，只出现在早期版本保存的轮次中。
+无法运行的轮次在 `turn/end` 上以错误结束：找不到命令时为 `CASPER_NOT_FOUND`，Casper 未能启动时为 `CASPER_START_FAILED`，轮次中途退出时为 `CASPER_EXITED`，提示中没有 Casper 能读取的内容时为 `CASPER_EMPTY_PROMPT`：没有文本、图片或文件，或只有无法发送的图片和文件（不会向 Casper 发送任何内容），达到 Casper 的轮次上限时为 `CASPER_TURN_LIMIT`，Casper 拒绝所选模型或推理等级时为 `CASPER_MODEL_UNAVAILABLE`（不发送提示），收到错误回复时为 `CASPER_RPC_<code>`。会话仍可使用；下一条提示会再次启动 Casper。`CASPER_TEXT_ONLY` 已不再产生，只出现在早期版本保存的轮次中。
 
 <a id="understand-the-implementation"></a>
 ## 理解实现
@@ -64,6 +64,9 @@ kind: "package-reference"
 | [`src/commands.ts`](src/commands.ts) | 供 `/` 菜单使用的 Casper 命令，以及保存最后一份列表的 Host 存储域 `casper_agent_commands` |
 | [`src/app-tools.ts`](src/app-tools.ts) | 应用工具 MCP 服务器：监听、认证、工具列表，以及以 Casper Agent 身份运行的调用 |
 | [`src/app-read.ts`](src/app-read.ts) | `app_read_file`：对应用安装目录与 profile 目录的只读访问 |
+| [`src/models.ts`](src/models.ts) | 把 Casper 的 `model` 与 `thought_level` 选项读成选择器的分组、推理等级与当前模型 |
+| [`src/model.ts`](src/model.ts) | `CasperModel`：Agent 的模型句柄，把选择交给 Casper 而不是 Host 目录 |
+| [`src/models-cache.ts`](src/models-cache.ts) | 保存最后一份模型列表的 Host 存储域 `casper_agent_models` |
 
 ### 轮次与事件
 
@@ -113,6 +116,15 @@ Casper 通过 `available_commands_update` 发送它的斜杠命令（包括用�
 
 该身份告诉客户端把这一行当作提示处理（[ui-commands](../../client/ui-commands/README.zh.md)）：选择命令会插入 `/name`，命令接受输入时带一个尾随空格；按 Enter 会把输入的这一行连同附件作为普通提示发送，由 Casper 作为它自己的命令运行。改为执行命令的界面会把同一行排入下一条提示。最后一份列表保存在 Host 存储域 `casper_agent_commands`（一条全局记录）中，每个新 Agent 在自己的 Casper 启动之前就提供它。Agent 只在发布之后才注册命令：每次注册都会让所有客户端重新拉取其 Session 的菜单，而重新拉取会恢复未运行的 Session，因此创建失败的 Agent 不注册任何命令。
 
+<a id="model-picker"></a>
+### 模型选择器
+
+Casper 在 `session/new` 与 `session/load` 的回复中发送它的选项，并在 `config_option_update` 中再次发送。类别为 `model` 的选项是按提供方分组的模型列表，每个模型在 `_meta.casper.efforts` 中列出它接受的推理等级；类别为 `thought_level` 的选项是推理等级，并为这些值命名。不发送 `_meta.casper.efforts` 的旧版 Casper 会让当前模型使用推理等级选项的值。这里不读取 Casper 的 `mode` 选项。每次变化的列表记录为插件记录 `plugin:casper-agent/models`；没有此包的应用版本会保留并跳过它，因此仍能打开该 Session。`agentModels` 投影跳过格式错误的记录，并向输入框标记与 `/model` 提供该列表、Casper 当前的模型与推理等级，以及它们是否由 Casper 自己发送（[ui-model-selection](../../client/ui-model-selection/README.zh.md#agent-offered-models)）。消息以 Casper 报告的模型标注。
+
+选择交给 Agent，而不是 Host 目录：它会按 Casper 的列表检查，记录为 `model/selection`，并通过 `session/set_config_option` 发送（先 `model`，推理等级不同时再发 `effort`）。Casper 未列出的模型，或该模型不接受的推理等级，会立即被拒绝；没有推理等级的模型不带推理等级。Casper 空闲时选择会立即发送，且不发送提示。在提示运行期间或 Casper 启动之前做出的选择，会在下一轮开始、发送提示之前发送。Casper 拒绝时，该轮以 `CASPER_MODEL_UNAVAILABLE` 结束并附上 Casper 的原话，不发送提示，标记重新显示 Casper 的模型。在前一个选择发送期间做出的选择会接着发送，因此以最后一次选择为准。ACP 无法取消设置请求，因此 Casper 尚未答复设置时按下停止会结束 Casper；选择会保留，并在下一个 Casper 的第一条提示之前送达。Casper 自己更改的模型（例如通过它自己的 `/model`）会移动标记，并标注之后的消息。
+
+新会话在自己的 Casper 启动之前显示保存在 Host 存储域 `casper_agent_models`（一条全局记录）中的列表，设置了配置中的 `model` 时以它为当前模型；在任何 Casper 发送列表之前，选择器会说明 Casper 启动后才会列出模型。恢复的会话保留其历史记录的内容。在记录此列表之前创建的会话，在其 Casper 启动之前会拒绝选择。
+
 ### 进程生命周期与恢复
 
 Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打开会话。`session/new` 之后，对话 id 会在发送提示前存入 sidecar。之后的进程用 `session/load` 重新打开它，并丢弃回放的更新，因为会话已经保存了历史；只有 Casper 的“没有已保存对话”回复（`-32002`，消息中含不区分大小写的 "no saved conversation"）会开启新对话，且该轮以一行说明开头，即使该轮随后什么也没有发送。Casper 只在第一次回复后保存对话，因此进程在此之前就停止的对话会以这种方式重新开始。其他加载失败会结束该轮并保留记录。释放时关闭 stdin，等待 `exitGraceMs`，然后终止进程，符合桌面端 10 秒的 Host 退出时限。恢复会像 agent-loop 一样修复中断的轮次，且不启动进程。
@@ -152,7 +164,7 @@ Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打�
 <a id="known-limitations-and-deferred-work"></a>
 
 - `initialize` 回复未设置 `promptCapabilities.image` 的 Casper 会收到占位文本，而不是每张图片。
-- 模型选择器不会更改 Casper 的模型，模型标记在用户选择之前保持为空；`model` 与 `effort` 属于部署配置。
+- 选择按 Casper 最后发送的列表检查；Casper 之后发现已退出登录的模型，会在发送选择时被拒绝。
 - 推理、token 用量与费用都不会显示，因为 Casper 不发送它们；`session/load` 的回放也不显示。
 - 正在运行的 shell 步骤在结束前不显示输出。
 - 只有应用工具服务器会传给 Casper；应用中配置的 MCP 服务器不会。
@@ -178,7 +190,6 @@ Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打�
 
 本开发备注是维护者的工作上下文：开放问题与尚未决定的探索方向。它明确不具权威性——已交付的行为与限制以上文和包代码为准。
 
-- **模型选择**——若要由 GUI 选择器决定 Casper 的模型，需要以 `--model` 重启 Casper，并用 `session/load` 重新打开对话。
 - **审批卡片**——一旦 Casper 的选项类型能映射到共享审批卡片的固定操作，composer 适配器即可用该卡片呈现 Casper 的审批框。
 - **检查插件**——Casper 会话经过实际验证后，可以从 Standard 预设中移除 `packages/casper/tool-checks`。
 

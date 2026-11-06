@@ -16,7 +16,7 @@ import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { RemoteError, TestRemote } from '@deepseek-ai/dsh-client-test-runtime'
 import type { ModelSelection } from '@deepseek-ai/dsh-agent/types'
-import type { ModelSelectionProjection } from '@deepseek-ai/dsh-agent/types'
+import type { AgentModelsProjection, ModelSelectionProjection } from '@deepseek-ai/dsh-agent/types'
 import { ReasoningEffortId } from '@deepseek-ai/dsh-llm/brand'
 import type { CommandContribution, PopupSelectSpec, SelectOption } from '@deepseek-ai/dsh-client-ui-commands/client'
 import type { ModelSelectInjected } from '../src/client/slots.ts'
@@ -73,6 +73,9 @@ async function bench(locale: 'zh' | 'en' = 'zh') {
   let selected = defaultSelection
   const calls = { models: 0, select: 0 }
   const projections = new Map<SessionId, SnapshotStore<ModelSelectionProjection | undefined>>()
+  // The `agentModels` face per Session: null for an Agent on the Host catalog.
+  const offered = new Map<SessionId, SnapshotStore<AgentModelsProjection | null>>()
+  const picks: { sessionId: SessionId; provider: string; model: string; reasoningEffort?: string }[] = []
   // Whether the Host advertises available models for the current route.
   let routable = true
   let catalogFailure = false
@@ -95,6 +98,16 @@ async function bench(locale: 'zh' | 'en' = 'zh') {
     selectModel: (payload: { sessionId: SessionId; provider: string; model: string; reasoningEffort?: string }) => {
       calls.select += 1
       if (selectionFailure !== undefined) return Promise.resolve({ ok: false as const, error: selectionFailure })
+      const own = offered.get(payload.sessionId)
+      const view = own?.getSnapshot()
+      if (own !== undefined && view != null) {
+        // An Agent with its own models takes the pick; the Host catalog and default stay untouched.
+        picks.push(payload)
+        const effort = payload.reasoningEffort === undefined ? {} : { reasoningEffort: ReasoningEffortId(payload.reasoningEffort) }
+        const pick = { provider: payload.provider, model: payload.model, ...effort }
+        own.set({ ...view, current: pick })
+        return Promise.resolve({ ok: true as const, value: { selected: pick } })
+      }
       selected = {
         provider: payload.provider,
         model: payload.model,
@@ -143,7 +156,7 @@ async function bench(locale: 'zh' | 'en' = 'zh') {
     session: {
       sessionId: SessionId
       getSnapshot: () => { blank: boolean }
-      projections: { faceOf: () => SnapshotStore<ModelSelectionProjection | undefined> }
+      projections: { faceOf: (key: string) => SnapshotStore<unknown> }
     }
     ctx: Context
   }>()
@@ -160,7 +173,7 @@ async function bench(locale: 'zh' | 'en' = 'zh') {
   const fiber = ctx.plugin({ inject: [...inject], apply })
   await fiber.await()
   await ctx.plugin(function probe() {}).await()
-  const mint = (key: string, blank = false) => {
+  const mint = (key: string, blank = false, agentModels: AgentModelsProjection | null = null) => {
     const id = sid(key)
     const handle = createScope(ctx, id)
     scopes.set(id, handle.ctx)
@@ -169,16 +182,22 @@ async function bench(locale: 'zh' | 'en' = 'zh') {
       next: null,
     })
     projections.set(id, projection)
+    const own = createSnapshotStore<AgentModelsProjection | null>(agentModels)
+    offered.set(id, own)
     const binding = {
       sessionId: id,
-      session: { sessionId: id, getSnapshot: () => ({ blank }), projections: { faceOf: () => projection } },
+      session: {
+        sessionId: id,
+        getSnapshot: () => ({ blank }),
+        projections: { faceOf: (face: string): SnapshotStore<unknown> => face === 'agentModels' ? own : projection },
+      },
       ctx: handle.ctx,
     }
     bindings.set(id, binding)
     handle.ctx.effect(() => () => {
       if (bindings.get(id) === binding) bindings.delete(id)
     })
-    return { ...handle, projection }
+    return { ...handle, projection, offered: own }
   }
   return {
     ctx, fiber, mint, calls, remote, track,
@@ -195,6 +214,8 @@ async function bench(locale: 'zh' | 'en' = 'zh') {
     },
     setHostCurrent: (selection: ModelSelection) => { defaultSelection = selection },
     setProjected: (id: SessionId, value: ModelSelectionProjection) => { projections.get(id)?.set(value) },
+    setOffered: (id: SessionId, value: AgentModelsProjection | null) => { offered.get(id)?.set(value) },
+    picks,
     address: (id: SessionId) => { addressed.add(id) },
     setGroups: (next: typeof GROUPS) => { groups = next },
     setCatalogFailure: (next: boolean) => { catalogFailure = next },
@@ -569,6 +590,85 @@ describe('ui-model-selection dual entry', () => {
   })
 })
 
+
+/** A Casper Session's own list, as its `agentModels` projection shows it. */
+const CASPER: AgentModelsProjection = {
+  groups: [
+    { id: 'openai-codex', name: 'openai-codex', models: [{
+      id: 'gpt-6.1-sol', name: 'GPT-6.1 Sol',
+      reasoning: { efforts: [{ id: 'auto', name: 'Auto' }, { id: 'high', name: 'High' }], defaultEffort: 'auto' },
+    }] },
+    { id: 'claude-subscription', name: 'Claude Code plan', models: [{ id: 'vendor/small:free', name: 'Small' }] },
+  ],
+  current: { provider: 'openai-codex', model: 'gpt-6.1-sol', reasoningEffort: ReasoningEffortId('auto') },
+  started: true,
+}
+
+describe('Agent-offered models', () => {
+  it('shows a Casper Session its own list, and only that Session', async () => {
+    const b = await bench('en')
+    b.mint('casper', false, CASPER)
+    b.mint('plain')
+    const casper = b.seat().inject!(sid('casper'))
+    const plain = b.seat().inject!(sid('plain'))
+    expect(casper.directory.getSnapshot()).toEqual({
+      current: CASPER.current, retainedEffort: 'Auto', routable: true, groups: CASPER.groups, failures: [],
+      status: 'ready', pending: null, error: null, agent: { started: true },
+    })
+    await vi.waitFor(() => { expect(plain.directory.getSnapshot().status).toBe('ready') })
+    expect(plain.directory.getSnapshot().groups).toEqual(GROUPS)
+    expect(plain.directory.getSnapshot().agent).toBeUndefined()
+    // The /model popup lists Casper's models in the Casper Session, the Host catalog elsewhere.
+    const casperRows = await b.popup().options(projection('casper'), new AbortController().signal)
+    expect(casperRows.map(row => [row.label, row.group?.label, row.active === true])).toEqual([
+      ['GPT-6.1 Sol', 'openai-codex', true], ['Small', 'Claude Code plan', false],
+    ])
+    const plainRows = await b.popup().options(projection('plain'), new AbortController().signal)
+    expect(plainRows.map(row => row.label)).toEqual(['DeepSeek-V4-Flash', 'DeepSeek-V4-Pro', 'External Flash'])
+    expect(b.calls.models).toBe(1)
+  })
+
+  it('moves the badge with the projection and sends a pick to the Session\'s Agent', async () => {
+    const b = await bench('en')
+    b.mint('casper', false, CASPER)
+    const face = b.seat().inject!(sid('casper'))
+    // Casper changed its own model: the badge follows.
+    b.setOffered(sid('casper'), { ...CASPER, current: { provider: 'claude-subscription', model: 'vendor/small:free' } })
+    expect(face.directory.getSnapshot()).toMatchObject({ current: { provider: 'claude-subscription', model: 'vendor/small:free' }, routable: true })
+    expect(face.directory.getSnapshot().retainedEffort).toBeUndefined()
+    const options = await b.popup().options(projection('casper'), new AbortController().signal)
+    await b.popup().onSelect(options[0]!, projection('casper'))
+    expect(b.picks).toEqual([{ sessionId: sid('casper'), provider: 'openai-codex', model: 'gpt-6.1-sol', reasoningEffort: 'auto' }])
+    expect(face.directory.getSnapshot()).toMatchObject({ current: { provider: 'openai-codex', model: 'gpt-6.1-sol', reasoningEffort: 'auto' }, status: 'ready' })
+    expect(b.track).toHaveBeenCalledWith('model_switch', { session_id: 'casper', switch_from: 'claude-subscription/vendor/small:free', switch_to: 'openai-codex/gpt-6.1-sol' })
+    b.track.mockClear()
+    await face.select({ provider: 'openai-codex', model: 'gpt-6.1-sol', reasoningEffort: 'high' })
+    expect(b.track).toHaveBeenCalledExactlyOnceWith('thinking_level_switch', {
+      session_id: 'casper', model_name: 'openai-codex/gpt-6.1-sol', switch_from: 'auto', switch_to: 'high',
+    })
+    expect(face.directory.getSnapshot().retainedEffort).toBe('High')
+    // A model Casper no longer lists is kept as current but marked not routable.
+    b.setOffered(sid('casper'), { ...CASPER, current: { provider: 'openai-codex', model: 'gpt-gone' } })
+    expect(face.directory.getSnapshot()).toMatchObject({ current: { provider: 'openai-codex', model: 'gpt-gone' }, routable: false })
+    expect(b.hostCurrent()).toEqual({ provider: 'deepseek-official', model: 'deepseek-v4-flash' })
+  })
+
+  it('says why the list is empty before Casper starts and when it has no models', async () => {
+    const b = await bench('en')
+    b.mint('casper', true, { groups: [], current: null, started: false })
+    const face = b.seat().inject!(sid('casper'))
+    expect(face.directory.getSnapshot()).toMatchObject({ groups: [], current: null, routable: null, status: 'ready', agent: { started: false } })
+    await expect(b.popup().options(projection('casper'), new AbortController().signal))
+      .rejects.toThrow('Casper lists its models once it starts. Send your first message.')
+    b.setOffered(sid('casper'), { groups: [], current: null, started: true })
+    await expect(b.popup().options(projection('casper'), new AbortController().signal))
+      .rejects.toThrow('Casper has no models you\'re signed in to. Run casper /login in a terminal.')
+    // An Agent that stops offering its own list falls back to the Host catalog.
+    b.setOffered(sid('casper'), null)
+    await vi.waitFor(() => { expect(face.directory.getSnapshot().groups).toEqual(GROUPS) })
+    expect(face.directory.getSnapshot().agent).toBeUndefined()
+  })
+})
 
 it.each([false, true])('reports accepted switches with blank=%s and no refused switch', async (blank) => {
   const b = await bench('en')

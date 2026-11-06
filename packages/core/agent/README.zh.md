@@ -53,6 +53,8 @@ await handle.dispose()   // stops the loop, unregisters, removes the session, un
 
 要启用作用域内的切换提示，在 Agent setup 中调用 `dsh-agent` 的 `installModelSelection(agentCtx)`。作用域拥有监听器，并在释放时移除它。
 
+自己运行模型的 Agent（例如 Casper）设置 `Model.own`。此时 `session.selectModel` 把选择交给 `own.choose(selection)`，跳过 Host 目录、已保存的默认值与图片检查；拒绝会变为 `session/model-unavailable`。这样的 Agent 把自己的列表记录为插件记录 `AGENT_MODELS_RECORD`（`plugin:casper-agent/models`），并注册 `agentModelsProjectionDefinition`，它跳过格式错误的记录：`agentModels` 视图在首次报告之前为 null，之后包含分组、`current`（报告之后记录的 `model/selection`，否则为报告的模型）与 `started`。它不进入 Session 摘要。
+
 ### 驱动 agent 的对话
 
 句柄的方法把带标识的 user 角色消息路由进 agent 的收件箱。`followup()` 排队一条普通的下一个轮次提示词并唤醒驱动器；`steer()` 提交下一步输入并唤醒它；`inject()` 添加面向模型的上下文但不唤醒驱动器，因此它落在下一个被接纳的步骤中。`cancel(cause)` 中止当前活动，并在未设置 `keepInbox` 时清除待处理工作；`whenIdle()` 会在整个 agent 达到完全停稳后完成。
@@ -116,6 +118,7 @@ await handle.agent.whenIdle()
 | [`src/types.ts`](src/types.ts) | `AgentOptions`、取消原因与收件箱投影词汇 |
 | [`src/dispatch.ts`](src/dispatch.ts) | `agentEvents` 融合分发器与 `assembleContextFor(agent)` |
 | [`src/model-selection.ts`](src/model-selection.ts) | `AgentModel`、持久投影与 `installModelSelection` 切换提示 |
+| [`src/agent-models.ts`](src/agent-models.ts) | Agent 自有模型列表的 `agentModels` 投影 |
 | [`src/consumed-work.ts`](src/consumed-work.ts) | `foldConsumedWork(events)`：日志消费掉的工作最终怎样了 |
 | [`src/archive-admission.ts`](src/archive-admission.ts) | Workspace 注册表归档准入中的 `turn` 族：运行中的回合及其用户原因取消 |
 

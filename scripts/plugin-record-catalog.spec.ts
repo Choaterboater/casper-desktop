@@ -117,6 +117,21 @@ describe('plugin record declarations', () => {
     expect(() => collectPluginRecords(root)).toThrow('must belong to a package declared experimental')
   })
 
+  it('admits a Casper package under its own name as the namespace', () => {
+    const source = 'packages/casper/casper-agent/src/models.ts'
+    const root = fixture({
+      'packages/casper/casper-agent/package.json': '{"name":"@deepseek-ai/dsh-casper-agent"}',
+      [source]: augmentation("    /** Retains the model list. */\n    'plugin:casper-agent/models': SavedEntry"),
+    })
+    expect(collectPluginRecords(root)).toEqual([{
+      name: 'plugin:casper-agent/models', owner: '@deepseek-ai/dsh-casper-agent', payload: 'SavedEntry', doc: 'Retains the model list.', source,
+    }])
+    put(root, source, augmentation("    /** Another package event. */\n    'plugin:casper/models': SavedEntry"))
+    expect(() => collectPluginRecords(root)).toThrow("must use 'plugin:casper-agent/<name>'")
+    put(root, 'packages/casper/casper-agent/package.json', '{"name":"@external/casper-agent"}')
+    expect(() => collectPluginRecords(root)).toThrow('or to a Casper package')
+  })
+
   it('requires the types module augmentation and verifiable package ownership', () => {
     expect(() => collectPluginRecords(fixture({
       [RECORDS]: augmentation(ENTRY).replace("dsh-session/types'", "dsh-session'"),

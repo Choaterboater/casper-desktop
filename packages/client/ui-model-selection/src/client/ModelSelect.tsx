@@ -40,6 +40,7 @@ import {
   IconDataOutlineRegular, IconWarningOutlineRegular, Input, isMobileDevice, rankByName, StateDot, Tag, Toast,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import { emptyModelsKey } from './directory.ts'
 import type { ModelLabelOwner, ModelSelectInjected } from './slots.ts'
 import css from './ModelSelect.module.css'
 import { orderModelProviders } from './provider-order.ts'
@@ -620,7 +621,7 @@ export function ModelSelect(
                 })}
               </div>
               {state.status === 'ready' && filteredGroups.length === 0 && (
-                <div className={css.empty} role="status">{t(choices.length === 0 ? 'empty.models' : 'search.empty')}</div>
+                <div className={css.empty} role="status">{t(choices.length === 0 ? emptyModelsKey(state) : 'search.empty')}</div>
               )}
             </>
           )}

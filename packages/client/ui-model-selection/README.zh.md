@@ -63,6 +63,11 @@ composer 菜单中的模型名称和推理等级均使用 400（regular）字重
 
 会话级列表 slot `conversation.input.model.options` 在模型与推理等级选项下方追加控件。Owner props 提供 `locked`、`reportFailure(message)` 和 `dismiss()`，后者关闭菜单并同步聚焦触发按钮，供贡献方随后打开其他浮层；贡献方读取自身投影并提供专用命令。启用的开关按钮参与菜单键盘导航。
 
+<a id="agent-offered-models"></a>
+### Agent 提供的模型
+
+Agent 自己提供模型的会话（例如 [Casper 会话](../../casper/casper-agent/README.zh.md#model-picker)）具有非空的 `agentModels` 投影。此时两个入口都显示该列表而不是 Host 目录，且只对该会话生效：它的分组、作为标记的 Agent 当前模型与推理强度，且没有目录失败项。标记跟随投影，因此 Agent 自己更改的模型会立即显示。选择仍通过 `session.selectModel` 提交；由 Agent 检查并应用，它的拒绝与其他选择失败一样显示。Agent 不再列出的模型保持为当前模型，但标为不可路由。列表为空时，在 Agent 首次发送列表之前，输入框菜单显示“Casper 启动后会列出它的模型。请先发送第一条消息。”，之后显示“没有你已登录的 Casper 模型。请在终端中运行 casper /login。”；`/model` 把同样的文字显示为失败行。
+
 -----
 
 <a id="understand-the-implementation"></a>

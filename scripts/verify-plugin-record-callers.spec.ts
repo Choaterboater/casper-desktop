@@ -34,6 +34,7 @@ function repository(files: Record<string, string>): string {
 
 const OWNER_SOURCE = 'export function appendPluginRecord(session, type, data) { return commit(session, type, data) }\n'
 const EXPERIMENTAL = 'packages/experimental/bridge/src/index.ts'
+const CASPER = 'packages/casper/casper-agent/src/agent.ts'
 const RELEASE = 'packages/core/agent/src/index.ts'
 
 /** A source-only compiler fixture whose production map declares one bridge record. */
@@ -133,9 +134,10 @@ describe('verify-plugin-record-callers', () => {
     expect(checkPluginRecordCallers(corpus(source))).toEqual([])
   })
 
-  it('admits experimental source, the owner, tests, this gate, and the dependency policy', () => {
+  it('admits experimental and Casper source, the owner, tests, this gate, and the dependency policy', () => {
     for (const file of [
       EXPERIMENTAL,
+      CASPER,
       OWNER_FILE,
       DEPENDENCY_POLICY_FILE,
       'packages/session/session-persistence/tests/live-write-contract.ts',
@@ -144,7 +146,7 @@ describe('verify-plugin-record-callers', () => {
       'scripts/verify-plugin-record-callers.spec.ts',
       'scripts/verify-plugin-record-callers.ts',
     ]) expect(isAdmittedCaller(file), file).toBe(true)
-    for (const file of [RELEASE, 'packages/core/session/src/surface.ts', 'scripts/tool.ts', 'apps/web/src/main.ts']) {
+    for (const file of [RELEASE, 'packages/core/session/src/surface.ts', 'scripts/tool.ts', 'apps/web/src/main.ts', 'packages/casperx/a/src/index.ts']) {
       expect(isAdmittedCaller(file), file).toBe(false)
     }
   })
@@ -252,6 +254,28 @@ describe('verify-plugin-record-callers', () => {
       'packages/experimental/bridge/tests/records.spec.ts': "import { appendPluginRecord } from '@deepseek-ai/dsh-session'\nappendPluginRecord({}, 'plugin:test/state', {})\n",
     })
     expect(checkDeclaredPluginRecordWrites(root, readRepositorySources(root))).toEqual([])
+  })
+
+  it('checks Casper writers against Casper declarations', () => {
+    const root = declaredRepository('export {}\n', {
+      'packages/casper/casper-agent/package.json': JSON.stringify({ name: '@deepseek-ai/dsh-casper-agent' }),
+      'packages/casper/casper-agent/src/models.ts': [
+        "declare module '@deepseek-ai/dsh-session/types' {",
+        '  interface PluginRecordMap {',
+        '    /** Stores the model list. */',
+        "    'plugin:casper-agent/models': { groups: string[] }",
+        '  }',
+        '}',
+      ].join('\n'),
+      [CASPER]: [
+        "import { appendPluginRecord } from '@deepseek-ai/dsh-session'",
+        "appendPluginRecord({}, 'plugin:casper-agent/models', { groups: [] })",
+        "appendPluginRecord({}, 'plugin:casper-agent/missing', {})",
+      ].join('\n'),
+    })
+    const errors = checkDeclaredPluginRecordWrites(root, readRepositorySources(root))
+    expect(errors.map(error => [error.file, error.line])).toEqual([[CASPER, 3]])
+    expect(errors[0]?.reason).toContain('not assignable')
   })
 
   it('checks an empty production caller set without loading a compiler project', () => {

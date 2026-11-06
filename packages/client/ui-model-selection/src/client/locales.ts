@@ -33,6 +33,8 @@ export const zh = {
   'search.empty': '没有匹配的模型。',
   'empty.models': '暂无可用模型',
   'empty.efforts': '当前模型未提供推理等级。',
+  'empty.agentNotStarted': 'Casper 启动后会列出它的模型。请先发送第一条消息。',
+  'empty.agentModels': '没有你已登录的 Casper 模型。请在终端中运行 casper /login。',
 } satisfies Record<string, string>
 
 /** The model namespace key union. */
@@ -63,6 +65,8 @@ export const en = {
   'search.empty': 'No matching models.',
   'empty.models': 'No models yet. Add a model provider in Settings → Models.',
   'empty.efforts': 'This model provides no reasoning effort levels.',
+  'empty.agentNotStarted': 'Casper lists its models once it starts. Send your first message.',
+  'empty.agentModels': 'Casper has no models you\'re signed in to. Run casper /login in a terminal.',
 } satisfies Record<ModelKey, string>
 
 /** Japanese copy, checked against the English keys. */
@@ -90,6 +94,8 @@ export const ja = {
   'search.empty': '一致するモデルがありません。',
   'empty.models': '利用可能なモデルがありません。',
   'empty.efforts': 'このモデルには推論強度の設定がありません。',
+  'empty.agentNotStarted': 'Casper は起動するとモデルを一覧表示します。最初のメッセージを送信してください。',
+  'empty.agentModels': 'サインイン済みの Casper モデルがありません。ターミナルで casper /login を実行してください。',
 } satisfies Record<keyof typeof en, string>
 
 /** Spanish dictionary, checked against the English keys. */
@@ -117,6 +123,8 @@ export const es = {
   'search.empty': 'No hay modelos coincidentes.',
   'empty.models': 'No hay modelos disponibles.',
   'empty.efforts': 'Este modelo no proporciona niveles de esfuerzo de razonamiento.',
+  'empty.agentNotStarted': 'Casper muestra sus modelos cuando se inicia. Envía tu primer mensaje.',
+  'empty.agentModels': 'Casper no tiene modelos con tu sesión iniciada. Ejecuta casper /login en una terminal.',
 } satisfies Record<keyof typeof en, string>
 
 /** French dictionary, checked against the English keys. */
@@ -144,6 +152,8 @@ export const fr = {
   'search.empty': 'Aucun modèle correspondant.',
   'empty.models': 'Aucun modèle disponible.',
   'empty.efforts': 'Ce modèle ne fournit aucun niveau d’effort de raisonnement.',
+  'empty.agentNotStarted': 'Casper affiche ses modèles une fois démarré. Envoyez votre premier message.',
+  'empty.agentModels': 'Casper n’a aucun modèle auquel vous êtes connecté. Exécutez casper /login dans un terminal.',
 } satisfies Record<keyof typeof en, string>
 
 /** German dictionary, checked against the English keys. */
@@ -171,6 +181,8 @@ export const de = {
   'search.empty': 'Keine passenden Modelle.',
   'empty.models': 'Keine Modelle verfügbar.',
   'empty.efforts': 'Dieses Modell liefert keine Argumentationsaufwandsstufen.',
+  'empty.agentNotStarted': 'Casper zeigt seine Modelle, sobald es startet. Senden Sie Ihre erste Nachricht.',
+  'empty.agentModels': 'Casper hat keine Modelle, bei denen Sie angemeldet sind. Führen Sie casper /login in einem Terminal aus.',
 } satisfies Record<keyof typeof en, string>
 
 /** Russian dictionary, checked against the English keys. */
@@ -198,6 +210,8 @@ export const ru = {
   'search.empty': 'Нет подходящих моделей.',
   'empty.models': 'Нет доступных моделей.',
   'empty.efforts': 'Эта модель не обеспечивает обоснования уровней усилий.',
+  'empty.agentNotStarted': 'Casper покажет свои модели после запуска. Отправьте первое сообщение.',
+  'empty.agentModels': 'У Casper нет моделей, в которые вы вошли. Выполните casper /login в терминале.',
 } satisfies Record<keyof typeof en, string>
 
 /** Portuguese dictionary, checked against the English keys. */
@@ -225,4 +239,6 @@ export const pt = {
   'search.empty': 'Não há modelos correspondentes.',
   'empty.models': 'Nenhum modelo disponível.',
   'empty.efforts': 'Este modelo não fornece níveis de esforço de raciocínio.',
+  'empty.agentNotStarted': 'O Casper lista os seus modelos quando inicia. Envie a sua primeira mensagem.',
+  'empty.agentModels': 'O Casper não tem modelos com sessão iniciada. Execute casper /login num terminal.',
 } satisfies Record<keyof typeof en, string>
