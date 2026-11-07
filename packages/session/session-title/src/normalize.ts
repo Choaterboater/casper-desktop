@@ -11,6 +11,9 @@ const CONTROL_CHARACTER = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]
 /** Directional and invisible controls that can make a displayed title deceptive. */
 const DIRECTIONAL_CONTROL = /[\u200B\u200E\u200F\u202A-\u202E\u2060-\u2064\u2066-\u206F\uFEFF]/gu
 
+/** A session mention, `@[label](dsh-session:…)`; its label puts a backslash before each `\` and `]`. */
+const SESSION_MENTION = /@\[((?:\\.|[^\\\]])*)\]\(dsh-session:[^\s)]*\)/gu
+
 /** Reject an invalid public text limit. */
 function assertPositiveInteger(name: string, value: number): void {
   if (!Number.isInteger(value) || value <= 0) {
@@ -62,13 +65,15 @@ export function normalizeSessionTitle(input: string, maxBytes: number): string {
 
 /**
  * Derive the deterministic first-prompt fallback.
- * @param input - text from the first eligible human message.
+ * @param input - text from the first eligible human message; a session mention counts as its label.
  * @param maxWords - positive whitespace-delimited word cap.
  * @param maxBytes - positive UTF-8 byte cap.
  * @returns the normalized leading words within both limits.
  */
 export function fallbackSessionTitle(input: string, maxWords: number, maxBytes: number): string {
   assertPositiveInteger('maxWords', maxWords)
-  const words = cleanTitleText(input).split(' ').filter(Boolean).slice(0, maxWords)
+  // A mention reads as its label, never as its markup.
+  const text = input.replace(SESSION_MENTION, (_match, label: string) => label.replace(/\\(.)/gu, '$1'))
+  const words = cleanTitleText(text).split(' ').filter(Boolean).slice(0, maxWords)
   return truncateTitleUtf8(words.join(' '), maxBytes).trimEnd()
 }

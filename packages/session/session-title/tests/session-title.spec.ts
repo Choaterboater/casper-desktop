@@ -38,6 +38,12 @@ describe('session title normalization', () => {
     expect(Buffer.byteLength(fallbackSessionTitle('😀😀', 5, 5), 'utf8')).toBe(4)
   })
 
+  it('shows a session mention in the fallback as its plain label', () => {
+    expect(fallbackSessionTitle('@[Before you change anything, use](dsh-session:ImEi) and fix it', 9, 80))
+      .toBe('Before you change anything, use and fix it')
+    expect(fallbackSessionTitle('Compare @[notes \\] draft](dsh-session:ImEi) today', 5, 80)).toBe('Compare notes ] draft today')
+  })
+
   it('rejects non-positive and fractional public limits', () => {
     expect(() => truncateTitleUtf8('title', 0)).toThrow(/maxBytes must be a positive integer/)
     expect(() => fallbackSessionTitle('title', 1.5, 10)).toThrow(/maxWords must be a positive integer/)
