@@ -314,7 +314,7 @@ export class TurnWriter {
   receipt(receipt: CasperReceipt): void {
     const acpId = `casper-receipt-${String(this.options.turn)}`
     this.startCall(acpId, CASPER_RECEIPT, JSON.stringify({ verdict: receipt.verdict }), undefined)
-    this.finishCall(acpId, () => ({ content: [{ type: 'text', text: receipt.text }], isError: false, meta: receipt as unknown as Json }))
+    this.finishCall(acpId, () => ({ content: [{ type: 'text', text: receipt.text }], isError: false, meta: receiptMeta(receipt) }))
   }
 
   /**
@@ -535,6 +535,16 @@ export class TurnWriter {
 
 function textResult(text: string, isError: boolean): ResultBody {
   return { content: [{ type: 'text', text }], isError }
+}
+
+/** A receipt as `tool/result` meta: the fields Casper sent, without the ones an older Casper leaves out. */
+function receiptMeta({ usage, cost, root, ...fields }: CasperReceipt): Json {
+  return {
+    ...fields,
+    ...usage === undefined ? {} : { usage },
+    ...cost === undefined ? {} : { cost },
+    ...root === undefined ? {} : { root },
+  }
 }
 
 /** JSON arguments of a check or approval box: its title and preview text. */

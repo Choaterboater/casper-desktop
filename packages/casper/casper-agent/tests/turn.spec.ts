@@ -718,5 +718,17 @@ describe('TurnWriter', () => {
       expect(result?.data).toMatchObject({ step: 2, meta: receipt, message: { isError: false, content: [{ type: 'text', text: receipt.text }] } })
       expect(result?.data.error).toBeUndefined()
     })
+
+    it('an older receipt without usage, cost or folder is the meta as sent', () => {
+      const { open, events } = setup()
+      const writer = open(1)
+      const receipt = {
+        outcome: 'verified', verdict: 'Verified.', exitCode: 0, changed: null,
+        checksRun: [], checksNotRun: [{ name: 'test', reason: 'no command' }], text: 'Verified.',
+      }
+      writer.receipt(receipt)
+      writer.close(false)
+      expect(ofType(events(), 'tool/result')[0]?.data.meta).toStrictEqual(receipt)
+    })
   })
 })
