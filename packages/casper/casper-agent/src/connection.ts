@@ -654,7 +654,10 @@ export class CasperConnection {
     )
   }
 
-  /** Race one request against the process exit; an error reply becomes `CASPER_RPC_<code>`, an exit `CASPER_EXITED`. */
+  /**
+   * Race one request against the process exit; an error reply becomes `CASPER_RPC_<code>`, an exit `CASPER_EXITED`.
+   * Both messages are redacted of the forwarded servers' values.
+   */
   private async request<T>(sent: Promise<T>): Promise<T> {
     const exited = this.exit.then((): never => { throw new Error('the Casper process exited') })
     exited.catch(() => {
@@ -664,7 +667,10 @@ export class CasperConnection {
       return await Promise.race([sent, exited])
     } catch (error: unknown) {
       if (error instanceof RequestError) {
-        throw new CasperError(`CASPER_RPC_${error.code}`, `Casper failed: ${error.message}`, { cause: error })
+        // Casper's words may echo a forwarded value; the cause carries them redacted too, without the reply's data.
+        const words = this.redact(error.message)
+        const cause = words === error.message ? error : new RequestError(error.code, words)
+        throw new CasperError(`CASPER_RPC_${error.code}`, `Casper failed: ${words}`, { cause })
       }
       // An exit or a closed protocol stream: report the exit facts once they arrive.
       throw this.exitError(await this.exitWithin(this.options.config.killGraceMs))
@@ -724,9 +730,16 @@ export class CasperConnection {
     return new CasperError('CASPER_EXITED', this.withStderr(`The Casper process exited before this turn finished (${outcomeText(outcome)}).`))
   }
 
+  /** The message and Casper's stderr tail, redacted of the forwarded servers' values. */
   private withStderr(message: string): string {
     const tail = this.stderrTail()
-    return tail === '' ? message : `${message}\n${tail}`
+    return this.redact(tail === '' ? message : `${message}\n${tail}`)
+  }
+
+  /** Replace every value the forwarded servers resolved, longest first, with `[redacted]`. */
+  private redact(text: string): string {
+    const secrets = [...this.forwarded?.secrets ?? []].sort((left, right) => right.length - left.length)
+    return secrets.reduce((out, secret) => out.replaceAll(secret, '[redacted]'), text)
   }
 }
 

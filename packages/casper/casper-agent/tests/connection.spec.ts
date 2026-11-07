@@ -511,15 +511,15 @@ describe('CasperConnection', { timeout: 30_000 }, () => {
 
 describe('the app\'s own MCP servers', { timeout: 30_000 }, () => {
   const SECRET = 'ghp-forwarded-secret'
-  /** A builder over one stdio and one http Settings server that counts its credential reads. */
-  function builder(): { build: (signal: AbortSignal) => Promise<ForwardedServers>; reads: () => number } {
+  /** A builder over one stdio and one http Settings server whose credential is `secret`, counting its credential reads. */
+  function builder(secret = SECRET): { build: (signal: AbortSignal) => Promise<ForwardedServers>; reads: () => number } {
     let reads = 0
     const build = (signal: AbortSignal): Promise<ForwardedServers> => forwardedServers({
       entries: {
         github: { transport: 'stdio', command: '/usr/bin/github-mcp', args: [], env: { GITHUB_TOKEN: '${credential:GITHUB_TOKEN}' }, cwd: '/work', url: '', headers: {}, enabled: true },
         docs: { transport: 'streamable-http', command: '', args: [], env: {}, cwd: '', url: 'https://docs.example/mcp', headers: { Authorization: 'Bearer ${credential:GITHUB_TOKEN}' }, enabled: true },
       },
-      credential: () => { reads += 1; return Promise.resolve(SECRET) },
+      credential: () => { reads += 1; return Promise.resolve(secret) },
       resolveExecutable: command => Promise.resolve(command),
       signal,
       skip: () => {},
@@ -563,6 +563,31 @@ describe('the app\'s own MCP servers', { timeout: 30_000 }, () => {
     expect(JSON.stringify(opened?.params)).toContain(SECRET)
     expect(opened?.exposed).toEqual({ argv: false, env: false })
     expect(connection.stderrTail()).not.toContain(SECRET)
+  })
+
+  it('no forwarded value, as is or URL-encoded, appears in an error reply or the stderr of an exit', async () => {
+    const odd = 'ghp/forwarded secret'
+    const words = `token ${odd} (${encodeURIComponent(odd)}) was refused`
+    const { start } = await setup({ prompts: [[{ fail: words }], [{ stderr: words }, { crash: 3 }]], mcpHttp: true })
+    const { connection } = await start({}, undefined, undefined, { mcpServers: builder(odd).build })
+    const replied = await connection.prompt([{ type: 'text', text: 'go' }]).catch((error: unknown) => error)
+    const exited = await connection.prompt([{ type: 'text', text: 'again' }]).catch((error: unknown) => error)
+    expect(codeOf(replied)).toBe('CASPER_RPC_-32603')
+    expect(codeOf(exited)).toBe('CASPER_EXITED')
+    expect(String(replied)).toContain('Casper failed: token [redacted] ([redacted]) was refused')
+    expect(String(exited)).toMatch(/exit code 3[\s\S]*token \[redacted\] \(\[redacted\]\) was refused/)
+    for (const failure of [replied, exited, (replied as Error).cause]) {
+      expect(String(failure)).not.toContain(odd)
+      expect(String(failure)).not.toContain(encodeURIComponent(odd))
+    }
+  })
+
+  it('no forwarded value appears in a start failure', async () => {
+    const { start } = await setup({ prompts: [], mcpHttp: true, loadError: `no conversation for ${SECRET}` })
+    const failure = await start({}, 'stored-1', undefined, { mcpServers: builder().build }).catch((error: unknown) => error)
+    expect(codeOf(failure)).toBe('CASPER_START_FAILED')
+    expect(String(failure)).toContain('no conversation for [redacted]')
+    expect(String(failure)).not.toContain(SECRET)
   })
 })
 

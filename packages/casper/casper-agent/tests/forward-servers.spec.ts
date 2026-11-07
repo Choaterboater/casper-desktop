@@ -148,4 +148,12 @@ describe('forwardedServers', () => {
     expect(rotated.digest).not.toBe(first.digest)
     expect(first.digest).not.toContain('ghp')
   })
+
+  it('the secrets are every resolved credential, as is and URL-encoded, and never a plain value', async () => {
+    const { secrets } = await build({
+      github: stdio({ env: { GITHUB_TOKEN: '${credential:GITHUB_TOKEN}', DEBUG: '1' } }),
+      docs: http({ headers: { Authorization: 'Bearer ${credential:DOCS_KEY}', 'X-Team': 'blue' } }),
+    }, { credential: ref => Promise.resolve(ref === 'GITHUB_TOKEN' ? 'ghp/secret value' : 'docs-secret-value') })
+    expect([...secrets].sort()).toEqual(['docs-secret-value', 'ghp%2Fsecret%20value', 'ghp/secret value'])
+  })
 })

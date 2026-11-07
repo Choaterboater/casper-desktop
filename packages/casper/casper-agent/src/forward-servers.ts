@@ -90,6 +90,8 @@ export interface ForwardedServers {
   readonly digest: string
   /** Servers left out for a reason that may pass: a credential that could not be read, a lookup error, or the time limit. */
   readonly passing: string[]
+  /** Every credential value resolved, as is and URL-encoded; kept in memory only, to redact them from Casper's error text. */
+  readonly secrets: readonly string[]
 }
 
 // Casper's own rules for an app's servers (its client-servers.ts), applied first so no server is sent only to be refused.
@@ -191,11 +193,17 @@ async function oneServer(name: string, entry: ForwardEntry, options: ForwardOpti
  * its own time limit. No entry carries `casper/clientAsks`, so Casper asks
  * before every change these servers make.
  * @param options - the entries, the resolvers, the signal, and the skip receiver.
- * @returns the entries, their names, their digest, and the servers left out for a reason that may pass.
+ * @returns the entries, their names, their digest, the servers left out for a reason that may pass, and the resolved values.
  * @throws the signal's reason when it aborts.
  */
 export async function forwardedServers(options: ForwardOptions): Promise<ForwardedServers> {
   const timeoutMs = options.timeoutMs ?? FORWARD_TIMEOUT_MS
+  const secrets = new Set<string>()
+  const credential = async (ref: string): Promise<string | undefined> => {
+    const value = await options.credential(ref)
+    if (value !== undefined && value !== '') secrets.add(value).add(encodeURIComponent(value))
+    return value
+  }
   const built = await Promise.all(Object.entries(options.entries).map(async ([name, entry]): Promise<[string, McpServer | string]> => {
     if (!entry.enabled) return [name, SKIP.disabled]
     if (name === APP_SERVER_NAME) return [name, SKIP.appName]
@@ -203,7 +211,7 @@ export async function forwardedServers(options: ForwardOptions): Promise<Forward
     if (problem !== undefined) return [name, problem]
     const signal = AbortSignal.any([options.signal, AbortSignal.timeout(timeoutMs)])
     try {
-      return [name, await until(oneServer(name, entry, options, signal), signal)]
+      return [name, await until(oneServer(name, entry, { ...options, credential }, signal), signal)]
     } catch (error: unknown) {
       options.signal.throwIfAborted()
       if (error instanceof Skipped) return [name, error.message]
@@ -227,5 +235,5 @@ export async function forwardedServers(options: ForwardOptions): Promise<Forward
       names.push(name)
     }
   }
-  return { entries, names, digest: createHash('sha256').update(JSON.stringify(entries)).digest('hex'), passing }
+  return { entries, names, digest: createHash('sha256').update(JSON.stringify(entries)).digest('hex'), passing, secrets: [...secrets] }
 }
