@@ -1649,6 +1649,35 @@ describe('Casper\'s forms', { timeout: 60_000 }, () => {
     expect(turnEnds(agent)).toEqual([{ kind: 'completed' }, { kind: 'completed' }])
   })
 
+  it('Casper\'s final update closes every open card of its step', async () => {
+    const skipped = JSON.stringify({ answers: [], skipped: true, remaining: 7 })
+    const aborted: string[] = []
+    let cards = 0
+    const fake = fakeCasper()
+    cleanups.push(() => { fake.remove() })
+    const shown = gate(fake, 'cards-shown')
+    const askStep = { tool: 'ask', rawInput: { question: 'Which database?', options: DATABASES }, meta: { tool: 'ask' } }
+    // Two forms on one step: the first is withdrawn only after 5 s, so only the step's close answers it sooner.
+    fake.script({ prompts: [[askStep, {
+      elicit: { question: 'Which database?', options: DATABASES, from: 'ai', onStep: 1, timeoutMs: 5_000 },
+      during: [{ elicit: { question: 'Which port?', from: 'ai', onStep: 1 }, during: [{ waitFile: shown.path }, { toolEnd: 1, content: [skipped] }] }],
+    }]] })
+    const host = await boot(fake, {}, request => new Promise((_resolve, reject) => {
+      request.signal?.addEventListener('abort', () => {
+        aborted.push(request.questions[0]?.question ?? '')
+        reject(new Error('aborted'))
+      }, { once: true })
+      if (++cards === 2) shown.open()
+    }))
+    cleanups.push(() => host.ctx.fiber.dispose())
+    const { agent } = await host.create('casper-form-two')
+    await run(agent, 'go')
+    expect(host.asked).toHaveLength(2)
+    expect(aborted).toEqual(['Which database?', 'Which port?'])
+    expect(replies(fake)).toEqual([{ action: 'cancel' }, { action: 'cancel' }])
+    expect(results(agent)).toEqual([{ isError: false, text: skipped }])
+  })
+
   it('cancels a form without a question service or outside a prompt, and a skipped question is not an error', async () => {
     const { fake, host } = await setup({ prompts: [[{ elicit: { question: 'Anyone there?', options: DATABASES } }, { text: 'done\n', late: { elicit: { question: 'Late?', options: DATABASES } } }]] },
       {}, undefined, false)
@@ -1966,6 +1995,41 @@ describe('Casper\'s approval card', () => {
       .toEqual([[{ outcome: 'cancelled' }, true]])
     const result = eventsOf(agent).find(event => event.type === 'tool/result')
     expect(result?.type === 'tool/result' && result.data.message.content).toEqual([{ type: 'text', text: '→ No (access set to Read only)' }])
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }])
+  })
+
+  it('Casper withdrawing a box\'s request withdraws its card', async () => {
+    const fake = fakeCasper()
+    cleanups.push(() => { fake.remove() })
+    const withdrawn = gate(fake, 'card-withdrawn')
+    // The box's step stays open until the card is gone, so only the request's withdrawal can close the card.
+    fake.script({ prompts: [[{ permission: 'Run it?', timeoutMs: 200, during: [{ waitFile: withdrawn.path }] }, { text: 'done\n' }]] })
+    const host = await boot(fake, {}, request => new Promise((_resolve, reject) => {
+      request.signal?.addEventListener('abort', () => {
+        withdrawn.open()
+        reject(new UserQuestionError('ASK_ABORTED', 'withdrawn'))
+      }, { once: true })
+    }))
+    cleanups.push(() => host.ctx.fiber.dispose())
+    const { agent } = await host.create('casper-card-request-withdrawn')
+    agent.followup(prompt('go'))
+    await waitFor(() => withdrawn.exists(), 5_000)
+    await agent.whenIdle()
+    expect(host.asked).toHaveLength(1)
+    expect(fake.log().filter(entry => entry.event === 'answer').map(entry => entry.timedOut)).toEqual([true])
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }])
+  })
+
+  it('a box whose step Casper closed already opens no card and answers cancelled', async () => {
+    const { fake, host } = await setup({ prompts: [[{ permission: 'Run it?', closed: true }, { text: 'done\n' }]] })
+    const { agent } = await host.create('casper-card-closed')
+    await run(agent, 'go')
+    expect(host.asked).toHaveLength(0)
+    expect(fake.log().filter(entry => entry.event === 'answer').map(entry => [entry.outcome, entry.withdrawn]))
+      .toEqual([[{ outcome: 'cancelled' }, true]])
+    expect(eventsOf(agent).filter(event => event.type === 'tool/call')).toHaveLength(1)
+    const results = eventsOf(agent).flatMap(event => event.type === 'tool/result' ? [event.data.message.content] : [])
+    expect(results).toEqual([[{ type: 'text', text: '→ No (access set to Read only)' }]])
     expect(turnEnds(agent)).toEqual([{ kind: 'completed' }])
   })
 })

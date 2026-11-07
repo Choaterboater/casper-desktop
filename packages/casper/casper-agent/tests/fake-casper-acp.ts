@@ -46,7 +46,10 @@
  * diff content, the `locations`, and `_meta.casper.step: 'casper-tool-N'` for
  * `onStep: N`; a `{ withdraw: true }` step in `during` closes the box as a
  * switch to Read only does, before the reply, which is still logged with
- * `withdrawn: true`), `{ receipt }`, `{ stop }`,
+ * `withdrawn: true`; `closed: true` closes it that way before the request is
+ * sent, as when the close overtakes the request; `timeoutMs` withdraws the
+ * request with `$/cancel_request` after that delay, logged as
+ * `timedOut: true`, and closes the box as No), `{ receipt }`, `{ stop }`,
  * `{ hang: true }` (waits for session/cancel), `{ ignoreCancel: true }` (with
  * hang: never replies), `{ crash }` (exits with that code),
  * `{ waitFile }` (waits until the file exists), `{ stderr }` (writes a
@@ -180,6 +183,8 @@ interface Step {
   diffs?: { path: string; oldText?: string | null; newText: string }[]
   onStep?: number
   withdraw?: boolean
+  closed?: boolean
+  timeoutMs?: number
   planBox?: string
   receipt?: string
   stop?: StopReason
@@ -487,9 +492,22 @@ async function run(step: Step, params: PromptRequest, client: AgentContext, outc
       }))
       let picked: (typeof options)[number] | undefined
       let withdrawn = false
+      const withdraw = new AbortController()
+      const timer = step.timeoutMs === undefined ? undefined : setTimeout(() => { withdraw.abort() }, step.timeoutMs)
       try {
+        if (step.closed === true) {
+          withdrawn = true
+          await update(client, {
+            sessionUpdate: 'tool_call_update', toolCallId, status: 'failed',
+            content: [{ type: 'content', content: { type: 'text', text: READ_ONLY_NO } }],
+          })
+        }
         const request = { sessionId: params.sessionId, toolCall, options }
-        const asked = client.request<RequestPermissionResponse>(methods.client.session.requestPermission, request)
+        const asked = client.request<RequestPermissionResponse>(methods.client.session.requestPermission, request, {
+          cancellationSignal: withdraw.signal,
+        })
+        const timedOut = new Promise<'withdrawn'>((resolve) => { withdraw.signal.addEventListener('abort', () => { resolve('withdrawn') }, { once: true }) })
+        asked.catch(() => { /* a withdrawn request may still settle */ })
         for (const meanwhile of step.during ?? []) {
           if (meanwhile.withdraw !== true) {
             await run(meanwhile, params, client, outcome)
@@ -502,13 +520,18 @@ async function run(step: Step, params: PromptRequest, client: AgentContext, outc
             content: [{ type: 'content', content: { type: 'text', text: READ_ONLY_NO } }],
           })
         }
-        const result = await asked
-        picked = result.outcome.outcome === 'selected' && !withdrawn
-          ? options.find(option => result.outcome.outcome === 'selected' && option.optionId === result.outcome.optionId)
-          : undefined
-        log({ event: 'answer', outcome: result.outcome, ...withdrawn ? { withdrawn } : {} })
+        const result = await Promise.race([timedOut, asked])
+        if (result === 'withdrawn') log({ event: 'answer', timedOut: true })
+        else {
+          picked = result.outcome.outcome === 'selected' && !withdrawn
+            ? options.find(option => result.outcome.outcome === 'selected' && option.optionId === result.outcome.optionId)
+            : undefined
+          log({ event: 'answer', outcome: result.outcome, ...withdrawn ? { withdrawn } : {} })
+        }
       } catch (error: unknown) {
         log({ event: 'answer', error: String(error) })
+      } finally {
+        clearTimeout(timer)
       }
       const yes = picked !== undefined && picked.kind !== 'reject_once'
       if (!withdrawn) {

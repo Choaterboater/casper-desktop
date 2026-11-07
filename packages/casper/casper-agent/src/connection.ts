@@ -119,9 +119,10 @@ export interface CasperConnectionHandlers {
   /**
    * Answer one `session/request_permission`.
    * @param params - Casper's request.
+   * @param signal - aborted when Casper withdraws the request or the connection closes.
    * @returns the reply; must not reject.
    */
-  permission(params: RequestPermissionRequest): Promise<RequestPermissionResponse>
+  permission(params: RequestPermissionRequest, signal: AbortSignal): Promise<RequestPermissionResponse>
   /**
    * Answer one `elicitation/create`: a question Casper asks as a form.
    * @param params - Casper's request.
@@ -556,7 +557,7 @@ export class CasperConnection {
           this.casperMode(update.currentModeId)
         } else if (!this.replaying) options.handlers.update(params)
       })
-      .onRequest(methods.client.session.requestPermission, ({ params }) => options.handlers.permission(params))
+      .onRequest(methods.client.session.requestPermission, ({ params, signal }) => options.handlers.permission(params, signal))
       .onRequest(methods.client.elicitation.create, ({ params, signal }) => options.handlers.elicitation(params, signal))
       .connect(ndJsonStream(
         Writable.toWeb(child.stdin) as WritableStream<Uint8Array>,

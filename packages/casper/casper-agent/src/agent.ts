@@ -177,7 +177,8 @@ export class CasperAgent implements Agent {
   private sink: PromptSink | undefined
   /** First failure recording an update; it ends the turn as an error. */
   private updateFailure: Error | undefined
-  private readonly asks = new Map<string, AbortController>()
+  /** The open questions of each step, by ACP id; the step's final update withdraws them all. */
+  private readonly asks = new Map<string, Set<AbortController>>()
   /** The Casper commands this Agent offers in the command menu. */
   private offered: readonly CasperCommand[]
   /** The command registry once it is mounted; registrations made through it belong to this Agent's scope. */
@@ -643,7 +644,7 @@ export class CasperAgent implements Agent {
       return turnEndFor(stopReason)
     } finally {
       this.sink = undefined
-      for (const ask of this.asks.values()) ask.abort()
+      for (const asks of this.asks.values()) for (const ask of asks) ask.abort()
       this.asks.clear()
       // A send still in flight settles first, so the next turn's claim and its own prompt come after its reply.
       if (sink !== undefined) await settlesWithin(sink.steers.chain, this.config.cancelGraceMs)
@@ -737,7 +738,7 @@ export class CasperAgent implements Agent {
         mode: () => { if (owner.connection !== undefined && owner.connection === this.connection) this.queueLiveAccess() },
         // Casper's Plan first value is the chip's, whoever changed it.
         plan: () => { if (owner.connection !== undefined && owner.connection === this.connection) this.syncPlan() },
-        permission: params => this.permission(owner.connection, params),
+        permission: (params, signal) => this.permission(owner.connection, params, signal),
         elicitation: (params, signal) => this.elicitation(owner.connection, params, signal),
       },
       appTools: this.config.appTools ? connection => this.startAppTools(connection, cwd, profile) : undefined,
@@ -1382,7 +1383,7 @@ export class CasperAgent implements Agent {
         case 'tool_call_update':
           // Only a final update closes the step; an in-progress one leaves an open box and the write path alone.
           if (update.status !== 'completed' && update.status !== 'failed') return
-          this.asks.get(update.toolCallId)?.abort()
+          for (const ask of this.asks.get(update.toolCallId) ?? []) ask.abort()
           sink.writer.toolUpdate(update)
           void this.flush()
           return
@@ -1419,14 +1420,20 @@ export class CasperAgent implements Agent {
     if (sample !== undefined) sink.writer.usage(sample.tokens, sample.toolUse)
   }
 
-  private async permission(connection: CasperConnection | undefined, params: RequestPermissionRequest): Promise<RequestPermissionResponse> {
+  private async permission(
+    connection: CasperConnection | undefined,
+    params: RequestPermissionRequest,
+    withdrawn: AbortSignal,
+  ): Promise<RequestPermissionResponse> {
     const sink = this.sinkFor(connection)
     if (sink === undefined) return { outcome: { outcome: 'cancelled' } }
-    this.record(() => { sink.writer.question(params.toolCall) })
     const id = params.toolCall.toolCallId
+    // As for a form, the box's step may be closed already; a late box would reopen it.
+    if (sink.writer.finished(id)) return { outcome: { outcome: 'cancelled' } }
+    this.record(() => { sink.writer.question(params.toolCall) })
     const own = new AbortController()
-    this.asks.set(id, own)
-    const signal = AbortSignal.any([sink.signal, own.signal])
+    this.openAsk(id, own)
+    const signal = AbortSignal.any([sink.signal, own.signal, withdrawn])
     const service = this.pluginCtx.get('userQuestions')
     try {
       return await answerPermission(
@@ -1437,8 +1444,22 @@ export class CasperAgent implements Agent {
         { callId: sink.connection.toolCallId(id), card: this.config.approvalCard },
       )
     } finally {
-      if (this.asks.get(id) === own) this.asks.delete(id)
+      this.closeAsk(id, own)
     }
+  }
+
+  /** Keep `own` among the open questions of step `id`, beside any other question on that step. */
+  private openAsk(id: string, own: AbortController): void {
+    const asks = this.asks.get(id)
+    if (asks === undefined) this.asks.set(id, new Set([own]))
+    else asks.add(own)
+  }
+
+  /** Forget the settled question `own` of step `id`. */
+  private closeAsk(id: string, own: AbortController): void {
+    const asks = this.asks.get(id)
+    asks?.delete(own)
+    if (asks?.size === 0) this.asks.delete(id)
   }
 
   /**
@@ -1462,7 +1483,7 @@ export class CasperAgent implements Agent {
     if (id !== undefined) {
       const asked = { question: question.question, options: question.options ?? [], multi: question.multiSelect === true }
       this.record(() => { sink.writer.question({ toolCallId: id }, asked) })
-      this.asks.set(id, own)
+      this.openAsk(id, own)
     }
     const signal = AbortSignal.any([sink.signal, own.signal, withdrawn])
     const service = this.pluginCtx.get('userQuestions')
@@ -1480,7 +1501,7 @@ export class CasperAgent implements Agent {
       if (reply.action === 'accept' && id !== undefined && batch !== undefined) this.record(() => { sink.writer.answered(id, batch) })
       return reply
     } finally {
-      if (id !== undefined && this.asks.get(id) === own) this.asks.delete(id)
+      if (id !== undefined) this.closeAsk(id, own)
     }
   }
 
