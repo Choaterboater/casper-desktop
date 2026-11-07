@@ -765,6 +765,29 @@ describe('CasperAgent', { timeout: 60_000 }, () => {
     expect(host.record('casper-cancel-start')).toBeDefined()
   })
 
+  it('starts no Casper for a prompt after the Agent closes, and closes a Casper that finished starting after it', async () => {
+    const { fake, host } = await setup({ prompts: [] })
+    const hold = gate(fake, 'hold-initialize')
+    fake.script({ prompts: [[]], holdInitialize: hold.path })
+    const { agent } = await host.create('casper-closed-start')
+    if (!(agent instanceof CasperAgent)) throw new Error('not a Casper agent')
+    const closing = { code: 'CASPER_START_FAILED', message: 'This session is closing, so Casper was not started.' }
+    // The Agent closes while its Casper is still starting.
+    agent.followup(prompt('first'))
+    await waitFor(() => fake.calls('initialize').length === 1)
+    await agent.closeConnection()
+    hold.open()
+    await agent.whenIdle()
+    expect(turnEnds(agent)).toEqual([{ kind: 'error', error: closing }])
+    await waitFor(() => fake.pids().every(pid => !alive(pid)))
+    expect(fake.calls('session/prompt')).toEqual([])
+    expect(host.record('casper-closed-start')).toBeUndefined()
+    // A prompt after the close starts no process.
+    await run(agent, 'second')
+    expect(turnEnds(agent)).toEqual([{ kind: 'error', error: closing }, { kind: 'error', error: closing }])
+    expect(fake.pids()).toHaveLength(1)
+  })
+
   it('runs two Sessions in their own processes with their own questions and records', async () => {
     const { fake, host } = await setup({ prompts: [] })
     const hold = gate(fake, 'hold-both')
@@ -1817,7 +1840,7 @@ describe('Plan review and Plan first', { timeout: 60_000 }, () => {
   it('a restarted Casper gets the Session\'s Plan first setting before the prompt', async () => {
     const { fake, host, chip } = await setupPlan({
       configOptions: withPlan('off'), replayConfig: true, newSessionId: 'conversation-plan',
-      prompts: [[{ configUpdate: withPlan('on') }, { text: 'on\n' }], [{ crash: 9 }], [{ text: 'planned\n' }]],
+      prompts: [[{ configUpdate: withPlan('on') }, { text: 'on\n' }], [{ crash: 9 }], [{ text: 'planned\n' }, { exitAfterMs: 20 }]],
     })
     const { agent } = await host.create('casper-plan-restart')
     await run(agent, '/plan on')
@@ -1835,9 +1858,8 @@ describe('Plan review and Plan first', { timeout: 60_000 }, () => {
       configOptions: withPlan('on'), replayConfig: true,
       prompts: [[], [], [], [{ configUpdate: withPlan('off') }, { text: 'off\n' }], [{ crash: 9 }], [{ text: 'still off\n' }]],
     })
-    // The next prompt starts a Casper that reads the new script.
-    if (!(agent instanceof CasperAgent)) throw new Error('not a Casper agent')
-    await agent.closeConnection()
+    // The Casper that ran it exits, so the next prompt starts a Casper that reads the new script.
+    await waitFor(() => fake.pids().every(pid => !alive(pid)))
     await run(agent, '/plan off')
     await run(agent, 'crash')
     await run(agent, 'last')

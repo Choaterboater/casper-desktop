@@ -80,6 +80,9 @@ export const FRESH_CONVERSATION_NOTICE = 'Casper could not reopen its earlier co
 /** Model name recorded on assistant messages when the config sets none. */
 const DEFAULT_MODEL_LABEL = 'casper'
 
+/** The error of a turn that would start Casper after the Agent closed. */
+const CLOSING_MESSAGE = 'This session is closing, so Casper was not started.'
+
 /** Projection readers the factory passes to each Agent. */
 export interface CasperAgentReaders {
   /** Casper's reported models and a pick not yet applied. */
@@ -222,7 +225,7 @@ export class CasperAgent implements Agent {
   private closing: Promise<void> = Promise.resolve()
   /** The model of the process closed while idle, until the next process opens its conversation. */
   private reapedModel: string | undefined
-  /** Set by {@link closeConnection}: no idle check runs after it. */
+  /** Set by {@link closeConnection}: no idle check runs and no process starts after it. */
   private closed = false
 
   /**
@@ -710,11 +713,13 @@ export class CasperAgent implements Agent {
 
   /**
    * The live connection, or a new process that reopens the stored conversation. A process closed earlier exits first.
+   * A closed Agent starts none, and a process that finishes starting after the close is closed at once.
    * @returns the connection, whether its conversation is new, and a note when a Casper closed while idle came back on
    *   another model.
    */
   private async ensureConnection(signal: AbortSignal): Promise<{ connection: CasperConnection; fresh: boolean; note?: string }> {
     await settledUnlessStopped(this.closing, signal)
+    if (this.closed) throw new CasperError('CASPER_START_FAILED', CLOSING_MESSAGE)
     const live = this.connection
     if (live !== undefined && !live.dead) return { connection: live, fresh: false }
     if (live !== undefined) this.dropConnection(live)
@@ -745,6 +750,11 @@ export class CasperAgent implements Agent {
       mcpServers: this.forwarder(),
     }, stored?.acpSessionId, signal)
     owner.connection = started.connection
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- closeConnection() can run during the start.
+    if (this.closed) {
+      await started.connection.dispose()
+      throw new CasperError('CASPER_START_FAILED', CLOSING_MESSAGE)
+    }
     try {
       await this.sidecar.write(this.id, { acpSessionId: started.acpSessionId, cwd })
     } catch (error: unknown) {
