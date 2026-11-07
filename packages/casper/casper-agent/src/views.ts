@@ -21,6 +21,12 @@ export const STEP_FAILED = 'Casper reported that this step failed.'
 /** The old side recorded when Casper hid both sides of an edit behind one placeholder, so it still reads as a change. */
 export const HIDDEN_OLD_TEXT = '<not shown: the text it replaced>'
 
+/** The Standard tool a Casper question is recorded as, so the app's question card draws it. */
+export const ASK_USER_QUESTION = 'ask_user_question'
+
+/** The question id a Casper question is recorded under; the same id its form's answer carries. */
+export const CASPER_QUESTION_ID = 'casper-question'
+
 /** Casper's placeholder for file text it does not send, such as text that holds or adds a secret. */
 const NOT_SHOWN = /^<not shown: [^>]*>$/
 
@@ -170,6 +176,52 @@ function searchArgs(input: Fields, pattern: string | undefined, include: boolean
   }
 }
 
+/** One question as Casper sends it: the ask tool's arguments, or a question step's `_meta.casper.question`. */
+export interface CasperQuestion {
+  /** The question's words. */
+  readonly question: string
+  /** The choices, in order; none for a typed line. */
+  readonly options: readonly { readonly label: string; readonly description?: string }[]
+  /** Whether several choices may be picked. */
+  readonly multi: boolean
+}
+
+/**
+ * Read a question from the ask tool's arguments or a question step's meta.
+ * @param fields - `question`, `options` (`{label, description?}` entries), and `multi`.
+ * @param fallback - the words used when `question` is missing, such as the step's title.
+ * @returns the question, with malformed options dropped.
+ */
+export function casperQuestion(fields: Readonly<Record<string, unknown>>, fallback = ''): CasperQuestion {
+  const options = (Array.isArray(fields.options) ? fields.options : []).flatMap((entry: unknown) => {
+    const option = record(entry)
+    const label = text(option?.label)
+    if (label === undefined) return []
+    const description = text(option?.description)
+    return [{ label, ...description === undefined ? {} : { description } }]
+  })
+  return { question: text(fields.question) ?? fallback, options, multi: fields.multi === true }
+}
+
+/**
+ * The `ask_user_question` arguments of one Casper question, as Standard's question card reads them.
+ * @param asked - the question.
+ * @returns the JSON-ready arguments: one question with id {@link CASPER_QUESTION_ID}.
+ */
+export function askArguments(asked: CasperQuestion): Readonly<Record<string, unknown>> {
+  return { questions: [{ id: CASPER_QUESTION_ID, question: asked.question, options: asked.options, multi_select: asked.multi }] }
+}
+
+/**
+ * The question a pending question step carries in `_meta.casper.question`.
+ * @param call - the ACP `tool_call`.
+ * @returns the question, or undefined for a step that is not a question.
+ */
+export function questionStep(call: ToolCall): CasperQuestion | undefined {
+  const fields = record(record(call._meta?.casper)?.question)
+  return fields === undefined ? undefined : casperQuestion(fields, call.title)
+}
+
 /** The Standard tool name and arguments of each mapped Casper tool. */
 function mapped(tool: string, input: Fields, casper: Fields | undefined, title: string): { name: string; args: Fields } | undefined {
   switch (tool) {
@@ -193,6 +245,8 @@ function mapped(tool: string, input: Fields, casper: Fields | undefined, title: 
       return { name: 'web_search', args: text(input.query) === undefined ? {} : { queries: [input.query] } }
     case 'web_fetch':
       return { name: 'web_fetch', args: text(input.url) === undefined ? {} : { url: input.url } }
+    case 'ask':
+      return { name: ASK_USER_QUESTION, args: askArguments(casperQuestion(input, title)) }
     default:
       return undefined
   }
@@ -462,6 +516,9 @@ export function standardResult(view: StandardView, update: ToolCallUpdate): Stan
       return fileResult(view, update, output)
     case 'read':
       return readResult(view, update, output)
+    case 'ask':
+      // Casper's own answer text; an answer given in the app replaces it (TurnWriter.answered).
+      return { text: words(update.content) ?? '', isError: false }
     default: {
       // grep, find, ls, web_search, and web_fetch.
       const meta = shapeMeta(view.tool, output)

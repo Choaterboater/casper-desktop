@@ -7,6 +7,7 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type { BridgedCall } from '../src/app-tools.ts'
 import { OPEN_CALL_RESULT, TurnWriter } from '../src/turn.ts'
 import { STEP_FAILED } from '../src/views.ts'
+import { parsed } from './support.ts'
 
 /** A writer on turn 1, step 1 over a fresh Session, with counters a test can share across writers. */
 function setup(counters = { attempt: 0, revision: 0 }, session = Session.create(SessionId('turn-writer'))) {
@@ -214,6 +215,35 @@ describe('TurnWriter', () => {
       [false, [{ type: 'text', text: '→ Yes, this once' }]],
       [false, [{ type: 'text', text: '' }]],
       [false, [{ type: 'text', text: '{"answer":"no answer"}' }]],
+    ])
+  })
+
+  it('records Casper\'s own question step as ask_user_question and an answered form as its {answers} result', () => {
+    const { open, events } = setup()
+    const writer = open(1)
+    const question = { question: 'Which database?', options: [{ label: 'SQLite' }, { label: 'Postgres', description: 'a server' }], multi: false, typed: true }
+    writer.toolCall({ toolCallId: 'casper-question-1', title: 'The AI asks: Which database?', kind: 'other', status: 'pending', _meta: { casper: { question } } })
+    writer.answered('casper-question-1', { answers: [{ id: 'casper-question', selected: ['Postgres'], custom: 'version 16' }] })
+    writer.toolUpdate({ toolCallId: 'casper-question-1', status: 'completed', content: [{ type: 'content', content: { type: 'text', text: '→ version 16' } }] })
+    // A skipped question is not an error and keeps Casper's words; its question falls back to the step's title.
+    writer.toolCall({ toolCallId: 'casper-question-2', title: 'Name?', kind: 'other', status: 'pending', _meta: { casper: { question: { multi: true } } } })
+    writer.answered('casper-question-2', { answers: [{ id: 'casper-question', selected: [], custom: 'late' }] })
+    writer.toolUpdate({ toolCallId: 'casper-question-2', status: 'failed', content: [{ type: 'content', content: { type: 'text', text: '— skipped' } }] })
+    // A form on a step not seen before opens the question card itself.
+    writer.question({ toolCallId: 'casper-question-3' }, { question: 'Port?', options: [], multi: false })
+    writer.toolUpdate({ toolCallId: 'casper-question-3', status: 'failed' })
+    writer.answered('casper-question-9', { answers: [] })
+    expect(['casper-question-1', 'casper-question-3', 'casper-question-9'].map(id => writer.finished(id))).toEqual([true, true, false])
+    writer.close(false)
+    expect(ofType(events(), 'tool/call').map(event => [event.data.name, parsed(event.data.arguments)])).toEqual([
+      ['ask_user_question', { questions: [{ id: 'casper-question', question: 'Which database?', options: [{ label: 'SQLite' }, { label: 'Postgres', description: 'a server' }], multi_select: false }] }],
+      ['ask_user_question', { questions: [{ id: 'casper-question', question: 'Name?', options: [], multi_select: true }] }],
+      ['ask_user_question', { questions: [{ id: 'casper-question', question: 'Port?', options: [], multi_select: false }] }],
+    ])
+    expect(ofType(events(), 'tool/result').map(event => [event.data.message.isError, event.data.message.content, event.data.error])).toEqual([
+      [false, [{ type: 'text', text: JSON.stringify({ answers: [{ id: 'casper-question', selected: ['Postgres'], custom: 'version 16' }] }) }], undefined],
+      [false, [{ type: 'text', text: '— skipped' }], undefined],
+      [false, [{ type: 'text', text: '' }], undefined],
     ])
   })
 

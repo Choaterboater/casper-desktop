@@ -61,6 +61,7 @@ kind: "package-reference"
 | [`src/turn.ts`](src/turn.ts) | 把 Casper 的更新写成步骤、助手消息、工具调用、结果与待办列表 |
 | [`src/views.ts`](src/views.ts) | 把 Casper 的工具步骤记录为做同样事情的 Standard 工具：名称、参数、结果文本与 meta |
 | [`src/permission.ts`](src/permission.ts) | 把审批框变成用户问题，并把答案映射回去 |
+| [`src/elicitation.ts`](src/elicitation.ts) | 把 Casper 的表单（`elicitation/create`）变成用户问题，并把答案映射回去 |
 | [`src/sidecar.ts`](src/sidecar.ts) | Host 存储域 `casper_agent`，把每个会话映射到其 Casper 对话 |
 | [`src/commands.ts`](src/commands.ts) | 供 `/` 菜单使用的 Casper 命令，以及保存最后一份列表的 Host 存储域 `casper_agent_commands` |
 | [`src/app-tools.ts`](src/app-tools.ts) | 应用工具 MCP 服务器：监听、认证、工具列表，以及以 Casper Agent 身份运行的调用 |
@@ -102,6 +103,7 @@ Casper 在 `_meta.casper.tool` 中给每个步骤命名，其 `rawInput` 是模�
 | `find`、`ls` | `glob` | `pattern`（`ls` 为 `*`）、`path` | meta `shape: paths`、`paths`、`total`、`truncated` |
 | `web_search` | `web_search` | `queries` | meta `sources`、`truncated`、`answer` |
 | `web_fetch` | `web_fetch` | `url` | meta `url`、`statusCode`、`truncated` |
+| `ask` | `ask_user_question` | 一个 id 为 `casper-question` 的问题：`question`、`options`、`multi_select` | 在应用中给出的答案，记为 `{answers}`；否则为 Casper 的文字 |
 | [应用工具](#app-tools) | 应用工具自己的名称 | MCP 参数；经 `call_capability` 调用时为其携带的 `arguments` | 应用工具自己的结果与 meta |
 | 其他 MCP 工具 | `casper_mcp` | `title`、输入与 `preview` | Casper 的文字 |
 | 其他任何工具 | `casper_<tool>`；工具名已以 `casper_` 开头时（如 `casper_check`）沿用其原名 | `title`、输入与 `preview` | Casper 的文字，或其原始输出的 JSON |
@@ -111,6 +113,8 @@ Casper 在 `_meta.casper.tool` 中给每个步骤命名，其 `rawInput` 是模�
 ### 审批
 
 `session/request_permission` 变成一个 `ctx.userQuestions.ask` 问题，以 Casper 的选项为标签，拒绝项在前。选中一个标签即选择该选项。输入文本、未选择、问题失败或被中止，以及没有问题服务时，都回答 `cancelled`，Casper 将其视为“否”。当 Casper 自行关闭审批框或提示结束时，问题随之关闭。
+
+客户端的 `initialize` 提供 `clientCapabilities.elicitation.form`，因此 Casper 会把 AI 的问题以及它自己需要输入文字或多选的问题作为表单发来，而不是跳过。符合 Casper 形状的 `elicitation/create`（表单模式，一个 `answer` 字段，为带标题的单选、带标题的多选或一行输入文字，以及一个可选的 `other` 字段用于输入文字）变成一个 id 为 `casper-question` 的问题；AI 的问题标题为 `The AI asks`，其余为 `Casper asks`。选中的标签按选择顺序以其值发回，输入的文字以 `other` 发回，一行输入的问题则作为 `answer` 发回。在没有 `other` 的表单上输入文字，以及其他任何形状的表单，都回答 decline；没有回答、问题失败或被中止、提示之外的表单，以及没有问题服务时，都回答 cancel，Casper 视为跳过。表单所属的步骤记录为 `ask_user_question`：即 ask 工具自己的步骤，或 Casper 为自己的问题打开的待处理 `casper-question-N` 步骤。在应用中记录的答案会在 Casper 完成该步骤时成为其结果 `{answers}`，因此 Standard 的问题卡片会显示答案。当 Casper 关闭该步骤或撤回请求，或提示结束时，问题随之关闭。
 
 <a id="access-control"></a>
 ### 访问权限

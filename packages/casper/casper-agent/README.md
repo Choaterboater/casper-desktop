@@ -61,6 +61,7 @@ A turn that cannot run ends with an error on `turn/end`: `CASPER_NOT_FOUND` when
 | [`src/turn.ts`](src/turn.ts) | Writes Casper's updates as steps, assistant messages, tool calls, results, and the todo list |
 | [`src/views.ts`](src/views.ts) | Records a Casper tool step under the Standard tool that does the same job: its name, arguments, result text, and meta |
 | [`src/permission.ts`](src/permission.ts) | Turns an approval box into a user question and maps the answer back |
+| [`src/elicitation.ts`](src/elicitation.ts) | Turns one of Casper's forms (`elicitation/create`) into a user question and maps the answer back |
 | [`src/sidecar.ts`](src/sidecar.ts) | Host storage domain `casper_agent` mapping each Session to its Casper conversation |
 | [`src/commands.ts`](src/commands.ts) | Casper's commands for the `/` menu, and host storage domain `casper_agent_commands` keeping the last list |
 | [`src/app-tools.ts`](src/app-tools.ts) | The app tools MCP server: listener, auth, tool list, and calls run as the Casper Agent |
@@ -102,6 +103,7 @@ Casper names each step in `_meta.casper.tool`, and its `rawInput` holds the mode
 | `find`, `ls` | `glob` | `pattern` (`*` for `ls`), `path` | meta `shape: paths`, `paths`, `total`, `truncated` |
 | `web_search` | `web_search` | `queries` | meta `sources`, `truncated`, `answer` |
 | `web_fetch` | `web_fetch` | `url` | meta `url`, `statusCode`, `truncated` |
+| `ask` | `ask_user_question` | one question with id `casper-question`: `question`, `options`, `multi_select` | the answers given in the app as `{answers}`, else Casper's words |
 | an [app tool](#app-tools) | the app tool's own name | the MCP arguments; for a call through `call_capability`, the `arguments` it carries | the app tool's own result and meta |
 | another MCP tool | `casper_mcp` | `title`, the input, and `preview` | Casper's words |
 | any other tool | `casper_<tool>`, or the tool's own name when it already starts with `casper_`, such as `casper_check` | `title`, the input, and `preview` | Casper's words, or its raw output as JSON |
@@ -111,6 +113,8 @@ A shell step that ran is never an error, whatever its exit code. Any other faile
 ### Approvals
 
 `session/request_permission` becomes one `ctx.userQuestions.ask` question with Casper's options as labels, refusals first. One picked label selects that option. Typed text, no pick, a failed or aborted question, and a missing question service answer `cancelled`, which Casper treats as No. The question closes when Casper closes the box itself or the prompt ends.
+
+The client's `initialize` offers `clientCapabilities.elicitation.form`, so Casper asks the AI's questions and its own typed or multi-pick questions as forms instead of skipping them. An `elicitation/create` in Casper's shape (form mode, an `answer` field that is a titled single pick, a titled multi pick, or a typed line, and an optional `other` field for typed words) becomes one question with id `casper-question`, headed `The AI asks` for the AI's question and `Casper asks` otherwise. Picked labels go back as their values in the order picked, and typed words go back as `other`, or as the `answer` of a typed line. Typed words on a form without `other`, and a form in any other shape, decline; no answer, a failed or aborted question, a form outside a prompt, and a missing question service cancel, which Casper treats as skipped. The form's step is recorded as `ask_user_question`: the ask tool's own step, or the pending `casper-question-N` step Casper opens for its own question. An answer recorded in the app becomes that step's result as `{answers}` when Casper completes it, so Standard's question card shows the answer. The question closes when Casper closes the step or withdraws the request, or the prompt ends.
 
 <a id="access-control"></a>
 ### Access control

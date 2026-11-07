@@ -14,6 +14,8 @@ import {
   type AvailableCommand,
   type ClientConnection,
   type ContentBlock as AcpContentBlock,
+  type CreateElicitationRequest,
+  type CreateElicitationResponse,
   type InitializeResponse,
   type McpServer,
   type RequestPermissionRequest,
@@ -105,6 +107,13 @@ export interface CasperConnectionHandlers {
    * @returns the reply; must not reject.
    */
   permission(params: RequestPermissionRequest): Promise<RequestPermissionResponse>
+  /**
+   * Answer one `elicitation/create`: a question Casper asks as a form.
+   * @param params - Casper's request.
+   * @param signal - aborted when Casper withdraws the request or the connection closes.
+   * @returns the reply; must not reject.
+   */
+  elicitation(params: CreateElicitationRequest, signal: AbortSignal): Promise<CreateElicitationResponse>
 }
 
 /** Inputs for starting one Casper process. */
@@ -428,6 +437,7 @@ export class CasperConnection {
         } else if (!this.replaying) options.handlers.update(params)
       })
       .onRequest(methods.client.session.requestPermission, ({ params }) => options.handlers.permission(params))
+      .onRequest(methods.client.elicitation.create, ({ params, signal }) => options.handlers.elicitation(params, signal))
       .connect(ndJsonStream(
         Writable.toWeb(child.stdin) as WritableStream<Uint8Array>,
         Readable.toWeb(child.stdout) as ReadableStream<Uint8Array>,
@@ -435,7 +445,8 @@ export class CasperConnection {
     const agent = this.connection.agent
     this.initialized = await agent.request(methods.agent.initialize, {
       protocolVersion: PROTOCOL_VERSION,
-      clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
+      // Form elicitation: Casper asks its questions as forms instead of skipping them.
+      clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false, elicitation: { form: {} } },
     })
     const mcpServers = await this.openAppTools()
     if (stored !== undefined) {

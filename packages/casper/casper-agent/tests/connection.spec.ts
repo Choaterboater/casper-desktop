@@ -3,7 +3,7 @@ import { chmodSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
-import type { AvailableCommand, SessionConfigOption, SessionNotification } from '@agentclientprotocol/sdk'
+import type { AvailableCommand, CreateElicitationRequest, CreateElicitationResponse, SessionConfigOption, SessionNotification } from '@agentclientprotocol/sdk'
 import { randomBytes } from 'node:crypto'
 import { appToolsEntry } from '../src/app-tools.ts'
 import type { AppToolsServer } from '../src/app-tools.ts'
@@ -28,12 +28,18 @@ async function setup(script: FakeScript = { prompts: [] }) {
   const commands: AvailableCommand[][] = []
   const configs: SessionConfigOption[][] = []
   const modes: string[] = []
+  const forms: { params: CreateElicitationRequest; signal: AbortSignal }[] = []
+  const form = { reply: (_params: CreateElicitationRequest, _signal: AbortSignal): Promise<CreateElicitationResponse> => Promise.resolve({ action: 'cancel' }) }
   const handlers: CasperConnectionHandlers = {
     update: (notification) => { updates.push(notification) },
     commands: (list) => { commands.push([...list]) },
     config: (options) => { configs.push([...options]) },
     mode: (modeId) => { modes.push(modeId) },
     permission: () => Promise.resolve({ outcome: { outcome: 'cancelled' } }),
+    elicitation: (params, signal) => {
+      forms.push({ params, signal })
+      return form.reply(params, signal)
+    },
   }
   const start = async (
     overrides: Partial<Config> = {},
@@ -46,7 +52,7 @@ async function setup(script: FakeScript = { prompts: [] }) {
     cleanups.push(() => started.connection.dispose())
     return started
   }
-  return { fake, ctx, updates, commands, configs, modes, handlers, start }
+  return { fake, ctx, updates, commands, configs, modes, forms, form, handlers, start }
 }
 
 /** A stand-in app tools server with a fresh token that records whether it was closed. */
@@ -378,6 +384,33 @@ describe('CasperConnection', { timeout: 30_000 }, () => {
     expect(updates.map(entry => entry.update.sessionUpdate)).toEqual(['agent_message_chunk', 'tool_call', 'tool_call_update', 'agent_message_chunk'])
     expect(updates.at(-1)?.update).toMatchObject({ _meta: { casper: { receipt: { outcome: 'verified' } } } })
     expect(connection.toolCallId('casper-tool-1')).toBe(`casper:${connection.epoch}:casper-tool-1`)
+  })
+
+  it('initialize offers form elicitation and routes elicitation/create to the handler', async () => {
+    const { fake, start, updates, forms, form } = await setup({ prompts: [[
+      { elicit: { question: 'Which database?', options: [{ label: 'SQLite' }, { label: 'Postgres' }], typed: true, from: 'ai' } },
+      { elicit: { question: 'Port?', timeoutMs: 200 } },
+    ]] })
+    const withdrawn: string[] = []
+    form.reply = (params, signal) => params.message === 'Which database?'
+      ? Promise.resolve({ action: 'accept', content: { answer: '2', other: 'version 16' } })
+      : new Promise((resolve) => {
+        signal.addEventListener('abort', () => { withdrawn.push(params.message); resolve({ action: 'cancel' }) }, { once: true })
+      })
+    const { connection } = await start()
+    expect(fake.calls('initialize')[0]?.params).toMatchObject({ clientCapabilities: { elicitation: { form: {} } } })
+    expect(await connection.prompt([{ type: 'text', text: 'go' }])).toBe('end_turn')
+    expect(forms[0]?.params).toMatchObject({
+      sessionId: fake.calls('session/prompt')[0]?.params?.sessionId, toolCallId: 'casper-question-1', mode: 'form', message: 'Which database?',
+      _meta: { casper: { question: { from: 'ai', multi: false, typed: true } } },
+    })
+    expect(fake.log().filter(entry => entry.event === 'elicitation').map(entry => entry.reply ?? { timedOut: entry.timedOut }))
+      .toEqual([{ action: 'accept', content: { answer: '2', other: 'version 16' } }, { timedOut: true }])
+    // Casper withdrawing its request aborts the handler's signal.
+    await waitFor(() => withdrawn.length === 1)
+    expect(updates.flatMap(({ update }) => update.sessionUpdate === 'tool_call_update' ? [[update.toolCallId, update.status]] : [])).toEqual([
+      ['casper-question-1', 'completed'], ['casper-question-2', 'failed'],
+    ])
   })
 
   it('rejects the prompt with the exit and stderr when Casper exits mid-prompt', async () => {

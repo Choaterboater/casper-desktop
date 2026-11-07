@@ -4,7 +4,15 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import type { AvailableCommand, RequestPermissionRequest, RequestPermissionResponse, SessionNotification, StopReason } from '@agentclientprotocol/sdk'
+import type {
+  AvailableCommand,
+  CreateElicitationRequest,
+  CreateElicitationResponse,
+  RequestPermissionRequest,
+  RequestPermissionResponse,
+  SessionNotification,
+  StopReason,
+} from '@agentclientprotocol/sdk'
 import type {
   Agent,
   AgentCancelCause,
@@ -35,7 +43,7 @@ import type {} from '@deepseek-ai/dsh-session-persistence'
 import type {} from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-tools'
-import type {} from '@deepseek-ai/dsh-user-questions'
+import type { AskUserQuestionAnswer } from '@deepseek-ai/dsh-user-questions'
 import { ACCESS_MODE_LABELS, accessModeFor } from './access.ts'
 import type { AccessModeId } from './access.ts'
 import { appReadRoots, isInstalled, selfAnchor } from './app-read.ts'
@@ -45,6 +53,7 @@ import { casperCommandId, casperCommands } from './commands.ts'
 import type { CasperCommand, CasperCommandCache } from './commands.ts'
 import type { Config } from './config.ts'
 import { CasperConnection, CasperError } from './connection.ts'
+import { answerElicitation, elicitationQuestion, elicitationStep } from './elicitation.ts'
 import { CasperModel } from './model.ts'
 import { effortState, reportOf, valueOf } from './models.ts'
 import type { CasperModelsCache } from './models-cache.ts'
@@ -479,6 +488,7 @@ export class CasperAgent implements Agent {
         // Casper's own mode change is kept, never copied to the chip; only Read only is restored.
         mode: () => { if (owner.connection !== undefined && owner.connection === this.connection) this.queueLiveAccess() },
         permission: params => this.permission(owner.connection, params),
+        elicitation: (params, signal) => this.elicitation(owner.connection, params, signal),
       },
       appTools: this.config.appTools ? connection => this.startAppTools(connection, cwd, profile) : undefined,
     }, stored?.acpSessionId, signal)
@@ -909,6 +919,49 @@ export class CasperAgent implements Agent {
       )
     } finally {
       if (this.asks.get(id) === own) this.asks.delete(id)
+    }
+  }
+
+  /**
+   * Answer one of Casper's forms as a user question on the step it names, as
+   * {@link permission} does for a box: the step's card stays open while the
+   * user answers and closes with Casper's final update of that step.
+   */
+  private async elicitation(
+    connection: CasperConnection | undefined,
+    params: CreateElicitationRequest,
+    withdrawn: AbortSignal,
+  ): Promise<CreateElicitationResponse> {
+    const question = elicitationQuestion(params)
+    if (question === undefined) return { action: 'decline' }
+    const sink = this.sinkFor(connection)
+    if (sink === undefined) return { action: 'cancel' }
+    const id = elicitationStep(params)
+    // A request is dispatched after the notifications sent behind it, so the step may be closed already.
+    if (id !== undefined && sink.writer.finished(id)) return { action: 'cancel' }
+    const own = new AbortController()
+    if (id !== undefined) {
+      const asked = { question: question.question, options: question.options ?? [], multi: question.multiSelect === true }
+      this.record(() => { sink.writer.question({ toolCallId: id }, asked) })
+      this.asks.set(id, own)
+    }
+    const signal = AbortSignal.any([sink.signal, own.signal, withdrawn])
+    const service = this.pluginCtx.get('userQuestions')
+    let answer: AskUserQuestionAnswer | undefined
+    try {
+      const reply = await answerElicitation(
+        params,
+        service === undefined ? undefined : async (item) => {
+          answer = await service.ask({ agent: this, questions: [item], signal })
+          return answer
+        },
+        (error) => { this.pluginCtx.logger.debug(`casper agent "${this.id}": form question ended: ${String(error)}`) },
+      )
+      const batch = answer
+      if (reply.action === 'accept' && id !== undefined && batch !== undefined) this.record(() => { sink.writer.answered(id, batch) })
+      return reply
+    } finally {
+      if (id !== undefined && this.asks.get(id) === own) this.asks.delete(id)
     }
   }
 

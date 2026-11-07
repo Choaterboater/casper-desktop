@@ -1274,3 +1274,106 @@ describe('The access chip in a Casper session', { timeout: 60_000 }, () => {
     expect(promptTexts(fake)).toEqual(['first'])
   })
 })
+
+describe('Casper\'s forms', { timeout: 60_000 }, () => {
+  const DATABASES = [{ label: 'SQLite', description: 'one file' }, { label: 'Postgres' }]
+
+  function replies(fake: FakeCasper): unknown[] {
+    return fake.log().filter(entry => entry.event === 'elicitation').map(entry => entry.reply ?? { timedOut: entry.timedOut })
+  }
+
+  function results(agent: Agent): { isError: boolean; text: string }[] {
+    return eventsOf(agent).flatMap(event => event.type === 'tool/result'
+      ? [{ isError: event.data.message.isError === true, text: event.data.message.content.map(block => block.type === 'text' ? block.text : '').join('') }]
+      : [])
+  }
+
+  it('an accepted form sends answer and other', async () => {
+    const { fake, host } = await setup({ prompts: [[{ elicit: { question: 'Which database?', options: DATABASES, typed: true } }]] }, {},
+      request => Promise.resolve({ answers: [{ id: request.questions[0]?.id ?? '', selected: ['Postgres'], custom: 'version 16' }] }))
+    const { agent } = await host.create('casper-form-accept')
+    await run(agent, 'set it up')
+    expect(host.asked).toHaveLength(1)
+    expect(host.asked[0]?.agent).toBe(agent)
+    expect(host.asked[0]?.questions).toEqual([{
+      id: 'casper-question', header: 'Casper asks', question: 'Which database?',
+      options: [{ label: 'SQLite', description: 'one file' }, { label: 'Postgres' }], multiSelect: false,
+    }])
+    expect(replies(fake)).toEqual([{ action: 'accept', content: { answer: '2', other: 'version 16' } }])
+    expect(results(agent)).toEqual([{ isError: false, text: JSON.stringify({ answers: [{ id: 'casper-question', selected: ['Postgres'], custom: 'version 16' }] }) }])
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }])
+  })
+
+  it('the AI\'s question is headed The AI asks', async () => {
+    const { fake, host } = await setup({ prompts: [[{ elicit: { question: 'Which port?', from: 'ai', hint: 'A port number' } }]] }, {},
+      request => Promise.resolve({ answers: [{ id: request.questions[0]?.id ?? '', selected: [], custom: '8080' }] }))
+    const { agent } = await host.create('casper-form-ai')
+    await run(agent, 'serve it')
+    expect(host.asked[0]?.questions).toEqual([{ id: 'casper-question', header: 'The AI asks', question: 'Which port?' }])
+    expect(replies(fake)).toEqual([{ action: 'accept', content: { answer: '8080' } }])
+    const call = eventsOf(agent).find(event => event.type === 'tool/call')
+    expect(call?.type === 'tool/call' && [call.data.name, parsed(call.data.arguments)]).toEqual([
+      'ask_user_question', { questions: [{ id: 'casper-question', question: 'Which port?', options: [], multi_select: false }] },
+    ])
+  })
+
+  it('the ask step is recorded once as ask_user_question', async () => {
+    const asked = { question: 'Which databases?', options: DATABASES, multi: true }
+    const { fake, host } = await setup({ prompts: [[
+      { tool: 'ask', rawInput: asked, meta: { tool: 'ask' } },
+      { elicit: { ...asked, from: 'ai', onStep: 1 } },
+    ]] }, {}, request => Promise.resolve({ answers: [{ id: request.questions[0]?.id ?? '', selected: ['Postgres', 'SQLite'] }] }))
+    const { agent } = await host.create('casper-form-ask-step')
+    await run(agent, 'store it')
+    expect(host.asked[0]?.questions[0]).toMatchObject({ header: 'The AI asks', multiSelect: true })
+    expect(replies(fake)).toEqual([{ action: 'accept', content: { answer: ['2', '1'] } }])
+    const calls = eventsOf(agent).flatMap(event => event.type === 'tool/call' ? [[event.data.name, parsed(event.data.arguments)]] : [])
+    expect(calls).toEqual([[
+      'ask_user_question',
+      { questions: [{ id: 'casper-question', question: 'Which databases?', options: [{ label: 'SQLite', description: 'one file' }, { label: 'Postgres' }], multi_select: true }] },
+    ]])
+    expect(results(agent)).toEqual([{ isError: false, text: JSON.stringify({ answers: [{ id: 'casper-question', selected: ['Postgres', 'SQLite'] }] }) }])
+  })
+
+  it('Casper\'s final update closes an open card', async () => {
+    const skipped = JSON.stringify({ answers: [], skipped: true, remaining: 7 })
+    const aborted: string[] = []
+    const fake = fakeCasper()
+    cleanups.push(() => { fake.remove() })
+    const shown = gate(fake, 'card-shown')
+    const askStep = { tool: 'ask', rawInput: { question: 'Which database?', options: DATABASES }, meta: { tool: 'ask' } }
+    const asked = { question: 'Which database?', options: DATABASES, from: 'ai', onStep: 1 }
+    fake.script({ prompts: [
+      [askStep, { elicit: asked, during: [{ waitFile: shown.path }, { toolEnd: 1, content: [skipped] }] }],
+      // A form whose step Casper closed already, as when its close overtakes the request: no card opens.
+      [askStep, { toolEnd: 2, content: [skipped] }, { elicit: { ...asked, onStep: 2 } }],
+    ] })
+    const host = await boot(fake, {}, request => new Promise((_resolve, reject) => {
+      request.signal?.addEventListener('abort', () => {
+        aborted.push(request.questions[0]?.question ?? '')
+        reject(new Error('aborted'))
+      }, { once: true })
+      shown.open()
+    }))
+    cleanups.push(() => host.ctx.fiber.dispose())
+    const { agent } = await host.create('casper-form-closed')
+    await run(agent, 'go')
+    await run(agent, 'again')
+    expect(host.asked).toHaveLength(1)
+    expect(aborted).toEqual(['Which database?'])
+    expect(replies(fake)).toEqual([{ action: 'cancel' }, { action: 'cancel' }])
+    expect(results(agent)).toEqual([{ isError: false, text: skipped }, { isError: false, text: skipped }])
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }, { kind: 'completed' }])
+  })
+
+  it('cancels a form without a question service or outside a prompt, and a skipped question is not an error', async () => {
+    const { fake, host } = await setup({ prompts: [[{ elicit: { question: 'Anyone there?', options: DATABASES } }, { text: 'done\n', late: { elicit: { question: 'Late?', options: DATABASES } } }]] },
+      {}, undefined, false)
+    const { agent } = await host.create('casper-form-no-service')
+    await run(agent, 'go')
+    await waitFor(() => replies(fake).length === 2)
+    expect(replies(fake)).toEqual([{ action: 'cancel' }, { action: 'cancel' }])
+    expect(results(agent)).toEqual([{ isError: false, text: '— skipped' }])
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }])
+  })
+})

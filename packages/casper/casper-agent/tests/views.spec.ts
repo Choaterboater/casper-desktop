@@ -207,6 +207,19 @@ describe('standardCall and standardResult', () => {
     })
   })
 
+  it('records the ask tool as ask_user_question with its question, choices and multi, and keeps its words as the result', () => {
+    const options = [{ label: 'SQLite', description: 'one file' }, { label: 'Postgres', description: '' }, { label: '' }, 'MySQL']
+    expect(shape(call('ask', { question: 'Which database?', options, multi: true }), done({ content: words('{"answers":["SQLite"]}') }))).toEqual({
+      name: 'ask_user_question',
+      args: { questions: [{ id: 'casper-question', question: 'Which database?', options: [{ label: 'SQLite', description: 'one file' }, { label: 'Postgres' }], multi_select: true }] },
+      result: { text: '{"answers":["SQLite"]}', isError: false },
+    })
+    expect(parsed(standardCall(call('ask', { options: 'none' })).arguments)).toEqual({
+      questions: [{ id: 'casper-question', question: 'ask step', options: [], multi_select: false }],
+    })
+    expect(standardResult(standardCall(call('ask', {})), done())).toEqual({ text: '', isError: false })
+  })
+
   it('keeps a Casper tool already named casper_<tool> without doubling the prefix', () => {
     expect(shape(call('casper_check', { check: 'test' }), done({ content: words('passed') }))).toEqual({
       name: 'casper_check', args: { title: 'casper_check step', check: 'test' }, result: { text: 'passed', isError: false },

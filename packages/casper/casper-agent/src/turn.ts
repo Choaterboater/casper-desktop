@@ -12,10 +12,11 @@ import type { ContentBlock, ToolCallId } from '@deepseek-ai/dsh-llm'
 import { TOOL_OUTCOME_UNKNOWN } from '@deepseek-ai/dsh-session'
 import type { Session, SessionSeq } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-tool-todo'
+import type { AskUserQuestionAnswer } from '@deepseek-ai/dsh-user-questions'
 import type { BridgedCall } from './app-tools.ts'
 import { toolCallText } from './permission.ts'
-import { standardCall, standardResult } from './views.ts'
-import type { Json, StandardView } from './views.ts'
+import { ASK_USER_QUESTION, askArguments, questionStep, standardCall, standardResult } from './views.ts'
+import type { CasperQuestion, Json, StandardView } from './views.ts'
 
 /** Provider name recorded on Casper's assistant messages. */
 export const CASPER_PROVIDER = 'casper'
@@ -52,6 +53,8 @@ interface OpenCall {
   readonly view: StandardView | undefined
   /** The app tool's own result, when the step ran one through the app tools server. */
   bridged: BridgedCall | undefined
+  /** The answers the user gave this step's form in the app, recorded as its result once Casper completes it. */
+  answers?: AskUserQuestionAnswer['answers'] | undefined
 }
 
 /** One `tool/result` to append. */
@@ -81,6 +84,8 @@ export class TurnWriter {
   private readonly openCalls = new Map<string, OpenCall>()
   /** App tool results that arrived before their step's `tool_call`. */
   private readonly earlyBridged = new Map<string, BridgedCall>()
+  /** ACP ids of the steps this prompt has closed. */
+  private readonly closed = new Set<string>()
   private buffered: string[] = []
 
   /** @param options - the Session, frame publisher, positions, counters, and id mapping. */
@@ -119,11 +124,18 @@ export class TurnWriter {
    * Record a `tool_call` update. A running step is recorded as the Standard
    * tool it maps to ({@link standardCall}); a call that arrives already
    * completed or failed (a Casper check) is `casper_check` and closed at once,
-   * and a pending one (an approval box) is `casper_approval`.
+   * a pending one carrying `_meta.casper.question` (Casper's own question
+   * step) is `ask_user_question`, and any other pending one (an approval box)
+   * is `casper_approval`.
    * @param call - the ACP tool call.
    */
   toolCall(call: ToolCall): void {
     const terminal = call.status === 'completed' || call.status === 'failed'
+    const asked = call.status === 'pending' ? questionStep(call) : undefined
+    if (asked !== undefined) {
+      this.question(call, asked)
+      return
+    }
     if (!terminal && call.status !== 'pending') {
       const view = standardCall(call)
       this.startCall(call.toolCallId, view.name, view.arguments, view)
@@ -154,19 +166,35 @@ export class TurnWriter {
   }
 
   /**
-   * Make sure an approval box has an open call, and mark it as a question so
-   * a No closes it without an error.
-   * @param call - the tool call carried by `session/request_permission`.
+   * Make sure an approval box or a form has an open call, and mark it as a
+   * question so a No or a skip closes it without an error.
+   * @param call - the tool call carried by `session/request_permission`, or the step a form names.
+   * @param asked - the form's question; a step not seen before is then
+   *   recorded as `ask_user_question` instead of `casper_approval`.
    */
-  question(call: ToolCallUpdate): void {
+  question(call: ToolCallUpdate, asked?: CasperQuestion): void {
     const open = this.openCalls.get(call.toolCallId)
     if (open !== undefined) {
       open.question = true
       return
     }
-    this.startCall(call.toolCallId, 'casper_approval', callArguments(call.title ?? '', call.content), undefined)
+    if (asked === undefined) this.startCall(call.toolCallId, 'casper_approval', callArguments(call.title ?? '', call.content), undefined)
+    else this.startCall(call.toolCallId, ASK_USER_QUESTION, JSON.stringify(askArguments(asked)), undefined)
     const started = this.openCalls.get(call.toolCallId)
     if (started !== undefined) started.question = true
+  }
+
+  /**
+   * Keep the answers the user gave a step's form; when Casper completes the
+   * step, its result is `{answers}`, the shape Standard's question card reads.
+   * A step that fails or is still open at the end keeps Casper's words or the
+   * outcome-unknown result.
+   * @param acpId - the ACP tool call id of the step the form named.
+   * @param answer - the user's answer batch.
+   */
+  answered(acpId: string, answer: AskUserQuestionAnswer): void {
+    const open = this.openCalls.get(acpId)
+    if (open !== undefined) open.answers = answer.answers
   }
 
   /**
@@ -180,6 +208,7 @@ export class TurnWriter {
     if (update.status !== 'completed' && update.status !== 'failed') return
     const failed = update.status === 'failed'
     this.finishCall(update.toolCallId, (open) => {
+      if (open.answers !== undefined && !failed) return textResult(JSON.stringify({ answers: open.answers }), false)
       const bridged = open.bridged?.result
       if (bridged !== undefined) return { content: bridged.content, isError: bridged.isError, meta: bridged.meta }
       if (open.view === undefined || open.question) {
@@ -189,6 +218,15 @@ export class TurnWriter {
       const result = standardResult(open.view, update)
       return { ...textResult(result.text, result.isError), meta: result.meta }
     })
+  }
+
+  /**
+   * Whether Casper already closed a step in this prompt.
+   * @param acpId - the ACP tool call id.
+   * @returns true once the step's completed or failed update was recorded.
+   */
+  finished(acpId: string): boolean {
+    return this.closed.has(acpId)
   }
 
   /**
@@ -301,6 +339,7 @@ export class TurnWriter {
     const open = this.openCalls.get(acpId)
     if (open === undefined) return
     this.openCalls.delete(acpId)
+    this.closed.add(acpId)
     const result = resultOf(open)
     this.appendResult(open, result, result.isError ? { name: 'CasperToolFailed', code: 'CASPER_TOOL_FAILED' } : undefined)
     if (this.openCalls.size > 0 || this.buffered.length === 0) return

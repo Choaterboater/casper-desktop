@@ -63,6 +63,25 @@
  * `replay` lists
  * user chunks sent during a successful `session/load`.
  *
+ * `{ elicit: { question, options?, multi?, typed?, from?, hint?, onStep?,
+ * timeoutMs?, schema? }, during? }` asks a question as Casper's AcpAsker does
+ * when the client offered `clientCapabilities.elicitation.form`. With
+ * `onStep: N` it is the ask tool's question on the running `casper-tool-N`:
+ * after the reply that step completes with the ask tool's result
+ * (`{answers, skipped, remaining}`). Otherwise Casper opens its own pending
+ * `casper-question-N` step first (title `The AI asks: ` plus the question when
+ * `from` is `ai`, `_meta.casper.question`) and closes it completed with
+ * `→ a | b` or failed with `— skipped`. The form is `elicitation/create` with
+ * `answer` (a `oneOf` single pick, an `items.anyOf` multi pick, or a typed line
+ * titled `hint` when there are no options), `other` when `typed` and there are
+ * options, and `_meta.casper.question: {from, multi, typed}`; `schema` replaces
+ * the requested schema. Only `accept` counts: `answer` values map back to
+ * labels by index, unknown ones are dropped, `other` counts only when typed, a
+ * single pick prefers the typed words, a multi pick puts them last, and a
+ * line's spaces collapse. `timeoutMs` withdraws the request with
+ * `$/cancel_request` after that delay and treats it as skipped. Each reply is
+ * logged as `{ event: 'elicitation', reply }` (or `error`, or `timedOut`).
+ *
  * @module @deepseek-ai/dsh-casper-agent/tests/fake-casper-acp
  */
 
@@ -79,6 +98,7 @@ import {
   RequestError,
   type AgentContext,
   type AvailableCommand,
+  type CreateElicitationResponse,
   type McpServer,
   type PromptRequest,
   type PromptResponse,
@@ -127,6 +147,20 @@ interface Step {
   commandsUpdate?: AvailableCommand[]
   configUpdate?: SessionConfigOption[]
   mode?: string
+  elicit?: Elicit
+}
+
+/** A question Casper asks as a form; see the module comment. */
+interface Elicit {
+  question: string
+  options?: { label: string; description?: string }[]
+  multi?: boolean
+  typed?: boolean
+  from?: 'ai' | 'casper'
+  hint?: string
+  onStep?: number
+  timeoutMs?: number
+  schema?: Record<string, unknown>
 }
 
 /** A step's ACP fields beyond the id, status, and title. */
@@ -210,6 +244,7 @@ let sessionId: string | undefined
 let mcpServers: McpServer[] = []
 let steps = 0
 let boxes = 0
+let questions = 0
 let cancel: ((reason: StopReason) => void) | undefined
 let ignoreCancel = false
 /** This process's options; a set changes them. */
@@ -332,6 +367,7 @@ async function run(step: Step, params: PromptRequest, client: AgentContext, outc
         content: [{ type: 'content', content: { type: 'text', text: `→ ${picked?.name ?? 'No (no answer)'}` } }],
       })
     }
+    if (step.elicit !== undefined) await elicit(step.elicit, step.during ?? [], params, client, outcome)
     if (step.mcp !== undefined) await callMcp(step.mcp, step.args ?? {})
     if (step.waitFile !== undefined) await until(step.waitFile)
     if (step.stderr !== undefined) process.stderr.write(`${step.stderr}\n`)
@@ -345,6 +381,86 @@ async function run(step: Step, params: PromptRequest, client: AgentContext, outc
       outcome.receipt = 'cancelled'
     }
   }
+}
+
+/** The form Casper sends for one question (C7's questionSchema, without the hiding). */
+function questionSchema(asked: Elicit): Record<string, unknown> {
+  const options = asked.options ?? []
+  const oneOf = options.map(({ label, description }, at) => ({
+    const: String(at + 1), title: label, ...description === undefined ? {} : { description },
+  }))
+  const answer = options.length === 0
+    ? { type: 'string', title: asked.hint ?? 'Your answer' }
+    : asked.multi === true ? { type: 'array', items: { anyOf: oneOf } } : { type: 'string', title: 'Choose', oneOf }
+  const other = asked.typed === true && options.length > 0 ? { other: { type: 'string', title: 'Or type your answer' } } : {}
+  return { type: 'object', properties: { answer, ...other }, required: options.length === 0 ? ['answer'] : [] }
+}
+
+/** The answer Casper reads from a form reply (C7's formAnswer). */
+function formAnswer(result: CreateElicitationResponse | undefined, asked: Elicit): string[] | undefined {
+  if (result?.action !== 'accept' || !('content' in result)) return undefined
+  const content = (result.content ?? {}) as Record<string, unknown>
+  const options = asked.options ?? []
+  const other = asked.typed === true && typeof content.other === 'string' && content.other.trim() !== '' ? content.other.trim() : undefined
+  if (options.length === 0) {
+    const line = typeof content.answer === 'string' ? content.answer.replace(/\s+/g, ' ').trim() : ''
+    return line === '' ? undefined : [line]
+  }
+  const values = Array.isArray(content.answer) ? content.answer : content.answer === undefined ? [] : [content.answer]
+  const picks = values.flatMap(value => typeof value === 'string' ? [options[Number(value) - 1]?.label].filter((label): label is string => label !== undefined) : [])
+  const typed = other === undefined ? [] : [other]
+  const answer = asked.multi === true ? [...picks, ...typed] : other === undefined ? picks.slice(0, 1) : typed
+  return answer.length === 0 ? undefined : answer
+}
+
+/** Ask one question as a form, on the ask tool's step or on a question step of Casper's own. */
+async function elicit(asked: Elicit, during: Step[], params: PromptRequest, client: AgentContext, outcome: Outcome): Promise<void> {
+  const own = asked.onStep === undefined
+  const toolCallId = own ? `casper-question-${++questions}` : `casper-tool-${asked.onStep}`
+  const multi = asked.multi === true
+  const typed = asked.typed === true || (asked.options ?? []).length === 0
+  if (own) {
+    await update(client, {
+      sessionUpdate: 'tool_call', toolCallId, title: `${asked.from === 'ai' ? 'The AI asks: ' : ''}${asked.question}`, kind: 'other', status: 'pending',
+      _meta: { casper: { question: { question: asked.question, options: asked.options ?? [], multi, typed } } },
+    })
+  }
+  const withdraw = new AbortController()
+  const timer = asked.timeoutMs === undefined ? undefined : setTimeout(() => { withdraw.abort() }, asked.timeoutMs)
+  let result: CreateElicitationResponse | undefined
+  try {
+    const request = {
+      sessionId: params.sessionId, toolCallId, mode: 'form', message: asked.question,
+      requestedSchema: asked.schema ?? questionSchema(asked),
+      _meta: { casper: { question: { from: asked.from ?? 'casper', multi, typed } } },
+    }
+    const sent = client.request<CreateElicitationResponse>(methods.client.elicitation.create, request, {
+      cancellationSignal: withdraw.signal,
+    })
+    const withdrawn = new Promise<'withdrawn'>((resolve) => { withdraw.signal.addEventListener('abort', () => { resolve('withdrawn') }, { once: true }) })
+    for (const meanwhile of during) await run(meanwhile, params, client, outcome)
+    const settled = await Promise.race([sent, withdrawn])
+    sent.catch(() => { /* a withdrawn request may still settle */ })
+    if (settled === 'withdrawn') log({ event: 'elicitation', timedOut: true })
+    else {
+      result = settled
+      log({ event: 'elicitation', reply: result })
+    }
+  } catch (error: unknown) {
+    log({ event: 'elicitation', error: String(error) })
+  } finally {
+    clearTimeout(timer)
+  }
+  const answer = formAnswer(result, asked)
+  if (own) {
+    await update(client, {
+      sessionUpdate: 'tool_call_update', toolCallId, status: answer === undefined ? 'failed' : 'completed',
+      content: [{ type: 'content', content: { type: 'text', text: answer === undefined ? '— skipped' : `→ ${answer.join(' | ')}` } }],
+    })
+    return
+  }
+  const reply = JSON.stringify({ answers: answer ?? [], skipped: answer === undefined, remaining: 7 })
+  await update(client, { sessionUpdate: 'tool_call_update', toolCallId, status: 'completed', content: [{ type: 'content', content: { type: 'text', text: reply } }] })
 }
 
 /** Call one tool on the app's MCP server the way Casper's MCP client does. */

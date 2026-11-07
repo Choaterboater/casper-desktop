@@ -29,6 +29,10 @@ export interface FakeLogEntry {
   readonly result?: { content?: { type: string; text?: string }[]; isError?: boolean }
   /** The serverInfo the app's MCP server answered with. */
   readonly server?: { name?: string; version?: string }
+  /** The app's reply to a form. */
+  readonly reply?: { action: string; content?: Record<string, unknown> }
+  /** Whether Casper stopped waiting for a form. */
+  readonly timedOut?: boolean
 }
 
 /** One step of the stand-in's prompt script; see `fake-casper-acp.ts`. */
