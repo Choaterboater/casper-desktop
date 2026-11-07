@@ -514,6 +514,8 @@ export interface Config {
    * table does not list, the derived `custom`, and Auto set `ask`; a read-only sandbox always sets `read`.
    */
   accessModes: Record<string, AccessModeId>
+  /** Show Casper's boxes with Casper's approval card; off shows the generic question card. */
+  approvalCard: boolean
 }
 
 /** Casper's access modes over ACP: Read only, Ask first, and Don't ask (`/permissions all`). */

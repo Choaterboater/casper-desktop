@@ -1637,3 +1637,53 @@ describe('Plan review and Plan first', { timeout: 60_000 }, () => {
     expect(planSets(fake)).toEqual([])
   })
 })
+
+describe('Casper\'s approval card', () => {
+  const FILE = '/work/project/sum.js'
+
+  it('a box a running step raises is headed Casper and shows the step\'s diff lines', async () => {
+    const { fake, host } = await setup({ prompts: [[
+      { tool: 'edit', kind: 'edit', rawInput: { path: 'sum.js', edits: [{ oldText: 'a - b', newText: 'a + b' }] }, meta: { tool: 'edit', target: 'sum.js' } },
+      {
+        permission: 'Change sum.js outside the project?', preview: 'The AI wants to change sum.js.', onStep: 1, locations: [{ path: FILE }],
+        diffs: [{ path: FILE, oldText: 'return a - b\n', newText: 'return a + b\n' }],
+      },
+      { toolEnd: 1 },
+    ]] })
+    const { agent } = await host.create('casper-card-diff')
+    await run(agent, 'fix it')
+    expect(host.asked[0]?.questions).toEqual([{
+      id: 'casper-permission',
+      header: 'Casper',
+      question: 'Change sum.js outside the project?',
+      detail: `The AI wants to change sum.js.\n\n${FILE}\n- return a - b\n+ return a + b`,
+      options: [{ label: 'No' }, { label: 'Yes, this once' }, { label: 'Yes for this session' }],
+      multiSelect: false,
+    }])
+    expect(fake.log().filter(entry => entry.event === 'answer').map(entry => entry.outcome)).toEqual([{ outcome: 'selected', optionId: '2' }])
+    // approvalCard off asks the same box on the generic question card.
+    const generic = await setup({ prompts: [[{ permission: 'Run it?' }]] }, { approvalCard: false })
+    await run((await generic.host.create('casper-card-off')).agent, 'go')
+    expect(generic.host.asked[0]?.questions[0]?.header).toBeUndefined()
+  })
+
+  it('Casper closing a box withdraws the card and answers cancelled', async () => {
+    let withdrawn: boolean | undefined
+    const { fake, host } = await setup({ prompts: [[{ permission: 'Run it?', during: [{ withdraw: true }] }, { text: 'done\n' }]] },
+      {}, request => new Promise((_resolve, reject) => {
+        request.signal?.addEventListener('abort', () => {
+          withdrawn = true
+          reject(new UserQuestionError('ASK_ABORTED', 'withdrawn'))
+        }, { once: true })
+      }))
+    const { agent } = await host.create('casper-card-withdrawn')
+    await run(agent, 'go')
+    expect(host.asked).toHaveLength(1)
+    expect(withdrawn).toBe(true)
+    expect(fake.log().filter(entry => entry.event === 'answer').map(entry => [entry.outcome, entry.withdrawn]))
+      .toEqual([[{ outcome: 'cancelled' }, true]])
+    const result = eventsOf(agent).find(event => event.type === 'tool/result')
+    expect(result?.type === 'tool/result' && result.data.message.content).toEqual([{ type: 'text', text: '→ No (access set to Read only)' }])
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }])
+  })
+})

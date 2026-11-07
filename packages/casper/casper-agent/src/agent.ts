@@ -1008,8 +1008,8 @@ export class CasperAgent implements Agent {
         params,
         service === undefined ? undefined : async question => service.ask({ agent: this, questions: [question], signal }),
         (error) => { this.pluginCtx.logger.debug(`casper agent "${this.id}": permission question ended: ${String(error)}`) },
-        // A plan review reopens the plan recorded under the box's step.
-        { callId: sink.connection.toolCallId(id) },
+        // A plan review reopens the plan recorded under the box's step; any other box is marked for Casper's card.
+        { callId: sink.connection.toolCallId(id), card: this.config.approvalCard },
       )
     } finally {
       if (this.asks.get(id) === own) this.asks.delete(id)

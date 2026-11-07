@@ -40,8 +40,13 @@
  * older Casper's `rawInput: { tool, target }`), `{ toolEnd, ok }` (ends tool
  * N), `{ toolUpdate }` (an in-progress update of tool N, or of the open box
  * for `'box'`), `{ check, status }`, `{ plan }`, `{ permission, options,
- * preview?, during? }` (`during` steps play while the box waits for its
- * answer), `{ receipt }`, `{ stop }`,
+ * preview?, diffs?, locations?, onStep?, during? }` (`during` steps play while
+ * the box waits for its answer; as C9 sends a box a running step raises, the
+ * pending step and the request carry the preview text followed by `diffs` as
+ * diff content, the `locations`, and `_meta.casper.step: 'casper-tool-N'` for
+ * `onStep: N`; a `{ withdraw: true }` step in `during` closes the box as a
+ * switch to Read only does, before the reply, which is still logged with
+ * `withdrawn: true`), `{ receipt }`, `{ stop }`,
  * `{ hang: true }` (waits for session/cancel), `{ ignoreCancel: true }` (with
  * hang: never replies), `{ crash }` (exits with that code),
  * `{ waitFile }` (waits until the file exists), `{ stderr }` (writes a
@@ -131,6 +136,9 @@ interface Step {
   permission?: string
   options?: string[]
   preview?: string
+  diffs?: { path: string; oldText?: string | null; newText: string }[]
+  onStep?: number
+  withdraw?: boolean
   planBox?: string
   receipt?: string
   stop?: StopReason
@@ -350,32 +358,52 @@ async function run(step: Step, params: PromptRequest, client: AgentContext, outc
     }
     if (step.permission !== undefined) {
       const toolCallId = `casper-approval-${++boxes}`
+      const content = [
+        ...step.preview === undefined ? [] : [{ type: 'content' as const, content: { type: 'text' as const, text: step.preview } }],
+        ...(step.diffs ?? []).map(diff => ({ type: 'diff' as const, ...diff })),
+      ]
       const toolCall = {
         toolCallId, title: step.permission, kind: 'other' as const, status: 'pending' as const,
-        ...step.preview === undefined ? {} : { content: [{ type: 'content' as const, content: { type: 'text' as const, text: step.preview } }] },
+        ...content.length === 0 ? {} : { content },
+        ...step.locations === undefined ? {} : { locations: step.locations },
+        ...step.onStep === undefined ? {} : { _meta: { casper: { step: `casper-tool-${String(step.onStep)}` } } },
       }
       await update(client, { sessionUpdate: 'tool_call', ...toolCall })
       const options = (step.options ?? ['No', 'Yes, this once', 'Yes for this session']).map((name, at) => ({
         optionId: String(at + 1), name, kind: optionKind(name),
       }))
       let picked: (typeof options)[number] | undefined
+      let withdrawn = false
       try {
         const request = { sessionId: params.sessionId, toolCall, options }
         const asked = client.request<RequestPermissionResponse>(methods.client.session.requestPermission, request)
-        for (const meanwhile of step.during ?? []) await run(meanwhile, params, client, outcome)
+        for (const meanwhile of step.during ?? []) {
+          if (meanwhile.withdraw !== true) {
+            await run(meanwhile, params, client, outcome)
+            continue
+          }
+          // AcpAsker.withdrawAll: Casper stops waiting without a $/cancel_request and closes the step as No.
+          withdrawn = true
+          await update(client, {
+            sessionUpdate: 'tool_call_update', toolCallId, status: 'failed',
+            content: [{ type: 'content', content: { type: 'text', text: READ_ONLY_NO } }],
+          })
+        }
         const result = await asked
-        picked = result.outcome.outcome === 'selected'
+        picked = result.outcome.outcome === 'selected' && !withdrawn
           ? options.find(option => result.outcome.outcome === 'selected' && option.optionId === result.outcome.optionId)
           : undefined
-        log({ event: 'answer', outcome: result.outcome })
+        log({ event: 'answer', outcome: result.outcome, ...withdrawn ? { withdrawn } : {} })
       } catch (error: unknown) {
         log({ event: 'answer', error: String(error) })
       }
       const yes = picked !== undefined && picked.kind !== 'reject_once'
-      await update(client, {
-        sessionUpdate: 'tool_call_update', toolCallId, status: yes ? 'completed' : 'failed',
-        content: [{ type: 'content', content: { type: 'text', text: `→ ${picked?.name ?? 'No (no answer)'}` } }],
-      })
+      if (!withdrawn) {
+        await update(client, {
+          sessionUpdate: 'tool_call_update', toolCallId, status: yes ? 'completed' : 'failed',
+          content: [{ type: 'content', content: { type: 'text', text: `→ ${picked?.name ?? 'No (no answer)'}` } }],
+        })
+      }
     }
     if (step.planBox !== undefined) await planBox(step.planBox, step.during ?? [], params, client, outcome)
     if (step.elicit !== undefined) await elicit(step.elicit, step.during ?? [], params, client, outcome)
@@ -393,6 +421,9 @@ async function run(step: Step, params: PromptRequest, client: AgentContext, outc
     }
   }
 }
+
+/** The text of a box closed by a switch to Read only (src/acp/permission.ts READ_ONLY_NO). */
+const READ_ONLY_NO = '→ No (access set to Read only)'
 
 /** Casper's plan choices (safe-choices.ts PLAN_CHOICES) and the kinds C8 gives them. */
 const PLAN_CHOICES = [

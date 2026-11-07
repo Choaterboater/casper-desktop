@@ -1,34 +1,7 @@
 {
-  "extends": "../../../tsconfig.base.json",
-  "compilerOptions": {
-    "rootDir": "src",
-    "outDir": "lib/types"
-  },
-  "include": [
-    "src"
-  ],
+  "files": [],
   "references": [
-    { "path": "../../../vendor/cordis" },
-    { "path": "../../../vendor/schemastery" },
-    { "path": "../../core/agent" },
-    { "path": "../../core/agent-loop" },
-    { "path": "../../llm/llm" },
-    { "path": "../../attachment/attachment" },
-    { "path": "../../interaction/commands" },
-    { "path": "../../interaction/permission-presets" },
-    { "path": "../../plan/plan-mode" },
-    { "path": "../../sandbox/sandbox-policy" },
-    { "path": "../../core/scope" },
-    { "path": "../../core/session" },
-    { "path": "../../session/session-persistence" },
-    { "path": "../../session/session-projection" },
-    { "path": "../../storage/storage-domain" },
-    { "path": "../../subprocess/subprocess" },
-    { "path": "../../todo/tool-todo" },
-    { "path": "../../interaction/user-questions" },
-    { "path": "../../boot/app-boot" },
-    { "path": "../../skill/skill" },
-    { "path": "../../core/tools" },
-    { "path": "../../util/code-language" }
+    { "path": "./tsconfig.host.json" },
+    { "path": "./tsconfig.client.json" }
   ]
 }

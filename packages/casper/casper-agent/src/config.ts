@@ -41,6 +41,8 @@ export interface Config {
    * table does not list, the derived `custom`, and Auto set `ask`; a read-only sandbox always sets `read`.
    */
   accessModes: Record<string, AccessModeId>
+  /** Show Casper's boxes with Casper's approval card; off shows the generic question card. */
+  approvalCard: boolean
 }
 
 /** Runtime schema for {@link Config}; the defaults keep teardown inside a 10 s host shutdown window. */
@@ -58,4 +60,5 @@ export const Config: z<Config> = z.object({
   stderrTailBytes: z.natural().min(1).default(4_096),
   appTools: z.boolean().default(true),
   accessModes: z.dict(z.union(ACCESS_MODE_IDS as AccessModeId[])).default({ ...DEFAULT_ACCESS_MODES }),
+  approvalCard: z.boolean().default(true),
 })

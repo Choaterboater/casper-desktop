@@ -41,6 +41,7 @@ kind: "package-reference"
 | `stderrTailBytes` | `4096` | 为失败信息保留的 Casper stderr 字节数 |
 | `appTools` | `true` | 向 Casper 提供应用工具；`false` 时发送空的 `mcpServers` 列表 |
 | `accessModes` | `{ read-only: read, workspace-write: ask, danger-full-access: full }` | 每个权限预设设置的[访问模式](#access-control)；不能列出 `custom` 与 `auto` |
+| `approvalCard` | `true` | 用 [Casper 的审批卡片](#approvals)显示 Casper 的审批框；`false` 时显示通用问题卡片 |
 
 子进程不会收到 `DEEPSEEK_*` 或 `DSH_*` 名称，也不会收到 `env` 未列出的凭据类名称。唯一的例外是应用 profile：应用带 profile 运行时，Casper 会收到 `DSH_PROFILE` 与 `DSH_PROFILE_DIR`，使它构建的 bundle 能指明要安装到的 profile。
 
@@ -60,7 +61,10 @@ kind: "package-reference"
 | [`src/connection.ts`](src/connection.ts) | 一个 `casper acp` 进程：查找、启动、ACP 客户端、`session/new` 或 `session/load`、提示、取消与释放 |
 | [`src/turn.ts`](src/turn.ts) | 把 Casper 的更新写成步骤、助手消息、工具调用、结果与待办列表 |
 | [`src/views.ts`](src/views.ts) | 把 Casper 的工具步骤记录为做同样事情的 Standard 工具：名称、参数、结果文本与 meta |
-| [`src/permission.ts`](src/permission.ts) | 把审批框变成用户问题，并把答案映射回去；计划 Build 框变成计划审阅 |
+| [`src/permission.ts`](src/permission.ts) | 把审批框变成标题为 `Casper` 的用户问题，detail 中带有发起步骤的差异行，并把答案映射回去；计划 Build 框变成计划审阅 |
+| [`src/box.ts`](src/box.ts) | 审批框的问题 id、标题与卡片上限，由两半共用 |
+| [`src/client/index.ts`](src/client/index.ts) | 客户端一半：把 Casper 的审批卡片注册为对话输入框链的第一项 |
+| [`src/client/CasperBoxCard.tsx`](src/client/CasperBoxCard.tsx) | Casper 的审批卡片：它接管哪些问题、它的行、按键与回答 |
 | [`src/elicitation.ts`](src/elicitation.ts) | 把 Casper 的表单（`elicitation/create`）变成用户问题，并把答案映射回去 |
 | [`src/sidecar.ts`](src/sidecar.ts) | Host 存储域 `casper_agent`，把每个会话映射到其 Casper 对话 |
 | [`src/commands.ts`](src/commands.ts) | 供 `/` 菜单使用的 Casper 命令，以及保存最后一份列表的 Host 存储域 `casper_agent_commands` |
@@ -110,9 +114,12 @@ Casper 在 `_meta.casper.tool` 中给每个步骤命名，其 `rawInput` 是模�
 
 已运行的 shell 步骤无论退出码为何都不是错误。其他失败的步骤是错误，内容为 Casper 的文字；Casper 未发送文字时为 `Casper reported that this step failed.`。只有 Casper 报告了绝对路径时才记录 meta 路径，因此该轮的交付物会列出其编辑与写入产生的文件。结果形状不符合预期的步骤保留 Casper 的文本且不带 meta，显示为普通卡片。
 
+<a id="approvals"></a>
 ### 审批
 
-`session/request_permission` 变成一个 `ctx.userQuestions.ask` 问题，以 Casper 的选项为标签，拒绝项在前。选中一个标签即选择该选项。输入文本、未选择、问题失败或被中止，以及没有问题服务时，都回答 `cancelled`，Casper 将其视为“否”。当 Casper 自行关闭审批框或提示结束时，问题随之关闭。
+`session/request_permission` 变成一个 `ctx.userQuestions.ask` 问题，id 为 `casper-permission`，标题为 `Casper`，以 Casper 的选项为标签，拒绝项在前，并带有选项说明。其 detail 是审批框的文本，随后是发起该框的步骤的差异：每个文件的路径，旧行以 `- ` 开头，新行以 `+ ` 开头，最多 120 行，之后是 `… N more lines in the edit step`。较旧的 Casper 发来的审批框不带差异，只显示文本。选中一个标签即选择该选项。输入文本、未选择、问题失败或被中止，以及没有问题服务时，都回答 `cancelled`，Casper 将其视为“否”。当 Casper 自行关闭审批框或提示结束时，问题随之关闭。
+
+本插件的客户端一半用 Casper 的审批卡片显示这样的问题，该卡片注册为对话输入框链的第一项（优先级 -1）。卡片只接管只有一项、带有上述 id 与标题、单选且有 1 到 4 个选项的问题；其他任何问题（包括计划审阅）保留各自的卡片。标题是问题的第一行，其余各行与 detail 以纯文本跟在后面。每个选项是一行，按 Casper 的顺序排列，“否”在前，带有编号，说明在其下方。卡片在最初 300 毫秒内不计任何操作，之后聚焦“否”；但若焦点位于输入框区域之外的其他字段，焦点保留在原处。只有焦点在卡片内时其按键才计入，可滚动的详情可以用 Tab 到达。Esc 回答“否”，数字选择对应的行；带修饰键的按键、重复按键以及输入法组字中的按键都不计。Enter 没有自己的处理，因此它点击获得焦点的行。回答只发送一次：卡片保持忙碌，直到 Casper 关闭审批框；发送失败时各行恢复可用。已关闭的问题不作任何回答。`approvalCard: false` 时审批框不带标题，由通用问题卡片询问。
 
 客户端的 `initialize` 提供 `clientCapabilities.elicitation.form`，因此 Casper 会把 AI 的问题以及它自己需要输入文字或多选的问题作为表单发来，而不是跳过。符合 Casper 形状的 `elicitation/create`（表单模式，一个 `answer` 字段，为带标题的单选、带标题的多选或一行输入文字，以及一个可选的 `other` 字段用于输入文字）变成一个 id 为 `casper-question` 的问题；AI 的问题标题为 `The AI asks`，其余为 `Casper asks`。选中的标签按选择顺序以其值发回，输入的文字以 `other` 发回，一行输入的问题则作为 `answer` 发回。在没有 `other` 的表单上输入文字，以及其他任何形状的表单，都回答 decline；没有回答、问题失败或被中止、提示之外的表单，以及没有问题服务时，都回答 cancel，Casper 视为跳过。表单所属的步骤记录为 `ask_user_question`：即 ask 工具自己的步骤，或 Casper 为自己的问题打开的待处理 `casper-question-N` 步骤。在应用中记录的答案会在 Casper 完成该步骤时成为其结果 `{answers}`，因此 Standard 的问题卡片会显示答案。当 Casper 关闭该步骤或撤回请求，或提示结束时，问题随之关闭。
 
@@ -189,7 +196,7 @@ Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打�
 - 只有应用工具服务器会传给 Casper；应用中配置的 MCP 服务器不会。
 - 应用工具的结果只以文本形式到达 Casper：图片或其他非文本块会变成一行说明。目前提供的工具都不返回图片。
 - 在打包的应用中，`app_read_file` 能读到每个已安装包的 `README.md`、`package.json` 与构建出的 `lib/*.js`、技能文件，以及 `ui-theme` 的 `lib/styles`。Desktop 运行时副本会去掉所有 `.d.ts`，各包不发布 `src/`，仓库的 `docs/` 也不在任何包中，因此那里无法读取 `lib/types`、`ui-sidebar` 的 `slots.ts`、`docs/cordis-tutorial` 与 `docs/web-styling.md`；插槽属性与主题令牌改由 `cordis_inspect_query` 获得。尚未随应用提供这些指南。
-- 审批使用通用问题卡片；没有固定的审批卡片或单独的“始终允许”呈现。
+- Casper 的审批卡片以纯文本的 `- ` 与 `+ ` 行显示差异，最多 120 行，而不是差异视图。
 - Casper 自己选择的模式不会显示：权限控件仍显示预设。
 - 引导消息作为下一条提示送达。
 - 在本应用中还没有任何 Casper 发送过命令列表之前，Casper 的命令不会出现在 `/` 菜单中，直到会话的第一条提示启动 Casper。
@@ -210,7 +217,6 @@ Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打�
 
 本开发备注是维护者的工作上下文：开放问题与尚未决定的探索方向。它明确不具权威性——已交付的行为与限制以上文和包代码为准。
 
-- **审批卡片**——一旦 Casper 的选项类型能映射到共享审批卡片的固定操作，composer 适配器即可用该卡片呈现 Casper 的审批框。
 - **检查插件**——Casper 会话经过实际验证后，可以从 Standard 预设中移除 `packages/casper/tool-checks`。
 
 </details>

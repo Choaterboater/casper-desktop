@@ -7,9 +7,12 @@ import type { PermissionOption, RequestPermissionRequest, RequestPermissionRespo
 import type { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { UserQuestionError } from '@deepseek-ai/dsh-user-questions'
 import type { AskUserQuestionAnswer, AskUserQuestionItem } from '@deepseek-ai/dsh-user-questions'
+import { CASPER_BOX_HEADER, PERMISSION_QUESTION_ID } from './box.ts'
 
-/** The question id every Casper approval uses. */
-export const PERMISSION_QUESTION_ID = 'casper-permission'
+export { PERMISSION_QUESTION_ID } from './box.ts'
+
+/** The most diff lines a box's detail shows; the rest are counted and stay in the edit step. */
+export const MAX_DIFF_LINES = 120
 
 /** The header of Casper's plan Build box in the app. */
 export const PLAN_REVIEW_HEADER = 'Plan review'
@@ -28,6 +31,8 @@ export interface PermissionQuestion {
 export interface PermissionQuestionOptions {
   /** The Session call id the box's step is recorded under, so a plan review reopens its plan. */
   readonly callId?: ToolCallId | undefined
+  /** Mark the box for Casper's approval card (`header: 'Casper'`); false leaves it to the generic question card. Default true. */
+  readonly card?: boolean | undefined
 }
 
 /** The option labels of Casper's plan Build box, from `_meta.casper.plan`. */
@@ -48,6 +53,32 @@ export function toolCallText(content: RequestPermissionRequest['toolCall']['cont
     if (item.type === 'content' && item.content.type === 'text' && item.content.text !== '') return item.content.text
   }
   return undefined
+}
+
+/**
+ * Write the diffs a box carries from the step that raised it as plain lines:
+ * each file's path, then its old lines as `- ` and its new lines as `+ `. At
+ * most {@link MAX_DIFF_LINES} lines are shown; a last line counts the rest,
+ * which the edit step shows.
+ * @param content - the box's content list.
+ * @returns the lines, or undefined when the box carries no diff.
+ */
+export function diffText(content: RequestPermissionRequest['toolCall']['content']): string | undefined {
+  const lines: string[] = []
+  for (const item of content ?? []) {
+    if (item.type !== 'diff') continue
+    lines.push(item.path, ...linesOf(item.oldText).map(line => `- ${line}`), ...linesOf(item.newText).map(line => `+ ${line}`))
+  }
+  if (lines.length === 0) return undefined
+  if (lines.length <= MAX_DIFF_LINES) return lines.join('\n')
+  const more = lines.length - MAX_DIFF_LINES
+  return [...lines.slice(0, MAX_DIFF_LINES), `… ${String(more)} more ${more === 1 ? 'line' : 'lines'} in the edit step`].join('\n')
+}
+
+/** A diff side's lines, without the empty line a final newline leaves; none for an absent or empty side. */
+function linesOf(text: string | null | undefined): string[] {
+  if (text === undefined || text === null || text === '') return []
+  return text.replace(/\r?\n$/, '').split(/\r?\n/)
 }
 
 /**
@@ -78,13 +109,15 @@ export function reviewedPlan(call: Pick<ToolCallUpdate, '_meta' | 'content'>): s
 }
 
 /**
- * Build the question for one `session/request_permission`. Casper's plan
- * Build box (`_meta.casper.plan`) becomes a plan review: its Build and Change
- * the plan options, the plan as the detail, and the `plan-review` intent, so
- * the app shows its plan card. A box that names options it does not offer, or
- * carries no titled plan, is asked as any other box.
+ * Build the question for one `session/request_permission`. A box is headed
+ * `Casper`, so Casper's approval card shows it, unless `card` is false. Its
+ * detail is the box's text followed by the diff lines of the step that raised
+ * it. Casper's plan Build box (`_meta.casper.plan`) becomes a plan review
+ * instead: its Build and Change the plan options, the plan as the detail, and
+ * the `plan-review` intent, so the app shows its plan card. A box that names
+ * options it does not offer, or carries no titled plan, is asked as any other box.
  * @param params - Casper's request.
- * @param extra - the call id of the box's step.
+ * @param extra - the call id of the box's step, and whether Casper's card shows the box.
  * @returns the question and the options in question order.
  */
 export function permissionQuestion(params: RequestPermissionRequest, extra: PermissionQuestionOptions = {}): PermissionQuestion {
@@ -92,11 +125,13 @@ export function permissionQuestion(params: RequestPermissionRequest, extra: Perm
   if (review !== undefined) return review
   const refusal = (option: PermissionOption): boolean => option.kind === 'reject_once' || option.kind === 'reject_always'
   const options = [...params.options.filter(refusal), ...params.options.filter(option => !refusal(option))]
-  const detail = toolCallText(params.toolCall.content)
+  const parts = [toolCallText(params.toolCall.content), diffText(params.toolCall.content)].filter(part => part !== undefined)
+  const detail = parts.length === 0 ? undefined : parts.join('\n\n')
   return {
     options,
     question: {
       id: PERMISSION_QUESTION_ID,
+      ...extra.card === false ? {} : { header: CASPER_BOX_HEADER },
       question: params.toolCall.title ?? 'Casper asks for permission',
       ...detail === undefined ? {} : { detail },
       options: options.map(labelOf),
@@ -171,7 +206,7 @@ export function permissionOutcome(
  * @param params - Casper's request.
  * @param ask - asks the user-questions service, or undefined when none is mounted.
  * @param onError - receives a failed ask for logging.
- * @param extra - the call id of the box's step.
+ * @param extra - the call id of the box's step, and whether Casper's card shows the box.
  * @returns the reply for Casper; never rejects.
  */
 export async function answerPermission(

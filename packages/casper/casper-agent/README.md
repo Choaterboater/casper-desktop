@@ -41,6 +41,7 @@ The Desktop profile mounts the plugin from `packages/bundle/web-app/cordis.patch
 | `stderrTailBytes` | `4096` | Bytes of Casper's stderr kept for failure messages |
 | `appTools` | `true` | Offer the app tools to Casper; `false` sends an empty `mcpServers` list |
 | `accessModes` | `{ read-only: read, workspace-write: ask, danger-full-access: full }` | The [access mode](#access-control) each permission preset sets; `custom` and `auto` cannot be listed |
+| `approvalCard` | `true` | Show Casper's boxes with [Casper's approval card](#approvals); `false` shows the generic question card |
 
 The child never receives `DEEPSEEK_*` or `DSH_*` names, or credential-shaped names that `env` does not list. The one exception is the app profile: when the app runs with a profile, Casper gets `DSH_PROFILE` and `DSH_PROFILE_DIR`, so a bundle it builds can name the profile it installs into.
 
@@ -60,7 +61,10 @@ A turn that cannot run ends with an error on `turn/end`: `CASPER_NOT_FOUND` when
 | [`src/connection.ts`](src/connection.ts) | One `casper acp` process: lookup, spawn, ACP client, `session/new` or `session/load`, prompt, cancel, and disposal |
 | [`src/turn.ts`](src/turn.ts) | Writes Casper's updates as steps, assistant messages, tool calls, results, and the todo list |
 | [`src/views.ts`](src/views.ts) | Records a Casper tool step under the Standard tool that does the same job: its name, arguments, result text, and meta |
-| [`src/permission.ts`](src/permission.ts) | Turns an approval box into a user question and maps the answer back; a plan Build box becomes a plan review |
+| [`src/permission.ts`](src/permission.ts) | Turns an approval box into a user question headed `Casper`, with the raising step's diff lines in its detail, and maps the answer back; a plan Build box becomes a plan review |
+| [`src/box.ts`](src/box.ts) | The box's question id, header, and card limit, shared by both halves |
+| [`src/client/index.ts`](src/client/index.ts) | Client half: registers Casper's approval card first in the conversation composer chain |
+| [`src/client/CasperBoxCard.tsx`](src/client/CasperBoxCard.tsx) | Casper's approval card: which questions it takes, its rows, keys, and answer |
 | [`src/elicitation.ts`](src/elicitation.ts) | Turns one of Casper's forms (`elicitation/create`) into a user question and maps the answer back |
 | [`src/sidecar.ts`](src/sidecar.ts) | Host storage domain `casper_agent` mapping each Session to its Casper conversation |
 | [`src/commands.ts`](src/commands.ts) | Casper's commands for the `/` menu, and host storage domain `casper_agent_commands` keeping the last list |
@@ -110,9 +114,12 @@ Casper names each step in `_meta.casper.tool`, and its `rawInput` holds the mode
 
 A shell step that ran is never an error, whatever its exit code. Any other failed step is an error with Casper's words, or `Casper reported that this step failed.` when it sent none. A meta path is recorded only when Casper reports an absolute one, so the turn's deliverables list the files its edits and writes produced. A step whose result does not have the expected shape keeps Casper's text with no meta, which draws the plain card.
 
+<a id="approvals"></a>
 ### Approvals
 
-`session/request_permission` becomes one `ctx.userQuestions.ask` question with Casper's options as labels, refusals first. One picked label selects that option. Typed text, no pick, a failed or aborted question, and a missing question service answer `cancelled`, which Casper treats as No. The question closes when Casper closes the box itself or the prompt ends.
+`session/request_permission` becomes one `ctx.userQuestions.ask` question with id `casper-permission`, headed `Casper`, with Casper's options as labels, refusals first, and their descriptions. Its detail is the box's text, then the diffs of the step that raised the box: each file's path, its old lines as `- ` and its new lines as `+ `, at most 120 lines and then `… N more lines in the edit step`. A box from an older Casper carries no diffs and shows its text only. One picked label selects that option. Typed text, no pick, a failed or aborted question, and a missing question service answer `cancelled`, which Casper treats as No. The question closes when Casper closes the box itself or the prompt ends.
+
+The plugin's Client half shows such a question with Casper's approval card, registered first in the conversation composer chain (priority -1). The card takes only a question with one item, that id and header, a single pick, and 1 to 4 options; any other question, a plan review included, keeps its own card. The title is the question's first line, and its other lines and the detail follow as plain text. Each option is one row in Casper's order, No first, with its number and its description under it. The card counts nothing in its first 300 ms, then focuses No unless focus is in another field outside the composer seat, where it stays. Its keys count only while focus is in the card, and its scrolling detail can be reached with Tab. Esc answers No, and a digit picks that row; a key with a modifier, a repeated key, and a key during IME composition count for nothing. Enter has no handler of its own, so it clicks the focused row. An answer is sent once: the card stays busy until Casper closes the box, and the rows work again if the send fails. A closed question answers nothing. With `approvalCard: false` the box has no header and the generic question card asks it.
 
 The client's `initialize` offers `clientCapabilities.elicitation.form`, so Casper asks the AI's questions and its own typed or multi-pick questions as forms instead of skipping them. An `elicitation/create` in Casper's shape (form mode, an `answer` field that is a titled single pick, a titled multi pick, or a typed line, and an optional `other` field for typed words) becomes one question with id `casper-question`, headed `The AI asks` for the AI's question and `Casper asks` otherwise. Picked labels go back as their values in the order picked, and typed words go back as `other`, or as the `answer` of a typed line. Typed words on a form without `other`, and a form in any other shape, decline; no answer, a failed or aborted question, a form outside a prompt, and a missing question service cancel, which Casper treats as skipped. The form's step is recorded as `ask_user_question`: the ask tool's own step, or the pending `casper-question-N` step Casper opens for its own question. An answer recorded in the app becomes that step's result as `{answers}` when Casper completes it, so Standard's question card shows the answer. The question closes when Casper closes the step or withdraws the request, or the prompt ends.
 
@@ -189,7 +196,7 @@ The plugin sends no model request, so it has no cache effect; Casper's own reque
 - Only the app tools server is passed to Casper; the app's configured MCP servers are not.
 - App tool results reach Casper as text only: an image or other non-text block becomes a note. None of the served tools returns an image today.
 - In a packaged app `app_read_file` reaches each installed package's `README.md`, `package.json` and built `lib/*.js`, the skill files, and `ui-theme`'s `lib/styles`. The Desktop runtime copy drops every `.d.ts`, packages publish no `src/`, and the repository's `docs/` ship in no package, so `lib/types`, `ui-sidebar`'s `slots.ts`, `docs/cordis-tutorial` and `docs/web-styling.md` cannot be read there; slot props and theme tokens come from `cordis_inspect_query` instead. Shipping those guides with the app is not done.
-- Approvals use the generic question card; there is no fixed approval card or separate Allow-always presentation.
+- Casper's approval card shows a diff as plain `- ` and `+ ` lines, at most 120, not as a diff view.
 - A mode Casper picks itself is not shown: the access control keeps showing the preset.
 - Steering is delivered as the next prompt.
 - Before any Casper has sent its command list in this app, Casper's commands are missing from the `/` menu until the Session's first prompt starts Casper.
@@ -210,7 +217,6 @@ The plugin sends no model request, so it has no cache effect; Casper's own reque
 
 This Dev Note is working context for maintainers: open questions and undecided directions. It is explicitly non-authoritative — shipped behavior and limits live in the sections above and in the package code.
 
-- **Approval card** — a composer adapter could render Casper's boxes with the shared approval card once Casper's option kinds map onto its fixed actions.
 - **Checks plugin** — `packages/casper/tool-checks` can be removed from the Standard preset once Casper Sessions are proven live.
 
 </details>

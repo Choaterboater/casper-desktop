@@ -22,6 +22,8 @@ export interface FakeLogEntry {
   readonly path?: string
   readonly cwd?: string
   readonly outcome?: { outcome: string; optionId?: string }
+  /** Whether Casper had closed the box before this reply came. */
+  readonly withdrawn?: boolean
   readonly error?: string
   readonly profile?: { name?: string; dir?: string }
   readonly exposed?: { argv: boolean; env: boolean }
@@ -129,6 +131,7 @@ export function fakeCasper(script: FakeScript = { prompts: [] }): FakeCasper {
       stderrTailBytes: 4_096,
       appTools: false,
       accessModes: { ...DEFAULT_ACCESS_MODES },
+      approvalCard: true,
       ...overrides,
     }),
     remove: () => { rmSync(root, { recursive: true, force: true }) },
