@@ -31,6 +31,7 @@ import type { SubprocessHandle, SubprocessOutcome, SubprocessRuntime } from '@de
 import { appToolsEntry } from './app-tools.ts'
 import type { AppToolsServer } from './app-tools.ts'
 import type { Config } from './config.ts'
+import type { ForwardedServers } from './forward-servers.ts'
 
 /** ACP error code Casper uses for an unknown or unloadable session. */
 const ACP_NOT_FOUND = -32002
@@ -143,6 +144,13 @@ export interface CasperConnectionOptions {
    * @returns the running server.
    */
   readonly appTools?: ((connection: CasperConnection) => Promise<AppToolsServer>) | undefined
+  /**
+   * Build the app's own MCP servers this connection hands Casper after the app tools server; omitted hands none.
+   * Called only when Casper's `initialize` reply sets `mcpCapabilities.http` to true.
+   * @param signal - aborted when the start is stopped.
+   * @returns the entries, their names, and their digest.
+   */
+  readonly mcpServers?: ((signal: AbortSignal) => Promise<ForwardedServers>) | undefined
 }
 
 /** A started connection and the Casper conversation it holds. */
@@ -220,6 +228,8 @@ export class CasperConnection {
   private appTools: AppToolsServer | undefined
   /** Set once the app tools must stay closed: a server started later is closed at once. */
   private appToolsClosed = false
+  /** The app's own servers handed to Casper at open; undefined when none was built. */
+  private forwarded: ForwardedServers | undefined
 
   private constructor(
     private readonly child: SubprocessHandle,
@@ -249,6 +259,19 @@ export class CasperConnection {
   get acceptsSteer(): boolean {
     const casper = this.initialized?.agentCapabilities?._meta?.casper
     return typeof casper === 'object' && casper !== null && (casper as { steer?: unknown }).steer === true
+  }
+
+  /** The names of the app's own servers handed to Casper at open; Casper names them `acp-<name>`. */
+  get forwardedNames(): readonly string[] {
+    return this.forwarded?.names ?? []
+  }
+
+  /**
+   * The digest of the app's own servers handed to Casper at open; undefined when the connection built none, because
+   * Casper takes no HTTP servers or forwarding is off.
+   */
+  get forwardedDigest(): string | undefined {
+    return this.forwarded?.digest
   }
 
   /**
@@ -316,7 +339,7 @@ export class CasperConnection {
     }
     const connection = new CasperConnection(child, options)
     try {
-      const opened = await connection.raceStart(connection.open(stored), signal)
+      const opened = await connection.raceStart(connection.open(stored, signal), signal)
       return { connection, ...opened }
     } catch (error: unknown) {
       if (signal.aborted) {
@@ -466,7 +489,7 @@ export class CasperConnection {
     return this.child.collected.stderr?.readFrom(0).text.trim() ?? ''
   }
 
-  private async open(stored: string | undefined): Promise<Omit<CasperStarted, 'connection'>> {
+  private async open(stored: string | undefined, signal: AbortSignal): Promise<Omit<CasperStarted, 'connection'>> {
     const { child, options } = this
     /* v8 ignore next 3 -- 'pipe' dispositions expose both streams by the subprocess contract. */
     if (child.stdin === undefined || child.stdout === undefined) {
@@ -499,7 +522,7 @@ export class CasperConnection {
       // Form elicitation: Casper asks its questions as forms instead of skipping them.
       clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false, elicitation: { form: {} } },
     })
-    const mcpServers = await this.openAppTools()
+    const mcpServers = [...await this.openAppTools(), ...await this.forwardServers(signal)]
     if (stored !== undefined) {
       this.replaying = true
       try {
@@ -555,6 +578,13 @@ export class CasperConnection {
     }
     this.appTools = server
     return [appToolsEntry(server)]
+  }
+
+  /** Build the app's own servers when Casper takes HTTP servers and a builder is configured. */
+  private async forwardServers(signal: AbortSignal): Promise<McpServer[]> {
+    if (this.options.mcpServers === undefined || this.initialized?.agentCapabilities?.mcpCapabilities?.http !== true) return []
+    this.forwarded = await this.options.mcpServers(signal)
+    return this.forwarded.entries
   }
 
   /** Close the app tools server for good; later requests fail. */

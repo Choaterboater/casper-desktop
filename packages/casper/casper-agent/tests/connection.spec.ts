@@ -10,6 +10,8 @@ import type { AppToolsServer } from '../src/app-tools.ts'
 import { CasperConnection, CasperError, casperArgv, casperEnv, profileEnv } from '../src/connection.ts'
 import type { CasperConnectionHandlers, CasperConnectionOptions } from '../src/connection.ts'
 import type { Config } from '../src/config.ts'
+import { forwardedServers } from '../src/forward-servers.ts'
+import type { ForwardedServers } from '../src/forward-servers.ts'
 import { alive, casperModes, casperOptions, fakeCasper, gate, optionsWithoutMode, waitFor, withPlan } from './support.ts'
 import type { FakeScript } from './support.ts'
 
@@ -495,5 +497,62 @@ describe('CasperConnection', { timeout: 30_000 }, () => {
     const [pid] = fake.pids()
     await connection.dispose()
     expect(alive(pid ?? 0)).toBe(false)
+  })
+})
+
+describe('the app\'s own MCP servers', { timeout: 30_000 }, () => {
+  const SECRET = 'ghp-forwarded-secret'
+  /** A builder over one stdio and one http Settings server that counts its credential reads. */
+  function builder(): { build: (signal: AbortSignal) => Promise<ForwardedServers>; reads: () => number } {
+    let reads = 0
+    const build = (signal: AbortSignal): Promise<ForwardedServers> => forwardedServers({
+      entries: {
+        github: { transport: 'stdio', command: '/usr/bin/github-mcp', args: [], env: { GITHUB_TOKEN: '${credential:GITHUB_TOKEN}' }, cwd: '/work', url: '', headers: {}, enabled: true },
+        docs: { transport: 'streamable-http', command: '', args: [], env: {}, cwd: '', url: 'https://docs.example/mcp', headers: { Authorization: 'Bearer ${credential:GITHUB_TOKEN}' }, enabled: true },
+      },
+      credential: () => { reads += 1; return Promise.resolve(SECRET) },
+      resolveExecutable: command => Promise.resolve(command),
+      signal,
+      skip: () => {},
+    })
+    return { build, reads: () => reads }
+  }
+
+  it('with http true both session/new and session/load get the bridge then the forwarded servers', async () => {
+    const { fake, start } = await setup({ prompts: [], known: ['stored-1'], mcpHttp: true })
+    const { build } = builder()
+    const bridge = stubServer()
+    const appTools = (): Promise<AppToolsServer> => Promise.resolve(bridge)
+    const fresh = await start({}, undefined, undefined, { appTools, mcpServers: build })
+    const reopened = await start({}, 'stored-1', undefined, { appTools, mcpServers: build })
+    const forwarded = (await build(new AbortController().signal)).entries
+    expect(forwarded.map(entry => entry.name)).toEqual(['github', 'docs'])
+    expect(fake.calls('session/new')[0]?.params).toEqual({ cwd: fake.cwd, mcpServers: [appToolsEntry(bridge), ...forwarded] })
+    expect(fake.calls('session/load')[0]?.params).toEqual({ sessionId: 'stored-1', cwd: fake.cwd, mcpServers: [appToolsEntry(bridge), ...forwarded] })
+    for (const { connection } of [fresh, reopened]) {
+      expect(connection.forwardedNames).toEqual(['github', 'docs'])
+      expect(connection.forwardedDigest).toMatch(/^[0-9a-f]{64}$/)
+    }
+  })
+
+  it('with http false nothing is forwarded and no credential is resolved', async () => {
+    const { fake, start } = await setup({ prompts: [] })
+    const { build, reads } = builder()
+    const { connection } = await start({}, undefined, undefined, { mcpServers: build })
+    expect(fake.calls('session/new')[0]?.params).toEqual({ cwd: fake.cwd, mcpServers: [] })
+    expect(reads()).toBe(0)
+    expect(connection.forwardedNames).toEqual([])
+    expect(connection.forwardedDigest).toBeUndefined()
+  })
+
+  it('no forwarded value appears in Casper\'s argv or env', async () => {
+    const { fake, start } = await setup({ prompts: [], mcpHttp: true })
+    const { build, reads } = builder()
+    const { connection } = await start({}, undefined, undefined, { mcpServers: build })
+    expect(reads()).toBeGreaterThan(0)
+    const opened = fake.calls('session/new')[0]
+    expect(JSON.stringify(opened?.params)).toContain(SECRET)
+    expect(opened?.exposed).toEqual({ argv: false, env: false })
+    expect(connection.stderrTail()).not.toContain(SECRET)
   })
 })

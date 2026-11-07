@@ -33,7 +33,7 @@ export type { ReconnectConfig, ResolvedReconnectPolicy } from './connection.ts'
 export type { McpConnectionStatusHandle } from './status.ts'
 export type * from './types.ts'
 export { probeServer } from './probe.ts'
-export { assertTemplateSyntax } from './templates.ts'
+export { assertTemplateSyntax, credentialRefsIn, MissingTemplateValue, resolveTemplateString } from './templates.ts'
 export type { McpProbeOptions } from './probe.ts'
 
 /** Cordis plugin name used by loader diagnostics. */

@@ -76,6 +76,8 @@ export interface FakeScript {
   readonly steerReplies?: readonly boolean[]
   /** Wait this long before replying to a steer. */
   readonly steerReplyDelayMs?: number
+  /** Say in `initialize` that Casper takes HTTP MCP servers, so the app hands it its own. */
+  readonly mcpHttp?: boolean
 }
 
 /** One command the stand-in offers, in ACP's `available_commands_update` shape. */
@@ -140,6 +142,7 @@ export function fakeCasper(script: FakeScript = { prompts: [] }): FakeCasper {
       appTools: false,
       accessModes: { ...DEFAULT_ACCESS_MODES },
       approvalCard: true,
+      forwardMcpServers: true,
       ...overrides,
     }),
     remove: () => { rmSync(root, { recursive: true, force: true }) },

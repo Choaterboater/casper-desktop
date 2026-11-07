@@ -72,6 +72,68 @@ const BRIDGED: readonly BridgedTool[] = [
   { mcp: 'cordis_inspect_list', dsh: 'cordis_inspect_list', readOnly: true, pin: false, guide: true },
 ]
 
+/** Result of a resource tool while no MCP server in the app offers resources. */
+export const NO_RESOURCES = 'No MCP server in the app offers resources right now.'
+
+/** Prefix Casper gives every server the app hands it. */
+const ACP_PREFIX = 'acp-'
+
+/** One of the app's MCP resource tools, served with a fixed schema whether or not the app has registered it yet. */
+interface ResourceTool {
+  /** Name Casper sees, which is also the app tool it runs. */
+  readonly mcp: string
+  /** What it does, before the server list. */
+  readonly does: string
+  /** Its arguments; `server` is always among them. */
+  readonly schema: JsonSchemaType
+}
+
+const SERVER_ARG = { type: 'string', description: 'The MCP server, as Casper names it (acp-<name>).' } as const
+const CURSOR_ARG = { type: 'string', description: 'Continuation cursor returned by this server.' } as const
+
+/** The resource tools, served after {@link BRIDGED}, read-only and never pinned. */
+const RESOURCE_TOOLS: readonly ResourceTool[] = [
+  {
+    mcp: 'list_mcp_resources',
+    does: 'List the resources an MCP server the app hands you offers.',
+    schema: { type: 'object', required: ['server'], properties: { server: SERVER_ARG, cursor: CURSOR_ARG } },
+  },
+  {
+    mcp: 'list_mcp_resource_templates',
+    does: 'List the parameterized resource URI templates of an MCP server the app hands you.',
+    schema: { type: 'object', required: ['server'], properties: { server: SERVER_ARG, cursor: CURSOR_ARG } },
+  },
+  {
+    mcp: 'read_mcp_resource',
+    does: 'Read a resource by URI from an MCP server the app hands you; use a listed URI or an expanded template.',
+    schema: { type: 'object', required: ['server', 'uri'], properties: { server: SERVER_ARG, uri: { type: 'string', description: 'Resource URI to read.' } } },
+  },
+]
+
+/**
+ * The description of one resource tool: what it does and the servers it reaches.
+ * @param does - the tool's own sentence.
+ * @param servers - the forwarded servers' names, without Casper's prefix.
+ * @returns at most {@link DESCRIPTION_MAX} characters.
+ */
+export function resourceDescription(does: string, servers: readonly string[]): string {
+  return clipDescription(`${does} Servers: ${serverList(servers)}.`)
+}
+
+/** The servers as Casper names them, or "none right now". */
+function serverList(servers: readonly string[]): string {
+  return servers.length === 0 ? 'none right now' : servers.map(name => `${ACP_PREFIX}${name}`).join(', ')
+}
+
+/**
+ * The app's name for a server Casper names: `acp-x` is `x`.
+ * @param server - the server argument Casper sent.
+ * @returns the name in the app's Settings.
+ */
+export function appServerName(server: string): string {
+  return server.startsWith(ACP_PREFIX) ? server.slice(ACP_PREFIX.length) : server
+}
+
 /**
  * The app tool name a served MCP tool runs under.
  * @param mcp - the MCP tool name Casper called.
@@ -79,7 +141,8 @@ const BRIDGED: readonly BridgedTool[] = [
  */
 export function dshNameOf(mcp: string): string | undefined {
   const tool = BRIDGED.find(entry => entry.mcp === mcp)
-  return tool === undefined ? undefined : tool.dsh ?? tool.mcp
+  if (tool !== undefined) return tool.dsh ?? tool.mcp
+  return RESOURCE_TOOLS.some(entry => entry.mcp === mcp) ? mcp : undefined
 }
 
 /** One app tool call the server ran for a Casper step. */
@@ -129,6 +192,11 @@ export interface AppToolsOptions {
   readonly roots: readonly string[]
   /** Whether the app runs from installed packages, which carry no `lib/types`, `src/` or repository `docs/`. */
   readonly installed: boolean
+  /**
+   * The Settings servers this connection hands Casper, which the resource tools reach; read at each request.
+   * @returns their names, without Casper's `acp-` prefix; none when omitted.
+   */
+  readonly resourceServers?: (() => readonly string[]) | undefined
   /**
    * The open Casper prompt's signal.
    * @returns the signal, or undefined while no Casper turn is open.
@@ -347,6 +415,24 @@ async function mcpServer(options: AppToolsOptions, version: string): Promise<Mcp
       inputSchema: fromJsonSchema<Record<string, unknown>>(schema.parameters as JsonSchemaType),
       ...hints(tool),
     }, (args, ctx) => run(tool, dsh, args, ctx))
+  }
+  const forwarded = options.resourceServers?.() ?? []
+  for (const tool of RESOURCE_TOOLS) {
+    const bridged: BridgedTool = { mcp: tool.mcp, dsh: tool.mcp, readOnly: true, pin: false, guide: false }
+    server.registerTool(tool.mcp, {
+      description: resourceDescription(tool.does, forwarded),
+      inputSchema: fromJsonSchema<Record<string, unknown>>(tool.schema),
+      ...hints(bridged),
+    }, (args, ctx) => {
+      // The app registers its resource tools only while one of its servers offers resources.
+      if (!schemas.has(tool.mcp)) return Promise.resolve(errorResult(NO_RESOURCES))
+      const name = appServerName(String(args.server))
+      const servers = options.resourceServers?.() ?? []
+      if (!servers.includes(name)) {
+        return Promise.resolve(errorResult(`The app hands Casper no MCP server named ${String(args.server)}. Servers: ${serverList(servers)}.`))
+      }
+      return run(bridged, tool.mcp, { ...args, server: name }, ctx)
+    })
   }
   return server
 }

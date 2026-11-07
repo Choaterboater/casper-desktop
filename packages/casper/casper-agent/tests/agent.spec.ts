@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import CommandRuntime, { CommandDefinitionId } from '@deepseek-ai/dsh-commands'
+import * as McpClient from '@deepseek-ai/dsh-mcp-client'
 import AttachmentStore, { AttachmentId } from '@deepseek-ai/dsh-attachment'
 import type { FileAttachmentRef, ImageAttachmentLimits, ImageAttachmentRef, StoredImageAttachment } from '@deepseek-ai/dsh-attachment'
 import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
@@ -18,6 +19,7 @@ import { CasperConnection } from '../src/connection.ts'
 import { reportOf } from '../src/models.ts'
 import { CasperModelsCache } from '../src/models-cache.ts'
 import { FORK_UNSUPPORTED } from '../src/factory.ts'
+import type { ForwardEntry } from '../src/forward-servers.ts'
 import { TEXT_ONLY_PICTURE } from '../src/prompt.ts'
 import { boot, eventsOf, filesText, mountPermissionPresets, prompt, turnEnds } from './harness.ts'
 import { alive, casperModes, casperOptions, fakeCasper, gate, optionsWithoutMode, parsed, waitFor, withPlan } from './support.ts'
@@ -2026,5 +2028,113 @@ describe('Casper\'s usage and receipt', { timeout: 60_000 }, () => {
     expect(eventsOf(agent).some(event => event.type === 'tool/call')).toBe(false)
     const final = eventsOf(agent).filter(event => event.type === 'assistant/message').at(-1)
     expect(final?.type === 'assistant/message' && final.data.message.content).toEqual([{ type: 'text', text: 'Done.\n\n\nReceipt: verified\n' }])
+  })
+})
+
+describe('Settings MCP servers in a Casper session', { timeout: 60_000 }, () => {
+  const SECRET = 'docs-forwarded-secret'
+  type Entry = ForwardEntry
+  /** A stdio Settings entry whose credential the stand-in provider resolves. */
+  const docs = (args: string[] = []): Entry => ({
+    transport: 'stdio', command: process.execPath, args, env: { DOCS_TOKEN: '${credential:DOCS_TOKEN}' }, cwd: '', url: '', headers: {}, enabled: true,
+  })
+
+  /** The stand-in provider: only DOCS_TOKEN is set. */
+  const stored = (ref: string) => Promise.resolve(ref === 'DOCS_TOKEN' ? { value: SECRET, source: 'test' } : undefined)
+
+  /**
+   * Boot with a stand-in MCP manager over `entries` and a credentials provider; `network` also mounts the
+   * bundled-style row, and `resolve` replaces the provider's lookup.
+   */
+  async function withServers(
+    script: FakeScript, entries: Record<string, Entry>, overrides: Overrides = {}, network = false, resolve = stored,
+  ) {
+    const fake = fakeCasper(script)
+    cleanups.push(() => { fake.remove() })
+    const host = await boot(fake, overrides, undefined, true, async (ctx) => {
+      ctx.provide('mcpManager', { config: { servers: { get: () => entries } } } as never)
+      ctx.provide('credentials', { resolve: (ref: string) => resolve(ref) } as never)
+      // A row of its own, as the shipped network server is: never one of the Settings servers.
+      if (network) {
+        await ctx.plugin(McpClient, {
+          transport: 'stdio', serverName: 'network', command: process.execPath, args: ['-e', ''], reconnect: { enabled: false },
+        } as never)
+      }
+    })
+    cleanups.push(() => host.ctx.fiber.dispose())
+    return { fake, host }
+  }
+
+  /** The server names of every `session/new` and `session/load`, in order. */
+  function offered(fake: FakeCasper): { method: string | undefined; pid: number; names: string[] }[] {
+    return fake.log().filter(entry => entry.method === 'session/new' || entry.method === 'session/load').map(entry => ({
+      method: entry.method, pid: entry.pid, names: ((entry.params?.['mcpServers'] ?? []) as { name: string }[]).map(server => server.name),
+    }))
+  }
+
+  it('forwardMcpServers false sends the bridge only', async () => {
+    const off = { appTools: true, forwardMcpServers: false }
+    const { fake, host } = await withServers({ prompts: [[]], mcpHttp: true }, { docs: docs() }, off)
+    const { agent } = await host.create('casper-forward-off')
+    await run(agent, 'hi')
+    expect(offered(fake)).toEqual([{ method: 'session/new', pid: fake.pids()[0], names: ['app'] }])
+  })
+
+  it('a Settings server reaches session/new and the bundled network row does not', async () => {
+    const { fake, host } = await withServers({ prompts: [[]], mcpHttp: true }, { docs: docs(['docs-server.js']) }, {}, true)
+    const { agent } = await host.create('casper-forward-docs')
+    await run(agent, 'hi')
+    const opened = fake.calls('session/new')[0]
+    expect(opened?.params?.['mcpServers']).toEqual([{ name: 'docs', command: process.execPath, args: ['docs-server.js'], env: [{ name: 'DOCS_TOKEN', value: SECRET }] }])
+    expect(opened?.exposed).toEqual({ argv: false, env: false })
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }])
+    // The credential reaches Casper only inside the ACP request, never the Session log.
+    expect(filesText(join(fake.root, 'sessions'))).not.toContain(SECRET)
+  })
+
+  it('a changed Settings entry reopens through session/load between turns, never during a prompt', async () => {
+    const entries: Record<string, Entry> = { docs: docs(['v1.js']) }
+    const { fake, host } = await withServers({ prompts: [] }, entries)
+    const midPrompt = gate(fake, 'mid-prompt')
+    fake.script({ prompts: [[{ waitFile: midPrompt.path }], [], []], mcpHttp: true })
+    const { agent } = await host.create('casper-forward-change')
+    agent.followup(prompt('first'))
+    await waitFor(() => fake.calls('session/prompt').length === 1)
+    // Changed while the prompt runs: the running Casper keeps going on its list.
+    entries.docs = docs(['v2.js'])
+    midPrompt.open()
+    await agent.whenIdle()
+    expect(fake.pids()).toHaveLength(1)
+    expect(offered(fake).map(entry => entry.method)).toEqual(['session/new'])
+    await run(agent, 'second')
+    const [first, second] = fake.pids()
+    expect(second).toBeDefined()
+    await waitFor(() => !alive(first ?? 0))
+    const reopened = fake.calls('session/load')
+    expect(reopened).toHaveLength(1)
+    expect(reopened[0]?.pid).toBe(second)
+    expect(reopened[0]?.params?.['mcpServers']).toMatchObject([{ name: 'docs', args: ['v2.js'] }])
+    expect(fake.calls('session/prompt').map(entry => entry.pid)).toEqual([first, second])
+    // An unchanged list keeps the live Casper.
+    await run(agent, 'third')
+    expect(fake.pids()).toEqual([first, second])
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }, { kind: 'completed' }, { kind: 'completed' }])
+  })
+
+  it('a handed server whose credential cannot be read for one turn keeps the live Casper', async () => {
+    let failing = false
+    const resolve = (ref: string) => failing ? Promise.reject(new Error('keychain busy')) : stored(ref)
+    const { fake, host } = await withServers({ prompts: [[], [], []], mcpHttp: true }, { docs: docs() }, {}, false, resolve)
+    const { agent } = await host.create('casper-forward-passing')
+    await run(agent, 'first')
+    failing = true
+    await run(agent, 'second')
+    failing = false
+    await run(agent, 'third')
+    // Neither the failing turn nor the recovered one restarts Casper, and it keeps the server it was handed.
+    expect(fake.pids()).toHaveLength(1)
+    expect(offered(fake)).toEqual([{ method: 'session/new', pid: fake.pids()[0], names: ['docs'] }])
+    expect(fake.calls('session/prompt').map(entry => entry.pid)).toEqual([fake.pids()[0], fake.pids()[0], fake.pids()[0]])
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }, { kind: 'completed' }, { kind: 'completed' }])
   })
 })

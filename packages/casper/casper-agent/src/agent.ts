@@ -30,8 +30,11 @@ import { ReactLoopInbox } from '@deepseek-ai/dsh-agent-loop'
 import { getDshRuntimeVersion } from '@deepseek-ai/dsh-app-boot'
 import type {} from '@deepseek-ai/dsh-attachment'
 import type { CommandResult } from '@deepseek-ai/dsh-commands'
+import type { CredentialRef } from '@deepseek-ai/dsh-credentials'
 import { createUserMessage, MessageId } from '@deepseek-ai/dsh-llm'
 import type { LlmFailure } from '@deepseek-ai/dsh-llm'
+// Type-only: `ctx.mcpManager`, whose Settings servers are handed to Casper.
+import type {} from '@deepseek-ai/dsh-mcp-manager'
 import { CUSTOM_PRESET } from '@deepseek-ai/dsh-permission-presets'
 // Type-only: the `plan/mode` event and the `plan` projection the composer's plan chip reads.
 import type { PlanUnitState } from '@deepseek-ai/dsh-plan-mode'
@@ -56,6 +59,8 @@ import type { CasperCommand, CasperCommandCache } from './commands.ts'
 import type { Config } from './config.ts'
 import { CasperConnection, CasperError } from './connection.ts'
 import { answerElicitation, elicitationQuestion, elicitationStep } from './elicitation.ts'
+import { forwardedServers } from './forward-servers.ts'
+import type { ForwardedServers } from './forward-servers.ts'
 import { CasperModel } from './model.ts'
 import { effortState, reportOf, valueOf } from './models.ts'
 import type { CasperModelsCache } from './models-cache.ts'
@@ -429,6 +434,9 @@ export class CasperAgent implements Agent {
       // The prompt and its turn are durable before Casper can change files.
       await this.flush(true)
       signal.throwIfAborted()
+      // Between turns, never during a prompt: changed Settings servers reopen Casper through session/load.
+      await this.refreshServers(signal)
+      signal.throwIfAborted()
       const opened = await this.ensureConnection(signal)
       signal.throwIfAborted()
       connection = opened.connection
@@ -546,6 +554,7 @@ export class CasperAgent implements Agent {
         elicitation: (params, signal) => this.elicitation(owner.connection, params, signal),
       },
       appTools: this.config.appTools ? connection => this.startAppTools(connection, cwd, profile) : undefined,
+      mcpServers: this.forwarder(),
     }, stored?.acpSessionId, signal)
     owner.connection = started.connection
     try {
@@ -578,8 +587,59 @@ export class CasperAgent implements Agent {
       turn: () => this.sinkFor(connection)?.signal,
       callId: acpId => connection.toolCallId(acpId),
       record: (acpId, call) => { this.sinkFor(connection)?.writer.bridged(acpId, call) },
+      resourceServers: () => connection.forwardedNames,
       onError: (error) => { this.pluginCtx.logger.debug(`casper agent "${this.id}": app tools: ${error.message}`) },
     })
+  }
+
+  /**
+   * The builder of the Settings servers handed to Casper, when forwarding is on and the app has an MCP manager.
+   * A server left out is logged with its reason, never with a value.
+   * @returns the builder, or undefined when nothing is forwarded.
+   */
+  private forwarder(): ((signal: AbortSignal) => Promise<ForwardedServers>) | undefined {
+    const manager = this.pluginCtx.get('mcpManager')
+    if (!this.config.forwardMcpServers || manager === undefined) return undefined
+    return (signal) => {
+      const credentials = this.pluginCtx.get('credentials')
+      return forwardedServers({
+        entries: manager.config.servers.get(),
+        // Without a credentials provider, a server that names a credential is left out as not set.
+        credential: ref => credentials === undefined
+          ? Promise.resolve(undefined)
+          : credentials.resolve(ref as CredentialRef).then(found => found?.value),
+        resolveExecutable: (command, env, lookup) => this.pluginCtx.subprocess.resolveExecutable(command, env, lookup),
+        signal,
+        skip: (name, reason) => { this.pluginCtx.logger.info(`casper agent "${this.id}": the MCP server ${name} is not handed to Casper: ${reason}`) },
+      })
+    }
+  }
+
+  /**
+   * Before a turn, rebuild the Settings servers the live Casper was handed. When they changed, Casper is closed, and
+   * this turn reopens it through `session/load` with the new list; the session's "Yes, for this session" answers end
+   * with it. A rebuild that fails keeps the live Casper, and so does one that leaves out a server Casper was handed for
+   * a reason that may pass, so a slow credential store neither drops that server nor restarts Casper twice.
+   * @param signal - the turn's signal.
+   */
+  private async refreshServers(signal: AbortSignal): Promise<void> {
+    const live = this.connection
+    const build = this.forwarder()
+    if (live === undefined || live.dead || live.forwardedDigest === undefined || build === undefined) return
+    let rebuilt: ForwardedServers
+    try {
+      rebuilt = await build(signal)
+    } catch (error: unknown) {
+      signal.throwIfAborted()
+      /* v8 ignore next 2 -- the builder turns each server's failure into a skip; only reading the entries can throw. */
+      this.pluginCtx.logger.warn(`casper agent "${this.id}": the MCP servers were not rebuilt: ${String(error)}`)
+      return
+    }
+    if (rebuilt.passing.some(name => live.forwardedNames.includes(name))) return
+    if (rebuilt.digest === live.forwardedDigest || live !== this.connection) return
+    // The old process exits before the new one opens the same conversation.
+    this.connection = undefined
+    await live.dispose()
   }
 
   /**

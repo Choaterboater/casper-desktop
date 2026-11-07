@@ -110,6 +110,9 @@ describe('MCP 1.x compatibility', { timeout: 60_000 }, () => {
       ['app_read_file', true, true],
       ['cordis_inspect_query', true, true],
       ['cordis_inspect_list', false, true],
+      ['list_mcp_resources', false, true],
+      ['list_mcp_resource_templates', false, true],
+      ['read_mcp_resource', false, true],
     ])
   })
 

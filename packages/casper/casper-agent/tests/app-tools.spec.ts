@@ -18,6 +18,7 @@ import {
   dshNameOf,
   INSTALLED_NOTE,
   mcpContent,
+  NO_RESOURCES,
   PLUGIN_SKILL,
   PROGRESS_INTERVAL_MS,
   skillDescription,
@@ -27,6 +28,11 @@ import {
 import type { AppToolsOptions, AppToolsServer, BridgedCall } from '../src/app-tools.ts'
 import { boot } from './harness.ts'
 import { fakeCasper } from './support.ts'
+
+/** The app tools in list order, which is the order Casper takes pins in. */
+const APP_TOOLS = ['app_skill', 'plugin_manager', 'app_read_file', 'cordis_inspect_query', 'cordis_inspect_list']
+/** The resource tools, listed after the app tools. */
+const RESOURCE_TOOLS = ['list_mcp_resources', 'list_mcp_resource_templates', 'read_mcp_resource']
 
 /** The app version the tests start servers with; no package carries it. */
 const APP_VERSION = '9.8.7-app'
@@ -187,7 +193,7 @@ describe('app tools listener', { timeout: 60_000 }, () => {
 })
 
 describe('app tools over MCP', { timeout: 60_000 }, () => {
-  it('lists exactly the five tools with their read hints, pins, and short descriptions', async () => {
+  it('lists exactly the five app tools and the three resource tools with their read hints, pins, and short descriptions', async () => {
     const { ctx, agent } = await host()
     const summary = (name: string, modelInvocable = true): SkillSummary => ({
       name, description: name, invocation: { modelInvocable, userInvocable: true }, source: 'bundled', provider: 'test',
@@ -197,16 +203,16 @@ describe('app tools over MCP', { timeout: 60_000 }, () => {
     expect(mcp.getInstructions()).toBeUndefined()
     const { tools } = await mcp.listTools()
     // Casper takes pins in list order: the guide and the install come first.
-    expect(tools.map(tool => tool.name)).toEqual(['app_skill', 'plugin_manager', 'app_read_file', 'cordis_inspect_query', 'cordis_inspect_list'])
+    expect(tools.map(tool => tool.name)).toEqual([...APP_TOOLS, ...RESOURCE_TOOLS])
     const byName = new Map(tools.map(tool => [tool.name, tool]))
-    for (const name of ['cordis_inspect_list', 'cordis_inspect_query', 'app_skill', 'app_read_file']) {
+    for (const name of ['cordis_inspect_list', 'cordis_inspect_query', 'app_skill', 'app_read_file', ...RESOURCE_TOOLS]) {
       expect(byName.get(name)?.annotations).toEqual({ readOnlyHint: true })
     }
     expect(byName.get('plugin_manager')?.annotations).toBeUndefined()
     for (const name of ['cordis_inspect_query', 'app_skill', 'app_read_file', 'plugin_manager']) {
       expect(byName.get(name)?._meta).toEqual({ 'casper/pin': true })
     }
-    expect(byName.get('cordis_inspect_list')?._meta).toBeUndefined()
+    for (const name of ['cordis_inspect_list', ...RESOURCE_TOOLS]) expect(byName.get(name)?._meta).toBeUndefined()
     for (const tool of tools) expect(tool.description?.length ?? 0).toBeLessThanOrEqual(DESCRIPTION_MAX)
     expect(byName.get('plugin_manager')?.description).toMatch(/^For app plugins, first load cordis-plugin-development with app_skill\. Manage profile plugins\./)
     expect(byName.get('plugin_manager')?.description?.endsWith('…')).toBe(true)
@@ -256,7 +262,7 @@ describe('app tools over MCP', { timeout: 60_000 }, () => {
       execute: input => ctx.tools.execute(input),
     }
     const mcp = await client(await serve(agent, ctx, { tools: hidden }))
-    expect((await mcp.listTools()).tools.map(tool => tool.name)).toEqual(['app_skill', 'app_read_file', 'cordis_inspect_query', 'cordis_inspect_list'])
+    expect((await mcp.listTools()).tools.map(tool => tool.name)).toEqual(['app_skill', 'app_read_file', 'cordis_inspect_query', 'cordis_inspect_list', ...RESOURCE_TOOLS])
   })
 
   it('runs a call as the Casper Agent under the mapped call id, with no log, and hands its result to the step', async () => {
@@ -286,8 +292,8 @@ describe('app tools over MCP', { timeout: 60_000 }, () => {
   })
 
   it('names each served tool after the app tool it runs', () => {
-    expect(['app_skill', 'plugin_manager', 'app_read_file', 'cordis_inspect_query', 'cordis_inspect_list', 'other'].map(dshNameOf))
-      .toEqual(['skill', 'plugin_manager', 'app_read_file', 'cordis_inspect_query', 'cordis_inspect_list', undefined])
+    expect([...APP_TOOLS, ...RESOURCE_TOOLS, 'other'].map(dshNameOf))
+      .toEqual(['skill', 'plugin_manager', 'app_read_file', 'cordis_inspect_query', 'cordis_inspect_list', ...RESOURCE_TOOLS, undefined])
   })
 
   it('gives a call without a Casper call id a fresh id of its own, and records no step result for it', async () => {
@@ -409,5 +415,50 @@ describe('app tools over MCP', { timeout: 60_000 }, () => {
     expect(await call).toEqual({ content: [{ type: 'text', text: 'installed' }], isError: false })
     await vi.advanceTimersByTimeAsync(PROGRESS_INTERVAL_MS * 2)
     expect(progress).toEqual([1, 2])
+  })
+
+  it('the resource tools are listed with no provider and return the no-server error', async () => {
+    const { ctx, agent, seen } = await host()
+    const mcp = await client(await serve(agent, ctx, { resourceServers: () => ['docs', 'github'] }))
+    const { tools } = await mcp.listTools()
+    const byName = new Map(tools.map(tool => [tool.name, tool]))
+    for (const name of RESOURCE_TOOLS) {
+      expect(byName.get(name)?.description).toMatch(/ Servers: acp-docs, acp-github\.$/)
+      expect(byName.get(name)?.inputSchema).toMatchObject({ type: 'object', properties: { server: { type: 'string' } } })
+    }
+    expect(byName.get('read_mcp_resource')?.inputSchema).toMatchObject({ required: ['server', 'uri'] })
+    for (const [name, args] of [
+      ['list_mcp_resources', { server: 'acp-docs' }],
+      ['list_mcp_resource_templates', { server: 'acp-docs' }],
+      ['read_mcp_resource', { server: 'acp-docs', uri: 'docs://intro' }],
+    ] as const) {
+      expect(await mcp.callTool({ name, arguments: args })).toEqual({ content: [{ type: 'text', text: NO_RESOURCES }], isError: true })
+    }
+    expect(seen).toEqual([])
+    const none = await client(await serve(agent, ctx))
+    expect((await none.listTools()).tools.find(tool => tool.name === 'list_mcp_resources')?.description).toMatch(/ Servers: none right now\.$/)
+  })
+
+  it('read_mcp_resource for acp-docs runs on docs', async () => {
+    const { ctx, agent, seen } = await host()
+    ctx.tools.register(defineTool({
+      name: 'read_mcp_resource', description: 'Read an MCP resource.',
+      parameters: { server: { type: 'string', required: true }, uri: { type: 'string', required: true } },
+      output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
+      execute: (args, exec) => { seen.push({ name: 'read_mcp_resource', args, exec }); return Promise.resolve(`read ${args.uri} on ${args.server}`) },
+    }))
+    const recorded: [string, BridgedCall][] = []
+    const mcp = await client(await serve(agent, ctx, { resourceServers: () => ['docs'], record: (...call) => { recorded.push(call) } }))
+    const result = await mcp.callTool({ name: 'read_mcp_resource', arguments: { server: 'acp-docs', uri: 'docs://intro' }, _meta: { 'casper/acpToolCallId': 'casper-tool-4' } })
+    expect(result).toEqual({ content: [{ type: 'text', text: 'read docs://intro on docs' }], isError: false })
+    expect(seen.map(entry => [entry.name, entry.args, entry.exec.agent === agent])).toEqual([['read_mcp_resource', { server: 'docs', uri: 'docs://intro' }, true]])
+    expect(recorded.map(([id, call]) => [id, call.name, call.arguments])).toEqual([
+      ['casper-tool-4', 'read_mcp_resource', JSON.stringify({ server: 'docs', uri: 'docs://intro' })],
+    ])
+    // Only a server this connection hands Casper is reached.
+    const other = await mcp.callTool({ name: 'read_mcp_resource', arguments: { server: 'acp-network', uri: 'x://y' } }) as { content: { text: string }[]; isError: boolean }
+    expect(other.isError).toBe(true)
+    expect(other.content[0]?.text).toBe('The app hands Casper no MCP server named acp-network. Servers: acp-docs.')
+    expect(seen).toHaveLength(1)
   })
 })

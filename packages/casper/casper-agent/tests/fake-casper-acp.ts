@@ -63,6 +63,11 @@
  * `{ mcp, args? }` (calls that tool on the first `mcpServers` entry with an
  * MCP 1.x client, carrying the current tool id as `casper/acpToolCallId`,
  * and logs `{ event: 'mcp', name, result, server }`, `server` being the answered serverInfo).
+ * With `mcpHttp: true` the `initialize` reply sets `mcpCapabilities.http`, as
+ * a Casper whose `acp_mcp` is not off does, so the app hands it its own
+ * servers after the app tools server. `session/new` and `session/load` log
+ * whether any header or env value of any entry (a header's `Bearer ` cut)
+ * also reached this process's argv or environment.
  * A `tool`, `toolEnd`, or `toolUpdate` step also takes the fields a current
  * Casper sends: `rawInput` (the model's arguments, replacing the older
  * shape), `meta` (sent as `_meta.casper`), `locations`, `content` (plain
@@ -279,6 +284,7 @@ interface Script {
   steer?: boolean
   steerReplies?: boolean[]
   steerReplyDelayMs?: number
+  mcpHttp?: boolean
 }
 
 const logFile = process.env.FAKE_CASPER_LOG ?? ''
@@ -319,9 +325,11 @@ log({
   profile: { name: process.env.DSH_PROFILE, dir: process.env.DSH_PROFILE_DIR },
 })
 
-/** Whether any offered header value also reached this process's argv or environment. */
+/** Whether any offered header or env value also reached this process's argv or environment. */
 function exposed(servers: McpServer[]): { argv: boolean; env: boolean } {
-  const values = servers.flatMap(server => 'headers' in server ? server.headers.map(header => header.value.replace(/^Bearer /, '')) : [])
+  const values = servers.flatMap(server => 'headers' in server
+    ? server.headers.map(header => header.value.replace(/^Bearer /, ''))
+    : 'env' in server ? server.env.map(variable => variable.value) : [])
   const found = (text: string | undefined): boolean => values.some(value => value !== '' && text?.includes(value) === true)
   return { argv: process.argv.some(found), env: Object.values(process.env).some(found) }
 }
@@ -674,7 +682,7 @@ createAcpAgent({ name: 'fake-casper' })
       agentCapabilities: {
         loadSession: true,
         promptCapabilities: script.promptCapabilities ?? { image: false, audio: false, embeddedContext: false },
-        mcpCapabilities: { http: false, sse: false },
+        mcpCapabilities: { http: script.mcpHttp === true, sse: false },
         ...script.steer === true ? { _meta: { casper: { steer: true } } } : {},
       },
       agentInfo: { name: 'casper', title: 'Casper', version: '0.0.0-test' },

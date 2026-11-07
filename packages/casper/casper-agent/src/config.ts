@@ -43,6 +43,11 @@ export interface Config {
   accessModes: Record<string, AccessModeId>
   /** Show Casper's boxes with Casper's approval card; off shows the generic question card. */
   approvalCard: boolean
+  /**
+   * Hand Casper the enabled Settings > MCP servers, credentials resolved, when Casper takes HTTP servers; Casper
+   * connects to them for the session and asks before their changes. A change reaches Casper at the next turn.
+   */
+  forwardMcpServers: boolean
 }
 
 /** Runtime schema for {@link Config}; the defaults keep teardown inside a 10 s host shutdown window. */
@@ -61,4 +66,5 @@ export const Config: z<Config> = z.object({
   appTools: z.boolean().default(true),
   accessModes: z.dict(z.union(ACCESS_MODE_IDS as AccessModeId[])).default({ ...DEFAULT_ACCESS_MODES }),
   approvalCard: z.boolean().default(true),
+  forwardMcpServers: z.boolean().default(true),
 })

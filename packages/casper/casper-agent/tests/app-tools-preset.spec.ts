@@ -215,7 +215,7 @@ it('serves the preset\'s real tools, and a bridged install asks once through the
   expect(JSON.stringify(hidden?.result)).toContain('does not offer that bundle')
 })
 
-it('lists all five app tools to Casper from the preset rows', { timeout: 60_000 }, async () => {
+it('lists all five app tools, then the resource tools, to Casper from the preset rows', { timeout: 60_000 }, async () => {
   const fake = fakeCasper({ prompts: [[]] })
   cleanups.push(() => { fake.remove() })
   const { create } = await host(fake)
@@ -230,5 +230,8 @@ it('lists all five app tools to Casper from the preset rows', { timeout: 60_000 
   await client.connect(new StreamableHTTPClientTransport(new URL(server.url), { requestInit: { headers } }) as Transport)
   cleanups.push(() => client.close())
   // No tool drops out silently: each preset row resolved its tool in the Agent's scope.
-  expect((await client.listTools()).tools.map(tool => tool.name)).toEqual(['app_skill', 'plugin_manager', 'app_read_file', 'cordis_inspect_query', 'cordis_inspect_list'])
+  expect((await client.listTools()).tools.map(tool => tool.name)).toEqual([
+    'app_skill', 'plugin_manager', 'app_read_file', 'cordis_inspect_query', 'cordis_inspect_list',
+    'list_mcp_resources', 'list_mcp_resource_templates', 'read_mcp_resource',
+  ])
 })
