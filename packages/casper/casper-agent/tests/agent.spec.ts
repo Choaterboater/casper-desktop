@@ -9,6 +9,7 @@ import AttachmentStore, { AttachmentId } from '@deepseek-ai/dsh-attachment'
 import type { FileAttachmentRef, ImageAttachmentLimits, ImageAttachmentRef, StoredImageAttachment } from '@deepseek-ai/dsh-attachment'
 import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
+import { planProjectionDefinition } from '@deepseek-ai/dsh-plan-mode'
 import { UserQuestionError } from '@deepseek-ai/dsh-user-questions'
 import { CasperAgent, FRESH_CONVERSATION_NOTICE } from '../src/agent.ts'
 import { CasperCommandCache } from '../src/commands.ts'
@@ -18,7 +19,7 @@ import { CasperModelsCache } from '../src/models-cache.ts'
 import { FORK_UNSUPPORTED } from '../src/factory.ts'
 import { TEXT_ONLY_PICTURE } from '../src/prompt.ts'
 import { boot, eventsOf, filesText, mountPermissionPresets, prompt, turnEnds } from './harness.ts'
-import { alive, casperModes, casperOptions, fakeCasper, gate, optionsWithoutMode, parsed, waitFor } from './support.ts'
+import { alive, casperModes, casperOptions, fakeCasper, gate, optionsWithoutMode, parsed, waitFor, withPlan } from './support.ts'
 import type { FakeCasper, FakeCommand, FakeScript } from './support.ts'
 
 const cleanups: (() => Promise<void> | void)[] = []
@@ -1375,5 +1376,264 @@ describe('Casper\'s forms', { timeout: 60_000 }, () => {
     expect(replies(fake)).toEqual([{ action: 'cancel' }, { action: 'cancel' }])
     expect(results(agent)).toEqual([{ isError: false, text: '— skipped' }])
     expect(turnEnds(agent)).toEqual([{ kind: 'completed' }])
+  })
+})
+
+describe('Plan review and Plan first', { timeout: 60_000 }, () => {
+  const PLAN = '# Add a cache\n\n## Steps\n\n1. Cache the reads.\n'
+  const PLAN_COMMAND: FakeCommand = { name: 'plan', description: 'Plan first, or plan one request', input: { hint: '[on|off|request]' } }
+
+  /** A Host with the command registry, so `/plan` runs as a command. */
+  async function setupPlan(script: FakeScript, answer?: Answer) {
+    const fake = fakeCasper(script)
+    cleanups.push(() => { fake.remove() })
+    const host = await boot(fake, {}, answer, true, async (ctx) => { await ctx.plugin(CommandRuntime) })
+    cleanups.push(() => host.ctx.fiber.dispose())
+    const plan = await host.ctx.sessionProjections.register(planProjectionDefinition)
+    /** What the composer's plan chip reads. */
+    const chip = (agent: Agent) => planProjectionDefinition.wire.view(plan.stateOf(agent.session))
+    const execute = async (agent: Agent, line: string) => {
+      const executed = await host.ctx.commands.execute(agent, line, [], new AbortController().signal)
+      return executed?.result
+    }
+    return { fake, host, chip, execute }
+  }
+
+  function modes(agent: Agent): unknown[] {
+    return eventsOf(agent).flatMap(event => event.type === 'plan/mode' ? [event.data] : [])
+  }
+
+  function planSets(fake: FakeCasper): unknown[] {
+    return fake.calls('session/set_config_option').flatMap(entry => entry.params?.configId === 'plan' ? [entry.params.value] : [])
+  }
+
+  function answers(fake: FakeCasper): unknown[] {
+    return fake.log().filter(entry => entry.event === 'answer').map(entry => entry.outcome ?? entry.error)
+  }
+
+  it('a plan Build box is a plan review: Build builds, Discuss changes the plan, and a timeout stops', async () => {
+    const replies = [
+      (id: string) => Promise.resolve({ answers: [{ id, selected: ['Build'] }] }),
+      () => Promise.reject(new UserQuestionError('dismissed to discuss', 'ASK_CANCELLED')),
+      () => Promise.reject(new UserQuestionError('no answer in time', 'ASK_TIMED_OUT')),
+    ]
+    const { fake, host } = await setupPlan({ prompts: [[{ planBox: PLAN }], [{ planBox: PLAN }], [{ planBox: PLAN }]] },
+      request => (replies.shift() ?? replies[0])?.(request.questions[0]?.id ?? '') ?? Promise.reject(new Error('unexpected')))
+    const { agent } = await host.create('casper-plan-review')
+    await run(agent, '/plan add a cache')
+    const call = eventsOf(agent).find(event => event.type === 'tool/call')
+    expect(call?.type === 'tool/call' && [call.data.name, parsed(call.data.arguments)]).toEqual(['exit_plan_mode', { plan: PLAN }])
+    expect(host.asked[0]?.questions).toEqual([{
+      id: 'casper-permission',
+      header: 'Plan review',
+      question: 'Build this plan?',
+      detail: PLAN,
+      options: [
+        { label: 'Build', description: 'the model builds these steps and tests these cases' },
+        { label: 'Change the plan', description: 'tell the model what to change, then choose again' },
+      ],
+      multiSelect: false,
+      intent: { kind: 'plan-review', approve: 'Build', callId: call?.type === 'tool/call' ? call.data.callId : undefined },
+    }])
+    await run(agent, 'again')
+    await run(agent, 'once more')
+    expect(answers(fake)).toEqual([
+      { outcome: 'selected', optionId: '2' },
+      { outcome: 'selected', optionId: '3' },
+      { outcome: 'cancelled' },
+    ])
+    const results = eventsOf(agent).flatMap(event => event.type === 'tool/result' ? [[event.data.message.isError, event.data.message.content]] : [])
+    expect(results).toEqual([
+      [false, [{ type: 'text', text: '→ Build' }]],
+      [false, [{ type: 'text', text: '→ Change the plan' }]],
+      [false, [{ type: 'text', text: '→ No (no answer)' }]],
+    ])
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }, { kind: 'completed' }, { kind: 'completed' }])
+  })
+
+  it('Casper\'s plan option going on sets plan mode active and the chip shows it', async () => {
+    const { host, chip } = await setupPlan({
+      configOptions: withPlan('off'),
+      prompts: [[{ text: 'one\n' }], [{ configUpdate: withPlan('on') }, { text: 'Plan first is on.\n' }], [{ text: 'three\n' }]],
+    })
+    const { agent } = await host.create('casper-plan-option')
+    await run(agent, 'one')
+    expect(modes(agent)).toEqual([])
+    expect(chip(agent)).toEqual({ active: false, pending: false })
+    await run(agent, '/plan on')
+    expect(modes(agent)).toEqual([{ active: true }])
+    expect(chip(agent)).toEqual({ active: true, pending: false })
+    await run(agent, 'three')
+    expect(modes(agent)).toEqual([{ active: true }])
+  })
+
+  it('slash plan off sets the option and sends no prompt', async () => {
+    const { fake, host, chip, execute } = await setupPlan({ commands: [PLAN_COMMAND], configOptions: withPlan('on'), prompts: [[{ text: 'one\n' }]] })
+    const { agent } = await host.create('casper-plan-off')
+    await run(agent, 'one')
+    expect(chip(agent)).toEqual({ active: true, pending: false })
+    // The plan chip's exit runs /plan off.
+    expect(await execute(agent, '/plan off')).toEqual({ kind: 'success', text: 'Plan first off.' })
+    expect(chip(agent)).toEqual({ active: false, pending: false })
+    expect(await execute(agent, '/plan  on ')).toEqual({ kind: 'success', text: 'Plan first on: every request gets a plan first.' })
+    expect(chip(agent)).toEqual({ active: true, pending: false })
+    expect(planSets(fake)).toEqual(['off', 'on'])
+    expect(modes(agent)).toEqual([{ active: true }, { active: false }, { active: true }])
+    expect(promptTexts(fake)).toEqual(['one'])
+  })
+
+  it('bare slash plan and slash plan with words leave the chip inactive after the turn', async () => {
+    const { fake, host, chip, execute } = await setupPlan({
+      commands: [PLAN_COMMAND], configOptions: withPlan('off'), prompts: [[{ text: 'one\n' }], [{ planBox: PLAN }], [{ text: 'planned\n' }]],
+    }, request => Promise.reject(new UserQuestionError(`${request.questions.length} unanswered`, 'ASK_TIMED_OUT')))
+    const { agent } = await host.create('casper-plan-once')
+    await run(agent, 'one')
+    expect(await execute(agent, '/plan')).toEqual({ kind: 'success' })
+    // Until Casper's turn ends, the chip shows the /plan the user chose.
+    expect(chip(agent)).toEqual({ active: false, pending: true })
+    await waitFor(() => fake.calls('session/prompt').length === 2)
+    await agent.whenIdle()
+    expect(chip(agent)).toEqual({ active: false, pending: false })
+    expect(await execute(agent, '/plan add a cache')).toEqual({ kind: 'success' })
+    await waitFor(() => fake.calls('session/prompt').length === 3)
+    await agent.whenIdle()
+    expect(chip(agent)).toEqual({ active: false, pending: false })
+    expect(promptTexts(fake)).toEqual(['one', '/plan', '/plan add a cache'])
+    expect(planSets(fake)).toEqual([])
+    expect(modes(agent)).toEqual([{ active: false }, { active: false }])
+  })
+
+  it('a restarted Casper gets the Session\'s Plan first setting before the prompt', async () => {
+    const { fake, host, chip } = await setupPlan({
+      configOptions: withPlan('off'), replayConfig: true, newSessionId: 'conversation-plan',
+      prompts: [[{ configUpdate: withPlan('on') }, { text: 'on\n' }], [{ crash: 9 }], [{ text: 'planned\n' }]],
+    })
+    const { agent } = await host.create('casper-plan-restart')
+    await run(agent, '/plan on')
+    await run(agent, 'crash')
+    expect(turnEnds(agent)[1]).toMatchObject({ kind: 'error', error: { code: 'CASPER_EXITED' } })
+    await run(agent, 'next')
+    expect(fake.calls('session/load').map(entry => entry.params?.sessionId)).toEqual(['conversation-plan'])
+    const order = fake.log().filter(entry => entry.method === 'session/set_config_option' || entry.method === 'session/prompt').map(entry => entry.method)
+    expect(order).toEqual(['session/prompt', 'session/prompt', 'session/set_config_option', 'session/prompt'])
+    expect(planSets(fake)).toEqual(['on'])
+    expect(chip(agent)).toEqual({ active: true, pending: false })
+    expect(modes(agent)).toEqual([{ active: true }])
+    // Turned off, then restarted on a Casper whose own default is on: it is turned off again.
+    fake.script({
+      configOptions: withPlan('on'), replayConfig: true,
+      prompts: [[], [], [], [{ configUpdate: withPlan('off') }, { text: 'off\n' }], [{ crash: 9 }], [{ text: 'still off\n' }]],
+    })
+    // The next prompt starts a Casper that reads the new script.
+    if (!(agent instanceof CasperAgent)) throw new Error('not a Casper agent')
+    await agent.closeConnection()
+    await run(agent, '/plan off')
+    await run(agent, 'crash')
+    await run(agent, 'last')
+    expect(planSets(fake)).toEqual(['on', 'off'])
+    expect(chip(agent)).toEqual({ active: false, pending: false })
+    expect(modes(agent)).toEqual([{ active: true }, { active: false }])
+  })
+
+  it('a Casper that refuses Plan first keeps its own value, and slash plan reaches a stopped Casper as a prompt', async () => {
+    const { fake, host, chip, execute } = await setupPlan({
+      commands: [PLAN_COMMAND], configOptions: withPlan('off'), setFails: { plan: 'Plan first is busy.' },
+      prompts: [[{ configUpdate: withPlan('on') }, { text: 'on\n' }], [{ crash: 9 }], [{ text: 'not restored\n' }]],
+    })
+    const { agent } = await host.create('casper-plan-refused')
+    await run(agent, 'one')
+    expect(chip(agent)).toEqual({ active: true, pending: false })
+    expect(await execute(agent, '/plan off')).toEqual({ kind: 'error', text: 'Casper did not turn Plan first off: Plan first is busy.' })
+    expect(chip(agent)).toEqual({ active: true, pending: false })
+    await run(agent, 'crash')
+    // The Casper that ran it has exited, so the line goes to the next Casper as a prompt.
+    expect(await execute(agent, '/plan on')).toEqual({ kind: 'success' })
+    await waitFor(() => fake.calls('session/prompt').length === 3)
+    await agent.whenIdle()
+    expect(promptTexts(fake)).toEqual(['one', 'crash', '/plan on'])
+    expect(planSets(fake)).toEqual(['off', 'on'])
+    expect(turnEnds(agent).at(-1)).toEqual({ kind: 'completed' })
+    expect(chip(agent)).toEqual({ active: false, pending: false })
+  })
+
+  it('a stop while a restarted Casper takes Plan first kills it and sends no prompt', async () => {
+    const fake = fakeCasper({ prompts: [] })
+    cleanups.push(() => { fake.remove() })
+    const hold = gate(fake, 'hold-plan')
+    fake.script({
+      configOptions: withPlan('off'), holdSet: { plan: hold.path },
+      prompts: [[{ configUpdate: withPlan('on') }, { text: 'on\n' }], [{ crash: 9 }], [{ text: 'restored\n' }]],
+    })
+    const host = await boot(fake)
+    cleanups.push(() => host.ctx.fiber.dispose())
+    const plan = await host.ctx.sessionProjections.register(planProjectionDefinition)
+    const { agent } = await host.create('casper-plan-stop')
+    await run(agent, 'one')
+    await run(agent, 'crash')
+    agent.followup(prompt('next'))
+    await waitFor(() => planSets(fake).length === 1)
+    const pid = fake.pids().at(-1)
+    agent.cancel({ kind: 'user' })
+    await agent.whenIdle()
+    await waitFor(() => !alive(pid ?? 0))
+    expect(turnEnds(agent).at(-1)).toEqual({ kind: 'aborted', reason: { kind: 'user' } })
+    expect(promptTexts(fake)).toEqual(['one', 'crash'])
+    // The killed Casper's own default is not recorded, so the next Casper gets Plan first again.
+    expect(modes(agent)).toEqual([{ active: true }])
+    expect(planProjectionDefinition.wire.view(plan.stateOf(agent.session))).toEqual({ active: true, pending: false })
+    hold.open()
+    await run(agent, 'last')
+    expect(planSets(fake)).toEqual(['on', 'on'])
+    expect(promptTexts(fake)).toEqual(['one', 'crash', 'last'])
+    expect(modes(agent)).toEqual([{ active: true }])
+  })
+
+  it('a restarted Casper whose model pick fails gets Plan first on its next turn, and a slash plan off before then is kept', async () => {
+    const refusal = 'claude-subscription is signed out: run casper /login'
+    const opus = { provider: 'claude-subscription', model: 'claude-opus-5-5' }
+    const { fake, host, chip, execute } = await setupPlan({
+      commands: [PLAN_COMMAND], configOptions: withPlan('off'), setFails: { model: refusal },
+      prompts: [[{ configUpdate: withPlan('on') }, { text: 'on\n' }], [{ crash: 9 }], [{ text: 'restored\n' }], [{ crash: 9 }], [{ text: 'kept\n' }]],
+    })
+    const { agent } = await host.create('casper-plan-pick')
+    await run(agent, 'one')
+    await run(agent, 'crash')
+    // Chosen while no Casper runs, the pick is applied by the next turn, which Casper refuses.
+    await agent.model.own?.choose(opus)
+    await run(agent, 'next')
+    expect(turnEnds(agent).at(-1)).toMatchObject({ kind: 'error', error: { code: 'CASPER_MODEL_UNAVAILABLE' } })
+    expect(modes(agent)).toEqual([{ active: true }])
+    expect(chip(agent)).toEqual({ active: true, pending: false })
+    await run(agent, 'again')
+    expect(planSets(fake)).toEqual(['on'])
+    expect(promptTexts(fake)).toEqual(['one', 'crash', 'again'])
+    expect(chip(agent)).toEqual({ active: true, pending: false })
+    // Again restarted with a refused pick; the user turns Plan first off before the next prompt.
+    await run(agent, 'crash')
+    await agent.model.own?.choose(opus)
+    await run(agent, 'next')
+    expect(await execute(agent, '/plan off')).toEqual({ kind: 'success', text: 'Plan first off.' })
+    expect(chip(agent)).toEqual({ active: false, pending: false })
+    await run(agent, 'last')
+    expect(planSets(fake)).toEqual(['on', 'off'])
+    expect(promptTexts(fake)).toEqual(['one', 'crash', 'again', 'crash', 'last'])
+    expect(chip(agent)).toEqual({ active: false, pending: false })
+    expect(modes(agent)).toEqual([{ active: true }, { active: false }])
+  })
+
+  it('a Casper without Plan first sends slash plan as a prompt and never moves the chip', async () => {
+    const { fake, host, chip, execute } = await setupPlan({
+      commands: [PLAN_COMMAND], prompts: [[{ text: 'one\n' }], [{ text: 'planned\n' }], [{ text: 'on\n' }]],
+    })
+    const { agent } = await host.create('casper-plan-older')
+    await run(agent, 'one')
+    for (const [line, prompts] of [['/plan add a cache', 2], ['/plan on', 3]] as const) {
+      expect(await execute(agent, line)).toEqual({ kind: 'success' })
+      await waitFor(() => fake.calls('session/prompt').length === prompts)
+      await agent.whenIdle()
+      expect(chip(agent)).toEqual({ active: false, pending: false })
+    }
+    expect(promptTexts(fake)).toEqual(['one', '/plan add a cache', '/plan on'])
+    expect(planSets(fake)).toEqual([])
   })
 })

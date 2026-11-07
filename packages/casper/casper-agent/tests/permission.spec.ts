@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest'
 import type { PermissionOption, RequestPermissionRequest } from '@agentclientprotocol/sdk'
 import { UserQuestionError } from '@deepseek-ai/dsh-user-questions'
 import type { AskUserQuestionAnswer, AskUserQuestionItem } from '@deepseek-ai/dsh-user-questions'
-import { answerPermission, PERMISSION_QUESTION_ID, permissionOutcome, permissionQuestion, toolCallText } from '../src/permission.ts'
+import { ToolCallId } from '@deepseek-ai/dsh-llm'
+import {
+  answerPermission, PERMISSION_QUESTION_ID, permissionOutcome, permissionQuestion, planLabels, reviewedPlan, toolCallText,
+} from '../src/permission.ts'
 
 const NO: PermissionOption = { optionId: '1', name: 'No', kind: 'reject_once' }
 const ONCE: PermissionOption = { optionId: '2', name: 'Yes, this once', kind: 'allow_once', _meta: { casper: { description: 'Only this write' } } }
@@ -112,5 +115,95 @@ describe('answerPermission', () => {
     const answer = await answerPermission(request([NO, ONCE]), () => Promise.reject(failure), (error) => { reported.push(error) })
     expect(answer).toEqual(cancelled)
     expect(reported).toEqual([failure])
+  })
+})
+
+describe('plan review', () => {
+  const STOP: PermissionOption = { optionId: '1', name: 'Stop', kind: 'reject_once', _meta: { casper: { description: 'nothing is built' } } }
+  const BUILD: PermissionOption = { optionId: '2', name: 'Build', kind: 'allow_once', _meta: { casper: { description: 'the model builds these steps and tests these cases' } } }
+  const CHANGE: PermissionOption = { optionId: '3', name: 'Change the plan', kind: 'reject_once', _meta: { casper: { description: 'tell the model what to change, then choose again' } } }
+  const PLAN = '# Add a cache\n\n## Steps\n\n1. Cache the reads.\n'
+  const LABELS = { approve: 'Build', change: 'Change the plan' }
+
+  function box(meta: unknown = { plan: LABELS }, text = PLAN, options = [STOP, BUILD, CHANGE]): RequestPermissionRequest {
+    return {
+      sessionId: 'acp-session',
+      toolCall: {
+        toolCallId: 'casper-approval-1', title: 'Build this plan?', kind: 'other', status: 'pending',
+        content: [{ type: 'content', content: { type: 'text', text } }],
+        _meta: { casper: meta },
+      },
+      options,
+    }
+  }
+
+  it('a plan review item names Build and Change the plan', () => {
+    const callId = ToolCallId('casper:epoch:casper-approval-1')
+    const { question, options, change } = permissionQuestion(box(), { callId })
+    expect(question).toEqual({
+      id: PERMISSION_QUESTION_ID,
+      header: 'Plan review',
+      question: 'Build this plan?',
+      detail: PLAN,
+      options: [
+        { label: 'Build', description: 'the model builds these steps and tests these cases' },
+        { label: 'Change the plan', description: 'tell the model what to change, then choose again' },
+      ],
+      multiSelect: false,
+      intent: { kind: 'plan-review', approve: 'Build', callId },
+    })
+    expect(options).toEqual([BUILD, CHANGE])
+    expect(change).toBe(CHANGE)
+    expect(permissionQuestion(box()).question.intent).toEqual({ kind: 'plan-review', approve: 'Build' })
+    const untitled = box()
+    delete untitled.toolCall.title
+    expect(permissionQuestion(untitled).question.question).toBe('Build this plan?')
+    expect(permissionOutcome(options, answer(['Build']))).toEqual({ outcome: { outcome: 'selected', optionId: '2' } })
+    expect(permissionOutcome(options, answer(['Change the plan']))).toEqual({ outcome: { outcome: 'selected', optionId: '3' } })
+    expect(permissionOutcome(options, answer(['Stop']))).toEqual({ outcome: { outcome: 'cancelled' } })
+  })
+
+  it('asks a box as usual when its plan labels or its titled plan are missing or do not match its options', () => {
+    for (const odd of [
+      box(null),
+      box({ plan: 'Build' }),
+      box({ plan: { approve: 'Build' } }),
+      box({ plan: { approve: 'Build', change: 'Build' } }),
+      box({ plan: { approve: 'Go', change: 'Change the plan' } }),
+      box({ plan: LABELS }, 'Add a cache'),
+      box({ plan: LABELS }, PLAN, [STOP, BUILD]),
+    ]) {
+      const { question, options, change } = permissionQuestion(odd)
+      expect(question.intent).toBeUndefined()
+      expect(question.header).toBeUndefined()
+      expect(change).toBeUndefined()
+      expect(options[0]).toBe(STOP)
+    }
+    expect(planLabels({ _meta: { casper: { plan: LABELS } } })).toEqual(LABELS)
+    expect(planLabels({ _meta: null })).toBeUndefined()
+    expect(reviewedPlan(box().toolCall)).toBe(PLAN)
+    expect(reviewedPlan({ content: box().toolCall.content ?? null })).toBeUndefined()
+  })
+
+  it('Build selects Build, and Discuss selects the change option', async () => {
+    expect(await answerPermission(box(), async () => answer(['Build']), () => {})).toEqual({ outcome: { outcome: 'selected', optionId: '2' } })
+    const reported: unknown[] = []
+    const discussed = await answerPermission(box(), () => Promise.reject(new UserQuestionError('dismissed', 'ASK_CANCELLED')), (error) => { reported.push(error) })
+    expect(discussed).toEqual({ outcome: { outcome: 'selected', optionId: '3' } })
+    expect(reported).toEqual([])
+    // Any other box that is dismissed is still No.
+    const other = await answerPermission(request([NO, ONCE]), () => Promise.reject(new UserQuestionError('dismissed', 'ASK_CANCELLED')), () => {})
+    expect(other).toEqual({ outcome: { outcome: 'cancelled' } })
+  })
+
+  it.each([
+    new UserQuestionError('timed out', 'ASK_TIMED_OUT'),
+    new UserQuestionError('aborted', 'ASK_ABORTED'),
+    new Error('api-remotes: forwarded Remote event source ended'),
+  ])('a timeout or abort is cancelled, which Casper treats as Stop ($message)', async (failure) => {
+    const reported: unknown[] = []
+    expect(await answerPermission(box(), () => Promise.reject(failure), (error) => { reported.push(error) })).toEqual({ outcome: { outcome: 'cancelled' } })
+    expect(reported).toEqual([failure])
+    expect(await answerPermission(box(), undefined, () => {})).toEqual({ outcome: { outcome: 'cancelled' } })
   })
 })

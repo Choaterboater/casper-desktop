@@ -102,6 +102,14 @@ export interface CasperConnectionHandlers {
    */
   mode(modeId: string): void
   /**
+   * Receive Casper's Plan first option when it changes: from a
+   * `config_option_update` or a `session/set_config_option` reply, a set this
+   * client made included; the connection has stored it already. Called during
+   * a `session/load` replay too.
+   * @param active - whether every request gets a plan first.
+   */
+  plan(active: boolean): void
+  /**
    * Answer one `session/request_permission`.
    * @param params - Casper's request.
    * @returns the reply; must not reject.
@@ -204,6 +212,8 @@ export class CasperConnection {
   private modes_: SessionModeState | undefined
   /** Casper's current access mode; undefined for a Casper that offers no modes. */
   private mode_: string | undefined
+  /** Casper's Plan first option; undefined for a Casper that offers none. */
+  private plan_: boolean | undefined
   /** Updates are dropped while `session/load` replays the conversation the Session already holds. */
   private replaying = false
   private cancelSent = false
@@ -248,6 +258,15 @@ export class CasperConnection {
    */
   get accessMode(): string | undefined {
     return this.mode_
+  }
+
+  /**
+   * Casper's Plan first option (`plan`, `on` or `off`), kept up to date by
+   * Casper's updates and by each set's reply; undefined for a Casper that
+   * offers none.
+   */
+  get planMode(): boolean | undefined {
+    return this.plan_
   }
 
   /**
@@ -344,6 +363,7 @@ export class CasperConnection {
     )
     this.options_ = reply.configOptions
     this.mode_ = modeOf(reply.configOptions, this.modes_)
+    this.casperPlan(reply.configOptions)
     return reply.configOptions
   }
 
@@ -431,6 +451,7 @@ export class CasperConnection {
           this.options_ = update.configOptions
           options.handlers.config(update.configOptions)
           this.casperMode(modeOf(update.configOptions, undefined))
+          this.casperPlan(update.configOptions)
         } else if (update.sessionUpdate === 'current_mode_update') {
           if (this.modes_ !== undefined) this.modes_ = { ...this.modes_, currentModeId: update.currentModeId }
           this.casperMode(update.currentModeId)
@@ -476,6 +497,15 @@ export class CasperConnection {
     this.options_ = reply.configOptions ?? undefined
     this.modes_ = reply.modes ?? undefined
     this.mode_ = modeOf(this.options_, this.modes_)
+    this.plan_ = planOf(this.options_)
+  }
+
+  /** Store Casper's Plan first option from a list and tell the handler when it changed. */
+  private casperPlan(options: readonly SessionConfigOption[]): void {
+    const active = planOf(options)
+    if (active === this.plan_) return
+    this.plan_ = active
+    if (active !== undefined) this.options.handlers.plan(active)
   }
 
   /** Store a mode Casper reports itself and tell the handler when it changed. */
@@ -611,6 +641,17 @@ function modeOf(options: readonly SessionConfigOption[] | undefined, modes: Sess
  */
 function modeOption(options: readonly SessionConfigOption[] | undefined): Extract<SessionConfigOption, { type: 'select' }> | undefined {
   return options?.find((item): item is Extract<SessionConfigOption, { type: 'select' }> => item.category === 'mode' && item.type === 'select')
+}
+
+/**
+ * Read Casper's Plan first option: the select option `plan`, `on` or `off`.
+ * @param options - Casper's option list.
+ * @returns whether it is on, or undefined when Casper offers no such option.
+ */
+function planOf(options: readonly SessionConfigOption[] | undefined): boolean | undefined {
+  const option = options?.find(item => item.id === 'plan' && item.type === 'select')
+  if (option === undefined) return undefined
+  return option.currentValue === 'on' ? true : option.currentValue === 'off' ? false : undefined
 }
 
 /**

@@ -29,10 +29,12 @@ import { AGENT_MODELS_RECORD, agentEvents } from '@deepseek-ai/dsh-agent'
 import { ReactLoopInbox } from '@deepseek-ai/dsh-agent-loop'
 import { getDshRuntimeVersion } from '@deepseek-ai/dsh-app-boot'
 import type {} from '@deepseek-ai/dsh-attachment'
-import type {} from '@deepseek-ai/dsh-commands'
+import type { CommandResult } from '@deepseek-ai/dsh-commands'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { LlmFailure } from '@deepseek-ai/dsh-llm'
 import { CUSTOM_PRESET } from '@deepseek-ai/dsh-permission-presets'
+// Type-only: the `plan/mode` event and the `plan` projection the composer's plan chip reads.
+import type { PlanUnitState } from '@deepseek-ai/dsh-plan-mode'
 // Type-only: the `sandbox/mode` event the access chip writes, and `ctx.sandboxPolicy`.
 import type {} from '@deepseek-ai/dsh-sandbox-policy'
 import { createScope } from '@deepseek-ai/dsh-scope'
@@ -74,6 +76,8 @@ export interface CasperAgentReaders {
   readonly agentModels: () => AgentModelsState
   /** Current queued and claimed input. */
   readonly inbox: () => InboxState
+  /** The Session's logged Plan first state, which the composer's plan chip shows. */
+  readonly plan: () => PlanUnitState
 }
 
 /** Where the current prompt's updates go: its connection, turn writer, and turn signal. */
@@ -154,6 +158,13 @@ export class CasperAgent implements Agent {
   private readonly accessSet = new WeakMap<CasperConnection, AccessModeId>()
   /** A chip switch that failed while no prompt was open, kept for a turn that is preparing its prompt. */
   private lateAccess: AccessSync | undefined
+  /** Reader of the Session's logged Plan first state. */
+  private readonly planState: () => PlanUnitState
+  /**
+   * Connections whose Plan first value is the Session's: the restore ran or was not needed, or the user set it.
+   * Until then a restarted Casper's own default is never recorded.
+   */
+  private readonly planRestored = new WeakSet<CasperConnection>()
 
   /**
    * @param pluginCtx - the Casper plugin context whose services the Agent uses.
@@ -183,6 +194,7 @@ export class CasperAgent implements Agent {
     this.scope = createScope(pluginCtx, this)
     this.ctx = this.scope.ctx
     this.models = readers.agentModels
+    this.planState = readers.plan
     // Casper's own models: a pick is checked against Casper's list and applied to Casper.
     this.model = new CasperModel(readers.agentModels, session, selection => this.chooseModel(selection))
     this.inbox = new ReactLoopInbox(readers.inbox, session, this.dispatch)
@@ -353,6 +365,8 @@ export class CasperAgent implements Agent {
       }
     }
     this.session.append('turn/end', { turn, reason })
+    // A `/plan` sent as a prompt, with or without words, settles to the value Casper ends the turn with.
+    this.syncPlan()
     await this.flush()
     if (signal.aborted || !this.inbox.hasPending) return false
     phase.abort = new AbortController()
@@ -395,6 +409,9 @@ export class CasperAgent implements Agent {
       signal.throwIfAborted()
       // A pick made before Casper started or while it was busy reaches Casper before the prompt does.
       await this.applyWanted(connection, signal)
+      signal.throwIfAborted()
+      // A new Casper keeps the Session's Plan first setting, also when its first turn ended before the restore.
+      if (!this.planRestored.has(connection)) await this.applyPlan(connection, signal)
       signal.throwIfAborted()
       const content = await promptContent(claimed, { attachments: this.pluginCtx.get('attachments'), images: connection.acceptsImages, signal })
       // A store may finish a read after a Stop; the prompt is then not sent.
@@ -487,6 +504,8 @@ export class CasperAgent implements Agent {
         config: () => { if (owner.connection !== undefined && owner.connection === this.connection) this.report(owner.connection) },
         // Casper's own mode change is kept, never copied to the chip; only Read only is restored.
         mode: () => { if (owner.connection !== undefined && owner.connection === this.connection) this.queueLiveAccess() },
+        // Casper's Plan first value is the chip's, whoever changed it.
+        plan: () => { if (owner.connection !== undefined && owner.connection === this.connection) this.syncPlan() },
         permission: params => this.permission(owner.connection, params),
         elicitation: (params, signal) => this.elicitation(owner.connection, params, signal),
       },
@@ -560,6 +579,8 @@ export class CasperAgent implements Agent {
    * another command, such as the app's own `/permission`, `/export`, or
    * `/feedback`, keeps that command. Each registration's line is sent to Casper
    * as a prompt; clients that know the identity send the typed line instead.
+   * `/plan on` and `/plan off` (the plan chip's exit runs `/plan off`) set
+   * Casper's Plan first option instead when the running Casper offers it.
    */
   private registerCommands(): void {
     for (const off of this.commandOffs.splice(0)) off()
@@ -574,11 +595,84 @@ export class CasperAgent implements Agent {
         description: command.description,
         ...command.hint === undefined ? {} : { input: { hint: command.hint } },
         handler: ({ rawInput }) => {
+          const plan = command.name === 'plan' ? this.planSwitch(rawInput) : undefined
+          if (plan !== undefined) return plan
           this.followup(createUserMessage({ content: [{ type: 'text', text: `/${command.name}${rawInput}` }], source: { kind: 'user' } }))
           return { kind: 'success' }
         },
       }))
     }
+  }
+
+  /**
+   * Set Casper's Plan first option for `/plan on` or `/plan off`, without a
+   * prompt. Casper takes the option during a prompt too.
+   * @param rawInput - the command's input after `/plan`.
+   * @returns the command's result, or undefined when the line goes to Casper as a prompt: other input,
+   *   no running Casper, or a Casper without the option.
+   */
+  private planSwitch(rawInput: string): Promise<CommandResult> | undefined {
+    const value = rawInput.trim()
+    const connection = this.connection
+    if ((value !== 'on' && value !== 'off') || connection === undefined || connection.dead || connection.planMode === undefined) return undefined
+    // The user's choice replaces the Session's last value, so a later turn does not restore the old one.
+    this.planRestored.add(connection)
+    return connection.setConfigOption('plan', value).then(
+      (): CommandResult => {
+        // A Casper already at that value sends no change, while the log can still show the Session's last value.
+        this.syncPlan()
+        return { kind: 'success', text: value === 'on' ? 'Plan first on: every request gets a plan first.' : 'Plan first off.' }
+      },
+      (error: unknown): CommandResult => ({ kind: 'error', text: `Casper did not turn Plan first ${value}: ${casperWords(error).replace(/\.$/, '')}.` }),
+    )
+  }
+
+  /**
+   * Record Casper's Plan first value as `plan/mode` when the log says
+   * otherwise or a `/plan` selection is still pending, so the plan chip shows
+   * what Casper does. Without a value to record (no running Casper, a Casper
+   * that offers no option, or a restarted Casper not yet given the Session's
+   * value), a pending selection settles to the logged value, so the chip never
+   * moves. Never applies Standard's plan-mode controller.
+   */
+  private syncPlan(): void {
+    const connection = this.connection
+    const state = this.planState()
+    const casper = connection !== undefined && this.planRestored.has(connection) ? connection.planMode : undefined
+    const active = casper ?? state.active
+    if (state.active === active && state.wanted === null) return
+    try {
+      this.session.append('plan/mode', { active })
+    } catch (error: unknown) {
+      /* v8 ignore start -- an append fails only when the Session is closed under the Agent. */
+      this.pluginCtx.logger.warn(`casper agent "${this.id}": plan mode not recorded: ${String(error)}`)
+      /* v8 ignore stop */
+    }
+  }
+
+  /**
+   * Give a Casper the Session's logged Plan first setting before its first
+   * prompt: a restarted Casper starts with its own default while the chip
+   * shows the last Casper's value. A Session that was never in Plan first
+   * keeps Casper's own default. A Casper that refuses keeps its own value,
+   * which the turn's end then records. A turn that ends before the restore
+   * leaves it to that Casper's next turn.
+   * @param connection - the new connection.
+   * @param signal - stops the set.
+   * @throws the stop's error when stopped.
+   */
+  private async applyPlan(connection: CasperConnection, signal: AbortSignal): Promise<void> {
+    const casper = connection.planMode
+    const { active: logged, entered } = this.planState()
+    if (casper !== undefined && entered && casper !== logged) {
+      try {
+        await this.setUntilStopped(connection, 'plan', logged ? 'on' : 'off', signal)
+      } catch (error: unknown) {
+        if (signal.aborted) throw error
+        this.pluginCtx.logger.debug(`casper agent "${this.id}": Plan first not restored: ${errorText(error)}`)
+      }
+    }
+    this.planRestored.add(connection)
   }
 
   /**
@@ -636,9 +730,7 @@ export class CasperAgent implements Agent {
         if (!samePick(this.models().wanted, wanted)) continue
         this.report(connection, true)
         if (error instanceof CasperError && error.code === 'CASPER_EXITED') throw error
-        // An error reply carries Casper's own words as its cause.
-        const words = error instanceof CasperError && error.cause instanceof Error ? error.cause.message : errorText(error)
-        throw new CasperError('CASPER_MODEL_UNAVAILABLE', `Casper can't use ${wanted.provider}/${wanted.model}: ${words}. Pick another model.`, { cause: error })
+        throw new CasperError('CASPER_MODEL_UNAVAILABLE', `Casper can't use ${wanted.provider}/${wanted.model}: ${casperWords(error)}. Pick another model.`, { cause: error })
       }
       if (samePick(this.models().wanted, wanted)) {
         this.report(connection, true)
@@ -916,6 +1008,8 @@ export class CasperAgent implements Agent {
         params,
         service === undefined ? undefined : async question => service.ask({ agent: this, questions: [question], signal }),
         (error) => { this.pluginCtx.logger.debug(`casper agent "${this.id}": permission question ended: ${String(error)}`) },
+        // A plan review reopens the plan recorded under the box's step.
+        { callId: sink.connection.toolCallId(id) },
       )
     } finally {
       if (this.asks.get(id) === own) this.asks.delete(id)
@@ -1013,6 +1107,15 @@ function errorText(error: unknown): string {
 }
 
 /**
+ * Casper's own words for a failed request: an error reply carries them as its cause.
+ * @param error - the failure.
+ * @returns the cause's message, or the failure's own.
+ */
+function casperWords(error: unknown): string {
+  return error instanceof CasperError && error.cause instanceof Error ? error.cause.message : errorText(error)
+}
+
+/**
  * Words for an access mode Casper did not take.
  * @param wanted - the mode the chip asks for.
  * @param failure - why it was not set.
@@ -1023,8 +1126,7 @@ function accessFailureText(wanted: AccessModeId, failure: unknown): string {
   if (failure instanceof CasperError && failure.code === 'CASPER_NO_ACCESS_MODES') {
     return `This Casper has no access modes, so ${label} could not be set. Update Casper.`
   }
-  // An error reply carries Casper's own words as its cause.
-  const words = failure instanceof CasperError && failure.cause instanceof Error ? failure.cause.message : errorText(failure)
+  const words = casperWords(failure)
   return `Casper did not switch to ${label}: ${words.replace(/\.$/, '')}.`
 }
 

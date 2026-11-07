@@ -60,7 +60,7 @@ kind: "package-reference"
 | [`src/connection.ts`](src/connection.ts) | 一个 `casper acp` 进程：查找、启动、ACP 客户端、`session/new` 或 `session/load`、提示、取消与释放 |
 | [`src/turn.ts`](src/turn.ts) | 把 Casper 的更新写成步骤、助手消息、工具调用、结果与待办列表 |
 | [`src/views.ts`](src/views.ts) | 把 Casper 的工具步骤记录为做同样事情的 Standard 工具：名称、参数、结果文本与 meta |
-| [`src/permission.ts`](src/permission.ts) | 把审批框变成用户问题，并把答案映射回去 |
+| [`src/permission.ts`](src/permission.ts) | 把审批框变成用户问题，并把答案映射回去；计划 Build 框变成计划审阅 |
 | [`src/elicitation.ts`](src/elicitation.ts) | 把 Casper 的表单（`elicitation/create`）变成用户问题，并把答案映射回去 |
 | [`src/sidecar.ts`](src/sidecar.ts) | Host 存储域 `casper_agent`，把每个会话映射到其 Casper 对话 |
 | [`src/commands.ts`](src/commands.ts) | 供 `/` 菜单使用的 Casper 命令，以及保存最后一份列表的 Host 存储域 `casper_agent_commands` |
@@ -116,6 +116,8 @@ Casper 在 `_meta.casper.tool` 中给每个步骤命名，其 `rawInput` 是模�
 
 客户端的 `initialize` 提供 `clientCapabilities.elicitation.form`，因此 Casper 会把 AI 的问题以及它自己需要输入文字或多选的问题作为表单发来，而不是跳过。符合 Casper 形状的 `elicitation/create`（表单模式，一个 `answer` 字段，为带标题的单选、带标题的多选或一行输入文字，以及一个可选的 `other` 字段用于输入文字）变成一个 id 为 `casper-question` 的问题；AI 的问题标题为 `The AI asks`，其余为 `Casper asks`。选中的标签按选择顺序以其值发回，输入的文字以 `other` 发回，一行输入的问题则作为 `answer` 发回。在没有 `other` 的表单上输入文字，以及其他任何形状的表单，都回答 decline；没有回答、问题失败或被中止、提示之外的表单，以及没有问题服务时，都回答 cancel，Casper 视为跳过。表单所属的步骤记录为 `ask_user_question`：即 ask 工具自己的步骤，或 Casper 为自己的问题打开的待处理 `casper-question-N` 步骤。在应用中记录的答案会在 Casper 完成该步骤时成为其结果 `{answers}`，因此 Standard 的问题卡片会显示答案。当 Casper 关闭该步骤或撤回请求，或提示结束时，问题随之关闭。
 
+Casper 的计划 Build 框带有 `_meta.casper.plan`，其中是 Build 与 Change the plan 两个标签，计划本身是以 `# ` 标题开头的 Markdown。它会变成计划审阅：一个标题为 `Plan review` 的问题，以计划为 detail，只提供这两个选项，并带有 `plan-review` 意图与该框步骤的调用 id，因此应用会显示其计划卡片。该步骤记录为 `exit_plan_mode`，参数为 `{plan}`，因此计划卡片与 Plan 标签页可以打开该计划。Build 选择 Build。为了说明要改什么而关闭卡片（Discuss，`ASK_CANCELLED`）会选择 Change the plan，随后 Casper 以表单询问要改什么。超时、中止以及没有问题服务时，都回答 `cancelled`，Casper 视为 Stop。没有这些标签的框，或其标签与任何选项都不对应的框，按普通审批框询问。
+
 <a id="access-control"></a>
 ### 访问权限
 
@@ -130,6 +132,8 @@ Casper 在 `_meta.casper.tool` 中给每个步骤命名，其 `rawInput` 是模�
 Casper 通过 `available_commands_update` 发送它的斜杠命令（包括用户自己的 `~/.casper/commands`），在打开对话之后立即发送，列表变化时再次发送；`session/load` 回放期间也会保留该列表。挂载了 `commands` 注册表时，每条命令只为本 Agent 注册，带有 Casper 的描述、输入提示与定义 id `@deepseek-ai/dsh-casper-agent/<name>`，因此它出现在该会话的 `/` 菜单中，而不出现在其他会话的菜单中。之后的列表替换之前的列表，未变化的列表不注册任何内容。注册表会拒绝的名称、输入框自己的 `model` 与 `file`、没有描述的命令，以及已经解析为其他命令的名称（例如应用的 `/permission`、`/export` 或 `/feedback`）都不会提供；该名称仍归应用的命令。
 
 该身份告诉客户端把这一行当作提示处理（[ui-commands](../../client/ui-commands/README.zh.md)）：选择命令会插入 `/name`，命令接受输入时带一个尾随空格；按 Enter 会把输入的这一行连同附件作为普通提示发送，由 Casper 作为它自己的命令运行。改为执行命令的界面会把同一行排入下一条提示。最后一份列表保存在 Host 存储域 `casper_agent_commands`（一条全局记录）中，每个新 Agent 在自己的 Casper 启动之前就提供它。Agent 只在发布之后才注册命令：每次注册都会让所有客户端重新拉取其 Session 的菜单，而重新拉取会恢复未运行的 Session，因此创建失败的 Agent 不注册任何命令。
+
+Casper 的 `plan` 选项（Plan first：每个请求都先得到一份计划）由输入框的计划标签显示。插件只注册 plan-mode 的 `plan` 投影，从不应用其控制器；每当该选项变化以及每轮结束时，都把 Casper 的值记录为 `plan/mode`，因此作为提示发送的 `/plan`（无论是否带文字）会让标签停在 Casper 留下的状态。当提供该选项的 Casper 正在运行时，`/plan on` 与 `/plan off`（包括标签的退出操作）通过 `session/set_config_option` 设置该选项，不发送提示；否则这一行作为提示发给 Casper。会话进入过 Plan first 之后，重新启动的 Casper 会在第一个提示之前得到会话最后的值；拒绝的 Casper 保留自己的值。不提供该选项的 Casper 从不改变标签。
 
 <a id="model-picker"></a>
 ### 模型选择器

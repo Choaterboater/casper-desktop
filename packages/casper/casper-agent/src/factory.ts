@@ -20,6 +20,7 @@ import type {
 import { appendPluginRecord, interruptedTurnClosers, SessionLogOffset, SessionPreparation } from '@deepseek-ai/dsh-session'
 import type { Session } from '@deepseek-ai/dsh-session'
 import type { SessionHandle } from '@deepseek-ai/dsh-session-persistence'
+import type { PlanUnitState } from '@deepseek-ai/dsh-plan-mode'
 import type { ProjectionHandle } from '@deepseek-ai/dsh-session-projection'
 import { CasperAgent } from './agent.ts'
 import type { CasperCommandCache } from './commands.ts'
@@ -37,6 +38,8 @@ export interface CasperFactoryDependencies {
   readonly agentModels: ProjectionHandle<AgentModelsState>
   /** The registered `inbox` projection, shared with agent-loop. */
   readonly inbox: ProjectionHandle<InboxState>
+  /** The registered `plan` projection, shared with plan-mode; the composer's plan chip reads it. */
+  readonly plan: ProjectionHandle<PlanUnitState>
   /** The Session-to-conversation records. */
   readonly sidecar: CasperSidecar
   /** The last command list Casper sent. */
@@ -212,7 +215,11 @@ export class CasperAgentFactory implements AgentFactory {
     }
     const agent = new CasperAgent(
       this.ctx, id, init.agentOptions, session,
-      { agentModels: this.deps.agentModels.readerFor(session), inbox: this.deps.inbox.readerFor(session) },
+      {
+        agentModels: this.deps.agentModels.readerFor(session),
+        inbox: this.deps.inbox.readerFor(session),
+        plan: this.deps.plan.readerFor(session),
+      },
       this.ctx.agents.turnBoundaryOf(session).lastTurn,
       this.config,
       this.deps.sidecar,

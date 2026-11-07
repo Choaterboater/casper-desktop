@@ -4,6 +4,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { AGENT_MODELS_RECORD, agentModelsProjectionDefinition } from '@deepseek-ai/dsh-agent'
 import type { Agent, AgentModelsReport } from '@deepseek-ai/dsh-agent'
 import { inboxProjectionDefinition } from '@deepseek-ai/dsh-agent-loop'
+import { planProjectionDefinition } from '@deepseek-ai/dsh-plan-mode'
 import { KNOWN_SESSION_EVENT_TYPES, pluginRecordOf, Session, SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
@@ -255,6 +256,7 @@ describe('CasperAgentFactory', { timeout: 60_000 }, () => {
     const factory = new CasperAgentFactory(host.ctx, fake.config(), {
       agentModels: await host.ctx.sessionProjections.register(agentModelsProjectionDefinition),
       inbox: await host.ctx.sessionProjections.register(inboxProjectionDefinition),
+      plan: await host.ctx.sessionProjections.register(planProjectionDefinition),
       sidecar: new CasperSidecar(domain as never),
       commands: new CasperCommandCache(host.ctx.storageDomain.get('casper_agent_commands') as never),
       models: new CasperModelsCache(host.ctx.storageDomain.get('casper_agent_models') as never),

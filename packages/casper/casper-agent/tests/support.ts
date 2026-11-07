@@ -221,6 +221,25 @@ export function casperOptions(model = 'openai-codex/gpt-6.1-sol', effort = 'auto
 }
 
 /**
+ * Casper's Plan first option in the shape `casper acp` sends it: no category,
+ * just before the access option, which stays last.
+ * @param current - `on` or `off`.
+ * @param options - the list to put it in.
+ * @returns the list with the option before `mode`.
+ */
+export function withPlan(current: 'on' | 'off' = 'off', options: SessionConfigOption[] = casperOptions()): SessionConfigOption[] {
+  const plan: SessionConfigOption = {
+    id: 'plan', name: 'Plan first', type: 'select', currentValue: current,
+    options: [
+      { value: 'off', name: 'Off' },
+      { value: 'on', name: 'Plan first', description: 'every request gets a plan first; nothing is built until you choose Build' },
+    ],
+  }
+  const at = options.findIndex(option => option.category === 'mode')
+  return at === -1 ? [...options, plan] : [...options.slice(0, at), plan, ...options.slice(at)]
+}
+
+/**
  * Casper's mode state in the shape `casper acp` sends it next to its options.
  * @param current - the current mode.
  * @returns the mode state.

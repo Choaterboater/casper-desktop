@@ -10,7 +10,7 @@ import type { AppToolsServer } from '../src/app-tools.ts'
 import { CasperConnection, CasperError, casperArgv, casperEnv, profileEnv } from '../src/connection.ts'
 import type { CasperConnectionHandlers, CasperConnectionOptions } from '../src/connection.ts'
 import type { Config } from '../src/config.ts'
-import { alive, casperModes, casperOptions, fakeCasper, gate, optionsWithoutMode, waitFor } from './support.ts'
+import { alive, casperModes, casperOptions, fakeCasper, gate, optionsWithoutMode, waitFor, withPlan } from './support.ts'
 import type { FakeScript } from './support.ts'
 
 const cleanups: (() => Promise<void> | void)[] = []
@@ -28,6 +28,7 @@ async function setup(script: FakeScript = { prompts: [] }) {
   const commands: AvailableCommand[][] = []
   const configs: SessionConfigOption[][] = []
   const modes: string[] = []
+  const plans: boolean[] = []
   const forms: { params: CreateElicitationRequest; signal: AbortSignal }[] = []
   const form = { reply: (_params: CreateElicitationRequest, _signal: AbortSignal): Promise<CreateElicitationResponse> => Promise.resolve({ action: 'cancel' }) }
   const handlers: CasperConnectionHandlers = {
@@ -35,6 +36,7 @@ async function setup(script: FakeScript = { prompts: [] }) {
     commands: (list) => { commands.push([...list]) },
     config: (options) => { configs.push([...options]) },
     mode: (modeId) => { modes.push(modeId) },
+    plan: (active) => { plans.push(active) },
     permission: () => Promise.resolve({ outcome: { outcome: 'cancelled' } }),
     elicitation: (params, signal) => {
       forms.push({ params, signal })
@@ -52,7 +54,7 @@ async function setup(script: FakeScript = { prompts: [] }) {
     cleanups.push(() => started.connection.dispose())
     return started
   }
-  return { fake, ctx, updates, commands, configs, modes, forms, form, handlers, start }
+  return { fake, ctx, updates, commands, configs, modes, plans, forms, form, handlers, start }
 }
 
 /** A stand-in app tools server with a fresh token that records whether it was closed. */
@@ -234,6 +236,39 @@ describe('CasperConnection', { timeout: 30_000 }, () => {
     const busy = await connection.setConfigOption('effort', 'high').catch((error: unknown) => error)
     expect(busy).toMatchObject({ code: 'CASPER_RPC_-32603', message: 'Casper failed: Casper is working on a prompt; change the model or effort when it ends' })
     expect(connection.configOptions).toEqual(after)
+  })
+
+  it('keeps Casper\'s Plan first option and hands each change to its handler, a set\'s reply included', async () => {
+    const later = withPlan('on').map(option => option.id === 'plan' ? { ...option, currentValue: 'later' } : option)
+    const { start, plans } = await setup({
+      prompts: [
+        [{ configUpdate: withPlan('on') }, { configUpdate: withPlan('on') }, { text: 'planned\n' }],
+        // A value other than on or off, or no option at all, is no Plan first option.
+        [{ configUpdate: later }, { configUpdate: casperOptions() }, { text: 'gone\n' }],
+      ],
+      configOptions: withPlan('off'),
+    })
+    const { connection } = await start()
+    expect(connection.planMode).toBe(false)
+    expect(plans).toEqual([])
+    await connection.prompt([{ type: 'text', text: '/plan on' }])
+    // An unchanged list says nothing.
+    expect(plans).toEqual([true])
+    expect(connection.planMode).toBe(true)
+    await connection.setConfigOption('plan', 'off')
+    expect(plans).toEqual([true, false])
+    expect(connection.planMode).toBe(false)
+    await connection.setConfigOption('model', 'claude-subscription/claude-opus-5-5')
+    expect(plans).toEqual([true, false])
+    await connection.prompt([{ type: 'text', text: 'next' }])
+    expect(connection.planMode).toBeUndefined()
+    expect(plans).toEqual([true, false])
+
+    const older = await setup({ prompts: [], configOptions: casperOptions() })
+    const second = await older.start()
+    expect(second.connection.planMode).toBeUndefined()
+    await second.connection.setConfigOption('effort', 'high')
+    expect(older.plans).toEqual([])
   })
 
   it('keeps Casper\'s access mode, and hands a mode Casper changes itself to its handler once, during a replay too', async () => {

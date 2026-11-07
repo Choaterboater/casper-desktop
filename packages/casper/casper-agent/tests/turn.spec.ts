@@ -196,6 +196,43 @@ describe('TurnWriter', () => {
     expect(ofType(events(), 'tool/result')[0]?.data).toMatchObject({ message: { isError: false, content: [{ type: 'text', text: '→ No' }] } })
   })
 
+  it('the plan box is recorded as exit_plan_mode arguments submittedPlan parses', () => {
+    const { open, events } = setup()
+    const writer = open(1)
+    const plan = '# Add a cache\n\n## Steps\n\n1. Cache the reads.\n'
+    const box = (id: string, text: string) => ({
+      toolCallId: id, title: 'Build this plan?', kind: 'other' as const, status: 'pending' as const,
+      content: [{ type: 'content' as const, content: { type: 'text' as const, text } }],
+      _meta: { casper: { plan: { approve: 'Build', change: 'Change the plan' } } },
+    })
+    writer.toolCall(box('casper-approval-1', plan))
+    writer.question(box('casper-approval-1', plan))
+    writer.toolUpdate({ toolCallId: 'casper-approval-1', status: 'failed', content: [{ type: 'content', content: { type: 'text', text: '→ Change the plan' } }] })
+    // A box seen first in its request is the same; one without a titled plan stays an approval.
+    writer.question(box('casper-approval-2', plan))
+    writer.toolUpdate({ toolCallId: 'casper-approval-2', status: 'completed', content: [{ type: 'content', content: { type: 'text', text: '→ Build' } }] })
+    writer.toolCall(box('casper-approval-3', 'Add a cache'))
+    writer.question(box('casper-approval-3', 'Add a cache'))
+    writer.toolUpdate({ toolCallId: 'casper-approval-3', status: 'failed' })
+    writer.plan([{ content: 'Cache the reads', status: 'in_progress', priority: 'medium' }])
+    writer.close(false)
+    const calls = ofType(events(), 'tool/call').map(event => event.data)
+    expect(calls.map(call => call.name)).toEqual(['exit_plan_mode', 'exit_plan_mode', 'casper_approval'])
+    // ui-plan's submittedPlan reads a tool/call named exit_plan_mode whose JSON arguments hold a `# ` titled `plan`.
+    for (const call of calls.slice(0, 2)) {
+      const args = parsed(call.arguments) as { plan?: unknown }
+      expect(args).toEqual({ plan })
+      expect(/^#\s+(\S[^\r\n]*)/.exec(String(args.plan).trim())?.[1]).toBe('Add a cache')
+    }
+    expect(ofType(events(), 'tool/result').map(event => [event.data.message.isError, event.data.message.content])).toEqual([
+      [false, [{ type: 'text', text: '→ Change the plan' }]],
+      [false, [{ type: 'text', text: '→ Build' }]],
+      [false, [{ type: 'text', text: '' }]],
+    ])
+    // Plan steps stay the todo list.
+    expect(ofType(events(), 'todo/write').map(event => event.data)).toEqual([{ todos: [{ content: 'Cache the reads', status: 'in_progress' }] }])
+  })
+
   it('opens an approval call when the permission request names a step not seen before', () => {
     const { open, events } = setup()
     const writer = open(1)

@@ -8,13 +8,15 @@ import type { PlanEntry, ToolCall, ToolCallUpdate } from '@agentclientprotocol/s
 import type { AssistantStreamFrame } from '@deepseek-ai/dsh-agent'
 import { AssistantStreamAttempt } from '@deepseek-ai/dsh-agent-loop'
 import { createAssistantMessage, createToolResultMessage } from '@deepseek-ai/dsh-llm'
+// Standard's plan review tool: a Build box recorded under its name gets the app's plan card and Plan tab.
+import { EXIT_PLAN_MODE } from '@deepseek-ai/dsh-plan-mode'
 import type { ContentBlock, ToolCallId } from '@deepseek-ai/dsh-llm'
 import { TOOL_OUTCOME_UNKNOWN } from '@deepseek-ai/dsh-session'
 import type { Session, SessionSeq } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-tool-todo'
 import type { AskUserQuestionAnswer } from '@deepseek-ai/dsh-user-questions'
 import type { BridgedCall } from './app-tools.ts'
-import { toolCallText } from './permission.ts'
+import { reviewedPlan, toolCallText } from './permission.ts'
 import { ASK_USER_QUESTION, askArguments, questionStep, standardCall, standardResult } from './views.ts'
 import type { CasperQuestion, Json, StandardView } from './views.ts'
 
@@ -125,8 +127,9 @@ export class TurnWriter {
    * tool it maps to ({@link standardCall}); a call that arrives already
    * completed or failed (a Casper check) is `casper_check` and closed at once,
    * a pending one carrying `_meta.casper.question` (Casper's own question
-   * step) is `ask_user_question`, and any other pending one (an approval box)
-   * is `casper_approval`.
+   * step) is `ask_user_question`, a pending plan Build box (`_meta.casper.plan`
+   * with a `# ` titled plan) is `exit_plan_mode` with `{plan}`, and any other
+   * pending one (an approval box) is `casper_approval`.
    * @param call - the ACP tool call.
    */
   toolCall(call: ToolCall): void {
@@ -141,7 +144,8 @@ export class TurnWriter {
       this.startCall(call.toolCallId, view.name, view.arguments, view)
       return
     }
-    this.startCall(call.toolCallId, terminal ? 'casper_check' : 'casper_approval', callArguments(call.title, call.content), undefined)
+    if (terminal) this.startCall(call.toolCallId, 'casper_check', callArguments(call.title, call.content), undefined)
+    else this.startBox(call)
     if (terminal) {
       const output = call.rawOutput === undefined ? '' : `\n${JSON.stringify(call.rawOutput)}`
       const failed = call.status === 'failed'
@@ -170,7 +174,8 @@ export class TurnWriter {
    * question so a No or a skip closes it without an error.
    * @param call - the tool call carried by `session/request_permission`, or the step a form names.
    * @param asked - the form's question; a step not seen before is then
-   *   recorded as `ask_user_question` instead of `casper_approval`.
+   *   recorded as `ask_user_question` instead of `casper_approval` (or
+   *   `exit_plan_mode` for a plan Build box).
    */
   question(call: ToolCallUpdate, asked?: CasperQuestion): void {
     const open = this.openCalls.get(call.toolCallId)
@@ -178,7 +183,7 @@ export class TurnWriter {
       open.question = true
       return
     }
-    if (asked === undefined) this.startCall(call.toolCallId, 'casper_approval', callArguments(call.title ?? '', call.content), undefined)
+    if (asked === undefined) this.startBox(call)
     else this.startCall(call.toolCallId, ASK_USER_QUESTION, JSON.stringify(askArguments(asked)), undefined)
     const started = this.openCalls.get(call.toolCallId)
     if (started !== undefined) started.question = true
@@ -303,6 +308,13 @@ export class TurnWriter {
     this.committed = false
     this.openText = undefined
     this.blockIndex = 0
+  }
+
+  /** Open a box's call: a plan Build box as `exit_plan_mode`, any other as `casper_approval`. */
+  private startBox(call: ToolCallUpdate): void {
+    const plan = reviewedPlan(call)
+    if (plan !== undefined) this.startCall(call.toolCallId, EXIT_PLAN_MODE, JSON.stringify({ plan }), undefined)
+    else this.startCall(call.toolCallId, 'casper_approval', callArguments(call.title ?? '', call.content), undefined)
   }
 
   private startCall(acpId: string, name: string, args: string, view: StandardView | undefined): void {

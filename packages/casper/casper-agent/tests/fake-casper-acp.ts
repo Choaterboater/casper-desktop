@@ -63,6 +63,15 @@
  * `replay` lists
  * user chunks sent during a successful `session/load`.
  *
+ * `{ planBox: markdown, during? }` raises Casper's plan Build box as C8 sends
+ * it: a pending `casper-approval-N` step titled `Build this plan?` whose text
+ * content is the review Markdown, `_meta.casper.plan: {approve: 'Build',
+ * change: 'Change the plan'}` on the step and on the request, and the options
+ * Stop (reject_once), Build (allow_once) and Change the plan (reject_once) with
+ * their descriptions in `_meta.casper.description`. The answer is logged and
+ * the step closes like any box: completed for Build, failed with the picked
+ * name otherwise.
+ *
  * `{ elicit: { question, options?, multi?, typed?, from?, hint?, onStep?,
  * timeoutMs?, schema? }, during? }` asks a question as Casper's AcpAsker does
  * when the client offered `clientCapabilities.elicitation.form`. With
@@ -122,6 +131,7 @@ interface Step {
   permission?: string
   options?: string[]
   preview?: string
+  planBox?: string
   receipt?: string
   stop?: StopReason
   hang?: boolean
@@ -367,6 +377,7 @@ async function run(step: Step, params: PromptRequest, client: AgentContext, outc
         content: [{ type: 'content', content: { type: 'text', text: `→ ${picked?.name ?? 'No (no answer)'}` } }],
       })
     }
+    if (step.planBox !== undefined) await planBox(step.planBox, step.during ?? [], params, client, outcome)
     if (step.elicit !== undefined) await elicit(step.elicit, step.during ?? [], params, client, outcome)
     if (step.mcp !== undefined) await callMcp(step.mcp, step.args ?? {})
     if (step.waitFile !== undefined) await until(step.waitFile)
@@ -381,6 +392,45 @@ async function run(step: Step, params: PromptRequest, client: AgentContext, outc
       outcome.receipt = 'cancelled'
     }
   }
+}
+
+/** Casper's plan choices (safe-choices.ts PLAN_CHOICES) and the kinds C8 gives them. */
+const PLAN_CHOICES = [
+  { name: 'Stop', description: 'nothing is built', kind: 'reject_once' },
+  { name: 'Build', description: 'the model builds these steps and tests these cases', kind: 'allow_once' },
+  { name: 'Change the plan', description: 'tell the model what to change, then choose again', kind: 'reject_once' },
+] as const
+
+/** Raise the plan Build box as C8's AcpAsker does for a question with `review`. */
+async function planBox(markdown: string, during: Step[], params: PromptRequest, client: AgentContext, outcome: Outcome): Promise<void> {
+  const toolCallId = `casper-approval-${++boxes}`
+  const toolCall = {
+    toolCallId, title: 'Build this plan?', kind: 'other' as const, status: 'pending' as const,
+    content: [{ type: 'content' as const, content: { type: 'text' as const, text: markdown } }],
+    _meta: { casper: { plan: { approve: 'Build', change: 'Change the plan' } } },
+  }
+  await update(client, { sessionUpdate: 'tool_call', ...toolCall })
+  const options = PLAN_CHOICES.map((choice, at) => ({
+    optionId: String(at + 1), name: choice.name, kind: choice.kind, _meta: { casper: { description: choice.description } },
+  }))
+  let picked: (typeof options)[number] | undefined
+  try {
+    const request = { sessionId: params.sessionId, toolCall, options }
+    const asked = client.request<RequestPermissionResponse>(methods.client.session.requestPermission, request)
+    for (const meanwhile of during) await run(meanwhile, params, client, outcome)
+    const result = await asked
+    picked = result.outcome.outcome === 'selected'
+      ? options.find(option => result.outcome.outcome === 'selected' && option.optionId === result.outcome.optionId)
+      : undefined
+    log({ event: 'answer', outcome: result.outcome })
+  } catch (error: unknown) {
+    log({ event: 'answer', error: String(error) })
+  }
+  const yes = picked !== undefined && picked.kind !== 'reject_once'
+  await update(client, {
+    sessionUpdate: 'tool_call_update', toolCallId, status: yes ? 'completed' : 'failed',
+    content: [{ type: 'content', content: { type: 'text', text: `→ ${picked?.name ?? 'No (no answer)'}` } }],
+  })
 }
 
 /** The form Casper sends for one question (C7's questionSchema, without the hiding). */

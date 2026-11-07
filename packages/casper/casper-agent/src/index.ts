@@ -9,6 +9,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { agentModelsProjectionDefinition, modelSelectionProjectionDefinition } from '@deepseek-ai/dsh-agent'
 import { inboxProjectionDefinition } from '@deepseek-ai/dsh-agent-loop'
+import { planProjectionDefinition } from '@deepseek-ai/dsh-plan-mode'
 import type {} from '@deepseek-ai/dsh-session-persistence'
 import type {} from '@deepseek-ai/dsh-storage-domain'
 import type {} from '@deepseek-ai/dsh-subprocess'
@@ -61,10 +62,12 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   await ctx.sessionProjections.register(modelSelectionProjectionDefinition)
   const agentModels = await ctx.sessionProjections.register(agentModelsProjectionDefinition)
   const inbox = await ctx.sessionProjections.register(inboxProjectionDefinition)
+  // Only plan-mode's projection: the composer's plan chip shows Casper's Plan first option. Its controller is never applied.
+  const plan = await ctx.sessionProjections.register(planProjectionDefinition)
   const sidecar = await openSidecar(ctx.storageDomain)
   const commands = await openCommandCache(ctx.storageDomain)
   const models = await openModelsCache(ctx.storageDomain)
-  const factory = new CasperAgentFactory(ctx, config, { agentModels, inbox, sidecar, commands, models })
+  const factory = new CasperAgentFactory(ctx, config, { agentModels, inbox, plan, sidecar, commands, models })
   ctx.effect(() => async () => {
     await factory.dispose()
     await sidecar.close()

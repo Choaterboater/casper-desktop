@@ -16,6 +16,7 @@
     { "path": "../../attachment/attachment" },
     { "path": "../../interaction/commands" },
     { "path": "../../interaction/permission-presets" },
+    { "path": "../../plan/plan-mode" },
     { "path": "../../sandbox/sandbox-policy" },
     { "path": "../../core/scope" },
     { "path": "../../core/session" },
