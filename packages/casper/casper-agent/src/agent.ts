@@ -70,6 +70,7 @@ import { answerPermission } from './permission.ts'
 import { hasPromptContent, promptContent } from './prompt.ts'
 import { casperReceiptOf, usageModelOf, usageOf } from './receipt.ts'
 import { hasSessionReference, prepareReferences } from './references.ts'
+import type { PreparedReference, PreparedReferences } from './references.ts'
 import type { CasperSidecar } from './sidecar.ts'
 import { CASPER_PROVIDER, TurnWriter } from './turn.ts'
 
@@ -123,6 +124,14 @@ interface AccessSync {
   readonly wanted: AccessModeId
   /** Why Casper is not in that mode, when it is not. */
   readonly failure?: unknown
+}
+
+/** A queued line whose mentions were read, as it was when read. */
+interface ReadLine {
+  /** The line; a line edited since is a new object, and is read again. */
+  readonly message: UserMessage
+  /** Its prepared mentions; undefined when it names no Session. */
+  readonly reference: PreparedReference | undefined
 }
 
 type Phase =
@@ -196,6 +205,8 @@ export class CasperAgent implements Agent {
   private readonly planRestored = new WeakSet<CasperConnection>()
   /** Ids of the pending lines queued by {@link steer}; only these go to Casper during a prompt. */
   private readonly steerIds = new Set<MessageId>()
+  /** Set while a turn reads the Sessions its queued lines mention; {@link cancel} claims the lines first. */
+  private claimEarly: (() => void) | undefined
   /** Fires the idle check once the Agent has sat idle for `idleExitMs` with a live Casper. */
   private idleTimer: ReturnType<typeof setTimeout> | undefined
   /** Stops the idle check in flight when the Agent closes. */
@@ -386,6 +397,7 @@ export class CasperAgent implements Agent {
    */
   cancel(cause: AgentCancelCause, options: CancelOptions = {}): void {
     const active = this.active
+    this.claimEarly?.()
     if (options.keepInbox !== true) {
       this.inbox.clear()
       if (active !== undefined) active.wakeRequested = false
@@ -501,13 +513,40 @@ export class CasperAgent implements Agent {
   }
 
   private async runTurn(turn: number, signal: AbortSignal, onStep: (step: number) => void): Promise<TurnEndReason> {
-    const claimed = this.inbox.claim('next-turn', turn)
-    // A claimed line is this turn's prompt, never steering.
-    for (const message of claimed) this.steerIds.delete(message.id)
-    if (claimed.length === 0) return { kind: 'completed' }
-    this.session.append('step/start', { turn, step: 1 })
-    onStep(1)
-    for (const message of claimed) this.session.append('user/message', message, { surfaceOp: 'append' })
+    // Mentioned Sessions are read before Casper starts, so a mention that can't be sent ends the turn without one.
+    // The lines stay queued during the read, so a crash then keeps them; a line edited meanwhile is read again.
+    const resolver = this.pluginCtx.get('sessionReferenceResolver')
+    const read = new Map<MessageId, ReadLine>()
+    let readFailure: { readonly error: unknown } | undefined
+    let early: UserMessage[] | undefined
+    // A Stop during the read claims the lines first, so the turn it ends keeps them.
+    this.claimEarly = () => {
+      this.claimEarly = undefined
+      early = this.claimTurn(turn, undefined, onStep)
+    }
+    try {
+      for (;;) {
+        const fresh = this.nextTurnLines().filter(message => read.get(message.id)?.message !== message)
+        if (resolver === undefined || !fresh.some(hasSessionReference)) break
+        const prepared = await prepareReferences(this, resolver, fresh, this.modelLabel(), signal)
+        for (const message of fresh) read.set(message.id, { message, reference: prepared.get(message.id) })
+      }
+    } catch (error: unknown) {
+      readFailure = { error }
+    } finally {
+      this.claimEarly = undefined
+    }
+    // Claimed in the same tick as the last check, so every claimed mention has been read.
+    const claimed = early ?? this.claimTurn(turn, readFailure === undefined ? read : undefined, onStep)
+    if (claimed.length === 0) {
+      /* v8 ignore next -- a failed read's lines leave the queue only by hand meanwhile */
+      if (readFailure !== undefined) throw readFailure.error
+      return { kind: 'completed' }
+    }
+    const references: PreparedReferences = new Map(claimed.flatMap((message) => {
+      const line = read.get(message.id)
+      return line?.message === message && line.reference !== undefined ? [[message.id, line.reference] as const] : []
+    }))
     let connection: CasperConnection | undefined
     const label = (): string => this.modelLabel()
     const writer: TurnWriter = new TurnWriter({
@@ -524,13 +563,10 @@ export class CasperAgent implements Agent {
     let interrupted = true
     let sink: PromptSink | undefined
     try {
+      if (readFailure !== undefined) throw readFailure.error
       if (!hasPromptContent(claimed)) throw new CasperError('CASPER_EMPTY_PROMPT', 'The request is empty, so nothing was sent to Casper.')
       // The prompt and its turn are durable before Casper can change files.
       await this.flush(true)
-      signal.throwIfAborted()
-      // Mentioned Sessions are read before Casper starts, so a mention that can't be sent ends the turn without one.
-      const resolver = this.pluginCtx.get('sessionReferenceResolver')
-      const references = resolver === undefined ? undefined : await prepareReferences(this, resolver, claimed, this.modelLabel(), signal)
       signal.throwIfAborted()
       // Between turns, never during a prompt: changed Settings servers reopen Casper through session/load.
       await this.refreshServers(signal)
@@ -599,6 +635,35 @@ export class CasperAgent implements Agent {
       onStep(writer.step)
       writer.close(interrupted)
     }
+  }
+
+  /** The lines the next turn claims: the queued steering, then the first queued prompt. */
+  private nextTurnLines(): UserMessage[] {
+    return [...this.inbox.nextStep, ...this.inbox.nextTurn.slice(0, 1)]
+  }
+
+  /**
+   * Claim the turn's lines and log them in the same tick, so no claimed line is
+   * missing from the log. Each snapshot is logged right after the message that
+   * mentions it, in the prompt's order, as a Standard Session logs it.
+   * @param turn - the turn that claims the lines.
+   * @param read - the lines whose mentions were read; undefined logs no snapshot.
+   * @param onStep - told the step the lines open.
+   * @returns the claimed lines.
+   */
+  private claimTurn(turn: number, read: ReadonlyMap<MessageId, ReadLine> | undefined, onStep: (step: number) => void): UserMessage[] {
+    const claimed = this.inbox.claim('next-turn', turn)
+    // A claimed line is this turn's prompt, never steering.
+    for (const message of claimed) this.steerIds.delete(message.id)
+    if (claimed.length === 0) return claimed
+    this.session.append('step/start', { turn, step: 1 })
+    onStep(1)
+    for (const message of claimed) {
+      this.session.append('user/message', message, { surfaceOp: 'append' })
+      const line = read?.get(message.id)
+      if (line?.message === message && line.reference !== undefined) this.session.append('user/message', line.reference.context, { surfaceOp: 'append' })
+    }
+    return claimed
   }
 
   /** Send the prompt; on abort send `session/cancel` and wait the cancel grace before killing Casper. */

@@ -2201,6 +2201,19 @@ describe('Session mentions in a Casper session', { timeout: 60_000 }, () => {
     expect(logged?.type === 'user/message' && logged.data.content).toEqual([{ type: 'text', text: typed }])
   })
 
+  it('the snapshot Casper reads is logged after the message, as a Standard session logs it', async () => {
+    const { fake, host } = await withReferences({ prompts: [[{ text: 'Keep the path.\n' }], [{ text: 'Done.\n' }]], promptCapabilities: { embeddedContext: true } })
+    await run((await host.create('casper-ref-log-source')).agent, 'what is the cache key?')
+    const { agent } = await host.create('casper-ref-log')
+    await run(agent, `use ${mention('casper-ref-log-source', 'Key chat')}`)
+    const messages = eventsOf(agent).flatMap(event => event.type === 'user/message' ? [event.data] : [])
+    expect(messages.map(message => message.source.kind)).toEqual(['user', 'session-reference'])
+    const context = messages[1]
+    expect(context?.source).toMatchObject({ kind: 'session-reference', form: 'recall', references: [{ sessionId: 'casper-ref-log-source', label: 'Key chat' }] })
+    // What Casper read is what the Session logs.
+    expect(context?.content).toEqual([{ type: 'text', text: resourceOf(prompts(fake)[1] ?? [])?.text }])
+  })
+
   it('an older Casper gets the other session as a text block', async () => {
     const { fake, host } = await withReferences({ prompts: [[{ text: 'Noted.\n' }], [{ text: 'ok\n' }]] })
     await run((await host.create('casper-ref-old-source')).agent, 'the first chat')
@@ -2281,6 +2294,89 @@ describe('Session mentions in a Casper session', { timeout: 60_000 }, () => {
     expect(blocks[0]).toEqual({ type: 'text', text: 'also @Earlier' })
     expect(resourceOf(blocks)?.text).toContain('the earlier chat')
     expect(turnEnds(agent)).toEqual([{ kind: 'completed' }, { kind: 'completed' }])
+  })
+
+  it('a snapshot is logged right after the message that mentions it, also when a line follows it', async () => {
+    const { fake, host } = await withReferences({ prompts: [] })
+    const hold = gate(fake, 'hold')
+    fake.script({ steer: true, promptCapabilities: { embeddedContext: true }, prompts: [[{ text: 'Seen.\n' }], [{ waitFile: hold.path }], []] })
+    await run((await host.create('casper-ref-order-source')).agent, 'the earlier chat')
+    const { agent } = await host.create('casper-ref-order')
+    agent.followup(prompt('first'))
+    await waitFor(() => fake.calls('session/prompt').length === 2)
+    // The line with a mention stays queued, and the line typed after it stays with it: the next turn claims both.
+    agent.steer(prompt(`see ${mention('casper-ref-order-source', 'Earlier')}`))
+    agent.steer(prompt('also fix X'))
+    await new Promise((resolve) => { setTimeout(resolve, 100) })
+    hold.open()
+    await agent.whenIdle()
+    expect(fake.calls('_casper/steer')).toEqual([])
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }, { kind: 'completed' }])
+    const messages = eventsOf(agent).flatMap(event => event.type === 'user/message' ? [event.data] : [])
+    // The log keeps the prompt's order, so the snapshot's chip goes on the message that cited it.
+    expect(messages.map(message => message.source.kind === 'user'
+      ? message.content.flatMap(block => block.type === 'text' ? [block.text] : []).join('')
+      : message.source.kind)).toEqual(['first', `see ${mention('casper-ref-order-source', 'Earlier')}`, 'session-reference', 'also fix X'])
+    expect(messages[2]?.content).toEqual([{ type: 'text', text: resourceOf(prompts(fake)[2] ?? [])?.text }])
+  })
+
+  /** Hold each read of the mentioned Sessions until `release`; a Stop ends a held read. */
+  function holdReads(host: Awaited<ReturnType<typeof withReferences>>['host']) {
+    const resolver = host.ctx.get('sessionReferenceResolver') as SessionReferenceResolver
+    const prepare = resolver.prepare.bind(resolver)
+    const started = Promise.withResolvers<undefined>()
+    const released = Promise.withResolvers<undefined>()
+    const spy = vi.spyOn(resolver, 'prepare').mockImplementation(async (...args) => {
+      started.resolve(undefined)
+      const signal = args[4]
+      await new Promise<void>((resolve, reject) => {
+        void released.promise.then(() => { resolve() })
+        signal?.addEventListener('abort', () => { reject(signal.reason as Error) }, { once: true })
+      })
+      return prepare(...args)
+    })
+    cleanups.push(() => { spy.mockRestore() })
+    return { started: started.promise, release: () => { released.resolve(undefined) } }
+  }
+
+  it('a line stays queued while the sessions it mentions are read, so a crash then keeps it', async () => {
+    const { fake, host } = await withReferences({ prompts: [[{ text: 'Seen.\n' }], [{ text: 'Other.\n' }], [{ text: 'Done.\n' }]], promptCapabilities: { embeddedContext: true } })
+    await run((await host.create('casper-ref-queued-source')).agent, 'the earlier chat')
+    await run((await host.create('casper-ref-queued-other')).agent, 'the other chat')
+    const { agent } = await host.create('casper-ref-queued')
+    const read = holdReads(host)
+    const typed = prompt(`see ${mention('casper-ref-queued-source', 'Earlier')}`)
+    agent.followup(typed)
+    await read.started
+    // The log has the line queued until it is claimed with its user/message.
+    expect(agent.inbox.nextTurn.map(message => message.id)).toEqual([typed.id])
+    expect(eventsOf(agent).some(event => event.type === 'user/message')).toBe(false)
+    // A line edited during the read is read again.
+    const edited = { ...typed, content: [{ type: 'text' as const, text: `see ${mention('casper-ref-queued-other', 'Other')}` }] }
+    expect(agent.inbox.replace(typed.id, edited)).toBe(true)
+    read.release()
+    await agent.whenIdle()
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }])
+    const messages = eventsOf(agent).flatMap(event => event.type === 'user/message' ? [event.data] : [])
+    expect(messages.map(message => message.content)).toEqual([edited.content, [{ type: 'text', text: resourceOf(prompts(fake)[2] ?? [])?.text }]])
+    expect(messages[1]?.source).toMatchObject({ kind: 'session-reference', references: [{ sessionId: 'casper-ref-queued-other' }] })
+    expect(resourceOf(prompts(fake)[2] ?? [])?.text).toContain('the other chat')
+  })
+
+  it('a Stop while the sessions are read keeps the line in the turn it ends', async () => {
+    const { fake, host } = await withReferences({ prompts: [[{ text: 'Seen.\n' }]], promptCapabilities: { embeddedContext: true } })
+    await run((await host.create('casper-ref-stop-source')).agent, 'the earlier chat')
+    const { agent } = await host.create('casper-ref-stop')
+    const read = holdReads(host)
+    const typed = prompt(`see ${mention('casper-ref-stop-source', 'Earlier')}`)
+    agent.followup(typed)
+    await read.started
+    agent.cancel({ kind: 'user' })
+    await agent.whenIdle()
+    expect(turnEnds(agent)).toEqual([{ kind: 'aborted', reason: { kind: 'user' } }])
+    expect(eventsOf(agent).flatMap(event => event.type === 'user/message' ? [event.data.content] : [])).toEqual([typed.content])
+    expect([...agent.inbox.nextTurn, ...agent.inbox.nextStep]).toEqual([])
+    expect(fake.calls('session/prompt')).toHaveLength(1)
   })
 })
 

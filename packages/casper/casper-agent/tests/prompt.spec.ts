@@ -108,7 +108,7 @@ describe('promptContent with session mentions', () => {
     ({ attachments: undefined, images: false, signal: live, references, embedded })
   /** The resolver's result for `mentioned`: its readable words and the snapshot text. */
   const prepared = (text = '## Referenced sessions\n\nthe other chat'): ReadonlyMap<UserMessage['id'], PreparedReference> =>
-    new Map([[mentioned.id, { content: [{ type: 'text', text: 'see @Other and fix it' }], sessionId: OTHER, text }]])
+    new Map([[mentioned.id, { content: [{ type: 'text', text: 'see @Other and fix it' }], sessionId: OTHER, text, context: user([{ type: 'text', text }]) }]])
 
   it('a mention gives its text and a session resource', async () => {
     const content = await promptContent([mentioned, plain], withRefs(prepared()))

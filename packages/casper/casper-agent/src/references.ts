@@ -22,6 +22,8 @@ export interface PreparedReference {
   readonly sessionId: SessionId
   /** The service's untrusted snapshot of every Session the message names. */
   readonly text: string
+  /** The snapshot as the service's context message; the Session logs it right after the message that mentions it. */
+  readonly context: UserMessage
 }
 
 /** The mentioned messages of one turn, by message id. */
@@ -54,7 +56,8 @@ export function hasSessionReference(message: UserMessage): boolean {
 /**
  * Read the Sessions each claimed user message names. Messages without a
  * mention are left out of the result, and the claimed messages are not changed,
- * so the Session log keeps what the user typed.
+ * so the Session log keeps what the user typed; each snapshot comes with the
+ * context message a Standard Session logs for it.
  * @param agent - the Casper Agent; a mention of its own Session is refused.
  * @param resolver - the app's session-reference service.
  * @param messages - the turn's claimed messages.
@@ -85,8 +88,11 @@ export async function prepareReferences(
       if (first === undefined) continue
       const resolved = await resolver.prepare(agent, content, references, { provider: CASPER_PROVIDER, model }, signal)
       signal.throwIfAborted()
-      const text = (resolved.additionalContext?.content ?? []).flatMap(block => block.type === 'text' ? [block.text] : []).join('\n\n')
-      prepared.set(message.id, { content: resolved.content, sessionId: first.sessionId, text })
+      const context = resolved.additionalContext
+      /* v8 ignore if -- a parsed mention always leaves one normalized reference */
+      if (context === undefined) throw new Error('session-reference preparation omitted context for a mention')
+      const text = context.content.flatMap(block => block.type === 'text' ? [block.text] : []).join('\n\n')
+      prepared.set(message.id, { content: resolved.content, sessionId: first.sessionId, text, context })
     }
   } catch (error: unknown) {
     if (signal.aborted) throw error
