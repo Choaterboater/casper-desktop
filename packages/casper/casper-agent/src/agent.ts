@@ -61,8 +61,9 @@ import { effortState, reportOf, valueOf } from './models.ts'
 import type { CasperModelsCache } from './models-cache.ts'
 import { answerPermission } from './permission.ts'
 import { hasPromptContent, promptContent } from './prompt.ts'
+import { casperReceiptOf, usageModelOf, usageOf } from './receipt.ts'
 import type { CasperSidecar } from './sidecar.ts'
-import { TurnWriter } from './turn.ts'
+import { CASPER_PROVIDER, TurnWriter } from './turn.ts'
 
 /** Text that opens a turn whose earlier Casper conversation could not be reopened. */
 export const FRESH_CONVERSATION_NOTICE = 'Casper could not reopen its earlier conversation, so this turn starts fresh.\n'
@@ -1086,8 +1087,15 @@ export class CasperAgent implements Agent {
     const { update } = notification
     this.record(() => {
       switch (update.sessionUpdate) {
-        case 'agent_message_chunk':
-          if (update.content.type === 'text') sink.writer.text(update.content.text)
+        case 'agent_message_chunk': {
+          // Casper's receipt is a card of its own; a note, the model's words and an older Casper's receipt are text.
+          const receipt = casperReceiptOf(update._meta)
+          if (receipt !== undefined) sink.writer.receipt(receipt)
+          else if (update.content.type === 'text') sink.writer.text(update.content.text)
+          return
+        }
+        case 'usage_update':
+          this.usage(sink, update)
           return
         case 'agent_thought_chunk':
           // Casper's reasoning headlines and retries: shown as the step's reasoning block.
@@ -1117,6 +1125,25 @@ export class CasperAgent implements Agent {
           return
       }
     })
+  }
+
+  /**
+   * Record a response's usage: its window as the Session's `request/context`
+   * when that changed (the context ring's denominator), then its tokens on the
+   * step's message (the ring's numerator and the token count).
+   * @param sink - the prompt the update belongs to.
+   * @param update - Casper's `usage_update`.
+   */
+  private usage(sink: PromptSink, update: Extract<SessionNotification['update'], { sessionUpdate: 'usage_update' }>): void {
+    if (Number.isSafeInteger(update.size) && update.size > 0) {
+      const context = { provider: CASPER_PROVIDER, model: usageModelOf(update) ?? this.modelLabel(), contextWindow: update.size }
+      const known = this.session.requestContext()
+      if (known?.provider !== context.provider || known.model !== context.model || known.contextWindow !== context.contextWindow) {
+        this.session.append('request/context', context)
+      }
+    }
+    const sample = usageOf(update)
+    if (sample !== undefined) sink.writer.usage(sample.tokens, sample.toolUse)
   }
 
   private async permission(connection: CasperConnection | undefined, params: RequestPermissionRequest): Promise<RequestPermissionResponse> {

@@ -1,0 +1,10 @@
+/* Casper's receipt card: the verdict beside the title, and the receipt's facts under it. */
+.summary { margin-left: 8px; overflow: hidden; color: inherit; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.body { display: flex; flex-direction: column; gap: 10px; margin: 8px 0; padding: 12px; border-radius: var(--dsw-radius-lg); background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-secondary); font-size: 12px; }
+.heading { margin-bottom: 4px; color: var(--dsw-alias-label-primary); font-weight: 500; }
+.list { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.note { margin: 0; }
+.name { color: var(--dsw-alias-label-primary); }
+.command { margin-left: 6px; font-family: var(--dsw-font-markdown-code-font-family); overflow-wrap: anywhere; }
+.text { margin: 8px 0; padding: 12px; border-radius: var(--dsw-radius-lg); background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-secondary); white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+.link { align-self: flex-start; border: none; padding: 0; background: transparent; color: var(--dsw-alias-link); font: inherit; text-align: left; cursor: pointer; overflow-wrap: anywhere; }

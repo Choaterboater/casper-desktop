@@ -107,6 +107,22 @@
  * `user_message_chunk` with the steer's words, its `messageId`, and
  * `_meta.casper.steered: true`.
  *
+ * Usage, notes and the receipt as C12 sends them: a `{ usage: { input?,
+ * cacheRead?, cacheWrite?, output?, tokens?, toolUse?, size?, cost?,
+ * costKind?, provider?, model? } }` step sends a `usage_update` whose `used` is
+ * the prompt sum plus output (or `tokens` when input or output is missing),
+ * `size` the window (default 200000), `cost` `{amount, currency: 'USD'}` when
+ * set, and `_meta.casper` `{response: {input, cacheRead, cacheWrite, output,
+ * tokens, toolUse}, model: {provider, model}, cost: costKind}`, missing counts
+ * sent as null (provider and model default to `openai` and `gpt-5`). A
+ * `{ note }` step sends an `agent_message_chunk` with the note as its own
+ * paragraph and `_meta.casper.note: true`. A `{ fullReceipt: fields }` step
+ * makes the last chunk and the reply carry a whole receipt (outcome, verdict,
+ * exitCode, changed, checksRun, checksNotRun, text, json, usage, cost, and
+ * root, which defaults to this process's folder), with `fields` replacing
+ * those; the chunk's text is the receipt's text. Without it the receipt is
+ * the bare `{outcome}` of an older script.
+ *
  * @module @deepseek-ai/dsh-casper-agent/tests/fake-casper-acp
  */
 
@@ -178,6 +194,43 @@ interface Step {
   mode?: string
   elicit?: Elicit
   steerRead?: number
+  usage?: Usage
+  note?: string
+  fullReceipt?: Record<string, unknown>
+}
+
+/** A response's usage as C12's usageUpdate sends it; see the module comment. */
+interface Usage {
+  input?: number | null
+  cacheRead?: number | null
+  cacheWrite?: number | null
+  output?: number | null
+  tokens?: number | null
+  toolUse?: boolean
+  size?: number
+  cost?: number
+  costKind?: 'charged' | 'estimate' | 'subscription' | null
+  provider?: string | null
+  model?: string | null
+}
+
+/** The `usage_update` C12 sends after a main-runtime response. */
+function usageUpdate(usage: Usage): SessionUpdate & Record<string, unknown> {
+  const response = {
+    input: usage.input ?? null, cacheRead: usage.cacheRead ?? null, cacheWrite: usage.cacheWrite ?? null, output: usage.output ?? null,
+  }
+  const used = response.input !== null && response.output !== null
+    ? response.input + (response.cacheRead ?? 0) + (response.cacheWrite ?? 0) + response.output
+    : usage.tokens ?? 0
+  return {
+    sessionUpdate: 'usage_update', used, size: usage.size ?? 200_000,
+    ...usage.cost === undefined ? {} : { cost: { amount: usage.cost, currency: 'USD' } },
+    _meta: { casper: {
+      response: { ...response, tokens: usage.tokens ?? null, toolUse: usage.toolUse ?? false },
+      model: { provider: usage.provider === undefined ? 'openai' : usage.provider, model: usage.model === undefined ? 'gpt-5' : usage.model },
+      cost: usage.costKind ?? null,
+    } },
+  }
 }
 
 /** A question Casper asks as a form; see the module comment. */
@@ -311,6 +364,8 @@ async function update(client: AgentContext, item: SessionUpdate & Record<string,
 interface Outcome {
   stop: StopReason
   receipt: string
+  /** A whole receipt's fields, as C12 sends it. */
+  full?: Record<string, unknown>
 }
 
 async function play(params: PromptRequest, client: AgentContext): Promise<PromptResponse> {
@@ -322,12 +377,19 @@ async function play(params: PromptRequest, client: AgentContext): Promise<Prompt
     late = step.late ?? late
   }
   const text = `\nReceipt: ${outcome.receipt}\n`
-  await update(client, { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text }, _meta: { casper: { receipt: { outcome: outcome.receipt } } } })
+  const receipt: Record<string, unknown> = outcome.full === undefined
+    ? { outcome: outcome.receipt }
+    : {
+      outcome: outcome.receipt, verdict: `Receipt: ${outcome.receipt}`, exitCode: 0, changed: [], checksRun: [], checksNotRun: [], text: text.trim(),
+      json: { type: 'receipt', outcome: outcome.receipt }, usage: null, cost: null, root: process.cwd(), ...outcome.full,
+    }
+  const shown = outcome.full === undefined ? text : `\n\n${String(receipt.text)}\n`
+  await update(client, { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: shown }, _meta: { casper: { receipt } } })
   if (late !== undefined) {
     const after = late
     setTimeout(() => { void run(after, params, client, { stop: 'end_turn', receipt: 'late' }) }, 50)
   }
-  return { stopReason: outcome.stop, _meta: { casper: { receipt: { outcome: outcome.receipt } } } }
+  return { stopReason: outcome.stop, _meta: { casper: { receipt } } }
 }
 
 async function run(step: Step, params: PromptRequest, client: AgentContext, outcome: Outcome): Promise<void> {
@@ -336,6 +398,11 @@ async function run(step: Step, params: PromptRequest, client: AgentContext, outc
     if (step.image === true) await update(client, { sessionUpdate: 'agent_message_chunk', content: { type: 'image', mimeType: 'image/png', data: 'aGk=' } })
     if (step.thought !== undefined) await update(client, { sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: step.thought } })
     if (step.text !== undefined) await update(client, { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: step.text } })
+    if (step.note !== undefined) {
+      await update(client, { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: `\n\n${step.note}\n` }, _meta: { casper: { note: true } } })
+    }
+    if (step.usage !== undefined) await update(client, usageUpdate(step.usage))
+    if (step.fullReceipt !== undefined) outcome.full = step.fullReceipt
     if (step.commandsUpdate !== undefined) await update(client, { sessionUpdate: 'available_commands_update', availableCommands: step.commandsUpdate })
     if (step.configUpdate !== undefined) {
       configOptions = step.configUpdate

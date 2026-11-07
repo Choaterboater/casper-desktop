@@ -63,8 +63,10 @@ A turn that cannot run ends with an error on `turn/end`: `CASPER_NOT_FOUND` when
 | [`src/views.ts`](src/views.ts) | Records a Casper tool step under the Standard tool that does the same job: its name, arguments, result text, and meta |
 | [`src/permission.ts`](src/permission.ts) | Turns an approval box into a user question headed `Casper`, with the raising step's diff lines in its detail, and maps the answer back; a plan Build box becomes a plan review |
 | [`src/box.ts`](src/box.ts) | The box's question id, header, and card limit, shared by both halves |
-| [`src/client/index.ts`](src/client/index.ts) | Client half: registers Casper's approval card first in the conversation composer chain |
+| [`src/receipt.ts`](src/receipt.ts) | Reads Casper's receipt and a response's tokens from ACP `_meta`, shared by both halves |
+| [`src/client/index.ts`](src/client/index.ts) | Client half: registers Casper's approval card first in the conversation composer chain, and the receipt card as the `casper_receipt` tool view |
 | [`src/client/CasperBoxCard.tsx`](src/client/CasperBoxCard.tsx) | Casper's approval card: which questions it takes, its rows, keys, and answer |
+| [`src/client/ReceiptRow.tsx`](src/client/ReceiptRow.tsx) | Casper's receipt card: the verdict, changed files, checks, and model use, with its words in [`src/client/locales.ts`](src/client/locales.ts) |
 | [`src/elicitation.ts`](src/elicitation.ts) | Turns one of Casper's forms (`elicitation/create`) into a user question and maps the answer back |
 | [`src/sidecar.ts`](src/sidecar.ts) | Host storage domain `casper_agent` mapping each Session to its Casper conversation |
 | [`src/commands.ts`](src/commands.ts) | Casper's commands for the `/` menu, and host storage domain `casper_agent_commands` keeping the last list |
@@ -91,10 +93,12 @@ A line steered in during a prompt goes to a Casper whose `initialize` reply sets
 | `tool_call_update` still in progress | nothing: the call stays open and an asked approval box stays asked |
 | check `tool_call` (already completed or failed) | `tool/call` named `casper_check` and its result at once |
 | `plan` | `todo/write` with the whole list |
+| `usage_update` after a model response | its window (`size`, when a positive integer) as `request/context` with provider `casper` and model `<provider>/<model>` from `_meta.casper.model`, appended only when it differs from the Session's; its tokens (`_meta.casper.response`, when input and output are counts) as a `usage` chunk and the `usage` of the `assistant/message` that settles the response: a response with `toolUse` is committed by its first call, a text-only one at once, so the next text opens a new step |
+| `agent_message_chunk` carrying `_meta.casper.receipt` | a `casper_receipt` tool call closed at once, its result the receipt's text and its meta the receipt (without the `json` event), shown as the receipt card; meta that does not parse is text |
 | `user_message_chunk` read notice for a steered line | that line's `user/message`, opening the next step once the step's open calls close, or joining the step when Casper has written nothing in it yet |
 | a call still open when the prompt ends (Stop, exit, or reply) | an error `tool/result` with `TOOL_OUTCOME_UNKNOWN`, as agent-loop records for a failed step, before `step/end` |
 
-The receipt is the last text chunk, so it ends the final assistant message. A prompt reply resolves only after every update received before it has been written. Stop sends `session/cancel` and ends the turn as aborted; Casper is killed when it has not replied within `cancelGraceMs`. Tool call ids carry a random per-process prefix, so a restarted Casper's ids never fold into earlier cards.
+The receipt is the last chunk, so its card ends the turn; an older script's bare receipt meta is text that ends the final assistant message. A note Casper marks with `_meta.casper.note` is text like the model's. A prompt reply resolves only after every update received before it has been written. Stop sends `session/cancel` and ends the turn as aborted; Casper is killed when it has not replied within `cancelGraceMs`. Tool call ids carry a random per-process prefix, so a restarted Casper's ids never fold into earlier cards.
 
 <a id="tool-cards"></a>
 ### Tool cards
@@ -195,7 +199,7 @@ The plugin sends no model request, so it has no cache effect; Casper's own reque
 
 - A Casper whose `initialize` reply does not set `promptCapabilities.image` gets a placeholder instead of each picture.
 - A pick is checked against the list Casper last sent; a model Casper later finds signed out is refused when the pick is sent.
-- Token usage and cost are not shown, because Casper sends neither; reasoning shows only the headlines and retries Casper sends as thoughts, not the model's own reasoning. `session/load` replays are not shown.
+- A response with no text or call of its own counts toward the next call's step, or not at all when text comes next; a Casper that sends no `usage_update` shows no context ring or token count. Notes look like the model's text. Reasoning shows only the headlines and retries Casper sends as thoughts, not the model's own reasoning. `session/load` replays are not shown.
 - A running shell step shows no output until it ends.
 - Only the app tools server is passed to Casper; the app's configured MCP servers are not.
 - App tool results reach Casper as text only: an image or other non-text block becomes a note. None of the served tools returns an image today.

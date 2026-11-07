@@ -26,6 +26,9 @@ import Storage from '@deepseek-ai/dsh-storage'
 import * as StorageDomain from '@deepseek-ai/dsh-storage-domain'
 import * as StorageJson from '@deepseek-ai/dsh-storage-json'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
+import TokenMeter from '@deepseek-ai/dsh-token-meter'
+import type { ContextPressureProjection } from '@deepseek-ai/dsh-token-meter'
+import { contextOccupancy } from '@deepseek-ai/dsh-client-ui-conversation/src/client/context-occupancy.ts'
 import * as ToolTodo from '@deepseek-ai/dsh-tool-todo'
 import TypertRegistry from '@deepseek-ai/dsh-typert-registry'
 import UserQuestionService from '@deepseek-ai/dsh-user-questions'
@@ -248,4 +251,27 @@ it('sends a picture and an uploaded file from the GUI to Casper through the real
   const linked = fileURLToPath(sent[2]?.uri ?? '')
   expect(existsSync(linked)).toBe(true)
   expect(readFileSync(linked, 'utf8')).toBe('the notes\n')
+}, 120_000)
+
+it('shows a Casper Session\'s context ring as a percent and its receipt as the receipt card', async () => {
+  const fake = fakeCasper({ prompts: [[
+    { text: 'Fixed it.\n', usage: { input: 30_000, cacheRead: 19_000, cacheWrite: 0, output: 1000, tokens: 50_000, size: 200_000 } },
+    { fullReceipt: { verdict: 'Verified: 1 check passed.', changed: ['src/a.ts'], text: 'Verified: 1 check passed.' } },
+  ]] })
+  cleanups.push(() => { fake.remove() })
+  const booted = await host(fake)
+  cleanups.push(() => booted.ctx.fiber.dispose())
+  await booted.ctx.plugin(TokenMeter)
+  const { sessionId } = ok(await booted.remote.create({ cwd: fake.cwd }))
+  const agent = booted.ctx.agents.get(sessionId)
+  ok(await booted.remote.prompt({ requestId: 'req-ring' as SessionRequestId, sessionId, mode: 'queue', content: [{ type: 'text', text: 'Fix it' }] }))
+  await waitFor(() => events(agent).some(event => event.type === 'turn/end'))
+  const projections = ok(await booted.remote.projections({ sessionId }))
+  const pressure = projections?.kind === 'sequenced' ? projections.values.contextPressure as ContextPressureProjection | undefined : undefined
+  // The ring reads the response's prompt side over Casper's window.
+  expect(contextOccupancy(pressure)).toMatchObject({ percent: 25, contextWindow: 200_000 })
+  const card = events(agent).find(event => event.type === 'tool/result')
+  expect(card?.type === 'tool/result' && card.data.meta).toMatchObject({ verdict: 'Verified: 1 check passed.', changed: ['src/a.ts'], root: fake.cwd })
+  const call = events(agent).find(event => event.type === 'tool/call')
+  expect(call?.type === 'tool/call' && call.data.name).toBe('casper_receipt')
 }, 120_000)

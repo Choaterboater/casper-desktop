@@ -11,6 +11,7 @@ import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { planProjectionDefinition } from '@deepseek-ai/dsh-plan-mode'
 import { UserQuestionError } from '@deepseek-ai/dsh-user-questions'
+import { contextPressureProjectionDefinition, tokenUsageProjectionDefinition } from '@deepseek-ai/dsh-token-meter/src/usage-projection.ts'
 import { CasperAgent, FRESH_CONVERSATION_NOTICE } from '../src/agent.ts'
 import { CasperCommandCache } from '../src/commands.ts'
 import { CasperConnection } from '../src/connection.ts'
@@ -1903,5 +1904,127 @@ describe('Casper\'s approval card', () => {
     const result = eventsOf(agent).find(event => event.type === 'tool/result')
     expect(result?.type === 'tool/result' && result.data.message.content).toEqual([{ type: 'text', text: '→ No (access set to Read only)' }])
     expect(turnEnds(agent)).toEqual([{ kind: 'completed' }])
+  })
+})
+
+describe('Casper\'s usage and receipt', { timeout: 60_000 }, () => {
+  /** The token-meter's folds the composer's context ring and token pill read. */
+  function meters(agent: Agent) {
+    let usage: Parameters<typeof tokenUsageProjectionDefinition.apply>[0] = tokenUsageProjectionDefinition.init()
+    let pressure: Parameters<typeof contextPressureProjectionDefinition.apply>[0] = contextPressureProjectionDefinition.init()
+    for (const event of eventsOf(agent)) {
+      usage = tokenUsageProjectionDefinition.apply(usage, event)
+      pressure = contextPressureProjectionDefinition.apply(pressure, event)
+    }
+    return { pill: tokenUsageProjectionDefinition.wire.view(usage), ring: contextPressureProjectionDefinition.wire.view(pressure) }
+  }
+
+  function contexts(agent: Agent): unknown[] {
+    return eventsOf(agent).flatMap(event => event.type === 'request/context' ? [event.data] : [])
+  }
+
+  it('usage_update feeds the ring and the pill', async () => {
+    const { host } = await setup({ prompts: [[
+      { text: 'Looking.\n', usage: { input: 1000, cacheRead: 500, cacheWrite: 0, output: 100, tokens: 1600, toolUse: true, cost: 0.02, costKind: 'estimate' } },
+      { tool: 'bash', target: 'ls' },
+      { toolEnd: 1 },
+      { text: 'Done.\n', usage: { input: 200, cacheRead: 1500, cacheWrite: 0, output: 50, tokens: 1750 } },
+    ]] })
+    const { agent } = await host.create('casper-usage')
+    await run(agent, 'go')
+    const messages = eventsOf(agent).flatMap(event => event.type === 'assistant/message'
+      ? [[event.data.step, event.data.message.content.map(block => block.type), event.data.usage]]
+      : [])
+    expect(messages).toEqual([
+      [1, ['text', 'tool-call'], { inputTokens: 1000, outputTokens: 100, totalTokens: 1600, cacheReadTokens: 500, cacheWriteTokens: 0 }],
+      [2, ['text'], { inputTokens: 200, outputTokens: 50, totalTokens: 1750, cacheReadTokens: 1500, cacheWriteTokens: 0 }],
+      // An older Casper's receipt is text, after the committed answer.
+      [3, ['text'], undefined],
+    ])
+    expect(contexts(agent)).toEqual([{ provider: 'casper', model: 'openai/gpt-5', contextWindow: 200_000 }])
+    const { pill, ring } = meters(agent)
+    expect(pill).toEqual({ uncachedInputTokens: 1200, outputTokens: 150, cacheReadTokens: 2000, cacheWriteTokens: 0 })
+    expect(ring).toMatchObject({ contextWindow: 200_000, pressureTokens: 1700 })
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }])
+  })
+
+  it('request/context is appended once with provider casper and again after a model change, never after a reload', async () => {
+    const opus = { provider: 'anthropic', model: 'claude-opus-5-5' }
+    const fake = fakeCasper({
+      newSessionId: 'conversation-usage',
+      prompts: [
+        [{ text: 'a\n', usage: { input: 10, output: 1 } }, { text: 'b\n', usage: { input: 20, output: 2 } }],
+        [{ text: 'c\n', usage: { input: 30, output: 3, ...opus } }, { text: 'd\n', usage: { input: 40, output: 4, ...opus, size: 0 } }],
+        [{ text: 'e\n', usage: { input: 50, output: 5, ...opus } }, { text: 'f\n', usage: { output: 6, tokens: 66, provider: null, model: null, size: 1000 } }],
+      ],
+    })
+    cleanups.push(() => { fake.remove() })
+    const first = await boot(fake)
+    const { agent } = await first.create('casper-usage-context')
+    await run(agent, 'one')
+    await run(agent, 'two')
+    expect(contexts(agent)).toEqual([
+      { provider: 'casper', model: 'openai/gpt-5', contextWindow: 200_000 },
+      { provider: 'casper', model: 'anthropic/claude-opus-5-5', contextWindow: 200_000 },
+    ])
+    // A window of 0 is not a window: the response's tokens still count.
+    const last = eventsOf(agent).filter(event => event.type === 'assistant/message').at(-2)
+    expect(last?.type === 'assistant/message' && last.data.usage).toEqual({ inputTokens: 40, outputTokens: 4 })
+    await first.ctx.fiber.dispose()
+
+    const second = await boot(fake)
+    cleanups.push(() => second.ctx.fiber.dispose())
+    const resumed = (await second.ctx.agents.resume({ resumeSessionId: SessionId('casper-usage-context'), agentPreset: 'casper' })).agent
+    await run(resumed, 'three')
+    expect(fake.calls('session/load')).toHaveLength(1)
+    // A response without input and output counts still gives its window, and no tokens.
+    const final = eventsOf(resumed).filter(event => event.type === 'assistant/message').at(-1)
+    expect(final?.type === 'assistant/message' && [final.data.message.content, final.data.usage]).toEqual([[{ type: 'text', text: 'f\n\nReceipt: verified\n' }], undefined])
+    // The same model and window after the reload add nothing; a Casper that names no model is labelled as its messages are.
+    expect(contexts(resumed)).toEqual([
+      { provider: 'casper', model: 'openai/gpt-5', contextWindow: 200_000 },
+      { provider: 'casper', model: 'anthropic/claude-opus-5-5', contextWindow: 200_000 },
+      { provider: 'casper', model: 'casper', contextWindow: 1000 },
+    ])
+  })
+
+  it('the receipt chunk is a casper_receipt card', async () => {
+    const { fake, host } = await setup({ prompts: [[
+      { text: 'Done.\n', usage: { input: 10, output: 2, toolUse: false } },
+      { note: '[memory] saved: the tests use vitest' },
+      { fullReceipt: {
+        verdict: 'Verified: 1 check passed.', changed: ['src/a.ts'], text: 'Verified: 1 check passed.\nChanged: src/a.ts',
+        checksRun: [{ name: 'test', status: 'pass', command: 'npm test', exit: 0, ms: 12, fresh: true }],
+        checksNotRun: [{ name: 'lint', reason: 'not configured' }],
+        usage: { turns: 1, tokens: 12, estimatedCost: 0.001 }, cost: 'estimate',
+      } },
+    ]] })
+    const { agent } = await host.create('casper-receipt-card')
+    await run(agent, 'go')
+    const texts = eventsOf(agent).flatMap(event => event.type === 'assistant/message'
+      ? event.data.message.content.flatMap(block => block.type === 'text' ? [block.text] : [])
+      : [])
+    // The note is text of its own step; the receipt's words are the card's, never a message.
+    expect(texts).toEqual(['Done.\n', '\n\n[memory] saved: the tests use vitest\n'])
+    const call = eventsOf(agent).find(event => event.type === 'tool/call')
+    expect(call?.type === 'tool/call' && [call.data.name, call.data.arguments]).toEqual(['casper_receipt', JSON.stringify({ verdict: 'Verified: 1 check passed.' })])
+    const result = eventsOf(agent).find(event => event.type === 'tool/result')
+    expect(result?.type === 'tool/result' && result.data.message.content).toEqual([{ type: 'text', text: 'Verified: 1 check passed.\nChanged: src/a.ts' }])
+    expect(result?.type === 'tool/result' && result.data.meta).toEqual({
+      outcome: 'verified', verdict: 'Verified: 1 check passed.', exitCode: 0, changed: ['src/a.ts'],
+      checksRun: [{ name: 'test', status: 'pass', command: 'npm test', exit: 0, ms: 12, fresh: true }],
+      checksNotRun: [{ name: 'lint', reason: 'not configured' }],
+      text: 'Verified: 1 check passed.\nChanged: src/a.ts', usage: { turns: 1, tokens: 12, estimatedCost: 0.001 }, cost: 'estimate', root: fake.cwd,
+    })
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }])
+  })
+
+  it('malformed receipt meta is plain text', async () => {
+    const { host } = await setup({ prompts: [[{ text: 'Done.\n' }, { fullReceipt: { exitCode: 'zero' } }]] })
+    const { agent } = await host.create('casper-receipt-bad')
+    await run(agent, 'go')
+    expect(eventsOf(agent).some(event => event.type === 'tool/call')).toBe(false)
+    const final = eventsOf(agent).filter(event => event.type === 'assistant/message').at(-1)
+    expect(final?.type === 'assistant/message' && final.data.message.content).toEqual([{ type: 'text', text: 'Done.\n\n\nReceipt: verified\n' }])
   })
 })

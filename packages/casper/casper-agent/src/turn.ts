@@ -10,13 +10,15 @@ import { AssistantStreamAttempt } from '@deepseek-ai/dsh-agent-loop'
 import { createAssistantMessage, createToolResultMessage } from '@deepseek-ai/dsh-llm'
 // Standard's plan review tool: a Build box recorded under its name gets the app's plan card and Plan tab.
 import { EXIT_PLAN_MODE } from '@deepseek-ai/dsh-plan-mode'
-import type { ContentBlock, ToolCallId } from '@deepseek-ai/dsh-llm'
+import type { ContentBlock, TokenUsage, ToolCallId } from '@deepseek-ai/dsh-llm'
 import { TOOL_OUTCOME_UNKNOWN } from '@deepseek-ai/dsh-session'
 import type { Session, SessionSeq, UserMessage } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-tool-todo'
 import type { AskUserQuestionAnswer } from '@deepseek-ai/dsh-user-questions'
 import type { BridgedCall } from './app-tools.ts'
 import { reviewedPlan, toolCallText } from './permission.ts'
+import { CASPER_RECEIPT } from './receipt.ts'
+import type { CasperReceipt } from './receipt.ts'
 import { ASK_USER_QUESTION, askArguments, questionStep, standardCall, standardResult } from './views.ts'
 import type { CasperQuestion, Json, StandardView } from './views.ts'
 
@@ -63,6 +65,14 @@ interface OpenCall {
 type Buffered =
   | { readonly kind: 'text' | 'reasoning'; readonly text: string }
   | { readonly kind: 'user'; readonly message: UserMessage }
+  | { readonly kind: 'usage'; readonly sample: UsageSample }
+
+/** One model response's usage, kept until the attempt it belongs to is committed. */
+interface UsageSample {
+  readonly tokens: TokenUsage
+  /** Whether the response ended to run tools, so its first tool call commits it. */
+  readonly toolUse: boolean
+}
 
 /** The text or reasoning block the open attempt is streaming. */
 interface OpenText {
@@ -92,6 +102,13 @@ interface ResultBody {
  * a step boundary; it waits for open calls like text does. Casper's thoughts
  * (its reasoning headlines and retries) stream as reasoning blocks in the same
  * attempt, beside its text and in the order they arrive.
+ *
+ * A response's usage is recorded on the `assistant/message` that settles its
+ * attempt, as a `usage` stream chunk and the message's `usage`, so each
+ * response's sample sits in a step of its own: a response that ends to run
+ * tools is committed by its first call, and a text-only one at its usage, so
+ * text after it opens the next step. Casper's receipt is a `casper_receipt`
+ * call whose result carries the receipt as its meta.
  */
 export class TurnWriter {
   private currentStep: number
@@ -105,6 +122,8 @@ export class TurnWriter {
   /** ACP ids of the steps this prompt has closed. */
   private readonly closed = new Set<string>()
   private buffered: Buffered[] = []
+  /** The last response's usage, until an attempt is committed with it. */
+  private pending: UsageSample | undefined
 
   /** @param options - the Session, frame publisher, positions, counters, and id mapping. */
   constructor(private readonly options: TurnWriterOptions) {
@@ -266,6 +285,37 @@ export class TurnWriter {
   }
 
   /**
+   * Record one model response's usage. A response that ends to run tools
+   * waits for its first call, which commits the attempt with it; a text-only
+   * one commits the open attempt at once, so later text opens the next step.
+   * Model text that comes while a tool response's attempt is still open
+   * commits that attempt first. While calls of a committed step are open, it
+   * waits in order with the text.
+   * @param tokens - the response's tokens.
+   * @param toolUse - whether the response ended to run tools.
+   */
+  usage(tokens: TokenUsage, toolUse: boolean): void {
+    const sample = { tokens, toolUse }
+    if (this.buffered.length > 0) {
+      this.buffered.push({ kind: 'usage', sample })
+      return
+    }
+    this.pending = sample
+    if (!toolUse && this.attemptOpen()) this.commitAttempt()
+  }
+
+  /**
+   * Record Casper's receipt as a `casper_receipt` call, closed at once with
+   * the receipt's text as its result and the receipt as its meta.
+   * @param receipt - the receipt Casper sent on its last message.
+   */
+  receipt(receipt: CasperReceipt): void {
+    const acpId = `casper-receipt-${String(this.options.turn)}`
+    this.startCall(acpId, CASPER_RECEIPT, JSON.stringify({ verdict: receipt.verdict }), undefined)
+    this.finishCall(acpId, () => ({ content: [{ type: 'text', text: receipt.text }], isError: false, meta: receipt as unknown as Json }))
+  }
+
+  /**
    * Record a whole plan as the Session's todo list.
    * @param entries - the ACP plan entries, in order.
    */
@@ -289,6 +339,8 @@ export class TurnWriter {
     }
     this.writeBuffered()
     this.settleAttempt(interrupted)
+    // A usage that no attempt took belongs to a response with nothing to show.
+    this.pending = undefined
     this.options.session.append('step/end', { turn: this.options.turn, step: this.currentStep })
   }
 
@@ -301,6 +353,7 @@ export class TurnWriter {
     const attempt = this.attempt
     if (attempt === undefined || attempt.ended) return
     if (!interrupted) this.closeText(attempt)
+    const usage = this.takeUsage(attempt)
     // An attempt starts only with a text or reasoning block, so an unsettled one always has visible content.
     const content = interrupted ? attempt.interruptedBlocks() : attempt.blocks()
     attempt.settle('assistant/message', () => this.options.session.append('assistant/message', {
@@ -309,7 +362,32 @@ export class TurnWriter {
       message: createAssistantMessage({ content, source: { provider: CASPER_PROVIDER, model: this.options.model } }),
       ...interrupted ? { interrupted: true as const } : {},
       stream: attempt.stream,
+      ...usage === undefined ? {} : { usage },
     }, { surfaceOp: 'append' }).seq)
+  }
+
+  /** Settle the open attempt with its response's usage; the step then counts as committed, so text opens the next one. */
+  private commitAttempt(): void {
+    this.settleAttempt(false)
+    this.committed = true
+  }
+
+  /** Whether an attempt is streaming that no tool call or usage has committed. */
+  private attemptOpen(): boolean {
+    return this.attempt !== undefined && !this.attempt.ended
+  }
+
+  /**
+   * Hand the waiting usage to the attempt being settled, as its stream's usage chunk.
+   * @param attempt - the attempt about to settle.
+   * @returns the usage to record on its message, if any.
+   */
+  private takeUsage(attempt: AssistantStreamAttempt): TokenUsage | undefined {
+    const sample = this.pending
+    if (sample === undefined) return undefined
+    this.pending = undefined
+    attempt.push({ type: 'usage', usage: sample.tokens })
+    return sample.tokens
   }
 
   /** Write the text, thoughts and steered lines that waited for open calls, in order. */
@@ -318,6 +396,7 @@ export class TurnWriter {
     this.buffered = []
     for (const entry of waiting) {
       if (entry.kind === 'user') this.steered(entry.message)
+      else if (entry.kind === 'usage') this.usage(entry.sample.tokens, entry.sample.toolUse)
       else this.stream(entry.kind, entry.text)
     }
   }
@@ -331,6 +410,12 @@ export class TurnWriter {
    */
   private stream(kind: OpenText['kind'], text: string): void {
     if (text === '') return
+    if (this.pending !== undefined) {
+      // Text after a tool response's usage that no call took: that response is over, so its attempt commits first.
+      if (this.attemptOpen()) this.commitAttempt()
+      // A usage with no attempt of its own belongs to a response with nothing to show, never to this new text.
+      else this.pending = undefined
+    }
     if (this.committed) {
       if (this.openCalls.size > 0) {
         this.buffered.push({ kind, text })
@@ -395,7 +480,8 @@ export class TurnWriter {
     if (this.openCalls.has(acpId)) return
     const callId = this.options.callId(acpId)
     if (this.committed && this.openCalls.size === 0) this.nextStep()
-    if (this.committed) {
+    const joining = this.committed
+    if (joining) {
       // Other calls are open, so this call joins the step in an attempt of its own.
       this.attempt = undefined
       this.blockIndex = 0
@@ -406,11 +492,14 @@ export class TurnWriter {
     attempt.push({ type: 'block-start', index, blockType: 'tool-call' })
     attempt.push({ type: 'tool-call-delta', index, id: callId, name, argumentsDelta: args })
     attempt.push({ type: 'block-end', index, block: { type: 'tool-call', id: callId, name, arguments: args } })
+    // A step's usage is its first call's: a joining call leaves a waiting usage alone, so a step never holds two.
+    const usage = joining ? undefined : this.takeUsage(attempt)
     attempt.settle('assistant/message', () => this.options.session.append('assistant/message', {
       turn: this.options.turn,
       step: this.currentStep,
       message: createAssistantMessage({ content: attempt.blocks(), source: { provider: CASPER_PROVIDER, model: this.options.model } }),
       stream: attempt.stream,
+      ...usage === undefined ? {} : { usage },
     }, { surfaceOp: 'append' }).seq)
     this.committed = true
     const callSeq = this.options.session.append('tool/call', {

@@ -8,15 +8,20 @@
   "files": [
     "src/box.ts",
     "src/client/CasperBoxCard.tsx",
+    "src/client/ReceiptRow.tsx",
     "src/client/index.ts",
-    "src/css-modules.d.ts"
+    "src/client/locales.ts",
+    "src/css-modules.d.ts",
+    "src/receipt.ts"
   ],
   "references": [
     { "path": "../../../vendor/cordis" },
+    { "path": "../../client/locale/tsconfig.client.json" },
     { "path": "../../client/ui-conversation/tsconfig.client.json" },
     { "path": "../../client/ui-primitives" },
     { "path": "../../client/ui-renderer" },
     { "path": "../../client/ui-slots" },
+    { "path": "../../client/ui-tool" },
     { "path": "../../client/ui-user-questions" }
   ]
 }

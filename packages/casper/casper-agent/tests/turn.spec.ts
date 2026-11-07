@@ -573,4 +573,150 @@ describe('TurnWriter', () => {
       expect(written(events())).toEqual(['step/start 1', 'user first', 'user second', 'assistant 1 Ok', 'step/end 1'])
     })
   })
+
+  describe('usage and the receipt', () => {
+    const TOKENS = { inputTokens: 100, outputTokens: 20, totalTokens: 170, cacheReadTokens: 40, cacheWriteTokens: 10 }
+    const LATER = { inputTokens: 5, outputTokens: 7 }
+
+    /** Each message's step, block types, and usage. */
+    function messages(events: readonly SessionEvent[]) {
+      return ofType(events, 'assistant/message').map(event => ({
+        step: event.data.step,
+        blocks: event.data.message.content.map(block => block.type),
+        usage: event.data.usage,
+        streamed: event.data.stream.flatMap(record => record.type === 'chunk' && record.chunk.type === 'usage' ? [record.chunk] : []),
+      }))
+    }
+
+    it('a tool response\'s usage is on the message with its text and first call', () => {
+      const { frames, open, events, types } = setup()
+      const writer = open(1)
+      writer.text('Looking.')
+      writer.usage(TOKENS, true)
+      expect(ofType(events(), 'assistant/message')).toEqual([])
+      writer.toolCall(tool('casper-tool-1'))
+      writer.toolCall(tool('casper-tool-2'))
+      writer.toolUpdate({ toolCallId: 'casper-tool-1', status: 'completed' })
+      writer.toolUpdate({ toolCallId: 'casper-tool-2', status: 'completed' })
+      writer.close(false)
+      expect(types()).toEqual(['step/start', 'assistant/message', 'tool/call', 'assistant/message', 'tool/call', 'tool/result', 'tool/result', 'step/end'])
+      expect(messages(events())).toEqual([
+        { step: 1, blocks: ['text', 'tool-call'], usage: TOKENS, streamed: [{ type: 'usage', usage: TOKENS }] },
+        // A call that joins the step carries no second sample, so the step's usage is counted once.
+        { step: 1, blocks: ['tool-call'], usage: undefined, streamed: [] },
+      ])
+      expect(frames.some(frame => frame.type === 'chunk' && frame.chunk.type === 'usage')).toBe(true)
+    })
+
+    it('a text-only response commits at its usage', () => {
+      const { open, events, types } = setup()
+      const writer = open(1)
+      writer.thought('Thinking\n\n')
+      writer.text('All done.')
+      writer.usage(TOKENS, false)
+      expect(messages(events())).toEqual([{ step: 1, blocks: ['reasoning', 'text'], usage: TOKENS, streamed: [{ type: 'usage', usage: TOKENS }] }])
+      writer.text('More.')
+      writer.usage(LATER, false)
+      writer.close(false)
+      expect(types()).toEqual(['step/start', 'assistant/message', 'step/end', 'step/start', 'assistant/message', 'step/end'])
+      expect(messages(events()).map(message => [message.step, message.usage])).toEqual([[1, TOKENS], [2, LATER]])
+    })
+
+    it('text after a toolUse usage without a call starts a new step', () => {
+      const { open, events, types } = setup()
+      const writer = open(1)
+      writer.text('Trying.')
+      writer.usage(TOKENS, true)
+      writer.text('Never mind.')
+      writer.close(false)
+      expect(types()).toEqual(['step/start', 'assistant/message', 'step/end', 'step/start', 'assistant/message', 'step/end'])
+      expect(messages(events())).toEqual([
+        { step: 1, blocks: ['text'], usage: TOKENS, streamed: [{ type: 'usage', usage: TOKENS }] },
+        { step: 2, blocks: ['text'], usage: undefined, streamed: [] },
+      ])
+    })
+
+    it('a response with nothing to show gives its usage to its first call, and none to later text', () => {
+      const { open, events } = setup()
+      const writer = open(1)
+      writer.usage(TOKENS, true)
+      writer.toolCall(tool('casper-tool-1'))
+      writer.toolUpdate({ toolCallId: 'casper-tool-1', status: 'completed' })
+      writer.usage(LATER, false)
+      writer.text('After.')
+      writer.close(false)
+      expect(messages(events()).map(message => [message.step, message.blocks, message.usage])).toEqual([
+        [1, ['tool-call'], TOKENS],
+        [2, ['text'], undefined],
+      ])
+    })
+
+    it('a usage that comes while calls are open waits in order with the text', () => {
+      const { open, events } = setup()
+      const writer = open(1)
+      writer.toolCall(tool('casper-tool-1'))
+      writer.text('Meanwhile.')
+      writer.usage(LATER, false)
+      writer.text('Then.')
+      writer.toolUpdate({ toolCallId: 'casper-tool-1', status: 'completed' })
+      writer.close(false)
+      expect(messages(events()).map(message => [message.step, message.blocks, message.usage])).toEqual([
+        [1, ['tool-call'], undefined],
+        [2, ['text'], LATER],
+        [3, ['text'], undefined],
+      ])
+    })
+
+    it('a joining call leaves a waiting usage for the next attempt, and an untaken one is dropped at the end', () => {
+      const { open, events } = setup()
+      const writer = open(1)
+      writer.toolCall(tool('casper-tool-1'))
+      writer.usage(TOKENS, true)
+      writer.toolCall(tool('casper-tool-2'))
+      writer.toolUpdate({ toolCallId: 'casper-tool-1', status: 'completed' })
+      writer.toolUpdate({ toolCallId: 'casper-tool-2', status: 'completed' })
+      writer.text('Reading.')
+      writer.steered(createUserMessage({ content: [{ type: 'text', text: 'hi' }], source: { kind: 'user' } }))
+      writer.usage(LATER, true)
+      writer.close(true)
+      expect(messages(events()).map(message => [message.step, message.blocks, message.usage])).toEqual([
+        [1, ['tool-call'], undefined],
+        [1, ['tool-call'], undefined],
+        [2, ['text'], undefined],
+      ])
+    })
+
+    it('a steered line settles the open attempt with its usage', () => {
+      const { open, events } = setup()
+      const writer = open(1)
+      writer.text('Running.')
+      writer.usage(TOKENS, true)
+      writer.steered(createUserMessage({ content: [{ type: 'text', text: 'also' }], source: { kind: 'user' } }))
+      writer.close(false)
+      expect(messages(events()).map(message => [message.step, message.usage])).toEqual([[1, TOKENS]])
+    })
+
+    it('the receipt is a casper_receipt call with the receipt as its meta, in a step of its own after committed text', () => {
+      const { open, events, types } = setup()
+      const writer = open(1)
+      writer.text('Done.')
+      writer.usage(TOKENS, false)
+      const receipt = {
+        outcome: 'verified', verdict: 'Verified: 1 check passed.', exitCode: 0, changed: ['a.ts'],
+        checksRun: [{ name: 'test', status: 'pass' as const, command: 'npm test', exit: 0, ms: 5, fresh: true }],
+        checksNotRun: [], text: 'Verified: 1 check passed.\nChanged: a.ts', usage: null, cost: null, root: '/work',
+      }
+      writer.receipt(receipt)
+      writer.close(false)
+      expect(types()).toEqual([
+        'step/start', 'assistant/message', 'step/end',
+        'step/start', 'assistant/message', 'tool/call', 'tool/result', 'step/end',
+      ])
+      const call = ofType(events(), 'tool/call')[0]
+      expect(call?.data).toMatchObject({ step: 2, name: 'casper_receipt', callId: 'casper:epoch:casper-receipt-1', arguments: JSON.stringify({ verdict: receipt.verdict }) })
+      const result = ofType(events(), 'tool/result')[0]
+      expect(result?.data).toMatchObject({ step: 2, meta: receipt, message: { isError: false, content: [{ type: 'text', text: receipt.text }] } })
+      expect(result?.data.error).toBeUndefined()
+    })
+  })
 })
