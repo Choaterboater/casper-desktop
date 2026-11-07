@@ -173,6 +173,18 @@ describe('CasperAgent', { timeout: 60_000 }, () => {
       })
     }
 
+    /** The next-step claims and the user messages, in Session order: a claim as 'claim', a message as its text. */
+    function claimsAndMessages(agent: Agent): string[] {
+      return eventsOf(agent).flatMap((event) => {
+        if (event.type === 'agent/inbox/spliced') {
+          const { target, removedCount, outcome } = event.data
+          return target === 'next-step' && (removedCount ?? 0) > 0 && outcome === undefined ? ['claim'] : []
+        }
+        if (event.type !== 'user/message') return []
+        return [event.data.content.map(block => block.type === 'text' ? block.text : '').join('')]
+      })
+    }
+
     function steerTexts(fake: FakeCasper): string[] {
       return fake.calls('_casper/steer').map(entry => (entry.params?.prompt as { text: string }[]).map(block => block.text).join('|'))
     }
@@ -194,6 +206,8 @@ describe('CasperAgent', { timeout: 60_000 }, () => {
         'step/start', 'user/message', 'assistant/message', 'step/end', 'turn/end',
       ])
       expect(eventsOf(agent).filter(event => event.type === 'user/message').at(-1)?.data).toEqual(line)
+      // The claim comes right before the line it logs, so the app shows the line as steering.
+      expect(claimsAndMessages(agent)).toEqual(['first', 'claim', 'also this'])
       const words = eventsOf(agent).flatMap(event => event.type === 'assistant/message' ? [event.data.message.content] : [])
       expect(words).toEqual([[{ type: 'text', text: 'Working.\n' }], [{ type: 'text', text: 'Adjusted.\n\nReceipt: verified\n' }]])
       expect([...agent.inbox.nextTurn, ...agent.inbox.nextStep]).toEqual([])
@@ -268,6 +282,51 @@ describe('CasperAgent', { timeout: 60_000 }, () => {
       expect(steerTexts(fake)).toEqual(['one', 'two'])
       expect(userMessages(agent)).toEqual([{ step: 1, text: 'first' }, { step: 2, text: 'one' }, { step: 3, text: 'two' }])
       expect(promptTexts(fake)).toEqual(['first'])
+      expect([...agent.inbox.nextTurn, ...agent.inbox.nextStep]).toEqual([])
+    })
+
+    it('a steer read while a call is open stays queued until its user/message is written', async () => {
+      const { fake, host } = await setup({ prompts: [] })
+      const hold = gate(fake, 'hold')
+      fake.script({ steer: true, prompts: [[
+        { tool: 'bash', target: 'ls' }, { steerRead: 1 }, { tool: 'bash', target: 'pwd' }, { waitFile: hold.path },
+        { toolEnd: 1 }, { toolEnd: 2 }, { text: 'Done.\n' },
+      ]] })
+      const { agent } = await host.create('casper-steer-open-call')
+      agent.followup(prompt('first'))
+      await waitFor(() => fake.calls('session/prompt').length === 1)
+      agent.steer(prompt('also this'))
+      // The second call comes after the read notice, so the notice was handled once it is recorded.
+      await waitFor(() => eventsOf(agent).filter(event => event.type === 'tool/call').length === 2)
+      // Not yet written, so a crash now must leave the line in the queue, not lose it.
+      expect(userMessages(agent).map(entry => entry.text)).toEqual(['first'])
+      expect(agent.inbox.nextStep.map(message => message.content)).toEqual([[{ type: 'text', text: 'also this' }]])
+      hold.open()
+      await agent.whenIdle()
+      expect(userMessages(agent)).toEqual([{ step: 1, text: 'first' }, { step: 2, text: 'also this' }])
+      // Claimed only when it is written after the calls close, and right before it.
+      expect(claimsAndMessages(agent)).toEqual(['first', 'claim', 'also this'])
+      expect(promptTexts(fake)).toEqual(['first'])
+      expect([...agent.inbox.nextTurn, ...agent.inbox.nextStep]).toEqual([])
+    })
+
+    it('Stop never cancels a steer the AI read while a call is open', async () => {
+      const { fake, host } = await setup({ steer: true, prompts: [[
+        { tool: 'bash', target: 'ls' }, { steerRead: 1 }, { tool: 'bash', target: 'pwd' }, { hang: true },
+      ]] })
+      const { agent } = await host.create('casper-steer-read-stop')
+      agent.followup(prompt('first'))
+      await waitFor(() => fake.calls('session/prompt').length === 1)
+      const line = prompt('also this')
+      agent.steer(line)
+      // The second call comes after the read notice, so the notice was handled once it is recorded.
+      await waitFor(() => eventsOf(agent).filter(event => event.type === 'tool/call').length === 2)
+      agent.cancel({ kind: 'user' })
+      await agent.whenIdle()
+      // The AI read it, so it is claimed right before its user/message, never cancelled.
+      expect(claimsAndMessages(agent)).toEqual(['first', 'claim', 'also this'])
+      const canceled = eventsOf(agent).flatMap(event => event.type === 'agent/inbox/spliced' && event.data.outcome === 'canceled' ? [event.data] : [])
+      expect(canceled.some(splice => splice.target === 'next-step' && (splice.removedCount ?? 0) > 0)).toBe(false)
       expect([...agent.inbox.nextTurn, ...agent.inbox.nextStep]).toEqual([])
     })
 

@@ -64,7 +64,7 @@ interface OpenCall {
 /** An update held while calls of the step are open, written in order once they close. */
 type Buffered =
   | { readonly kind: 'text' | 'reasoning'; readonly text: string }
-  | { readonly kind: 'user'; readonly message: UserMessage }
+  | { readonly kind: 'user'; readonly message: UserMessage; readonly beforeWrite: (() => void) | undefined }
   | { readonly kind: 'usage'; readonly sample: UsageSample }
 
 /** One model response's usage, kept until the attempt it belongs to is committed. */
@@ -271,16 +271,18 @@ export class TurnWriter {
    * `user/message`; a line read before Casper's first words of the step joins
    * that step instead. While calls are open it waits, in order with the text.
    * @param message - the user message, as it was sent to Casper.
+   * @param beforeWrite - called right before the `user/message` is written, even when it waited.
    */
-  steered(message: UserMessage): void {
+  steered(message: UserMessage, beforeWrite?: () => void): void {
     if (this.openCalls.size > 0) {
-      this.buffered.push({ kind: 'user', message })
+      this.buffered.push({ kind: 'user', message, beforeWrite })
       return
     }
     if (this.attempt !== undefined || this.committed) {
       this.settleAttempt(false)
       this.nextStep()
     }
+    beforeWrite?.()
     this.options.session.append('user/message', message, { surfaceOp: 'append' })
   }
 
@@ -395,7 +397,7 @@ export class TurnWriter {
     const waiting = this.buffered
     this.buffered = []
     for (const entry of waiting) {
-      if (entry.kind === 'user') this.steered(entry.message)
+      if (entry.kind === 'user') this.steered(entry.message, entry.beforeWrite)
       else if (entry.kind === 'usage') this.usage(entry.sample.tokens, entry.sample.toolUse)
       else this.stream(entry.kind, entry.text)
     }

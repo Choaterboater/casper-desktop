@@ -205,6 +205,8 @@ export class CasperAgent implements Agent {
   private readonly planRestored = new WeakSet<CasperConnection>()
   /** Ids of the pending lines queued by {@link steer}; only these go to Casper during a prompt. */
   private readonly steerIds = new Set<MessageId>()
+  /** Ids of the steered lines the AI read whose `user/message` still waits for open calls; {@link cancel} keeps them queued. */
+  private readonly readSteers = new Set<MessageId>()
   /** Set while a turn reads the Sessions its queued lines mention; {@link cancel} claims the lines first. */
   private claimEarly: (() => void) | undefined
   /** Fires the idle check once the Agent has sat idle for `idleExitMs` with a live Casper. */
@@ -399,10 +401,23 @@ export class CasperAgent implements Agent {
     const active = this.active
     this.claimEarly?.()
     if (options.keepInbox !== true) {
-      this.inbox.clear()
+      this.clearInbox()
       if (active !== undefined) active.wakeRequested = false
     }
     active?.abort.abort(cause)
+  }
+
+  /**
+   * Cancel the queued input, except the steered lines the AI read: each stays
+   * queued until the turn's end writes it, right after its claim.
+   */
+  private clearInbox(): void {
+    if (this.readSteers.size === 0) {
+      this.inbox.clear()
+      return
+    }
+    for (const message of this.inbox.nextStep) if (!this.readSteers.has(message.id)) this.inbox.remove(message.id)
+    this.inbox.splice('next-turn', 0, this.inbox.nextTurn.length, [])
   }
 
   /**
@@ -1284,9 +1299,11 @@ export class CasperAgent implements Agent {
 
   /**
    * Record a steered line Casper says the AI read: claim it from the queue for
-   * this turn and write it, as it was sent, as the next step's `user/message`.
-   * The rest of the queue goes back unchanged. The notice may come before
-   * Casper's reply to the send.
+   * this turn right before it is written, as it was sent, as the next step's
+   * `user/message`. The write waits for open calls and the claim waits with it,
+   * so a crash meanwhile leaves the line queued, never lost, and a Stop
+   * meanwhile does not cancel it. The rest of the queue goes back unchanged.
+   * The notice may come before Casper's reply to the send.
    * @param sink - the prompt's sink.
    * @param messageId - the id the notice carries.
    */
@@ -1297,14 +1314,14 @@ export class CasperAgent implements Agent {
     if (message === undefined) return
     sink.steers.accepted.delete(id)
     this.steerIds.delete(id)
-    if (!this.inbox.nextStep.some(item => item.id === id)) {
+    this.readSteers.add(id)
+    sink.writer.steered(message, () => {
+      this.readSteers.delete(id)
       // Removed from the queue after it was sent: the AI read it all the same.
-      sink.writer.steered(message)
-      return
-    }
-    const batch = this.inbox.claim('next-step', sink.turn)
-    sink.writer.steered(message)
-    this.inbox.splice('next-step', 0, 0, batch.filter(item => item.id !== id))
+      if (!this.inbox.nextStep.some(item => item.id === id)) return
+      const batch = this.inbox.claim('next-step', sink.turn)
+      this.inbox.splice('next-step', 0, 0, batch.filter(item => item.id !== id))
+    })
   }
 
   /** Forget the current connection and start killing it. */
