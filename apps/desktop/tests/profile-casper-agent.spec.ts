@@ -106,7 +106,7 @@ it('looks Casper up on PATH, then the installer folders, and falls back to the b
   expect(lookup([join(home, '.local', 'bin', exe), join('/opt/tools', exe)], '/opt/tools')).toBe(join('/opt/tools', exe))
 })
 
-it('declares the Casper preset with the todo list and the plugin kit, on Desktop only', () => {
+it('declares the Casper preset with the todo list, the plugin kit and present, on Desktop only', () => {
   const row = desktopRows().find(entry => entry.id === 'preset-casper')
   expect(row?.config?.['id']).toBe('casper')
   const plugins = row?.config?.['plugins'] as Row[] | undefined
@@ -116,6 +116,7 @@ it('declares the Casper preset with the todo list and the plugin kit, on Desktop
     ['skill-filesystem', '@deepseek-ai/dsh-skill-filesystem'],
     ['tool-skill', '@deepseek-ai/dsh-tool-skill'],
     ['tool-plugin-manager', '@deepseek-ai/dsh-plugin-manager/tools'],
+    ['present', '@deepseek-ai/dsh-tool-present'],
   ])
   const disabled = expression(row?.disabled)
   expect(evaluate(disabled ?? '', profileCtx('desktop'))).toBe(false)

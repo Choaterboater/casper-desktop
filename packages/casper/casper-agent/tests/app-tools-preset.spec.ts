@@ -1,9 +1,11 @@
 /**
  * The shipped casper preset rows give a Casper Session the app's real plugin tools: the bridge serves the
- * Cordis inspection, skill and plugin_manager tools those rows bind in the Casper Agent's scope, and a
- * bridged install asks once, through the app's own approval, on the app's existing plugin manager.
+ * Cordis inspection, skill, present and plugin_manager tools those rows bind in the Casper Agent's scope, a
+ * bridged install asks once, through the app's own approval, on the app's existing plugin manager, and a bridged
+ * present records the delivery the app's file card reads in the Casper turn.
  */
 
+import { writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
@@ -31,13 +33,14 @@ import UserQuestionService from '@deepseek-ai/dsh-user-questions'
 import type { AskUserQuestionRequest } from '@deepseek-ai/dsh-user-questions'
 // The preset's other rows, imported from their sources as the Loader would load their packages.
 import * as PluginManagerTools from '../../../boot/plugin-manager/src/tools.ts'
+import * as ToolPresent from '../../../deliverables/tool-present/src/index.ts'
 import * as ToolCordis from '../../../extensions/tool-cordis/src/index.ts'
 import SandboxPolicy from '../../../sandbox/sandbox-policy/src/index.ts'
 import * as SkillFilesystem from '../../../skill/skill-filesystem/src/index.ts'
 import * as ToolSkill from '../../../skill/tool-skill/src/index.ts'
 import * as CasperAgentPlugin from '../src/index.ts'
 import { CasperAgent } from '../src/agent.ts'
-import { PLUGIN_SKILL } from '../src/app-tools.ts'
+import { PLUGIN_SKILL, TURN_OVER } from '../src/app-tools.ts'
 import { prompt, eventsOf } from './harness.ts'
 import { fakeCasper, waitFor } from './support.ts'
 import type { FakeCasper, FakeLogEntry, FakeScript } from './support.ts'
@@ -83,6 +86,7 @@ async function host(fake: FakeCasper) {
     '@deepseek-ai/dsh-skill-filesystem': SkillFilesystem,
     '@deepseek-ai/dsh-tool-skill': ToolSkill,
     '@deepseek-ai/dsh-plugin-manager/tools': PluginManagerTools,
+    '@deepseek-ai/dsh-tool-present': ToolPresent,
   }
   ctx.loader.internal = {
     version: 'v2',
@@ -215,13 +219,8 @@ it('serves the preset\'s real tools, and a bridged install asks once through the
   expect(JSON.stringify(hidden?.result)).toContain('does not offer that bundle')
 })
 
-it('lists all five app tools, then the resource tools, to Casper from the preset rows', { timeout: 60_000 }, async () => {
-  const fake = fakeCasper({ prompts: [[]] })
-  cleanups.push(() => { fake.remove() })
-  const { create } = await host(fake)
-  const agent = await create('casper-preset-list')
-  agent.followup(prompt('hi'))
-  await agent.whenIdle()
+/** Connect to the app tools server a Casper Session offered, as Casper's MCP client does. */
+async function appClient(fake: FakeCasper): Promise<Client> {
   const entry = await waitFor(() => fake.log().find(logged => logged.method === 'session/new'))
   const [server] = (entry.params?.['mcpServers'] ?? []) as { url: string; headers: { name: string; value: string }[] }[]
   if (server === undefined) throw new Error('no app server offered')
@@ -229,9 +228,122 @@ it('lists all five app tools, then the resource tools, to Casper from the preset
   const headers = Object.fromEntries(server.headers.map(header => [header.name, header.value]))
   await client.connect(new StreamableHTTPClientTransport(new URL(server.url), { requestInit: { headers } }) as Transport)
   cleanups.push(() => client.close())
+  return client
+}
+
+/** Casper's stop words for find_capability's word search (Casper's src/capabilities/search.ts). */
+const STOP_WORDS = new Set(['the', 'a', 'an', 'to', 'of', 'for', 'and', 'in', 'with', 'please', 'tool', 'tools', 'read', 'get', 'show', 'use'])
+
+/** Casper's `tokenize`: lowercase runs of 2+ letters or digits, stop words left out, each once. */
+function tokenize(text: string): string[] {
+  return [...new Set(text.toLowerCase().split(/[^a-z0-9]+/).filter(word => word.length > 1 && !STOP_WORDS.has(word)))]
+}
+
+/** Casper's `termVariants`: the word and its likely singulars. */
+function variants(word: string): string[] {
+  const forms = new Set([word])
+  if (word.length > 4 && word.endsWith('ies')) forms.add(`${word.slice(0, -3)}y`)
+  if (word.length > 3 && word.endsWith('es')) forms.add(word.slice(0, -2))
+  if (word.length >= 3 && word.endsWith('s') && !word.endsWith('ss')) forms.add(word.slice(0, -1))
+  return [...forms]
+}
+
+/** Casper's `indexWords`: every variant of every word. */
+function indexWords(text: string): Set<string> {
+  return new Set(tokenize(text).flatMap(variants))
+}
+
+/**
+ * The ids find_capability returns for a query, best first, scored as Casper's search scores them: 4 for a word
+ * of the tool's name or server, 2 for a 5+ letter word that starts a name word, 1 for a description word.
+ */
+function findCapability(query: string, server: string, tools: readonly { name: string; description?: string | undefined }[]): string[] {
+  const scored = tools.map((tool) => {
+    const name = indexWords(`${tool.name} ${server}`)
+    const description = indexWords(tool.description ?? '')
+    const score = tokenize(query).reduce((sum, term) => {
+      if (variants(term).some(form => name.has(form))) return sum + 4
+      if (term.length >= 5 && [...name].some(word => word.length > term.length && word.startsWith(term))) return sum + 2
+      return sum + (variants(term).some(form => description.has(form)) ? 1 : 0)
+    }, 0)
+    return { id: `mcp:${server}:${tool.name}`, score }
+  })
+  return scored.filter(entry => entry.score > 0).sort((a, b) => b.score - a.score || a.id.localeCompare(b.id)).map(entry => entry.id)
+}
+
+it('lists all six app tools, then the resource tools, to Casper from the preset rows', { timeout: 60_000 }, async () => {
+  const fake = fakeCasper({ prompts: [[]] })
+  cleanups.push(() => { fake.remove() })
+  const { create } = await host(fake)
+  const agent = await create('casper-preset-list')
+  agent.followup(prompt('hi'))
+  await agent.whenIdle()
+  const client = await appClient(fake)
   // No tool drops out silently: each preset row resolved its tool in the Agent's scope.
   expect((await client.listTools()).tools.map(tool => tool.name)).toEqual([
-    'app_skill', 'plugin_manager', 'app_read_file', 'cordis_inspect_query', 'cordis_inspect_list',
+    'app_skill', 'plugin_manager', 'app_read_file', 'present', 'cordis_inspect_query', 'cordis_inspect_list',
     'list_mcp_resources', 'list_mcp_resource_templates', 'read_mcp_resource',
   ])
+})
+
+it('present is in the preset list, after the plugin manager', () => {
+  const ids = presetRows().map(row => (row as { id?: unknown }).id)
+  expect(presetRows()).toContainEqual({ id: 'present', name: '@deepseek-ai/dsh-tool-present' })
+  expect(ids.indexOf('present')).toBe(ids.indexOf('tool-plugin-manager') + 1)
+})
+
+it('find_capability for present the report file returns acp-app present', { timeout: 60_000 }, async () => {
+  const fake = fakeCasper({ prompts: [[]] })
+  cleanups.push(() => { fake.remove() })
+  const { create } = await host(fake)
+  const agent = await create('casper-preset-find')
+  agent.followup(prompt('hi'))
+  await agent.whenIdle()
+  const { tools } = await (await appClient(fake)).listTools()
+  // The real present row's name and description, searched as Casper searches when present is not pinned.
+  expect(findCapability('present the report file', 'acp-app', tools)[0]).toBe('mcp:acp-app:present')
+})
+
+/** The arguments of a present call for the report file, as the model writes them. */
+const PRESENT_ARGS = { files: [{ path: 'report.md', description: 'The report' }] }
+
+/** A current Casper's step for the bridged present call. */
+const PRESENT_STEP = { tool: 'present', target: 'report.md', rawInput: PRESENT_ARGS, meta: { tool: 'mcp', mcp: { server: 'acp-app', tool: 'present' } } }
+
+it('a bridged present call shows a file card in the Casper turn', { timeout: 60_000 }, async () => {
+  const fake = fakeCasper({ prompts: [[PRESENT_STEP, { mcp: 'present', args: PRESENT_ARGS }, { toolEnd: 1 }]] })
+  cleanups.push(() => { fake.remove() })
+  writeFileSync(join(fake.cwd, 'report.md'), '# Report\n')
+  const { create } = await host(fake)
+  const agent = await create('casper-preset-present')
+  agent.followup(prompt('write the report and hand it to me'))
+  await agent.whenIdle()
+
+  const [present] = results(fake.log())
+  expect(present?.name).toBe('present')
+  expect(present?.result).toMatchObject({ isError: false })
+  const report = join(fake.cwd, 'report.md')
+  expect(JSON.stringify(present?.result)).toContain(`Presented ${report}`)
+  // The step is recorded as the app's present call, so Standard's present card draws it with the app's own result.
+  const events = eventsOf(agent)
+  const ids = callIds(agent)
+  expect(events.flatMap(event => event.type === 'tool/call' ? [event.data.name] : [])).toEqual(['present'])
+  // ui-deliverables draws a file card for each deliverables/presented event of a turn: this one names the Casper turn and step.
+  const [turn] = events.flatMap(event => event.type === 'turn/start' ? [event.data.turn] : [])
+  const presented = events.flatMap(event => event.type === 'deliverables/presented' ? [event.data] : [])
+  expect(presented).toEqual([{ turn, callId: ids[0], files: [{ path: report, description: 'The report' }] }])
+  expect(turn).toBe(1)
+})
+
+it('a present call after the turn ended returns TURN_OVER and appends nothing', { timeout: 60_000 }, async () => {
+  const fake = fakeCasper({ prompts: [[{ late: { mcp: 'present', args: PRESENT_ARGS } }]] })
+  cleanups.push(() => { fake.remove() })
+  writeFileSync(join(fake.cwd, 'report.md'), '# Report\n')
+  const { create } = await host(fake)
+  const agent = await create('casper-preset-present-late')
+  agent.followup(prompt('go'))
+  await agent.whenIdle()
+  const late = await waitFor(() => fake.log().find(entry => entry.event === 'mcp'))
+  expect(late.result).toEqual({ content: [{ type: 'text', text: TURN_OVER }], isError: true })
+  expect(eventsOf(agent).filter(event => event.type === 'deliverables/presented' || event.type === 'tool/call')).toEqual([])
 })

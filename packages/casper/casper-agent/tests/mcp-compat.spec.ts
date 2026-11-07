@@ -49,7 +49,7 @@ async function server(release?: Promise<void>): Promise<{ target: AppToolsServer
       return `${name} done`
     },
   })
-  for (const name of ['cordis_inspect_list', 'cordis_inspect_query', 'skill']) booted.ctx.tools.register(stand(name))
+  for (const name of ['cordis_inspect_list', 'cordis_inspect_query', 'skill', 'present']) booted.ctx.tools.register(stand(name))
   booted.ctx.tools.register(stand('plugin_manager', release))
   const target = await startAppTools({
     tools: booted.ctx.tools, skills: undefined, agent, cwd: fake.cwd, profile: undefined, version: '0.0.0-compat', roots: [fake.root], installed: false,
@@ -108,7 +108,8 @@ describe('MCP 1.x compatibility', { timeout: 60_000 }, () => {
       ['app_skill', true, true],
       ['plugin_manager', true, false],
       ['app_read_file', true, true],
-      ['cordis_inspect_query', true, true],
+      ['present', true, true],
+      ['cordis_inspect_query', false, true],
       ['cordis_inspect_list', false, true],
       ['list_mcp_resources', false, true],
       ['list_mcp_resource_templates', false, true],

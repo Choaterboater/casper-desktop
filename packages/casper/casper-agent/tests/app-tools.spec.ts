@@ -30,7 +30,7 @@ import { boot } from './harness.ts'
 import { fakeCasper } from './support.ts'
 
 /** The app tools in list order, which is the order Casper takes pins in. */
-const APP_TOOLS = ['app_skill', 'plugin_manager', 'app_read_file', 'cordis_inspect_query', 'cordis_inspect_list']
+const APP_TOOLS = ['app_skill', 'plugin_manager', 'app_read_file', 'present', 'cordis_inspect_query', 'cordis_inspect_list']
 /** The resource tools, listed after the app tools. */
 const RESOURCE_TOOLS = ['list_mcp_resources', 'list_mcp_resource_templates', 'read_mcp_resource']
 
@@ -78,6 +78,12 @@ async function host(release?: Promise<void>) {
     },
     output: { schema: { type: 'string' }, render: (_args, value) => text(value) },
     execute: (args, exec) => { seen.push({ name: 'cordis_inspect_query', args, exec }); return Promise.resolve(`queried ${args.method}`) },
+  }))
+  tools.register(defineTool({
+    name: 'present', description: 'Declare existing files as final deliverables for the user.',
+    parameters: { files: { type: 'array', required: true, items: { type: 'object', additionalProperties: false, properties: { path: { type: 'string', required: true } } } } },
+    output: { schema: { type: 'string' }, render: (_args, value) => text(value) },
+    execute: (args, exec) => { seen.push({ name: 'present', args, exec }); return Promise.resolve('presented') },
   }))
   tools.register(defineTool({
     name: 'skill', description: 'Load the full instructions for a skill.',
@@ -193,7 +199,30 @@ describe('app tools listener', { timeout: 60_000 }, () => {
 })
 
 describe('app tools over MCP', { timeout: 60_000 }, () => {
-  it('lists exactly the five app tools and the three resource tools with their read hints, pins, and short descriptions', async () => {
+  it('the tool list order is app_skill, plugin_manager, app_read_file, present, cordis_inspect_query, cordis_inspect_list, then the resource tools', async () => {
+    const { ctx, agent } = await host()
+    const mcp = await client(await serve(agent, ctx))
+    // Casper takes pins in list order: the guide and the install come first.
+    expect((await mcp.listTools()).tools.map(tool => tool.name)).toEqual([...APP_TOOLS, ...RESOURCE_TOOLS])
+  })
+
+  it('readOnlyHint is set on all but plugin_manager', async () => {
+    const { ctx, agent } = await host()
+    const { tools } = await (await client(await serve(agent, ctx))).listTools()
+    expect(tools.filter(tool => tool.annotations?.readOnlyHint !== true).map(tool => tool.name)).toEqual(['plugin_manager'])
+    expect(tools.find(tool => tool.name === 'plugin_manager')?.annotations).toBeUndefined()
+    for (const tool of tools.filter(listed => listed.name !== 'plugin_manager')) expect(tool.annotations).toEqual({ readOnlyHint: true })
+  })
+
+  it('the pins are app_skill, plugin_manager, app_read_file and present', async () => {
+    const { ctx, agent } = await host()
+    const { tools } = await (await client(await serve(agent, ctx))).listTools()
+    // Four pins, as before present: cordis_inspect_query gave its pin to present, so each request costs the same.
+    expect(tools.filter(tool => tool._meta?.['casper/pin'] === true).map(tool => tool.name)).toEqual(['app_skill', 'plugin_manager', 'app_read_file', 'present'])
+    for (const tool of tools) expect(tool._meta).toEqual(tool._meta?.['casper/pin'] === true ? { 'casper/pin': true } : undefined)
+  })
+
+  it('lists the app tools and the resource tools with short descriptions and their schemas', async () => {
     const { ctx, agent } = await host()
     const summary = (name: string, modelInvocable = true): SkillSummary => ({
       name, description: name, invocation: { modelInvocable, userInvocable: true }, source: 'bundled', provider: 'test',
@@ -202,17 +231,8 @@ describe('app tools over MCP', { timeout: 60_000 }, () => {
     const mcp = await client(await serve(agent, ctx, { skills }))
     expect(mcp.getInstructions()).toBeUndefined()
     const { tools } = await mcp.listTools()
-    // Casper takes pins in list order: the guide and the install come first.
     expect(tools.map(tool => tool.name)).toEqual([...APP_TOOLS, ...RESOURCE_TOOLS])
     const byName = new Map(tools.map(tool => [tool.name, tool]))
-    for (const name of ['cordis_inspect_list', 'cordis_inspect_query', 'app_skill', 'app_read_file', ...RESOURCE_TOOLS]) {
-      expect(byName.get(name)?.annotations).toEqual({ readOnlyHint: true })
-    }
-    expect(byName.get('plugin_manager')?.annotations).toBeUndefined()
-    for (const name of ['cordis_inspect_query', 'app_skill', 'app_read_file', 'plugin_manager']) {
-      expect(byName.get(name)?._meta).toEqual({ 'casper/pin': true })
-    }
-    for (const name of ['cordis_inspect_list', ...RESOURCE_TOOLS]) expect(byName.get(name)?._meta).toBeUndefined()
     for (const tool of tools) expect(tool.description?.length ?? 0).toBeLessThanOrEqual(DESCRIPTION_MAX)
     expect(byName.get('plugin_manager')?.description).toMatch(/^For app plugins, first load cordis-plugin-development with app_skill\. Manage profile plugins\./)
     expect(byName.get('plugin_manager')?.description?.endsWith('…')).toBe(true)
@@ -225,6 +245,9 @@ describe('app tools over MCP', { timeout: 60_000 }, () => {
       properties: { platform: { enum: ['host', 'client'] }, provider: { type: 'string' }, method: { type: 'string' } },
     })
     expect(byName.get('app_read_file')?.inputSchema).toMatchObject({ type: 'object', required: ['path'] })
+    // present goes as the app's own tool: its description and schema, no guide line.
+    expect(byName.get('present')?.description).toBe('Declare existing files as final deliverables for the user.')
+    expect(byName.get('present')?.inputSchema).toMatchObject({ type: 'object', required: ['files'], properties: { files: { type: 'array' } } })
   })
 
   it('names itself with the app version, or this package\'s version when the app gives none', async () => {
@@ -262,7 +285,7 @@ describe('app tools over MCP', { timeout: 60_000 }, () => {
       execute: input => ctx.tools.execute(input),
     }
     const mcp = await client(await serve(agent, ctx, { tools: hidden }))
-    expect((await mcp.listTools()).tools.map(tool => tool.name)).toEqual(['app_skill', 'app_read_file', 'cordis_inspect_query', 'cordis_inspect_list', ...RESOURCE_TOOLS])
+    expect((await mcp.listTools()).tools.map(tool => tool.name)).toEqual(['app_skill', 'app_read_file', 'present', 'cordis_inspect_query', 'cordis_inspect_list', ...RESOURCE_TOOLS])
   })
 
   it('runs a call as the Casper Agent under the mapped call id, with no log, and hands its result to the step', async () => {
@@ -293,7 +316,7 @@ describe('app tools over MCP', { timeout: 60_000 }, () => {
 
   it('names each served tool after the app tool it runs', () => {
     expect([...APP_TOOLS, ...RESOURCE_TOOLS, 'other'].map(dshNameOf))
-      .toEqual(['skill', 'plugin_manager', 'app_read_file', 'cordis_inspect_query', 'cordis_inspect_list', ...RESOURCE_TOOLS, undefined])
+      .toEqual(['skill', 'plugin_manager', 'app_read_file', 'present', 'cordis_inspect_query', 'cordis_inspect_list', ...RESOURCE_TOOLS, undefined])
   })
 
   it('gives a call without a Casper call id a fresh id of its own, and records no step result for it', async () => {

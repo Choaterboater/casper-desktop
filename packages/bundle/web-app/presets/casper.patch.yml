@@ -2,9 +2,10 @@
 # after the web patch. Sessions on this preset are driven by the Casper agent
 # (`@deepseek-ai/dsh-casper-agent`), so the preset mounts only what renders
 # Casper's work and what the Casper agent serves to Casper as the app's tools:
-# the todo list that shows Casper's plan, and the plugin kit (Cordis
+# the todo list that shows Casper's plan, the plugin kit (Cordis
 # inspection, the app's skills with the agent-preset skills folder, and
-# plugin_manager on the app's own plugin-manager service). Casper's own checks
+# plugin_manager on the app's own plugin-manager service), and present, whose
+# deliveries show as file cards in the Casper turn. Casper's own checks
 # replace casper-checks, and plugin-market has no service in this deployment.
 # Desktop only, never in a Worker, exactly like the casper-agent row.
 - insert:
@@ -34,3 +35,5 @@
           - id: tool-plugin-manager
             name: '@deepseek-ai/dsh-plugin-manager/tools'
             disabled: !!js "!ctx.get('profileContext')"
+          - id: present
+            name: '@deepseek-ai/dsh-tool-present'

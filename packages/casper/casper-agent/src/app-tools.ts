@@ -62,13 +62,17 @@ interface BridgedTool {
 
 /**
  * The tools served, in list order, which is the order Casper takes pins in:
- * the guide and the install first, then the reads they lead to.
+ * the guide and the install first, then the reader, then `present`, which
+ * hands the user a file the app shows as a card in the Casper turn. Four are
+ * pinned; `cordis_inspect_query` gave its pin to `present`, so each request
+ * costs the same, and Casper reaches it through find_capability.
  */
 const BRIDGED: readonly BridgedTool[] = [
   { mcp: 'app_skill', dsh: 'skill', readOnly: true, pin: true, guide: false },
   { mcp: 'plugin_manager', dsh: 'plugin_manager', readOnly: false, pin: true, guide: true },
   { mcp: 'app_read_file', dsh: undefined, readOnly: true, pin: true, guide: false },
-  { mcp: 'cordis_inspect_query', dsh: 'cordis_inspect_query', readOnly: true, pin: true, guide: false },
+  { mcp: 'present', dsh: 'present', readOnly: true, pin: true, guide: false },
+  { mcp: 'cordis_inspect_query', dsh: 'cordis_inspect_query', readOnly: true, pin: false, guide: false },
   { mcp: 'cordis_inspect_list', dsh: 'cordis_inspect_list', readOnly: true, pin: false, guide: true },
 ]
 
