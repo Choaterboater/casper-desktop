@@ -37,6 +37,8 @@ export interface FakeLogEntry {
   readonly timedOut?: boolean
   /** Casper's reply to a steer. */
   readonly steered?: boolean
+  /** Casper's reply to an idle check. */
+  readonly idle?: { idle: boolean; running: string[]; reason?: string }
 }
 
 /** One step of the stand-in's prompt script; see `fake-casper-acp.ts`. */
@@ -78,6 +80,12 @@ export interface FakeScript {
   readonly steerReplyDelayMs?: number
   /** Say in `initialize` that Casper takes HTTP MCP servers, so the app hands it its own. */
   readonly mcpHttp?: boolean
+  /** The reply to each idle check of a process in order, the last repeating; null answers -32601 as an older Casper. */
+  readonly idle?: readonly { readonly idle: boolean; readonly running: readonly string[]; readonly reason?: 'off' | 'busy' }[] | null
+  /** Each idle reply waits until this file exists. */
+  readonly holdIdle?: string
+  /** The options of a successful `session/load` reply and from then on, as when Casper puts back the conversation's model. */
+  readonly loadConfigOptions?: readonly SessionConfigOption[]
 }
 
 /** One command the stand-in offers, in ACP's `available_commands_update` shape. */
@@ -143,6 +151,8 @@ export function fakeCasper(script: FakeScript = { prompts: [] }): FakeCasper {
       accessModes: { ...DEFAULT_ACCESS_MODES },
       approvalCard: true,
       forwardMcpServers: true,
+      // Tests that close an idle Casper set their own idle time.
+      idleExitMs: 0,
       ...overrides,
     }),
     remove: () => { rmSync(root, { recursive: true, force: true }) },

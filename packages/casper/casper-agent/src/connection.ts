@@ -37,6 +37,9 @@ import type { ForwardedServers } from './forward-servers.ts'
 /** ACP error code Casper uses for an unknown or unloadable session. */
 const ACP_NOT_FOUND = -32002
 
+/** Limit for Casper's answer to `_casper/idle`; a Casper that does not answer by then is not idle. */
+const IDLE_CHECK_MS = 10_000
+
 /**
  * Matches both messages Casper sends with -32002 when a stored conversation is
  * gone: `--resume: no saved conversation in this workspace starts with "<id>". …`
@@ -411,6 +414,38 @@ export class CasperConnection {
       // A line Casper did not take runs as the next turn.
       void error
       return false
+    }
+  }
+
+  /**
+   * Ask Casper with `_casper/idle` whether the app may close it now: no prompt or model change under way, and no dev
+   * server, command, debugger, helper or checks still at work. Casper answers within 10 seconds or not at all.
+   * @param signal - stops the check, which then answers false.
+   * @returns whether Casper says it is idle; false for a busy reply, an error reply (an older Casper answers -32601),
+   *   no answer in time, a stop, or an exit.
+   */
+  async idle(signal: AbortSignal): Promise<boolean> {
+    const limit = AbortSignal.any([signal, AbortSignal.timeout(IDLE_CHECK_MS)])
+    if (this.dead || limit.aborted) return false
+    // A cancel is cooperative, so the check stops waiting on its own.
+    const stopped = Promise.withResolvers<undefined>()
+    const onStop = (): void => { stopped.resolve(undefined) }
+    limit.addEventListener('abort', onStop, { once: true })
+    try {
+      const sent = this.request(this.requireConnection().agent.request<{ idle?: unknown } | null>(
+        '_casper/idle', { sessionId: this.requireSession() }, { cancellationSignal: limit },
+      ))
+      sent.catch(() => {
+        // A reply after the stop no longer counts.
+      })
+      const reply = await Promise.race([sent, stopped.promise])
+      return reply?.idle === true
+    } catch (error: unknown) {
+      // Any failure keeps Casper.
+      void error
+      return false
+    } finally {
+      limit.removeEventListener('abort', onStop)
     }
   }
 

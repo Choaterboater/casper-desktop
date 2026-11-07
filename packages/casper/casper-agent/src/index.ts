@@ -66,11 +66,17 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   // Only plan-mode's projection: the composer's plan chip shows Casper's Plan first option. Its controller is never applied.
   const plan = await ctx.sessionProjections.register(planProjectionDefinition)
   const sidecar = await openSidecar(ctx.storageDomain)
+  // Records of Sessions that are gone are dropped in the background; disposal waits for it before closing the sidecar.
+  const pruned = sidecar.prune(async sessionId => await ctx.sessionPersistence.stat(sessionId) !== undefined).then(
+    (count) => { if (count > 0) ctx.logger.debug(`casper agent: dropped ${count} records of deleted sessions`) },
+    (error: unknown) => { ctx.logger.warn(`casper agent: records of deleted sessions not dropped: ${String(error)}`) },
+  )
   const commands = await openCommandCache(ctx.storageDomain)
   const models = await openModelsCache(ctx.storageDomain)
   const factory = new CasperAgentFactory(ctx, config, { agentModels, inbox, plan, sidecar, commands, models })
   ctx.effect(() => async () => {
     await factory.dispose()
+    await pruned
     await sidecar.close()
     await commands.close()
     await models.close()

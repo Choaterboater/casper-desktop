@@ -2283,3 +2283,240 @@ describe('Session mentions in a Casper session', { timeout: 60_000 }, () => {
     expect(turnEnds(agent)).toEqual([{ kind: 'completed' }, { kind: 'completed' }])
   })
 })
+
+describe('Closing an idle Casper', { timeout: 60_000 }, () => {
+  /** A short idle time, so a test sees the check. */
+  const IDLE = { idleExitMs: 200 }
+  const COMPLETED = { kind: 'completed' }
+
+  /** Where in the log one process logged an event, or -1. */
+  function at(fake: FakeCasper, pid: number | undefined, test: (entry: ReturnType<FakeCasper['log']>[number]) => boolean, nth = 1): number {
+    let seen = 0
+    return fake.log().findIndex(entry => entry.pid === pid && test(entry) && ++seen === nth)
+  }
+
+  const idleReply = (entry: { event?: string }) => entry.event === 'idle-reply'
+  const eof = (entry: { event?: string }) => entry.event === 'eof'
+
+  function replyText(agent: Agent): string {
+    return eventsOf(agent).flatMap(event => event.type === 'assistant/message'
+      ? event.data.message.content.flatMap(block => block.type === 'text' ? [block.text] : [])
+      : []).join('')
+  }
+
+  it('an idle Casper is closed and the next prompt reopens it with session/load and no fresh notice', async () => {
+    const { fake, host } = await setup({ prompts: [[{ text: 'one\n' }], [{ text: 'two\n' }]] }, IDLE)
+    const { agent } = await host.create('casper-idle-close')
+    await run(agent, 'first')
+    const [first] = fake.pids()
+    await waitFor(() => at(fake, first, eof) !== -1 && !alive(first ?? 0))
+    const conversation = host.record('casper-idle-close')?.acpSessionId
+    expect(fake.calls('_casper/idle').map(entry => entry.params)).toEqual([{ sessionId: conversation }])
+    // The check is not a turn, and the closed process leaves the Agent idle.
+    expect(agent.status).toBe('idle')
+    expect(turnEnds(agent)).toEqual([COMPLETED])
+    await run(agent, 'second')
+    const second = fake.pids()[1]
+    expect(second).toBeDefined()
+    expect(fake.calls('session/load')).toMatchObject([{ pid: second, params: { sessionId: conversation } }])
+    expect(fake.calls('session/prompt').map(entry => entry.pid)).toEqual([first, second])
+    expect(replyText(agent)).not.toContain(FRESH_CONVERSATION_NOTICE)
+    expect(replyText(agent)).not.toContain('reopened')
+    expect(turnEnds(agent)).toEqual([COMPLETED, COMPLETED])
+  })
+
+  it('a Casper running a dev server is kept and asked again later', async () => {
+    const idle = [{ idle: false, running: ['dev server'] }, { idle: true, running: [] }]
+    const { fake, host } = await setup({ prompts: [[{ text: 'serving\n' }]], idle }, IDLE)
+    const { agent } = await host.create('casper-idle-server')
+    await run(agent, 'start the server')
+    const [pid] = fake.pids()
+    await waitFor(() => at(fake, pid, eof) !== -1)
+    // Closed only after the second check said idle.
+    expect(fake.calls('_casper/idle')).toHaveLength(2)
+    expect(at(fake, pid, idleReply, 2)).toBeGreaterThan(-1)
+    expect(at(fake, pid, eof)).toBeGreaterThan(at(fake, pid, idleReply, 2))
+  })
+
+  it('an old Casper without the request is kept', async () => {
+    const { fake, host } = await setup({ prompts: [[{ text: 'one\n' }], [{ text: 'two\n' }]], idle: null }, IDLE)
+    const { agent } = await host.create('casper-idle-old')
+    await run(agent, 'first')
+    const [pid] = fake.pids()
+    // Its -32601 reads as not idle; it is asked again after another idle time.
+    await waitFor(() => fake.calls('_casper/idle').length >= 2)
+    expect(alive(pid ?? 0)).toBe(true)
+    expect(at(fake, pid, eof)).toBe(-1)
+    await run(agent, 'second')
+    expect(fake.pids()).toEqual([pid])
+    expect(fake.calls('session/load')).toEqual([])
+    expect(turnEnds(agent)).toEqual([COMPLETED, COMPLETED])
+  })
+
+  it('a prompt during a pending check runs on the old process once, and maintenance during the check succeeds', async () => {
+    const { fake, host } = await setup({ prompts: [] }, IDLE)
+    const check = gate(fake, 'idle-check')
+    const midPrompt = gate(fake, 'mid-prompt')
+    fake.script({ configOptions: casperOptions(), holdIdle: check.path, prompts: [[{ text: 'one\n' }], [{ waitFile: midPrompt.path }, { text: 'two\n' }]] })
+    const { agent } = await host.create('casper-idle-during')
+    await run(agent, 'first')
+    const [pid] = fake.pids()
+    await waitFor(() => fake.calls('_casper/idle').length === 1)
+    // A model pick while Casper is asked runs as maintenance on the live process.
+    const own = agent.model.own
+    if (own === undefined) throw new Error('a Casper Agent chooses its own models')
+    await own.choose({ provider: 'claude-subscription', model: 'claude-opus-5-5' })
+    expect(fake.calls('session/set_config_option').map(entry => entry.pid)).toEqual([pid])
+    agent.followup(prompt('second'))
+    await waitFor(() => fake.calls('session/prompt').length === 2)
+    // Casper answers idle while the prompt runs: the prompt keeps its process.
+    check.open()
+    await waitFor(() => at(fake, pid, idleReply) !== -1)
+    midPrompt.open()
+    await agent.whenIdle()
+    expect(fake.calls('session/prompt').map(entry => entry.pid)).toEqual([pid, pid])
+    expect(turnEnds(agent)).toEqual([COMPLETED, COMPLETED])
+    // The next idle time closes it.
+    await waitFor(() => at(fake, pid, eof) !== -1)
+    expect(at(fake, pid, idleReply, 2)).toBeGreaterThan(-1)
+    expect(at(fake, pid, eof)).toBeGreaterThan(at(fake, pid, idleReply, 2))
+    expect(fake.pids()).toEqual([pid])
+  })
+
+  it('a turn that starts and ends during the check prevents the close', async () => {
+    const { fake, host } = await setup({ prompts: [] }, IDLE)
+    const check = gate(fake, 'idle-check')
+    fake.script({ holdIdle: check.path, prompts: [[{ text: 'one\n' }], [{ text: 'two\n' }]] })
+    const { agent } = await host.create('casper-idle-turn')
+    await run(agent, 'first')
+    const [pid] = fake.pids()
+    await waitFor(() => fake.calls('_casper/idle').length === 1)
+    await run(agent, 'second')
+    check.open()
+    await waitFor(() => at(fake, pid, eof) !== -1)
+    // The first idle reply came after the turn, so only a later check closed Casper.
+    expect(at(fake, pid, idleReply, 2)).toBeGreaterThan(-1)
+    expect(at(fake, pid, eof)).toBeGreaterThan(at(fake, pid, idleReply, 2))
+    expect(fake.calls('session/prompt').map(entry => entry.pid)).toEqual([pid, pid])
+    expect(turnEnds(agent)).toEqual([COMPLETED, COMPLETED])
+  })
+
+  it('a prompt during a close starts the new process only after the old one exits', async () => {
+    // A Casper that ignores the end of its input holds the close for the exit grace.
+    const script = { prompts: [[{ text: 'one\n' }], [{ text: 'two\n' }]], ignoreEof: true }
+    const { fake, host } = await setup(script, { ...IDLE, exitGraceMs: 500, killGraceMs: 500 })
+    const { agent } = await host.create('casper-idle-closing')
+    await run(agent, 'first')
+    const [first] = fake.pids()
+    await waitFor(() => at(fake, first, eof) !== -1)
+    expect(alive(first ?? 0)).toBe(true)
+    agent.followup(prompt('second'))
+    await waitFor(() => fake.pids().length === 2)
+    expect(alive(first ?? 0)).toBe(false)
+    await agent.whenIdle()
+    expect(fake.calls('session/load').map(entry => entry.pid)).toEqual([fake.pids()[1]])
+    expect(turnEnds(agent)).toEqual([COMPLETED, COMPLETED])
+  })
+
+  it('a prompt stopped while the old Casper closes ends at once and starts no new process', async () => {
+    const script = { prompts: [[{ text: 'one\n' }], [{ text: 'two\n' }]], ignoreEof: true }
+    // The exit grace holds the close long enough to stop the prompt while it waits.
+    const { fake, host } = await setup(script, { ...IDLE, exitGraceMs: 4_000, killGraceMs: 500 })
+    const { agent } = await host.create('casper-idle-stopped')
+    await run(agent, 'first')
+    const [first] = fake.pids()
+    await waitFor(() => at(fake, first, eof) !== -1)
+    agent.followup(prompt('second'))
+    await waitFor(() => eventsOf(agent).filter(event => event.type === 'user/message').length === 2)
+    // The turn writes nothing while it waits for the close, so it is given time to reach the wait.
+    await new Promise((resolve) => { setTimeout(resolve, 300) })
+    const stopped = Date.now()
+    agent.cancel({ kind: 'user' })
+    await agent.whenIdle()
+    expect(Date.now() - stopped).toBeLessThan(2_000)
+    // The stop did not wait for the old process to exit.
+    expect(alive(first ?? 0)).toBe(true)
+    expect(turnEnds(agent)).toEqual([COMPLETED, { kind: 'aborted', reason: { kind: 'user' } }])
+    await waitFor(() => !alive(first ?? 0))
+    expect(fake.pids()).toEqual([first])
+    expect(fake.calls('session/load')).toEqual([])
+  })
+
+  it('a Casper that exited while idle is not asked, and the next prompt reopens it', async () => {
+    const { fake, host } = await setup({ prompts: [[{ text: 'one\n' }, { exitAfterMs: 20 }], [{ text: 'two\n' }]] }, IDLE)
+    const { agent } = await host.create('casper-idle-exited')
+    await run(agent, 'first')
+    const [first] = fake.pids()
+    await waitFor(() => !alive(first ?? 0))
+    // A negative: nothing to poll for, so the test waits past two idle times.
+    await new Promise((resolve) => { setTimeout(resolve, 500) })
+    expect(fake.calls('_casper/idle')).toEqual([])
+    await run(agent, 'second')
+    expect(fake.calls('session/load').map(entry => entry.pid)).toEqual([fake.pids()[1]])
+    expect(turnEnds(agent)).toEqual([COMPLETED, COMPLETED])
+  })
+
+  it('idleExitMs 0 never asks, and dispose during a check finishes in time', async () => {
+    const { fake, host } = await setup({ prompts: [[{ text: 'kept\n' }]] }, { idleExitMs: 0 })
+    const kept = await host.create('casper-idle-off')
+    await run(kept.agent, 'first')
+    // A negative: nothing to poll for, so the test waits several idle times of the other Agent below.
+    await new Promise((resolve) => { setTimeout(resolve, 600) })
+    expect(fake.calls('_casper/idle')).toEqual([])
+
+    const other = fakeCasper({ prompts: [] })
+    cleanups.push(() => { other.remove() })
+    const check = gate(other, 'idle-check')
+    other.script({ holdIdle: check.path, prompts: [[{ text: 'one\n' }]] })
+    const asked = await boot(other, { ...IDLE, exitGraceMs: 300, killGraceMs: 500 })
+    cleanups.push(() => asked.ctx.fiber.dispose())
+    const handle = await asked.create('casper-idle-dispose')
+    await run(handle.agent, 'first')
+    const [pid] = other.pids()
+    await waitFor(() => other.calls('_casper/idle').length === 1)
+    const started = Date.now()
+    await handle.dispose()
+    expect(Date.now() - started).toBeLessThan(5_000)
+    expect(alive(pid ?? 0)).toBe(false)
+    expect(other.calls('_casper/idle')).toHaveLength(1)
+  })
+
+  it('a reopened Casper on another model says so and sends no set', async () => {
+    const script = {
+      configOptions: casperOptions(), loadConfigOptions: casperOptions('claude-subscription/claude-opus-5-5'),
+      prompts: [[{ text: 'one\n' }], [{ text: 'two\n' }]],
+    }
+    const { fake, host } = await setup(script, IDLE)
+    const { agent } = await host.create('casper-idle-model')
+    await run(agent, 'first')
+    const [pid] = fake.pids()
+    await waitFor(() => !alive(pid ?? 0))
+    await run(agent, 'second')
+    expect(replyText(agent)).toContain('[Casper reopened on claude-subscription/claude-opus-5-5; it was openai-codex/gpt-6.1-sol.]\n')
+    expect(fake.calls('session/set_config_option')).toEqual([])
+    expect(agent.model.current()).toMatchObject({ provider: 'claude-subscription', model: 'claude-opus-5-5' })
+  })
+
+  it('Read only set before a close reaches the reopened Casper before its first prompt', async () => {
+    const fake = fakeCasper({ configOptions: casperOptions(), modes: casperModes(), prompts: [[{ text: 'one\n' }], [{ text: 'two\n' }]] })
+    cleanups.push(() => { fake.remove() })
+    const host = await boot(fake, IDLE, undefined, true, mountPermissionPresets)
+    cleanups.push(() => host.ctx.fiber.dispose())
+    const { agent } = await host.create('casper-idle-read')
+    await run(agent, 'first')
+    const [first] = fake.pids()
+    host.ctx.permissionPresets.set(agent.session, 'read-only')
+    await waitFor(() => !alive(first ?? 0))
+    await run(agent, 'second')
+    const second = fake.pids()[1]
+    const reopened = fake.log().flatMap(entry => entry.pid === second && entry.method !== undefined && entry.method !== 'initialize'
+      ? [[entry.method, entry.params?.configId ?? null, entry.params?.value ?? null]]
+      : [])
+    expect(reopened).toEqual([
+      ['session/load', null, null],
+      ['session/set_config_option', 'mode', 'read'],
+      ['session/prompt', null, null],
+    ])
+    expect(turnEnds(agent)).toEqual([COMPLETED, COMPLETED])
+  })
+})

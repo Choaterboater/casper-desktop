@@ -43,6 +43,7 @@ The Desktop profile mounts the plugin from `packages/bundle/web-app/cordis.patch
 | `accessModes` | `{ read-only: read, workspace-write: ask, danger-full-access: full }` | The [access mode](#access-control) each permission preset sets; `custom` and `auto` cannot be listed |
 | `approvalCard` | `true` | Show Casper's boxes with [Casper's approval card](#approvals); `false` shows the generic question card |
 | `forwardMcpServers` | `true` | Hand Casper the enabled [Settings > MCP servers](#settings-mcp-servers); `false` sends only the app tools server |
+| `idleExitMs` | `900000` | Idle time after which Casper is asked whether its process may be [closed](#process-lifetime-and-resume) (15 minutes); `0` keeps it until the Session closes |
 
 The child never receives `DEEPSEEK_*` or `DSH_*` names, or credential-shaped names that `env` does not list. The one exception is the app profile: when the app runs with a profile, Casper gets `DSH_PROFILE` and `DSH_PROFILE_DIR`, so a bundle it builds can name the profile it installs into.
 
@@ -162,9 +163,14 @@ A pick goes to the Agent, not the Host catalog: it is checked against Casper's l
 
 A new Session shows the list kept in the host storage domain `casper_agent_models` (one global record) until its own Casper starts, with `model` from the config as its current model when set; before any Casper has sent a list, the picker says Casper lists its models once it starts. A resumed Session keeps what its history recorded. A Session created before this list was recorded refuses a pick until its Casper starts.
 
+<a id="process-lifetime-and-resume"></a>
 ### Process lifetime and resume
 
 Casper starts at a Session's first prompt, so a missing command never blocks opening a Session. After `session/new`, the conversation id is stored in the sidecar before the prompt is sent. A later process reopens it with `session/load` and drops the replayed updates, since the Session already holds the history; only Casper's no-saved-conversation reply (`-32002` whose message contains "no saved conversation" in any letter case) starts a fresh conversation, and that turn opens with a line saying so, even when it then sends nothing. Casper saves a conversation only after its first reply, so a conversation whose process stopped before then starts fresh this way. Another load failure ends the turn and keeps the record. Disposal closes stdin, waits `exitGraceMs`, then terminates the process, which fits Desktop's 10 second host exit. Resume repairs an interrupted turn like agent-loop and starts no process.
+
+Once a Session has sat idle for `idleExitMs` with Casper running, the plugin asks Casper with `_casper/idle` (Casper's decision 91) whether the process may be closed. The reply names only kinds of work: Casper is idle when no prompt or model change is under way and no dev server, command, debugger, helper, or checks are still at work, a command whose note for the AI is still being written included; Casper's own `acp_idle_exit: off` always answers not idle. When Casper says idle and nothing started meanwhile, the process is closed as on disposal. A turn, a model pick, an access switch, or a Plan first set during the check keeps it and starts the idle time again; so does a Casper that is not idle, that gives no answer within 10 seconds, or that does not know the request (`-32601`), and it is asked again after another idle time. The next prompt starts Casper only after the old process has exited and reopens the conversation with `session/load`, with no fresh-conversation line. On that load Casper goes on with the conversation's own model; when that is not the model the closed process was on, the turn opens with `[Casper reopened on <model>; it was <model>.]` and the plugin sends no model set. What the closed process allowed for its session alone ends with it: "Yes, for this session" answers and an access mode Casper picked itself. The reopened Casper gets the access control's mode and the Session's Plan first value again before its first prompt.
+
+At each start the plugin drops, in the background, the sidecar records of Sessions that `sessionPersistence.stat` no longer finds; the app has no Session delete of its own. An archived Session is still stored and keeps its record, and so does one whose check fails.
 
 <a id="app-tools"></a>
 ### App tools
@@ -239,7 +245,7 @@ The plugin sends no model request, so it has no cache effect; Casper's own reque
 - Headless, SDK server, ACP, and webhook resumes do not pass a preset, so a Casper Session reopened by them runs on agent-loop.
 - Scheduled tasks with no saved preset run in Casper on Desktop, because they create Sessions through the Session Controller with the default preset.
 - Only Desktop on macOS and Linux is covered; the Windows lookup is untested.
-- Sidecar records are not removed when a Session is deleted, and idle Casper processes are not reaped.
+- A deleted Session's sidecar record goes only at the next start, and an archived Session keeps its process until it is idle for `idleExitMs`. A Casper from before decision 91 is never closed while idle.
 - Subagent, team, and goal features do not run inside Casper Sessions.
 - Host-plane title generation may still call a DeepSeek model for Casper Sessions.
 - `packages/casper/tool-checks` stays until Casper Sessions are proven live.

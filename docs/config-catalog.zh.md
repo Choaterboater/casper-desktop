@@ -523,6 +523,11 @@ export interface Config {
    * connects to them for the session and asks before their changes. A change reaches Casper at the next turn.
    */
   forwardMcpServers: boolean
+  /**
+   * Idle time after which the plugin asks Casper whether it may close the process (`_casper/idle`); a Casper that
+   * says it is idle is closed and the next prompt reopens its conversation. 0 keeps the process until the Session closes.
+   */
+  idleExitMs: number
 }
 
 /** Casper's access modes over ACP: Read only, Ask first, and Don't ask (`/permissions all`). */

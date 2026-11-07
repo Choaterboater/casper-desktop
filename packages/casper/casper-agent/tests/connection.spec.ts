@@ -565,3 +565,29 @@ describe('the app\'s own MCP servers', { timeout: 30_000 }, () => {
     expect(connection.stderrTail()).not.toContain(SECRET)
   })
 })
+
+describe('the idle check', { timeout: 30_000 }, () => {
+  it('answers Casper\'s idle, and false for a busy reply, an older Casper, a stop, and an exit', async () => {
+    const idle = [{ idle: true, running: [] }, { idle: false, running: ['dev server', 'checks'] }]
+    const { fake, start } = await setup({ prompts: [], idle })
+    const { connection, acpSessionId } = await start()
+    const live = new AbortController().signal
+    expect(await connection.idle(live)).toBe(true)
+    expect(await connection.idle(live)).toBe(false)
+    expect(fake.calls('_casper/idle').map(entry => entry.params)).toEqual([{ sessionId: acpSessionId }, { sessionId: acpSessionId }])
+    // A stop before an answer stops waiting.
+    fake.script({ prompts: [], holdIdle: gate(fake, 'never').path })
+    const held = (await start()).connection
+    const stop = new AbortController()
+    const asked = held.idle(stop.signal)
+    await waitFor(() => fake.calls('_casper/idle').length === 3)
+    stop.abort()
+    expect(await asked).toBe(false)
+    expect(await held.idle(stop.signal)).toBe(false)
+    fake.script({ prompts: [], idle: null })
+    const old = (await start()).connection
+    expect(await old.idle(live)).toBe(false)
+    await old.dispose()
+    expect(await old.idle(live)).toBe(false)
+  })
+})

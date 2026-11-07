@@ -128,6 +128,15 @@
  * those; the chunk's text is the receipt's text. Without it the receipt is
  * the bare `{outcome}` of an older script.
  *
+ * The idle check as C17 sends it: `_casper/idle` (logged like any request)
+ * answers `idle[n]` for the n-th check of this process, the last one repeating
+ * (default `{idle: true, running: []}`), and logs `{ event: 'idle-reply',
+ * idle }`; with `idle: null` it fails with -32601, as a Casper from before
+ * decision 91 does. `holdIdle` names a file whose existence holds each reply.
+ * `loadConfigOptions` replaces the option list in a successful `session/load`
+ * reply and from then on, as Casper does when it puts back the conversation's
+ * own model (decision 89).
+ *
  * @module @deepseek-ai/dsh-casper-agent/tests/fake-casper-acp
  */
 
@@ -285,6 +294,16 @@ interface Script {
   steerReplies?: boolean[]
   steerReplyDelayMs?: number
   mcpHttp?: boolean
+  idle?: IdleReply[] | null
+  holdIdle?: string
+  loadConfigOptions?: SessionConfigOption[]
+}
+
+/** The `_casper/idle` reply C17 sends. */
+interface IdleReply {
+  idle: boolean
+  running: string[]
+  reason?: 'off' | 'busy'
 }
 
 const logFile = process.env.FAKE_CASPER_LOG ?? ''
@@ -347,6 +366,8 @@ let configOptions: SessionConfigOption[] | undefined = script.configOptions
 let modes: SessionModeState | undefined = script.modes
 /** The steers this process received, in order: their words and message ids. */
 const steered: { text: string; messageId: string }[] = []
+/** The idle checks this process answered. */
+let idleChecks = 0
 
 /** Change the access mode in both the `mode` option and the mode state. */
 function setModeTo(modeId: string): void {
@@ -706,6 +727,8 @@ createAcpAgent({ name: 'fake-casper' })
     }
     sessionId = params.sessionId
     mcpServers = params.mcpServers
+    // Casper puts back the conversation's own model on a load.
+    if (script.loadConfigOptions !== undefined) configOptions = script.loadConfigOptions
     for (const text of script.replay ?? []) await update(client, { sessionUpdate: 'user_message_chunk', content: { type: 'text', text } })
     if (script.commands !== undefined) await update(client, { sessionUpdate: 'available_commands_update', availableCommands: script.commands })
     if (script.replayConfig === true && configOptions !== undefined) await update(client, { sessionUpdate: 'config_option_update', configOptions })
@@ -754,6 +777,17 @@ createAcpAgent({ name: 'fake-casper' })
     if (script.steerReplyDelayMs !== undefined) await new Promise((resolve) => { setTimeout(resolve, script.steerReplyDelayMs) })
     log({ event: 'steer-reply', steered: answer })
     return { steered: answer, messageId: params.messageId }
+  })
+  .onRequest('_casper/idle', params => params as { sessionId: string }, async ({ params }) => {
+    log({ method: '_casper/idle', params })
+    // A Casper from before decision 91 has no such request.
+    if (script.idle === null) throw RequestError.methodNotFound('_casper/idle')
+    if (params.sessionId !== sessionId) throw new RequestError(-32002, 'Unknown session')
+    if (script.holdIdle !== undefined) await until(script.holdIdle)
+    const replies = script.idle ?? [{ idle: true, running: [] }]
+    const reply = replies[Math.min(idleChecks++, replies.length - 1)] ?? { idle: true, running: [] }
+    log({ event: 'idle-reply', idle: reply })
+    return reply
   })
   .onNotification(methods.agent.session.cancel, ({ params }) => {
     log({ method: 'session/cancel', params })

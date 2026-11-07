@@ -43,6 +43,7 @@ kind: "package-reference"
 | `accessModes` | `{ read-only: read, workspace-write: ask, danger-full-access: full }` | 每个权限预设设置的[访问模式](#access-control)；不能列出 `custom` 与 `auto` |
 | `approvalCard` | `true` | 用 [Casper 的审批卡片](#approvals)显示 Casper 的审批框；`false` 时显示通用问题卡片 |
 | `forwardMcpServers` | `true` | 把已启用的[「设置 > MCP 服务器」](#settings-mcp-servers)交给 Casper；`false` 时只发送应用工具服务器 |
+| `idleExitMs` | `900000` | 空闲多久后询问 Casper 能否[关闭](#process-lifetime-and-resume)其进程（15 分钟）；`0` 时保留进程直到会话关闭 |
 
 子进程不会收到 `DEEPSEEK_*` 或 `DSH_*` 名称，也不会收到 `env` 未列出的凭据类名称。唯一的例外是应用 profile：应用带 profile 运行时，Casper 会收到 `DSH_PROFILE` 与 `DSH_PROFILE_DIR`，使它构建的 bundle 能指明要安装到的 profile。
 
@@ -162,9 +163,14 @@ Casper 在 `session/new` 与 `session/load` 的回复中发送它的选项，并
 
 新会话在自己的 Casper 启动之前显示保存在 Host 存储域 `casper_agent_models`（一条全局记录）中的列表，设置了配置中的 `model` 时以它为当前模型；在任何 Casper 发送列表之前，选择器会说明 Casper 启动后才会列出模型。恢复的会话保留其历史记录的内容。在记录此列表之前创建的会话，在其 Casper 启动之前会拒绝选择。
 
+<a id="process-lifetime-and-resume"></a>
 ### 进程生命周期与恢复
 
 Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打开会话。`session/new` 之后，对话 id 会在发送提示前存入 sidecar。之后的进程用 `session/load` 重新打开它，并丢弃回放的更新，因为会话已经保存了历史；只有 Casper 的“没有已保存对话”回复（`-32002`，消息中含不区分大小写的 "no saved conversation"）会开启新对话，且该轮以一行说明开头，即使该轮随后什么也没有发送。Casper 只在第一次回复后保存对话，因此进程在此之前就停止的对话会以这种方式重新开始。其他加载失败会结束该轮并保留记录。释放时关闭 stdin，等待 `exitGraceMs`，然后终止进程，符合桌面端 10 秒的 Host 退出时限。恢复会像 agent-loop 一样修复中断的轮次，且不启动进程。
+
+会话在 Casper 运行时空闲满 `idleExitMs` 后，插件用 `_casper/idle`（Casper 的决策 91）询问 Casper 能否关闭进程。回复只列出工作的种类：没有提示或模型更改正在进行，也没有开发服务器、命令、调试器、助手或检查仍在工作（包括写给 AI 的说明仍在写入的命令）时，Casper 才算空闲；Casper 自己的 `acp_idle_exit: off` 总是回答不空闲。Casper 回答空闲且期间没有任何工作开始时，进程会像释放时一样被关闭。检查期间的一轮、一次模型选择、一次访问切换或一次「先计划」设置都会保留进程并重新开始计时；Casper 不空闲、10 秒内没有回答或不认识该请求（`-32601`）时也会保留，并在下一个空闲时长后再次询问。下一条提示要等旧进程退出后才启动 Casper，并用 `session/load` 重新打开对话，不会出现新对话的那一行。加载时 Casper 沿用对话自己的模型；若它不是被关闭的进程所用的模型，该轮以 `[Casper reopened on <model>; it was <model>.]` 开头，插件不发送模型设置。被关闭的进程只为本会话允许的内容随之结束：「本会话内都同意」的回答，以及 Casper 自己选的访问模式。重新打开的 Casper 在第一条提示之前会再次得到访问控制的模式和会话的「先计划」值。
+
+每次启动时，插件会在后台删除 `sessionPersistence.stat` 已找不到的会话的 sidecar 记录；应用本身没有删除会话的功能。已归档的会话仍然保存着，会保留其记录；检查失败的会话也会保留。
 
 <a id="app-tools"></a>
 ### 应用工具
@@ -239,7 +245,7 @@ Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打�
 - Headless、SDK 服务器、ACP 与 webhook 恢复不传预设，因此由它们重新打开的 Casper 会话运行在 agent-loop 上。
 - 未保存预设的定时任务在桌面端运行于 Casper，因为它们通过会话控制器以默认预设创建会话。
 - 只覆盖 macOS 与 Linux 上的桌面端；Windows 查找未经测试。
-- 删除会话时不会移除 sidecar 记录，空闲的 Casper 进程也不会被回收。
+- 已删除会话的 sidecar 记录要到下次启动时才会删除；已归档的会话会保留其进程，直到空闲满 `idleExitMs`。决策 91 之前的 Casper 在空闲时不会被关闭。
 - Subagent、团队与目标功能不在 Casper 会话中运行。
 - Host 侧的标题生成仍可能为 Casper 会话调用 DeepSeek 模型。
 - `packages/casper/tool-checks` 会保留，直到 Casper 会话经过实际验证。

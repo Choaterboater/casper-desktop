@@ -149,7 +149,8 @@ function cancelCauseOf(signal: AbortSignal): AgentCancelCause | undefined {
  * and is recorded as a step's `user/message` once Casper says the AI read it;
  * a line Casper refuses or never reads, and any line for an older Casper, run
  * as the next turn. The process starts at the first prompt and restarts after
- * an exit.
+ * an exit; once the Agent has sat idle for `idleExitMs` and Casper says nothing
+ * of it is still at work, the process is closed and the next prompt reopens it.
  */
 export class CasperAgent implements Agent {
   readonly model: CasperModel
@@ -195,6 +196,20 @@ export class CasperAgent implements Agent {
   private readonly planRestored = new WeakSet<CasperConnection>()
   /** Ids of the pending lines queued by {@link steer}; only these go to Casper during a prompt. */
   private readonly steerIds = new Set<MessageId>()
+  /** Fires the idle check once the Agent has sat idle for `idleExitMs` with a live Casper. */
+  private idleTimer: ReturnType<typeof setTimeout> | undefined
+  /** Stops the idle check in flight when the Agent closes. */
+  private idleCheck: AbortController | undefined
+  /** Counts each start of a turn, maintenance job, access sync, and Plan first set; a check that saw another count closes nothing. */
+  private activityCount = 0
+  /** Access syncs and Plan first sets still running; Casper is not closed under one. */
+  private sideJobs = 0
+  /** The closes of earlier processes: the next process starts, and {@link closeConnection} ends, only after they finish. */
+  private closing: Promise<void> = Promise.resolve()
+  /** The model of the process closed while idle, until the next process opens its conversation. */
+  private reapedModel: string | undefined
+  /** Set by {@link closeConnection}: no idle check runs after it. */
+  private closed = false
 
   /**
    * @param pluginCtx - the Casper plugin context whose services the Agent uses.
@@ -254,7 +269,79 @@ export class CasperAgent implements Agent {
   private setPhase(next: Phase): void {
     const previous = this.status
     this.phase = next
+    // Work starts only while idle and always ends in idle, so each change enters or leaves idle.
+    if (next.kind === 'idle') {
+      this.armIdle()
+    } else {
+      this.activityCount++
+      this.disarmIdle()
+    }
     if (this.status !== previous) this.dispatch.emit('agent/status', { status: this.status })
+  }
+
+  /** Start the idle time when the Agent is idle with a live Casper and `idleExitMs` is not 0. */
+  private armIdle(): void {
+    this.disarmIdle()
+    const connection = this.connection
+    // A check in flight starts the idle time again itself when it keeps Casper.
+    if (this.closed || this.config.idleExitMs === 0 || this.active !== undefined || this.idleCheck !== undefined) return
+    if (connection === undefined || connection.dead) return
+    this.idleTimer = setTimeout(() => { void this.reapIdle() }, this.config.idleExitMs)
+    // The idle time never keeps the app running.
+    this.idleTimer.unref()
+  }
+
+  private disarmIdle(): void {
+    clearTimeout(this.idleTimer)
+    this.idleTimer = undefined
+  }
+
+  /**
+   * After the idle time, ask Casper whether it may be closed, and close it when
+   * it says so and nothing started meanwhile. This is not maintenance: a turn or
+   * a model pick during the check runs as usual on the live process and keeps it.
+   * A Casper that is not idle, or does not know the request, is asked again after
+   * another idle time. The next prompt reopens the conversation with `session/load`.
+   */
+  private async reapIdle(): Promise<void> {
+    this.idleTimer = undefined
+    const connection = this.connection
+    if (this.closed || this.active !== undefined || connection === undefined || connection.dead) return
+    const seen = this.activityCount
+    const check = new AbortController()
+    this.idleCheck = check
+    const idle = await connection.idle(check.signal)
+    this.settleIdleCheck(connection, seen, idle)
+  }
+
+  /**
+   * Act on Casper's idle answer, reading the Agent as it is now.
+   * @param connection - the connection that was asked.
+   * @param seen - the activity count when the check started.
+   * @param idle - Casper's answer.
+   */
+  private settleIdleCheck(connection: CasperConnection, seen: number, idle: boolean): void {
+    // No other check starts while this one is pending.
+    this.idleCheck = undefined
+    if (this.closed || this.connection !== connection || connection.dead) return
+    if (!idle || this.active !== undefined || this.activityCount !== seen || this.sideJobs > 0) {
+      // A turn running now starts the idle time again when it ends.
+      if (this.active === undefined) this.armIdle()
+      return
+    }
+    this.reapedModel = modelOf(connection)
+    this.connection = undefined
+    this.pluginCtx.logger.debug(`casper agent "${this.id}": Casper sat idle, so its process is closed until the next prompt`)
+    this.closeLater(connection)
+  }
+
+  /** Close a process the Agent no longer uses; the next process and {@link closeConnection} wait for it. */
+  private closeLater(connection: CasperConnection): void {
+    const closed = connection.dispose().catch(
+      /* v8 ignore next -- dispose fails only when the app tools listener cannot close. */
+      (error: unknown) => { this.pluginCtx.logger.warn(`casper agent "${this.id}": Casper did not close cleanly: ${String(error)}`) },
+    )
+    this.closing = Promise.all([this.closing, closed]).then(() => {})
   }
 
   /** The active turn or maintenance phase, or undefined while idle. */
@@ -341,9 +428,13 @@ export class CasperAgent implements Agent {
    * @returns resolution once the process range is empty.
    */
   async closeConnection(): Promise<void> {
+    this.closed = true
+    this.disarmIdle()
+    this.idleCheck?.abort()
     const connection = this.connection
     this.connection = undefined
-    await connection?.dispose()
+    // A process closed earlier, while idle or for changed servers, is part of the range too.
+    await Promise.all([this.closing, connection?.dispose()])
   }
 
   private wakeDriver(wakeAfterAbort = false): void {
@@ -449,6 +540,7 @@ export class CasperAgent implements Agent {
       connection = opened.connection
       // Said at once: the conversation is new even when this turn sends nothing.
       if (opened.fresh) writer.text(FRESH_CONVERSATION_NOTICE)
+      if (opened.note !== undefined) writer.text(opened.note)
       // Access goes first: it is the safety step.
       const accessNote = await this.applyAccess(connection)
       signal.throwIfAborted()
@@ -535,7 +627,13 @@ export class CasperAgent implements Agent {
     throw new Error('the prompt was stopped', { cause: signal.reason })
   }
 
-  private async ensureConnection(signal: AbortSignal): Promise<{ connection: CasperConnection; fresh: boolean }> {
+  /**
+   * The live connection, or a new process that reopens the stored conversation. A process closed earlier exits first.
+   * @returns the connection, whether its conversation is new, and a note when a Casper closed while idle came back on
+   *   another model.
+   */
+  private async ensureConnection(signal: AbortSignal): Promise<{ connection: CasperConnection; fresh: boolean; note?: string }> {
+    await settledUnlessStopped(this.closing, signal)
     const live = this.connection
     if (live !== undefined && !live.dead) return { connection: live, fresh: false }
     if (live !== undefined) this.dropConnection(live)
@@ -574,7 +672,15 @@ export class CasperAgent implements Agent {
     }
     this.connection = started.connection
     this.report(started.connection)
-    return { connection: started.connection, fresh: stored !== undefined && !started.reopened }
+    const fresh = stored !== undefined && !started.reopened
+    const before = this.reapedModel
+    this.reapedModel = undefined
+    const after = modelOf(started.connection)
+    // The reopened conversation goes on with its own model (Casper's decision 89); a pick waiting to be sent decides instead.
+    if (!started.reopened || before === undefined || after === undefined || after === before || this.models().wanted !== null) {
+      return { connection: started.connection, fresh }
+    }
+    return { connection: started.connection, fresh, note: `[Casper reopened on ${after}; it was ${before}.]\n` }
   }
 
   /**
@@ -646,9 +752,9 @@ export class CasperAgent implements Agent {
     }
     if (rebuilt.passing.some(name => live.forwardedNames.includes(name))) return
     if (rebuilt.digest === live.forwardedDigest || live !== this.connection) return
-    // The old process exits before the new one opens the same conversation.
+    // The old process exits before the new one opens the same conversation, and before the Agent's own close ends.
     this.connection = undefined
-    await live.dispose()
+    this.closeLater(live)
   }
 
   /**
@@ -722,7 +828,7 @@ export class CasperAgent implements Agent {
     if ((value !== 'on' && value !== 'off') || connection === undefined || connection.dead || connection.planMode === undefined) return undefined
     // The user's choice replaces the Session's last value, so a later turn does not restore the old one.
     this.planRestored.add(connection)
-    return connection.setConfigOption('plan', value).then(
+    return this.sideJob(() => connection.setConfigOption('plan', value)).then(
       (): CommandResult => {
         // A Casper already at that value sends no change, while the log can still show the Session's last value.
         this.syncPlan()
@@ -931,7 +1037,7 @@ export class CasperAgent implements Agent {
 
   /** Run one access job after the ones queued before it. */
   private queueAccess<T>(job: () => Promise<T>): Promise<T> {
-    const run = this.accessChain.then(job)
+    const run = this.accessChain.then(() => this.sideJob(job))
     this.accessChain = run.catch(
       /* v8 ignore next -- each caller observes its own job's failure; syncs report theirs as values. */
       () => {},
@@ -1036,6 +1142,17 @@ export class CasperAgent implements Agent {
       /* v8 ignore next -- the chip's preset is read only after the presets service is ready. */
       (error: unknown) => { this.pluginCtx.logger.warn(`casper agent "${this.id}": access not synced: ${String(error)}`) },
     )
+  }
+
+  /** Run a request outside a turn's phase, such as an access sync or a Plan first set, with Casper kept open meanwhile. */
+  private async sideJob<T>(job: () => Promise<T>): Promise<T> {
+    this.activityCount++
+    this.sideJobs++
+    try {
+      return await job()
+    } finally {
+      this.sideJobs--
+    }
   }
 
   /** Send the queued steering to the prompt in flight, after any send already running. */
@@ -1302,6 +1419,31 @@ async function settlesWithin(operation: Promise<unknown>, ms: number): Promise<b
   } finally {
     clearTimeout(timer)
   }
+}
+
+/**
+ * Wait for an operation that cannot be stopped, unless the signal stops first.
+ * @param operation - the operation; it must not reject.
+ * @param signal - the turn's signal.
+ * @throws the stop's error when stopped.
+ */
+async function settledUnlessStopped(operation: Promise<void>, signal: AbortSignal): Promise<void> {
+  signal.throwIfAborted()
+  const stopped = Promise.withResolvers<void>()
+  const onAbort = (): void => { stopped.resolve() }
+  signal.addEventListener('abort', onAbort, { once: true })
+  try {
+    await Promise.race([operation, stopped.promise])
+  } finally {
+    signal.removeEventListener('abort', onAbort)
+  }
+  signal.throwIfAborted()
+}
+
+/** The `provider/model` a connection's options name as current, or undefined when they name none. */
+function modelOf(connection: CasperConnection): string | undefined {
+  const current = reportOf(connection.configOptions).current
+  return current == null ? undefined : `${current.provider}/${current.model}`
 }
 
 /** Map Casper's stop reason to the turn's end. */

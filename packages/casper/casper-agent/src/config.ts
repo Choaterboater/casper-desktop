@@ -48,6 +48,11 @@ export interface Config {
    * connects to them for the session and asks before their changes. A change reaches Casper at the next turn.
    */
   forwardMcpServers: boolean
+  /**
+   * Idle time after which the plugin asks Casper whether it may close the process (`_casper/idle`); a Casper that
+   * says it is idle is closed and the next prompt reopens its conversation. 0 keeps the process until the Session closes.
+   */
+  idleExitMs: number
 }
 
 /** Runtime schema for {@link Config}; the defaults keep teardown inside a 10 s host shutdown window. */
@@ -67,4 +72,5 @@ export const Config: z<Config> = z.object({
   accessModes: z.dict(z.union(ACCESS_MODE_IDS as AccessModeId[])).default({ ...DEFAULT_ACCESS_MODES }),
   approvalCard: z.boolean().default(true),
   forwardMcpServers: z.boolean().default(true),
+  idleExitMs: z.natural().default(900_000),
 })

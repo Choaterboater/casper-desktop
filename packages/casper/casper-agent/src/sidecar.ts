@@ -56,6 +56,28 @@ export class CasperSidecar {
   }
 
   /**
+   * Delete the records of Sessions that no longer exist. The app has no Session
+   * delete of its own, so this runs once at startup; an archived Session still
+   * exists and keeps its record, and so does one whose check fails.
+   * @param exists - whether a Session is still stored; a rejection keeps the record.
+   * @returns the number of records deleted, in one write.
+   */
+  async prune(exists: (sessionId: SessionId) => Promise<boolean>): Promise<number> {
+    const table = this.domain.table('sessions')
+    const checked = await Promise.all([...table.keys()].map(async (sessionId) => {
+      try {
+        return await exists(sessionId) ? undefined : sessionId
+      } catch (error: unknown) {
+        // A Session that cannot be read now may still be there.
+        void error
+        return undefined
+      }
+    }))
+    const gone = checked.filter((sessionId): sessionId is SessionId => sessionId !== undefined)
+    return gone.length === 0 ? 0 : await table.deleteMany(gone)
+  }
+
+  /**
    * Close the domain.
    * @returns resolution once pending writes drain.
    */
