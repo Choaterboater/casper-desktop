@@ -59,7 +59,7 @@ A turn that cannot run ends with an error on `turn/end`: `CASPER_NOT_FOUND` when
 | [`src/factory.ts`](src/factory.ts) | Creates and resumes Agents with agent-loop's publication order, refuses forks, and tears every Agent down in parallel on unload |
 | [`src/agent.ts`](src/agent.ts) | `CasperAgent`: inbox, phases, one prompt per turn, steering sent to the prompt in flight, cancel, and process restart |
 | [`src/connection.ts`](src/connection.ts) | One `casper acp` process: lookup, spawn, ACP client, `session/new` or `session/load`, prompt, cancel, and disposal |
-| [`src/turn.ts`](src/turn.ts) | Writes Casper's updates as steps, assistant messages, tool calls, results, and the todo list |
+| [`src/turn.ts`](src/turn.ts) | Writes Casper's updates as steps, assistant messages with their reasoning, tool calls, results, and the todo list |
 | [`src/views.ts`](src/views.ts) | Records a Casper tool step under the Standard tool that does the same job: its name, arguments, result text, and meta |
 | [`src/permission.ts`](src/permission.ts) | Turns an approval box into a user question headed `Casper`, with the raising step's diff lines in its detail, and maps the answer back; a plan Build box becomes a plan review |
 | [`src/box.ts`](src/box.ts) | The box's question id, header, and card limit, shared by both halves |
@@ -84,6 +84,7 @@ A line steered in during a prompt goes to a Casper whose `initialize` reply sets
 | Casper update | Session events |
 |---|---|
 | `agent_message_chunk` text | live `agent/assistant-stream` frames, settled as `assistant/message` |
+| `agent_thought_chunk` text (Casper's reasoning headlines and retries) | a reasoning block in the same frames and message, beside the text in the order it arrives; while calls of the step are open it waits with the text |
 | `tool_call` | the step's `assistant/message` with a tool-call block, then `tool/call` with the Standard tool's name and arguments, or `casper_<tool>` (see [Tool cards](#tool-cards)); the next text opens a new step |
 | `tool_call` while other calls of the step are open | another `assistant/message` in the same step holding only that call's block, then its `tool/call`, so every stored call is advertised and the Session reopens |
 | `tool_call_update` completed or failed | `tool/result` with the Standard result text and meta, never a bare status word; a shell step that ran records its exit code and is not an error, any other failed step is, and a refused approval is not |
@@ -194,7 +195,7 @@ The plugin sends no model request, so it has no cache effect; Casper's own reque
 
 - A Casper whose `initialize` reply does not set `promptCapabilities.image` gets a placeholder instead of each picture.
 - A pick is checked against the list Casper last sent; a model Casper later finds signed out is refused when the pick is sent.
-- Reasoning, token usage, and cost are not shown, because Casper sends none of them; `session/load` replays are not shown.
+- Token usage and cost are not shown, because Casper sends neither; reasoning shows only the headlines and retries Casper sends as thoughts, not the model's own reasoning. `session/load` replays are not shown.
 - A running shell step shows no output until it ends.
 - Only the app tools server is passed to Casper; the app's configured MCP servers are not.
 - App tool results reach Casper as text only: an image or other non-text block becomes a note. None of the served tools returns an image today.

@@ -61,8 +61,15 @@ interface OpenCall {
 
 /** An update held while calls of the step are open, written in order once they close. */
 type Buffered =
-  | { readonly kind: 'text'; readonly text: string }
+  | { readonly kind: 'text' | 'reasoning'; readonly text: string }
   | { readonly kind: 'user'; readonly message: UserMessage }
+
+/** The text or reasoning block the open attempt is streaming. */
+interface OpenText {
+  readonly index: number
+  readonly kind: 'text' | 'reasoning'
+  text: string
+}
 
 /** One `tool/result` to append. */
 interface ResultBody {
@@ -82,13 +89,15 @@ interface ResultBody {
  * every open call has its result; text that arrives while calls are open waits
  * for them. A line the user steered in, once Casper says the AI read it,
  * opens the next step as its `user/message`, as agent-loop records steering at
- * a step boundary; it waits for open calls like text does.
+ * a step boundary; it waits for open calls like text does. Casper's thoughts
+ * (its reasoning headlines and retries) stream as reasoning blocks in the same
+ * attempt, beside its text and in the order they arrive.
  */
 export class TurnWriter {
   private currentStep: number
   private attempt: AssistantStreamAttempt | undefined
   private committed = false
-  private openText: { index: number; text: string } | undefined
+  private openText: OpenText | undefined
   private blockIndex = 0
   private readonly openCalls = new Map<string, OpenCall>()
   /** App tool results that arrived before their step's `tool_call`. */
@@ -112,21 +121,17 @@ export class TurnWriter {
    * @param text - the chunk's text.
    */
   text(text: string): void {
-    if (text === '') return
-    if (this.committed) {
-      if (this.openCalls.size > 0) {
-        this.buffered.push({ kind: 'text', text })
-        return
-      }
-      this.nextStep()
-    }
-    const attempt = this.ensureAttempt()
-    if (this.openText === undefined) {
-      this.openText = { index: this.blockIndex++, text: '' }
-      attempt.push({ type: 'block-start', index: this.openText.index, blockType: 'text' })
-    }
-    this.openText.text += text
-    attempt.push({ type: 'text-delta', index: this.openText.index, text })
+    this.stream('text', text)
+  }
+
+  /**
+   * Stream one of Casper's thoughts as reasoning: it continues an open
+   * reasoning block or opens one, closing open text first. Like text, it waits
+   * while calls of a committed step are open.
+   * @param text - the thought chunk's text.
+   */
+  thought(text: string): void {
+    this.stream('reasoning', text)
   }
 
   /**
@@ -296,7 +301,7 @@ export class TurnWriter {
     const attempt = this.attempt
     if (attempt === undefined || attempt.ended) return
     if (!interrupted) this.closeText(attempt)
-    // An attempt starts only with a text block, so an unsettled one always has visible content.
+    // An attempt starts only with a text or reasoning block, so an unsettled one always has visible content.
     const content = interrupted ? attempt.interruptedBlocks() : attempt.blocks()
     attempt.settle('assistant/message', () => this.options.session.append('assistant/message', {
       turn: this.options.turn,
@@ -307,14 +312,42 @@ export class TurnWriter {
     }, { surfaceOp: 'append' }).seq)
   }
 
-  /** Write the text and steered lines that waited for open calls, in order. */
+  /** Write the text, thoughts and steered lines that waited for open calls, in order. */
   private writeBuffered(): void {
     const waiting = this.buffered
     this.buffered = []
     for (const entry of waiting) {
-      if (entry.kind === 'text') this.text(entry.text)
-      else this.steered(entry.message)
+      if (entry.kind === 'user') this.steered(entry.message)
+      else this.stream(entry.kind, entry.text)
     }
+  }
+
+  /**
+   * Stream text or reasoning into the step's attempt. A chunk of the other
+   * kind closes the open block first; after a committed step it waits for open
+   * calls, then opens the next step.
+   * @param kind - the block kind the chunk streams into.
+   * @param text - the chunk's text.
+   */
+  private stream(kind: OpenText['kind'], text: string): void {
+    if (text === '') return
+    if (this.committed) {
+      if (this.openCalls.size > 0) {
+        this.buffered.push({ kind, text })
+        return
+      }
+      this.nextStep()
+    }
+    const attempt = this.ensureAttempt()
+    if (this.openText?.kind !== kind) this.closeText(attempt)
+    if (this.openText === undefined) {
+      this.openText = { index: this.blockIndex++, kind, text: '' }
+      attempt.push({ type: 'block-start', index: this.openText.index, blockType: kind })
+    }
+    this.openText.text += text
+    attempt.push(kind === 'text'
+      ? { type: 'text-delta', index: this.openText.index, text }
+      : { type: 'reasoning-delta', index: this.openText.index, text })
   }
 
   private ensureAttempt(): AssistantStreamAttempt {
@@ -332,11 +365,12 @@ export class TurnWriter {
     return attempt
   }
 
+  /** End the open text or reasoning block, if any. */
   private closeText(attempt: AssistantStreamAttempt): void {
     const open = this.openText
     if (open === undefined) return
     this.openText = undefined
-    attempt.push({ type: 'block-end', index: open.index, block: { type: 'text', text: open.text } })
+    attempt.push({ type: 'block-end', index: open.index, block: { type: open.kind, text: open.text } })
   }
 
   private nextStep(): void {

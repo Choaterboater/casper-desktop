@@ -816,12 +816,16 @@ describe('CasperAgent', { timeout: 60_000 }, () => {
     expect(JSON.stringify(eventsOf(agent))).not.toContain('too late')
   })
 
-  it('shows only text from Casper messages and leaves other updates out', async () => {
-    const { host } = await setup({ prompts: [[{ image: true }, { thought: 'thinking' }, { text: 'ok\n' }]] })
+  it('shows Casper\'s thoughts as reasoning', async () => {
+    const { host } = await setup({ prompts: [[{ image: true }, { thought: 'Reading the tests\n\n' }, { thought: 'Fixing the parser\n\n' }, { text: 'ok\n' }]] })
     const { agent } = await host.create('casper-kinds')
     await run(agent, 'go')
     const message = eventsOf(agent).find(event => event.type === 'assistant/message')
-    expect(message?.type === 'assistant/message' && message.data.message.content).toEqual([{ type: 'text', text: 'ok\n\nReceipt: verified\n' }])
+    // A picture in a message is still left out; the thoughts are one reasoning block before the answer.
+    expect(message?.type === 'assistant/message' && message.data.message.content).toEqual([
+      { type: 'reasoning', text: 'Reading the tests\n\nFixing the parser\n\n' },
+      { type: 'text', text: 'ok\n\nReceipt: verified\n' },
+    ])
   })
 
   it('ends a question that is still open when Casper exits', async () => {

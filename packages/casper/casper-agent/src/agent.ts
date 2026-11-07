@@ -1089,6 +1089,10 @@ export class CasperAgent implements Agent {
         case 'agent_message_chunk':
           if (update.content.type === 'text') sink.writer.text(update.content.text)
           return
+        case 'agent_thought_chunk':
+          // Casper's reasoning headlines and retries: shown as the step's reasoning block.
+          if (update.content.type === 'text') sink.writer.thought(update.content.text)
+          return
         case 'tool_call':
           sink.writer.toolCall(update)
           // Each Casper step that changes the workspace is made durable without waiting for the turn.

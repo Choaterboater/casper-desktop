@@ -50,8 +50,10 @@
  * `{ hang: true }` (waits for session/cancel), `{ ignoreCancel: true }` (with
  * hang: never replies), `{ crash }` (exits with that code),
  * `{ waitFile }` (waits until the file exists), `{ stderr }` (writes a
- * line to stderr), `{ fail }` (replies with a -32603 error), `{ image }` and
- * `{ thought }` (updates Casper does not send), `{ commandsUpdate }` (sends
+ * line to stderr), `{ fail }` (replies with a -32603 error), `{ image }` (a
+ * picture in a message, which Casper does not send), `{ thought }` (an
+ * `agent_thought_chunk` with that text, as Casper sends a reasoning headline
+ * or a retry), `{ commandsUpdate }` (sends
  * that `available_commands_update` list), `{ configUpdate }` (replaces the
  * option list and sends it as a `config_option_update`), `{ mode }` (Casper
  * changes its own access mode, as "Yes to everything this session" does: a

@@ -59,7 +59,7 @@ kind: "package-reference"
 | [`src/factory.ts`](src/factory.ts) | 按 agent-loop 的发布顺序创建与恢复 Agent，拒绝 fork，并在卸载时并行销毁所有 Agent |
 | [`src/agent.ts`](src/agent.ts) | `CasperAgent`：收件箱、阶段、每轮一条提示、把引导消息发给正在运行的提示、取消与进程重启 |
 | [`src/connection.ts`](src/connection.ts) | 一个 `casper acp` 进程：查找、启动、ACP 客户端、`session/new` 或 `session/load`、提示、取消与释放 |
-| [`src/turn.ts`](src/turn.ts) | 把 Casper 的更新写成步骤、助手消息、工具调用、结果与待办列表 |
+| [`src/turn.ts`](src/turn.ts) | 把 Casper 的更新写成步骤、带推理的助手消息、工具调用、结果与待办列表 |
 | [`src/views.ts`](src/views.ts) | 把 Casper 的工具步骤记录为做同样事情的 Standard 工具：名称、参数、结果文本与 meta |
 | [`src/permission.ts`](src/permission.ts) | 把审批框变成标题为 `Casper` 的用户问题，detail 中带有发起步骤的差异行，并把答案映射回去；计划 Build 框变成计划审阅 |
 | [`src/box.ts`](src/box.ts) | 审批框的问题 id、标题与卡片上限，由两半共用 |
@@ -84,6 +84,7 @@ kind: "package-reference"
 | Casper 更新 | 会话事件 |
 |---|---|
 | `agent_message_chunk` 文本 | 实时 `agent/assistant-stream` 帧，最终落为 `assistant/message` |
+| `agent_thought_chunk` 文本（Casper 的推理标题与重试） | 同一帧与消息中的推理块，按到达顺序与文本并列；步骤中仍有未结束的调用时，它与文本一起等待 |
 | `tool_call` | 该步骤带工具调用块的 `assistant/message`，随后是带 Standard 工具名称与参数的 `tool/call`，或名为 `casper_<tool>`（见[工具卡片](#tool-cards)）；其后的文本开启新步骤 |
 | 该步骤其他调用仍未结束时的 `tool_call` | 同一步骤中另一条只含该调用块的 `assistant/message`，随后是它的 `tool/call`，因此存储的每个调用都已声明，会话可以重新打开 |
 | `tool_call_update` 完成或失败 | 带 Standard 结果文本与 meta 的 `tool/result`，从不只写状态词；已运行的 shell 步骤记录其退出码且不是错误，其他失败的步骤是错误，被拒绝的审批不是 |
@@ -194,7 +195,7 @@ Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打�
 
 - `initialize` 回复未设置 `promptCapabilities.image` 的 Casper 会收到占位文本，而不是每张图片。
 - 选择按 Casper 最后发送的列表检查；Casper 之后发现已退出登录的模型，会在发送选择时被拒绝。
-- 推理、token 用量与费用都不会显示，因为 Casper 不发送它们；`session/load` 的回放也不显示。
+- token 用量与费用都不会显示，因为 Casper 不发送它们；推理只显示 Casper 作为思考发送的标题与重试，不显示模型自身的推理。`session/load` 的回放也不显示。
 - 正在运行的 shell 步骤在结束前不显示输出。
 - 只有应用工具服务器会传给 Casper；应用中配置的 MCP 服务器不会。
 - 应用工具的结果只以文本形式到达 Casper：图片或其他非文本块会变成一行说明。目前提供的工具都不返回图片。

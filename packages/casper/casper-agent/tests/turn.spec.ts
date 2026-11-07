@@ -431,6 +431,85 @@ describe('TurnWriter', () => {
     expect(new Set(frames.filter(frame => frame.type === 'start').map(frame => frame.attemptId)).size).toBe(3)
   })
 
+  describe('thoughts', () => {
+    it('reasoning then text', () => {
+      const { frames, open, events, types } = setup()
+      const writer = open(1)
+      writer.thought('Reading the tests\n\n')
+      writer.thought('')
+      writer.thought('Fixing it\n\n')
+      writer.text('Done.')
+      writer.thought('Checking\n\n')
+      writer.close(false)
+      expect(types()).toEqual(['step/start', 'assistant/message', 'step/end'])
+      expect(ofType(events(), 'assistant/message')[0]?.data.message.content).toEqual([
+        { type: 'reasoning', text: 'Reading the tests\n\nFixing it\n\n' },
+        { type: 'text', text: 'Done.' },
+        { type: 'reasoning', text: 'Checking\n\n' },
+      ])
+      const chunks = frames.flatMap(frame => frame.type === 'chunk' ? [frame.chunk] : [])
+      expect(chunks).toEqual([
+        { type: 'block-start', index: 0, blockType: 'reasoning' },
+        { type: 'reasoning-delta', index: 0, text: 'Reading the tests\n\n' },
+        { type: 'reasoning-delta', index: 0, text: 'Fixing it\n\n' },
+        { type: 'block-end', index: 0, block: { type: 'reasoning', text: 'Reading the tests\n\nFixing it\n\n' } },
+        { type: 'block-start', index: 1, blockType: 'text' },
+        { type: 'text-delta', index: 1, text: 'Done.' },
+        { type: 'block-end', index: 1, block: { type: 'text', text: 'Done.' } },
+        { type: 'block-start', index: 2, blockType: 'reasoning' },
+        { type: 'reasoning-delta', index: 2, text: 'Checking\n\n' },
+        { type: 'block-end', index: 2, block: { type: 'reasoning', text: 'Checking\n\n' } },
+      ])
+    })
+
+    it('reasoning then a tool call commits as reasoning and tool call', () => {
+      const { open, events, types } = setup()
+      const writer = open(1)
+      writer.thought('Looking around\n\n')
+      writer.toolCall(tool('casper-tool-1'))
+      writer.toolUpdate({ toolCallId: 'casper-tool-1', status: 'completed' })
+      writer.thought('Next\n\n')
+      writer.close(false)
+      expect(types()).toEqual([
+        'step/start', 'assistant/message', 'tool/call', 'tool/result', 'step/end',
+        'step/start', 'assistant/message', 'step/end',
+      ])
+      const [first, second] = ofType(events(), 'assistant/message')
+      expect(first?.data.message.content.map(block => block.type)).toEqual(['reasoning', 'tool-call'])
+      expect(first?.data.message.content[0]).toEqual({ type: 'reasoning', text: 'Looking around\n\n' })
+      expect(second?.data).toMatchObject({ step: 2, message: { content: [{ type: 'reasoning', text: 'Next\n\n' }] } })
+    })
+
+    it('a thought while calls are open is buffered in order and kept on close', () => {
+      const { open, events, types } = setup()
+      const writer = open(1)
+      writer.toolCall(tool('casper-tool-1'))
+      writer.thought('Waiting\n\n')
+      writer.text('a')
+      writer.thought('Still waiting\n\n')
+      expect(ofType(events(), 'assistant/message')).toHaveLength(1)
+      writer.toolUpdate({ toolCallId: 'casper-tool-1', status: 'completed' })
+      writer.toolCall(tool('casper-tool-2'))
+      writer.thought('Stopped\n\n')
+      writer.close(true)
+      expect(types()).toEqual([
+        'step/start', 'assistant/message', 'tool/call', 'tool/result', 'step/end',
+        'step/start', 'assistant/message', 'tool/call', 'tool/result', 'step/end',
+        'step/start', 'assistant/message', 'step/end',
+      ])
+      const messages = ofType(events(), 'assistant/message').map(event => event.data.message.content)
+      expect(messages[1]).toEqual([
+        { type: 'reasoning', text: 'Waiting\n\n' },
+        { type: 'text', text: 'a' },
+        { type: 'reasoning', text: 'Still waiting\n\n' },
+        { type: 'tool-call', id: 'casper:epoch:casper-tool-2', name: 'bash', arguments: JSON.stringify({ command: 'casper-tool-2', description: 'casper-tool-2' }) },
+      ])
+      // The thought that waited for the call still open at the stop is kept in the final step's interrupted prefix.
+      expect(messages[2]).toEqual([{ type: 'reasoning', text: 'Stopped\n\n' }])
+      expect(ofType(events(), 'assistant/message')[2]?.data.interrupted).toBe(true)
+    })
+  })
+
   describe('steered', () => {
     const line = (text: string) => createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } })
 
