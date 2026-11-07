@@ -10,6 +10,8 @@ import AttachmentStore, { AttachmentId } from '@deepseek-ai/dsh-attachment'
 import type { FileAttachmentRef, ImageAttachmentLimits, ImageAttachmentRef, StoredImageAttachment } from '@deepseek-ai/dsh-attachment'
 import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
+import SessionQueryEngine from '@deepseek-ai/dsh-session-query'
+import SessionReferenceResolver, { encodeSessionReferenceUri, formatSessionReferenceMention } from '@deepseek-ai/dsh-session-reference'
 import { planProjectionDefinition } from '@deepseek-ai/dsh-plan-mode'
 import { UserQuestionError } from '@deepseek-ai/dsh-user-questions'
 import { contextPressureProjectionDefinition, tokenUsageProjectionDefinition } from '@deepseek-ai/dsh-token-meter/src/usage-projection.ts'
@@ -20,7 +22,7 @@ import { reportOf } from '../src/models.ts'
 import { CasperModelsCache } from '../src/models-cache.ts'
 import { FORK_UNSUPPORTED } from '../src/factory.ts'
 import type { ForwardEntry } from '../src/forward-servers.ts'
-import { TEXT_ONLY_PICTURE } from '../src/prompt.ts'
+import { MAX_EMBEDDED_REFERENCE_BYTES, TEXT_ONLY_PICTURE } from '../src/prompt.ts'
 import { boot, eventsOf, filesText, mountPermissionPresets, prompt, turnEnds } from './harness.ts'
 import { alive, casperModes, casperOptions, fakeCasper, gate, optionsWithoutMode, parsed, waitFor, withPlan } from './support.ts'
 import type { FakeCasper, FakeCommand, FakeScript } from './support.ts'
@@ -2136,5 +2138,148 @@ describe('Settings MCP servers in a Casper session', { timeout: 60_000 }, () => 
     expect(offered(fake)).toEqual([{ method: 'session/new', pid: fake.pids()[0], names: ['docs'] }])
     expect(fake.calls('session/prompt').map(entry => entry.pid)).toEqual([fake.pids()[0], fake.pids()[0], fake.pids()[0]])
     expect(turnEnds(agent)).toEqual([{ kind: 'completed' }, { kind: 'completed' }, { kind: 'completed' }])
+  })
+})
+
+describe('Session mentions in a Casper session', { timeout: 60_000 }, () => {
+  /** The query engine over the Host's live and saved Sessions, without search. */
+  class StandInQuery extends SessionQueryEngine {
+    override searchSessions(): ReturnType<SessionQueryEngine['searchSessions']> {
+      return Promise.resolve({ items: [] })
+    }
+
+    override searchEvents(...args: Parameters<SessionQueryEngine['searchEvents']>): ReturnType<SessionQueryEngine['searchEvents']> {
+      return this.readSurface(args[0].sessionId).then(surface => ({ session: surface.session, items: [] }))
+    }
+  }
+
+  /** A Host with the session-reference service, as the app mounts it. */
+  async function withReferences(script: FakeScript) {
+    const fake = fakeCasper(script)
+    cleanups.push(() => { fake.remove() })
+    const host = await boot(fake, {}, undefined, true, async (ctx) => {
+      await ctx.plugin(StandInQuery)
+      await ctx.plugin(SessionReferenceResolver)
+    })
+    cleanups.push(() => host.ctx.fiber.dispose())
+    return { fake, host }
+  }
+
+  /** A mention of a Session as the composer inserts it. */
+  const mention = (id: string, label = id) => formatSessionReferenceMention({ sessionId: SessionId(id), label })
+
+  /** The blocks of each prompt Casper received. */
+  function prompts(fake: FakeCasper): unknown[][] {
+    return fake.calls('session/prompt').map(entry => entry.params?.prompt ?? [])
+  }
+
+  /** The context resource of a prompt's blocks, if any. */
+  function resourceOf(blocks: unknown[]): { uri: string; mimeType: string; text: string } | undefined {
+    const found = blocks.find((block): block is { type: 'resource'; resource: { uri: string; mimeType: string; text: string } } =>
+      (block as { type?: string }).type === 'resource')
+    return found?.resource
+  }
+
+  it('the prompt carries the other session\'s text and the log keeps the raw mention', async () => {
+    const { fake, host } = await withReferences({ prompts: [[{ text: 'The cache key is the path.\n' }], [{ text: 'Fixed.\n' }]], promptCapabilities: { embeddedContext: true } })
+    const other = await host.create('casper-ref-source')
+    await run(other.agent, 'why does the cache miss?')
+    const { agent } = await host.create('casper-ref-target')
+    const typed = `look at ${mention('casper-ref-source', 'Cache chat')} and fix it`
+    await run(agent, typed)
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }])
+    const blocks = prompts(fake)[1] ?? []
+    expect(blocks[0]).toEqual({ type: 'text', text: 'look at @Cache chat and fix it' })
+    const resource = resourceOf(blocks)
+    expect(resource).toMatchObject({ uri: encodeSessionReferenceUri(SessionId('casper-ref-source')), mimeType: 'text/markdown' })
+    expect(resource?.text).toContain('## Referenced sessions')
+    expect(resource?.text).toContain('why does the cache miss?')
+    expect(resource?.text).toContain('The cache key is the path.')
+    expect(blocks).toHaveLength(2)
+    // The Session log keeps what the user typed.
+    const logged = eventsOf(agent).find(event => event.type === 'user/message')
+    expect(logged?.type === 'user/message' && logged.data.content).toEqual([{ type: 'text', text: typed }])
+  })
+
+  it('an older Casper gets the other session as a text block', async () => {
+    const { fake, host } = await withReferences({ prompts: [[{ text: 'Noted.\n' }], [{ text: 'ok\n' }]] })
+    await run((await host.create('casper-ref-old-source')).agent, 'the first chat')
+    const { agent } = await host.create('casper-ref-old-target')
+    await run(agent, `continue ${mention('casper-ref-old-source', 'First')}`)
+    const blocks = prompts(fake)[1] as { type: string; text?: string }[]
+    expect(blocks.map(block => block.type)).toEqual(['text', 'text'])
+    expect(blocks[0]?.text).toBe('continue @First')
+    expect(blocks[1]?.text).toContain('the first chat')
+  })
+
+  it('a self mention ends the turn with its code and starts no Casper', async () => {
+    const { fake, host } = await withReferences({ prompts: [] })
+    const { agent } = await host.create('casper-ref-self')
+    await run(agent, `as said in ${mention('casper-ref-self')}`)
+    expect(turnEnds(agent)).toEqual([{ kind: 'error', error: {
+      code: 'SESSION_REFERENCE_SELF_REFERENCE', message: 'A session can\'t mention itself, so nothing was sent to Casper.',
+    } }])
+    expect(fake.pids()).toEqual([])
+  })
+
+  it('an unreadable session and a malformed reference end with their codes', async () => {
+    const { fake, host } = await withReferences({ prompts: [] })
+    const { agent } = await host.create('casper-ref-broken')
+    await run(agent, `see ${mention('no-such-session')}`)
+    await run(agent, 'see @[Broken](dsh-session:not!canonical)')
+    expect(turnEnds(agent)).toEqual([
+      { kind: 'error', error: { code: 'SESSION_REFERENCE_READ_FAILED', message: 'A mentioned session could not be read, so nothing was sent to Casper.' } },
+      { kind: 'error', error: { code: 'SESSION_REFERENCE_INVALID_REFERENCE', message: 'A session mention in the request is not valid, so nothing was sent to Casper.' } },
+    ])
+    expect(fake.pids()).toEqual([])
+  })
+
+  it('three references at full budget arrive whole', async () => {
+    // Each source's newest message, which the service keeps and cuts last, is a long reply.
+    const long = [1, 2, 3].map(index => [{ text: `chat ${index} ${'x'.repeat(80_000)}\n` }])
+    const { fake, host } = await withReferences({ prompts: [...long, [{ text: 'ok\n' }]], promptCapabilities: { embeddedContext: true } })
+    const sources = ['casper-ref-big-1', 'casper-ref-big-2', 'casper-ref-big-3']
+    for (const id of sources) await run((await host.create(id)).agent, 'write a lot')
+    const { agent } = await host.create('casper-ref-big-target')
+    await run(agent, `compare ${sources.map(id => mention(id)).join(' ')}`)
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }])
+    const blocks = prompts(fake)[3] ?? []
+    expect(blocks).toHaveLength(2)
+    const text = resourceOf(blocks)?.text ?? ''
+    // Each Session fills the service's 64 KiB budget, and all three still go as one resource Casper takes whole.
+    expect(Buffer.byteLength(text)).toBeGreaterThan(3 * 60 * 1024)
+    expect(Buffer.byteLength(text)).toBeLessThanOrEqual(MAX_EMBEDDED_REFERENCE_BYTES)
+    for (const index of [1, 2, 3]) expect(text).toContain(`chat ${index} xxx`)
+    const reply = eventsOf(agent).filter(event => event.type === 'assistant/message').at(-1)
+    expect(reply?.type === 'assistant/message' && reply.data.message.content).toEqual([{ type: 'text', text: 'ok\n\nReceipt: verified\n' }])
+  })
+
+  it('slash plan with a mention carries the context', async () => {
+    const { fake, host } = await withReferences({ prompts: [[{ text: 'Cache by path.\n' }], [{ text: 'planned\n' }]], promptCapabilities: { embeddedContext: true } })
+    await run((await host.create('casper-ref-plan-source')).agent, 'how should we cache?')
+    const { agent } = await host.create('casper-ref-plan')
+    await run(agent, `/plan add the cache from ${mention('casper-ref-plan-source', 'Design')}`)
+    const blocks = prompts(fake)[1] ?? []
+    expect(blocks[0]).toEqual({ type: 'text', text: '/plan add the cache from @Design' })
+    expect(resourceOf(blocks)?.text).toContain('Cache by path.')
+  })
+
+  it('a steered line with a mention runs as the next turn, so its mention is read', async () => {
+    const { fake, host } = await withReferences({ prompts: [] })
+    const hold = gate(fake, 'hold')
+    fake.script({ steer: true, promptCapabilities: { embeddedContext: true }, prompts: [[{ text: 'Seen.\n' }], [{ waitFile: hold.path }], []] })
+    await run((await host.create('casper-ref-steer-source')).agent, 'the earlier chat')
+    const { agent } = await host.create('casper-ref-steer')
+    agent.followup(prompt('first'))
+    await waitFor(() => fake.calls('session/prompt').length === 2)
+    agent.steer(prompt(`also ${mention('casper-ref-steer-source', 'Earlier')}`))
+    await new Promise((resolve) => { setTimeout(resolve, 100) })
+    hold.open()
+    await agent.whenIdle()
+    expect(fake.calls('_casper/steer')).toEqual([])
+    const blocks = prompts(fake)[2] ?? []
+    expect(blocks[0]).toEqual({ type: 'text', text: 'also @Earlier' })
+    expect(resourceOf(blocks)?.text).toContain('the earlier chat')
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }, { kind: 'completed' }])
   })
 })

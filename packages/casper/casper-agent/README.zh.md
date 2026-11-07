@@ -24,7 +24,7 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-桌面端 profile 通过 `packages/bundle/web-app/cordis.patch.yml` 挂载本插件（条目 `casper-agent`，在桌面端以外和浏览器内预览中禁用），并在 `packages/bundle/web-app/presets/casper.patch.yml` 中声明 `casper` 预设。该预设挂载 `tool-todo`（用待办列表展示 Casper 的计划），以及应用工具所运行的条目：`tool-cordis`、`skill-filesystem`（使用 Cordis 预设的技能目录）、`tool-skill` 与 `tool-plugin-manager`；后者绑定应用已有的插件管理器，应用不带 profile 运行时关闭。检查插件与插件市场不会挂载。在桌面端，预设注册表的默认值为 `casper`；设置中保存的默认值仍然优先。本插件注入 `agents`、`sessions`、`sessionProjections`、`sessionPersistence`、`subprocess`、`storageDomain` 与 `tools`，并在挂载了 `userQuestions`、`skills`、`profileContext`、`attachments`、`commands`、`permissionPresets`、`sandboxPolicy`、`mcpManager` 与 `credentials` 时使用它们。
+桌面端 profile 通过 `packages/bundle/web-app/cordis.patch.yml` 挂载本插件（条目 `casper-agent`，在桌面端以外和浏览器内预览中禁用），并在 `packages/bundle/web-app/presets/casper.patch.yml` 中声明 `casper` 预设。该预设挂载 `tool-todo`（用待办列表展示 Casper 的计划），以及应用工具所运行的条目：`tool-cordis`、`skill-filesystem`（使用 Cordis 预设的技能目录）、`tool-skill` 与 `tool-plugin-manager`；后者绑定应用已有的插件管理器，应用不带 profile 运行时关闭。检查插件与插件市场不会挂载。在桌面端，预设注册表的默认值为 `casper`；设置中保存的默认值仍然优先。本插件注入 `agents`、`sessions`、`sessionProjections`、`sessionPersistence`、`subprocess`、`storageDomain` 与 `tools`，并在挂载了 `userQuestions`、`skills`、`profileContext`、`attachments`、`commands`、`permissionPresets`、`sandboxPolicy`、`mcpManager`、`credentials` 与 `sessionReferenceResolver` 时使用它们。
 
 | 字段 | 默认值 | 含义 |
 |---|---|---|
@@ -48,7 +48,7 @@ kind: "package-reference"
 
 会话在 Casper 预设上创建时即成为 Casper 会话。空白会话不能在 Casper 与其他预设之间切换：预设注册表以 `agent-preset/locked` 与 `newSession: true` 拒绝这种切换，模式选择器则改为在所选预设上开启新会话。已存储的会话由其记录的预设所选择的工厂恢复；未记录预设的会话仍使用 agent-loop。
 
-无法运行的轮次在 `turn/end` 上以错误结束：找不到命令时为 `CASPER_NOT_FOUND`，Casper 未能启动时为 `CASPER_START_FAILED`，轮次中途退出时为 `CASPER_EXITED`，提示中没有 Casper 能读取的内容时为 `CASPER_EMPTY_PROMPT`：没有文本、图片或文件，或只有无法发送的图片和文件（不会向 Casper 发送任何内容），达到 Casper 的轮次上限时为 `CASPER_TURN_LIMIT`，Casper 拒绝所选模型或推理等级时为 `CASPER_MODEL_UNAVAILABLE`（不发送提示），Casper 未接受仅可查看或工作区内修改时为 `CASPER_ACCESS_NOT_APPLIED`（不发送提示，或停止正在运行的提示），收到错误回复时为 `CASPER_RPC_<code>`。会话仍可使用；下一条提示会再次启动 Casper。`CASPER_TEXT_ONLY` 已不再产生，只出现在早期版本保存的轮次中。
+无法运行的轮次在 `turn/end` 上以错误结束：找不到命令时为 `CASPER_NOT_FOUND`，Casper 未能启动时为 `CASPER_START_FAILED`，轮次中途退出时为 `CASPER_EXITED`，提示中没有 Casper 能读取的内容时为 `CASPER_EMPTY_PROMPT`：没有文本、图片或文件，或只有无法发送的图片和文件（不会向 Casper 发送任何内容），达到 Casper 的轮次上限时为 `CASPER_TURN_LIMIT`，Casper 拒绝所选模型或推理等级时为 `CASPER_MODEL_UNAVAILABLE`（不发送提示），Casper 未接受仅可查看或工作区内修改时为 `CASPER_ACCESS_NOT_APPLIED`（不发送提示，或停止正在运行的提示），[提及的会话](#session-mentions)无法发送时为某个 `SESSION_REFERENCE_*` 代码（不启动 Casper），收到错误回复时为 `CASPER_RPC_<code>`。会话仍可使用；下一条提示会再次启动 Casper。`CASPER_TEXT_ONLY` 已不再产生，只出现在早期版本保存的轮次中。
 
 <a id="understand-the-implementation"></a>
 ## 理解实现
@@ -73,6 +73,7 @@ kind: "package-reference"
 | [`src/commands.ts`](src/commands.ts) | 供 `/` 菜单使用的 Casper 命令，以及保存最后一份列表的 Host 存储域 `casper_agent_commands` |
 | [`src/app-tools.ts`](src/app-tools.ts) | 应用工具 MCP 服务器：监听、认证、工具列表，以及以 Casper Agent 身份运行的调用 |
 | [`src/forward-servers.ts`](src/forward-servers.ts) | 交给 Casper 的「设置 > MCP 服务器」：哪些会发送、解析后的凭据、某个服务器被略过的原因，以及列表的摘要 |
+| [`src/references.ts`](src/references.ts) | 通过会话引用服务读取消息提及的会话，并把其失败映射为该轮的代码 |
 | [`src/app-read.ts`](src/app-read.ts) | `app_read_file`：对应用安装目录与 profile 目录的只读访问 |
 | [`src/models.ts`](src/models.ts) | 把 Casper 的 `model` 与 `thought_level` 选项读成选择器的分组、推理等级与当前模型 |
 | [`src/model.ts`](src/model.ts) | `CasperModel`：Agent 的模型句柄，把选择交给 Casper 而不是 Host 目录 |
@@ -83,7 +84,7 @@ kind: "package-reference"
 
 每轮领取排队的输入，原样追加 `turn/start`、`step/start` 与领取的 `user/message` 事件，然后在 Casper 能改动文件之前刷写会话。领取的消息作为一条 `session/prompt` 发给 Casper，各块保持原有顺序：文本为 `text`；当 Casper 的 `initialize` 回复将 `promptCapabilities.image` 设为 true 时，图片为 `image` 块，内容是其存储的规范化字节的 base64，并带存储的媒体类型；文件为指向附件服务只读宿主副本的 `resource_link`（`file:` URI、名称与字节大小），由 Casper 用自己的文件工具读取。旧版 Casper 无法接收的图片、附件服务无法读取的图片，以及没有宿主路径的文件，各以一行占位文本发送，且该轮回复开头会有一条说明。读取图片期间中止，则该轮以中止结束且不发送提示，即使附件服务仍完成了读取。
 
-提示运行期间插入的引导消息，会以 `_casper/steer` 发给 `initialize` 回复中设置了 `agentCapabilities._meta.casper.steer` 的 Casper，带上该会话的 Casper 对话 id、该消息的块及其消息 id：在提示发出后立即发送，按队列顺序一次一条。该消息会一直留在队列中，直到 Casper 发来已读通知，即带有该 `messageId` 的 `user_message_chunk`；此时该消息被本轮领取，并按发送时的内容记录为开启下一步的 `user/message`。Casper 拒绝或始终未读的消息，以及含有会以占位文本发送的部分的消息，会连同其后排队的所有消息作为下一轮运行；旧版 Casper 收到的所有消息也是如此。停止会把未读的消息与队列其余部分一起清除。
+提示运行期间插入的引导消息，会以 `_casper/steer` 发给 `initialize` 回复中设置了 `agentCapabilities._meta.casper.steer` 的 Casper，带上该会话的 Casper 对话 id、该消息的块及其消息 id：在提示发出后立即发送，按队列顺序一次一条。该消息会一直留在队列中，直到 Casper 发来已读通知，即带有该 `messageId` 的 `user_message_chunk`；此时该消息被本轮领取，并按发送时的内容记录为开启下一步的 `user/message`。Casper 拒绝或始终未读的消息，以及含有会以占位文本发送的部分或含有会话提及的消息，会连同其后排队的所有消息作为下一轮运行；旧版 Casper 收到的所有消息也是如此。停止会把未读的消息与队列其余部分一起清除。
 
 | Casper 更新 | 会话事件 |
 |---|---|
@@ -200,10 +201,17 @@ Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打�
 
 共有三个关闭开关：设置中服务器自己的开关、本插件的 `forwardMcpServers: false`，以及 Casper 的 `acp_mcp: off`。设置中的更改或凭据的变化会在下一轮到达 Casper：在发送提示之前会重新构建列表，若与之前不同（以保存在内存中的 SHA-256 比较），进程会被关闭，该轮通过 `session/load` 用新列表重新打开对话。这次重新打开会结束 Casper 的「本会话内都同意」回答。无法构建的列表会保留正在运行的进程；若列表因凭据无法读取、命令查找失败或 5 秒内未就绪而漏掉 Casper 已获得的服务器，也会保留该进程。更改从不打断提示。每个对话都运行各 stdio 服务器自己的副本。
 
+<a id="session-mentions"></a>
+### 会话提及
+
+消息可以按输入框插入的形式 `@[label](dsh-session:…)` 提及其他会话。挂载了 `ctx.sessionReferenceResolver` 时，该轮在刷写会话之后、启动 Casper 之前读取它们：每条用户消息的文本由 `parseSessionReferenceText` 解析，服务的 `prepare` 在其常规预算下读取所提及的会话（最多 3 个，且不能是本会话），provider 为 `casper`，model 为该轮的模型标签。随后提示先带上消息的文字，其中每个提及写作 `@label`，再跟一个 `resource` 块：`uri` 是第一个被提及会话的 `encodeSessionReferenceUri`，`mimeType` 为 `text/markdown`，`text` 是服务为所有被提及会话生成的不可信快照。Casper 把没有文件对应的嵌入文本当作上下文而不是请求来读（Casper 的决定 90），因此不会据此列出检查清单或提议，`/` 命令也只取输入的文字。决定 90 之前的 Casper 同样设置 `promptCapabilities.embeddedContext`，却把这段文本当作请求的一部分来读，而其 `initialize` 回复无法区分两者，因此这需要带有决定 90 的 Casper。
+
+当 Casper 的 `initialize` 回复没有设置 `promptCapabilities.embeddedContext` 时，快照改以 `text` 块发送；超过 250 KiB 时也是如此，因为 Casper 会截断超过 256 KiB 的嵌入文本，这种情况下回复开头会写 "The referenced sessions went as plain text because they are large."。会话日志保留输入时的消息及其提及。无法发送的提及会让该轮以服务的代码结束（`SESSION_REFERENCE_SELF_REFERENCE`、`SESSION_REFERENCE_READ_FAILED`、`SESSION_REFERENCE_INVALID_REFERENCE`、`SESSION_REFERENCE_TOO_MANY`、`SESSION_REFERENCE_BUDGET_EXCEEDED`），且不启动 Casper；读取会话期间停止则该轮以中止结束。没有该服务时，提及按输入的文本发给 Casper。带有提及的引导消息不会被引导发送：它作为下一轮运行，以便读取其提及。
+
 <a id="model-experience"></a>
 ## 模型体验
 
-无，因为 Casper 进程自行构造模型请求，本插件不向任何 DeepSeek 请求添加内容。应用工具的名称、描述与结果会进入 Casper 自己的请求，资源工具的描述还会列出交给 Casper 的设置服务器。
+无，因为 Casper 进程自行构造模型请求，本插件不向任何 DeepSeek 请求添加内容。应用工具的名称、描述与结果会进入 Casper 自己的请求，资源工具的描述还会列出交给 Casper 的设置服务器，被提及会话的快照也会作为上下文进入 Casper 的请求。
 
 #### KV Cache 影响
 

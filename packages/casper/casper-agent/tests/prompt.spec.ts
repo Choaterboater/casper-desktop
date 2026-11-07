@@ -4,9 +4,12 @@ import { pathToFileURL } from 'node:url'
 import { AttachmentId } from '@deepseek-ai/dsh-attachment'
 import type { FileAttachmentRef, ImageAttachmentRef, StoredImageAttachment } from '@deepseek-ai/dsh-attachment'
 import { createUserMessage, fileHandleText } from '@deepseek-ai/dsh-llm'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import type { UserMessage } from '@deepseek-ai/dsh-session'
-import { hasPromptContent, promptContent, TEXT_ONLY_PICTURE, UNREADABLE_PICTURE } from '../src/prompt.ts'
+import { encodeSessionReferenceUri } from '@deepseek-ai/dsh-session-reference'
+import { hasPromptContent, LARGE_REFERENCES_NOTE, MAX_EMBEDDED_REFERENCE_BYTES, promptContent, TEXT_ONLY_PICTURE, UNREADABLE_PICTURE } from '../src/prompt.ts'
 import type { PromptAttachments } from '../src/prompt.ts'
+import type { PreparedReference } from '../src/references.ts'
 
 const PICTURE: ImageAttachmentRef = {
   attachmentId: AttachmentId(`sha256:${'a'.repeat(64)}`), mediaType: 'image/png', bytes: 3, width: 1, height: 1, name: 'shot.png',
@@ -93,6 +96,61 @@ describe('promptContent', () => {
     const content = await promptContent([user([{ type: 'reasoning', text: 'thinking' } as never, { type: 'text', text: 'hi' }])],
       { attachments: undefined, images: false, signal: live })
     expect(content).toEqual({ blocks: [{ type: 'text', text: 'hi' }], notes: [], readable: true })
+  })
+})
+
+describe('promptContent with session mentions', () => {
+  const OTHER = SessionId('other-session')
+  const mentioned = user([{ type: 'text', text: `see @[Other](${encodeSessionReferenceUri(OTHER)}) and fix it` }])
+  const plain = user([{ type: 'text', text: 'and then test it' }])
+  /** Options with no attachments, text only, and these references. */
+  const withRefs = (references: ReadonlyMap<UserMessage['id'], PreparedReference> | undefined, embedded = true) =>
+    ({ attachments: undefined, images: false, signal: live, references, embedded })
+  /** The resolver's result for `mentioned`: its readable words and the snapshot text. */
+  const prepared = (text = '## Referenced sessions\n\nthe other chat'): ReadonlyMap<UserMessage['id'], PreparedReference> =>
+    new Map([[mentioned.id, { content: [{ type: 'text', text: 'see @Other and fix it' }], sessionId: OTHER, text }]])
+
+  it('a mention gives its text and a session resource', async () => {
+    const content = await promptContent([mentioned, plain], withRefs(prepared()))
+    expect(content).toEqual({
+      blocks: [
+        { type: 'text', text: 'see @Other and fix it' },
+        { type: 'resource', resource: { uri: encodeSessionReferenceUri(OTHER), mimeType: 'text/markdown', text: '## Referenced sessions\n\nthe other chat' } },
+        { type: 'text', text: 'and then test it' },
+      ],
+      notes: [],
+      readable: true,
+    })
+  })
+
+  it('without embedded context it is a text block', async () => {
+    const content = await promptContent([mentioned], withRefs(prepared(), false))
+    expect(content).toEqual({
+      blocks: [{ type: 'text', text: 'see @Other and fix it' }, { type: 'text', text: '## Referenced sessions\n\nthe other chat' }],
+      notes: [],
+      readable: true,
+    })
+  })
+
+  it('over 250 KiB it is a text block with a note', async () => {
+    const whole = 'x'.repeat(MAX_EMBEDDED_REFERENCE_BYTES)
+    const atLimit = await promptContent([mentioned], withRefs(prepared(whole)))
+    expect(MAX_EMBEDDED_REFERENCE_BYTES).toBe(250 * 1024)
+    expect(atLimit.blocks[1]).toMatchObject({ type: 'resource' })
+    expect(atLimit.notes).toEqual([])
+    // Bytes count, not characters: one more two-byte character is over.
+    const over = `${whole.slice(1)}é`
+    const content = await promptContent([mentioned], withRefs(prepared(over)))
+    expect(content.blocks).toEqual([{ type: 'text', text: 'see @Other and fix it' }, { type: 'text', text: over }])
+    expect(content.notes).toEqual([LARGE_REFERENCES_NOTE])
+    expect(LARGE_REFERENCES_NOTE).toBe('The referenced sessions went as plain text because they are large.\n')
+  })
+
+  it('without references the text is unchanged', async () => {
+    for (const references of [undefined, new Map<UserMessage['id'], PreparedReference>()]) {
+      const content = await promptContent([mentioned], withRefs(references))
+      expect(content.blocks).toEqual(mentioned.content)
+    }
   })
 })
 

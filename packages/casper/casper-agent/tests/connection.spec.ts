@@ -120,6 +120,15 @@ describe('CasperConnection', { timeout: 30_000 }, () => {
     expect((await start()).connection.acceptsImages).toBe(false)
   })
 
+  it('takes embedded context only when the initialize reply sets promptCapabilities.embeddedContext to true', async () => {
+    const { fake, start } = await setup()
+    expect((await start()).connection.acceptsEmbeddedContext).toBe(false)
+    fake.script({ prompts: [], promptCapabilities: { image: false, audio: false, embeddedContext: true } })
+    expect((await start()).connection.acceptsEmbeddedContext).toBe(true)
+    fake.script({ prompts: [], promptCapabilities: { image: true } })
+    expect((await start()).connection.acceptsEmbeddedContext).toBe(false)
+  })
+
   it('passes the app profile to Casper as DSH_PROFILE and DSH_PROFILE_DIR', async () => {
     const { fake, start } = await setup()
     await start({}, undefined, undefined, { profile: { name: 'desktop', dir: join(fake.root, 'profile') } })

@@ -26,6 +26,7 @@ import {
   type StopReason,
 } from '@agentclientprotocol/sdk'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
+import type { SessionReferenceErrorCode } from '@deepseek-ai/dsh-session-reference'
 import { SubprocessExecutableNotFoundError } from '@deepseek-ai/dsh-subprocess'
 import type { SubprocessHandle, SubprocessOutcome, SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 import { appToolsEntry } from './app-tools.ts'
@@ -58,6 +59,8 @@ export type CasperFailureCode =
   | 'CASPER_ACCESS_NOT_APPLIED'
   | 'CASPER_TEXT_ONLY'
   | `CASPER_RPC_${number}`
+  // A session mention that could not be read ends the turn with the session-reference service's own code.
+  | SessionReferenceErrorCode
 
 /** A Casper failure with the code its turn ends with. */
 export class CasperError extends Error {
@@ -250,6 +253,14 @@ export class CasperConnection {
   /** Whether Casper's `initialize` reply set `promptCapabilities.image` to true, so prompts may carry image blocks. */
   get acceptsImages(): boolean {
     return this.initialized?.agentCapabilities?.promptCapabilities?.image === true
+  }
+
+  /**
+   * Whether Casper's `initialize` reply set `promptCapabilities.embeddedContext` to true, so prompts may carry
+   * `resource` blocks, which Casper reads as context and not as the request.
+   */
+  get acceptsEmbeddedContext(): boolean {
+    return this.initialized?.agentCapabilities?.promptCapabilities?.embeddedContext === true
   }
 
   /**

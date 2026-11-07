@@ -45,6 +45,8 @@ import type { Scope } from '@deepseek-ai/dsh-scope'
 import { appendPluginRecord } from '@deepseek-ai/dsh-session'
 import type { Session, SessionId, TurnEndReason, UserMessage } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-persistence'
+// Type-only: `ctx.sessionReferenceResolver`, which reads the Sessions a message mentions.
+import type {} from '@deepseek-ai/dsh-session-reference'
 import type {} from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-tools'
@@ -67,6 +69,7 @@ import type { CasperModelsCache } from './models-cache.ts'
 import { answerPermission } from './permission.ts'
 import { hasPromptContent, promptContent } from './prompt.ts'
 import { casperReceiptOf, usageModelOf, usageOf } from './receipt.ts'
+import { hasSessionReference, prepareReferences } from './references.ts'
 import type { CasperSidecar } from './sidecar.ts'
 import { CASPER_PROVIDER, TurnWriter } from './turn.ts'
 
@@ -434,6 +437,10 @@ export class CasperAgent implements Agent {
       // The prompt and its turn are durable before Casper can change files.
       await this.flush(true)
       signal.throwIfAborted()
+      // Mentioned Sessions are read before Casper starts, so a mention that can't be sent ends the turn without one.
+      const resolver = this.pluginCtx.get('sessionReferenceResolver')
+      const references = resolver === undefined ? undefined : await prepareReferences(this, resolver, claimed, this.modelLabel(), signal)
+      signal.throwIfAborted()
       // Between turns, never during a prompt: changed Settings servers reopen Casper through session/load.
       await this.refreshServers(signal)
       signal.throwIfAborted()
@@ -451,7 +458,9 @@ export class CasperAgent implements Agent {
       // A new Casper keeps the Session's Plan first setting, also when its first turn ended before the restore.
       if (!this.planRestored.has(connection)) await this.applyPlan(connection, signal)
       signal.throwIfAborted()
-      const content = await promptContent(claimed, { attachments: this.pluginCtx.get('attachments'), images: connection.acceptsImages, signal })
+      const content = await promptContent(claimed, {
+        attachments: this.pluginCtx.get('attachments'), images: connection.acceptsImages, signal, references, embedded: connection.acceptsEmbeddedContext,
+      })
       // A store may finish a read after a Stop; the prompt is then not sent.
       signal.throwIfAborted()
       if (!content.readable) {
@@ -1039,9 +1048,9 @@ export class CasperAgent implements Agent {
   /**
    * Send each steered line still pending, in queue order, while this prompt is
    * open and Casper takes them. A line is marked sent before its request, so a
-   * read notice that comes before the reply finds it. A refusal, a failure, or
-   * a line with a part that would go as a placeholder keeps it, and every line
-   * after it, for the next turn.
+   * read notice that comes before the reply finds it. A refusal, a failure, a
+   * line with a part that would go as a placeholder, or a line with a session
+   * mention keeps it, and every line after it, for the next turn.
    */
   private async sendSteers(sink: PromptSink): Promise<void> {
     const { connection, steers } = sink
@@ -1073,8 +1082,10 @@ export class CasperAgent implements Agent {
           steers.accepted.delete(id)
           continue
         }
-        // A placeholder's note belongs at the head of a turn's reply, so such a line runs as the next turn.
-        taken = content.readable && content.notes.length === 0 && this.sink === sink && await connection.steer(content.blocks, message.id)
+        // A placeholder's note belongs at the head of a turn's reply, and a mention is read only for a turn,
+        // so such a line runs as the next turn.
+        taken = content.readable && content.notes.length === 0 && !hasSessionReference(message) && this.sink === sink
+          && await connection.steer(content.blocks, message.id)
       } catch (error: unknown) {
         this.pluginCtx.logger.debug(`casper agent "${this.id}": steering not sent: ${errorText(error)}`)
       }
