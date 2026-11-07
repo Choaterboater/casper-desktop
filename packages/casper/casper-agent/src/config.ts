@@ -63,7 +63,7 @@ export const Config: z<Config> = z.object({
   model: z.string().min(1),
   effort: z.string().min(1),
   env: z.dict(z.string()).default({}),
-  startTimeoutMs: z.natural().min(1).default(30_000),
+  startTimeoutMs: z.natural().min(1).default(120_000),
   cancelGraceMs: z.natural().min(1).default(5_000),
   exitGraceMs: z.natural().min(1).default(2_500),
   killGraceMs: z.natural().min(1).default(5_000),

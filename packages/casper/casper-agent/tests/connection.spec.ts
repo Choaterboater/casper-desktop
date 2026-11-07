@@ -9,7 +9,7 @@ import { appToolsEntry } from '../src/app-tools.ts'
 import type { AppToolsServer } from '../src/app-tools.ts'
 import { CasperConnection, CasperError, casperArgv, casperEnv, profileEnv } from '../src/connection.ts'
 import type { CasperConnectionHandlers, CasperConnectionOptions } from '../src/connection.ts'
-import type { Config } from '../src/config.ts'
+import { Config } from '../src/config.ts'
 import { forwardedServers } from '../src/forward-servers.ts'
 import type { ForwardedServers } from '../src/forward-servers.ts'
 import { alive, casperModes, casperOptions, fakeCasper, gate, optionsWithoutMode, waitFor, withPlan } from './support.ts'
@@ -375,6 +375,11 @@ describe('CasperConnection', { timeout: 30_000 }, () => {
     const relative = await start({ command: 'bin/casper' }).catch((error: unknown) => error)
     expect(codeOf(relative)).toBe('CASPER_START_FAILED')
     expect(fake.pids()).toEqual([])
+  })
+
+  it('gives a start two minutes by default, enough for a busy machine, and keeps the limit configurable', () => {
+    expect(Config({} as never).startTimeoutMs).toBe(120_000)
+    expect(Config({ startTimeoutMs: 45_000 } as never).startTimeoutMs).toBe(45_000)
   })
 
   it('fails and kills a start that runs past its limit', async () => {

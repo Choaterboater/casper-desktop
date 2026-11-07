@@ -34,7 +34,7 @@ kind: "package-reference"
 | `model` | 未设置 | 起始模型，以 `--model` 传入；未设置时沿用 Casper 自身的默认值。[模型选择器](#model-picker)可按会话更改 |
 | `effort` | 未设置 | 起始推理等级，以 `--effort` 传入；未设置时沿用 Casper 自身的默认值。模型选择器可按会话更改 |
 | `env` | `{}` | 在子进程清理之后加入的子进程环境；桌面端条目传入以 bun 目录开头的 PATH，并在已设置时传入 `OPENROUTER_API_KEY` |
-| `startTimeoutMs` | `30000` | `initialize` 加上 `session/new` 或 `session/load` 的时限 |
+| `startTimeoutMs` | `120000` | `initialize` 加上 `session/new` 或 `session/load` 的时限 |
 | `cancelGraceMs` | `5000` | 停止后等待提示回复的时间，超时则结束 Casper |
 | `exitGraceMs` | `2500` | 关闭 stdin 后等待 Casper 退出的时间 |
 | `killGraceMs` | `5000` | SIGTERM 与 SIGKILL 之间的宽限时间 |

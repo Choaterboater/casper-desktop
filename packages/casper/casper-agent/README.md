@@ -34,7 +34,7 @@ The Desktop profile mounts the plugin from `packages/bundle/web-app/cordis.patch
 | `model` | unset | Start model, passed as `--model`; unset keeps Casper's own default. The [model picker](#model-picker) changes it per Session |
 | `effort` | unset | Start effort, passed as `--effort`; unset keeps Casper's own default. The model picker changes it per Session |
 | `env` | `{}` | Child environment added after the subprocess scrub; the Desktop row passes a PATH that leads with bun's folders and `OPENROUTER_API_KEY` when set |
-| `startTimeoutMs` | `30000` | Limit for `initialize` plus `session/new` or `session/load` |
+| `startTimeoutMs` | `120000` | Limit for `initialize` plus `session/new` or `session/load` |
 | `cancelGraceMs` | `5000` | Wait for the prompt reply after Stop before Casper is killed |
 | `exitGraceMs` | `2500` | Wait for Casper to exit after stdin closes |
 | `killGraceMs` | `5000` | Grace between SIGTERM and SIGKILL |
