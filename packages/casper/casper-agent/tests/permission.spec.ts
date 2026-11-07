@@ -110,6 +110,16 @@ describe('Casper\'s approval card', () => {
     expect(question.options).toEqual([{ label: 'No' }, { label: 'Yes, this once', description: 'Only this write' }])
   })
 
+  it('a box without a refusal goes to the generic card, so Esc or Enter on row one never says yes', () => {
+    const reject: PermissionOption = { optionId: '4', name: 'No, and stop', kind: 'reject_always' }
+    expect(permissionQuestion(request([ONCE, reject])).question.header).toBe(CASPER_BOX_HEADER)
+    const { question, options } = permissionQuestion(request([ONCE, SESSION], '/elsewhere/file.txt'))
+    expect(question.header).toBeUndefined()
+    expect(question.detail).toBe('/elsewhere/file.txt')
+    expect(question.options).toEqual([{ label: 'Yes, this once', description: 'Only this write' }, { label: 'Yes for this session' }])
+    expect(options).toEqual([ONCE, SESSION])
+  })
+
   it('an answer maps a label to its optionId, and typed text or no pick is cancelled', async () => {
     const asked: AskUserQuestionItem[] = []
     const ask = (answerWith: AskUserQuestionAnswer) => async (question: AskUserQuestionItem) => {

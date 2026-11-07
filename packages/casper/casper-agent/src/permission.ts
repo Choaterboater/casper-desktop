@@ -31,7 +31,7 @@ export interface PermissionQuestion {
 export interface PermissionQuestionOptions {
   /** The Session call id the box's step is recorded under, so a plan review reopens its plan. */
   readonly callId?: ToolCallId | undefined
-  /** Mark the box for Casper's approval card (`header: 'Casper'`); false leaves it to the generic question card. Default true. */
+  /** Mark a box with a refusal for Casper's approval card (`header: 'Casper'`); false leaves it to the generic card. Default true. */
   readonly card?: boolean | undefined
 }
 
@@ -110,7 +110,9 @@ export function reviewedPlan(call: Pick<ToolCallUpdate, '_meta' | 'content'>): s
 
 /**
  * Build the question for one `session/request_permission`. A box is headed
- * `Casper`, so Casper's approval card shows it, unless `card` is false. Its
+ * `Casper`, so Casper's approval card shows it with No as row one, unless
+ * `card` is false or the box offers no refusal: Esc and Enter on that card
+ * pick row one, so a box of only yeses goes to the generic card. Its
  * detail is the box's text followed by the diff lines of the step that raised
  * it. Casper's plan Build box (`_meta.casper.plan`) becomes a plan review
  * instead: its Build and Change the plan options, the plan as the detail, and
@@ -131,7 +133,7 @@ export function permissionQuestion(params: RequestPermissionRequest, extra: Perm
     options,
     question: {
       id: PERMISSION_QUESTION_ID,
-      ...extra.card === false ? {} : { header: CASPER_BOX_HEADER },
+      ...extra.card === false || options[0] === undefined || !refusal(options[0]) ? {} : { header: CASPER_BOX_HEADER },
       question: params.toolCall.title ?? 'Casper asks for permission',
       ...detail === undefined ? {} : { detail },
       options: options.map(labelOf),

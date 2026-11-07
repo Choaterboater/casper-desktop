@@ -105,6 +105,11 @@ describe('selectCasperBox', () => {
     expect(selectCasperBox({ key: 'approval:1', kind: 'approval', sessionId: SESSION } as never)).toBeNull()
   })
 
+  it('leaves a box of only yeses, which Casper sends with no header, to the generic card, so Esc picks no yes', () => {
+    const yesOnly = new PendingQuestion(SESSION, [box({ header: undefined, options: [ONCE, SESSION_WIDE] })], ToolCallId('casper:epoch:casper-approval-1'))
+    expect(selectCasperBox(yesOnly)).toBeNull()
+  })
+
   it('registers first in the composer chain with the Slot registry and the locale injected', () => {
     type Options = { name: string; priority: number; select: (owner: { pendingInteraction: unknown }) => unknown }
     const register = vi.fn((_options: Options) => () => {})
