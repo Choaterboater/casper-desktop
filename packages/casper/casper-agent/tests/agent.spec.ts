@@ -2139,6 +2139,32 @@ describe('Settings MCP servers in a Casper session', { timeout: 60_000 }, () => 
     expect(fake.calls('session/prompt').map(entry => entry.pid)).toEqual([fake.pids()[0], fake.pids()[0], fake.pids()[0]])
     expect(turnEnds(agent)).toEqual([{ kind: 'completed' }, { kind: 'completed' }, { kind: 'completed' }])
   })
+
+  it('a handed server turned off reopens Casper even while another handed server\'s credential cannot be read', async () => {
+    let failing = false
+    const resolve = (ref: string) => {
+      if (ref === 'WIKI_TOKEN') return Promise.resolve({ value: 'wiki-forwarded-secret', source: 'test' })
+      return failing ? Promise.reject(new Error('keychain busy')) : stored(ref)
+    }
+    const wiki: Entry = { ...docs(['wiki.js']), env: { WIKI_TOKEN: '${credential:WIKI_TOKEN}' } }
+    const entries: Record<string, Entry> = { docs: docs(), wiki }
+    const { fake, host } = await withServers({ prompts: [[], []], mcpHttp: true }, entries, {}, false, resolve)
+    const { agent } = await host.create('casper-forward-off-while-passing')
+    await run(agent, 'first')
+    failing = true
+    entries.wiki = { ...wiki, enabled: false }
+    await run(agent, 'second')
+    const [first, second] = fake.pids()
+    expect(second).toBeDefined()
+    await waitFor(() => !alive(first ?? 0))
+    // The server turned off is gone from the reopened Casper; the unreadable one is left out until it reads again.
+    expect(offered(fake)).toEqual([
+      { method: 'session/new', pid: first, names: ['docs', 'wiki'] },
+      { method: 'session/load', pid: second, names: [] },
+    ])
+    expect(fake.calls('session/prompt').map(entry => entry.pid)).toEqual([first, second])
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }, { kind: 'completed' }])
+  })
 })
 
 describe('Session mentions in a Casper session', { timeout: 60_000 }, () => {

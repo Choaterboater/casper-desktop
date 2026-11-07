@@ -799,7 +799,8 @@ export class CasperAgent implements Agent {
    * Before a turn, rebuild the Settings servers the live Casper was handed. When they changed, Casper is closed, and
    * this turn reopens it through `session/load` with the new list; the session's "Yes, for this session" answers end
    * with it. A rebuild that fails keeps the live Casper, and so does one that leaves out a server Casper was handed for
-   * a reason that may pass, so a slow credential store neither drops that server nor restarts Casper twice.
+   * a reason that may pass, so a slow credential store neither drops that server nor restarts Casper twice, unless
+   * another server Casper was handed is now turned off, removed or refused for good.
    * @param signal - the turn's signal.
    */
   private async refreshServers(signal: AbortSignal): Promise<void> {
@@ -815,7 +816,9 @@ export class CasperAgent implements Agent {
       this.pluginCtx.logger.warn(`casper agent "${this.id}": the MCP servers were not rebuilt: ${String(error)}`)
       return
     }
-    if (rebuilt.passing.some(name => live.forwardedNames.includes(name))) return
+    // A handed server now turned off, removed or refused for good always reaches Casper, whatever else is passing.
+    const gone = live.forwardedNames.some(name => !rebuilt.names.includes(name) && !rebuilt.passing.includes(name))
+    if (!gone && rebuilt.passing.some(name => live.forwardedNames.includes(name))) return
     if (rebuilt.digest === live.forwardedDigest || live !== this.connection) return
     // The old process exits before the new one opens the same conversation, and before the Agent's own close ends.
     this.connection = undefined
