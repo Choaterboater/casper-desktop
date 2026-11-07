@@ -24,6 +24,7 @@ import { diffCardModel } from '../src/client/tool/models/diff-card-model.ts'
 import { readCardModel } from '../src/client/tool/models/read-card-model.ts'
 import { searchCardModel } from '../src/client/tool/models/search-card-model.ts'
 import { terminalCardModel } from '../src/client/tool/models/terminal-card-model.ts'
+import { toolRowModel } from '../src/client/tool/models/tool-call-model.ts'
 import { webCardModel } from '../src/client/tool/models/web-card-model.ts'
 import { FileMutationRow } from '../src/client/tool/toolviews/file-mutation-row.tsx'
 
@@ -67,6 +68,7 @@ describe('Standard card models on the shapes a Casper Session records', () => {
   it('cover every row of the golden file', () => {
     expect(SHAPES.map(entry => entry.case)).toEqual([
       'edit', 'write a new file', 'write over a file', 'bash', 'bash exit 3', 'powershell', 'read', 'grep', 'find', 'ls', 'web_search', 'web_fetch',
+      'casper_check failed', 'ask',
     ])
   })
 
@@ -105,6 +107,16 @@ describe('Standard card models on the shapes a Casper Session records', () => {
   it('draw web search sources and the fetched page', () => {
     expect(webCardModel(settled(shape('web_search')))).toMatchObject({ kind: 'search', sources: [{ url: 'https://nodejs.org/api/assert.html' }] })
     expect(webCardModel(settled(shape('web_fetch')))).toMatchObject({ kind: 'fetch', url: 'https://example.com/', statusCode: 200 })
+  })
+
+  it('title a step Standard has no card for, and a question, with words instead of raw JSON', () => {
+    const check = toolRowModel('casper_check', settled(shape('casper_check failed')), CWD)
+    expect(check).toMatchObject({ summary: 'casper_check · test', state: 'error', errorSummary: 'casper_check test failed: npm run test (exit code 1)' })
+    const ask = shape('ask')
+    expect(toolRowModel(ask.name, running(ask), CWD).summary).toBe('Which database?')
+    expect(toolRowModel(ask.name, settled(ask), CWD)).toMatchObject({ summary: 'Which database?', state: 'ok' })
+    // A question that ends in an error keeps its words; the question row draws that summary red.
+    expect(toolRowModel(ask.name, settled({ ...ask, result: { ...ask.result, isError: true } }), CWD)).toMatchObject({ summary: 'Which database?', state: 'error' })
   })
 
   it('render the edit diff in the file mutation row', () => {

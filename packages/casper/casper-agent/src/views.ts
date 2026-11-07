@@ -206,10 +206,14 @@ export function casperQuestion(fields: Readonly<Record<string, unknown>>, fallba
 /**
  * The `ask_user_question` arguments of one Casper question, as Standard's question card reads them.
  * @param asked - the question.
- * @returns the JSON-ready arguments: one question with id {@link CASPER_QUESTION_ID}.
+ * @returns the JSON-ready arguments: one question with id {@link CASPER_QUESTION_ID}, and the
+ *   question as the `description` the row shows when it has no answer to summarize.
  */
 export function askArguments(asked: CasperQuestion): Readonly<Record<string, unknown>> {
-  return { questions: [{ id: CASPER_QUESTION_ID, question: asked.question, options: asked.options, multi_select: asked.multi }] }
+  return {
+    questions: [{ id: CASPER_QUESTION_ID, question: asked.question, options: asked.options, multi_select: asked.multi }],
+    ...asked.question === '' ? {} : { description: asked.question },
+  }
 }
 
 /**
@@ -258,10 +262,16 @@ function mcpName(mcp: Fields): string {
   return dshNameOf(mcp.tool) ?? CASPER_MCP
 }
 
-/** JSON arguments of an unmapped Casper call: its title, raw input, and preview text. */
-function casperArguments(title: string, input: Fields, content: ToolCall['content']): string {
+/**
+ * JSON arguments of an unmapped Casper call: its title, the `description` the
+ * generic row shows (what the step acts on, else its title without the tool's
+ * name), raw input, and preview text.
+ */
+function casperArguments(tool: string, title: string, casper: Fields | undefined, input: Fields, content: ToolCall['content']): string {
   const preview = toolCallText(content)
-  return JSON.stringify({ title, ...input, ...preview === undefined ? {} : { preview } })
+  const description = text(casper?.target) ?? text(title.startsWith(`${tool} `) ? title.slice(tool.length + 1) : title)
+  const summary = description === undefined ? {} : { description }
+  return JSON.stringify({ title, ...summary, ...input, ...preview === undefined ? {} : { preview } })
 }
 
 /**
@@ -285,7 +295,7 @@ export function standardCall(call: ToolCall): StandardView {
   const mcp = record(casper?.mcp)
   if (mcp !== undefined) {
     const name = mcpName(mcp)
-    if (name === CASPER_MCP) return { ...base, kind: 'mcp', name, arguments: casperArguments(call.title, input, call.content) }
+    if (name === CASPER_MCP) return { ...base, kind: 'mcp', name, arguments: casperArguments(tool, call.title, casper, input, call.content) }
     // `call_capability` carries the app tool's own arguments inside its own.
     const args = tool === 'call_capability' ? record(input.arguments) ?? {} : input
     return { ...base, kind: 'mcp', name, arguments: JSON.stringify(args) }
@@ -295,7 +305,7 @@ export function standardCall(call: ToolCall): StandardView {
   // A Casper tool already named `casper_<x>`, such as `casper_check`, keeps its name.
   const safe = tool.toLowerCase().replaceAll(/[^a-z0-9_]/g, '_')
   const name = safe.startsWith('casper_') ? safe : `casper_${safe}`
-  return { ...base, kind: 'casper', name, arguments: casperArguments(call.title, casper === undefined ? raw : input, call.content) }
+  return { ...base, kind: 'casper', name, arguments: casperArguments(tool, call.title, casper, casper === undefined ? raw : input, call.content) }
 }
 
 /**
@@ -496,6 +506,25 @@ function shapeMeta(tool: string, output: Fields | undefined): Json | undefined {
 }
 
 /**
+ * A failed step's result text. Words that are one JSON report, such as a
+ * failed check's, follow a plain first line, which the row shows as the
+ * failure: the step's title, and the report's command and exit code.
+ */
+function failedText(view: StandardView, said: string | undefined): string {
+  if (said === undefined) return STEP_FAILED
+  let report: Fields | undefined
+  try {
+    report = record(JSON.parse(said))
+  } catch {
+    return said
+  }
+  if (report === undefined) return said
+  const command = text(report.command)
+  const exitCode = typeof report.exitCode === 'number' && Number.isInteger(report.exitCode) ? report.exitCode : undefined
+  return `${view.title} failed${command === undefined ? '' : `: ${firstLine(command)}`}${exitCode === undefined ? '' : ` (exit code ${exitCode})`}\n${said}`
+}
+
+/**
  * Map a final `tool_call_update` to the result the Standard card reads.
  * A failed step is an error result with Casper's words, except a shell step
  * with an exit code, which Standard records as a completed command.
@@ -506,7 +535,7 @@ function shapeMeta(tool: string, output: Fields | undefined): Json | undefined {
 export function standardResult(view: StandardView, update: ToolCallUpdate): StandardResult {
   const output = record(update.rawOutput)
   if (view.kind === 'standard' && (view.tool === 'bash' || view.tool === 'powershell')) return shellResult(update, output)
-  if (update.status === 'failed') return { text: words(update.content) ?? STEP_FAILED, isError: true }
+  if (update.status === 'failed') return { text: failedText(view, words(update.content)), isError: true }
   if (view.kind !== 'standard') {
     return { text: words(update.content) ?? (update.rawOutput === undefined || update.rawOutput === null ? '' : JSON.stringify(update.rawOutput)), isError: false }
   }

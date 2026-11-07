@@ -119,12 +119,12 @@ Casper 在 `_meta.casper.tool` 中给每个步骤命名，其 `rawInput` 是模�
 | `find`、`ls` | `glob` | `pattern`（`ls` 为 `*`）、`path` | meta `shape: paths`、`paths`、`total`、`truncated` |
 | `web_search` | `web_search` | `queries` | meta `sources`、`truncated`、`answer` |
 | `web_fetch` | `web_fetch` | `url` | meta `url`、`statusCode`、`truncated` |
-| `ask` | `ask_user_question` | 一个 id 为 `casper-question` 的问题：`question`、`options`、`multi_select` | 在应用中给出的答案，记为 `{answers}`；否则为 Casper 的文字 |
+| `ask` | `ask_user_question` | 一个 id 为 `casper-question` 的问题：`question`、`options`、`multi_select`；以及作为 `description` 的问题本身，即该行的摘要 | 在应用中给出的答案，记为 `{answers}`；否则为 Casper 的文字 |
 | [应用工具](#app-tools) | 应用工具自己的名称 | MCP 参数；经 `call_capability` 调用时为其携带的 `arguments` | 应用工具自己的结果与 meta |
-| 其他 MCP 工具 | `casper_mcp` | `title`、输入与 `preview` | Casper 的文字 |
-| 其他任何工具 | `casper_<tool>`；工具名已以 `casper_` 开头时（如 `casper_check`）沿用其原名 | `title`、输入与 `preview` | Casper 的文字，或其原始输出的 JSON |
+| 其他 MCP 工具 | `casper_mcp` | `title`、`description`、输入与 `preview` | Casper 的文字 |
+| 其他任何工具 | `casper_<tool>`；工具名已以 `casper_` 开头时（如 `casper_check`）沿用其原名 | `title`、`description`（步骤作用的对象；否则为去掉工具名的标题）、输入与 `preview` | Casper 的文字，或其原始输出的 JSON |
 
-已运行的 shell 步骤无论退出码为何都不是错误。其他失败的步骤是错误，内容为 Casper 的文字；Casper 未发送文字时为 `Casper reported that this step failed.`。只有 Casper 报告了绝对路径时才记录 meta 路径，因此该轮的交付物会列出其编辑与写入产生的文件。结果形状不符合预期的步骤保留 Casper 的文本且不带 meta，显示为普通卡片。
+已运行的 shell 步骤无论退出码为何都不是错误。其他失败的步骤是错误，内容为 Casper 的文字；Casper 未发送文字时为 `Casper reported that this step failed.`；若文字是一份 JSON 报告（如失败的检查），其前面会加上一行供该行显示：步骤标题、`failed`，以及报告中的命令与退出码。只有 Casper 报告了绝对路径时才记录 meta 路径，因此该轮的交付物会列出其编辑与写入产生的文件。结果形状不符合预期的步骤保留 Casper 的文本且不带 meta，显示为普通卡片。
 
 <a id="approvals"></a>
 ### 审批

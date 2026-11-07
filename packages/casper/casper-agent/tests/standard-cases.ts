@@ -191,4 +191,26 @@ export const STANDARD_CASES: readonly StandardCase[] = [
       rawOutput: { url: 'https://example.com/', statusCode: 200, title: 'Example Domain', truncated: false },
     },
   },
+  {
+    // A tool Standard has no card for, failing with a JSON report as its words.
+    case: 'casper_check failed',
+    call: {
+      toolCallId: 'casper-tool-13', title: 'casper_check test', kind: 'execute', status: 'in_progress',
+      rawInput: { check: 'test' },
+      _meta: { casper: { tool: 'casper_check', target: 'test' } },
+    },
+    end: {
+      toolCallId: 'casper-tool-13', status: 'failed',
+      content: [text(JSON.stringify({ name: 'test', command: 'npm run test', cwd: CASE_CWD, status: 'fail', exitCode: 1, coverage: 'not-certified' }))],
+    },
+  },
+  {
+    case: 'ask',
+    call: {
+      toolCallId: 'casper-tool-14', title: 'ask', kind: 'other', status: 'in_progress',
+      rawInput: { question: 'Which database?', options: [{ label: 'SQLite' }, { label: 'Postgres' }] },
+      _meta: { casper: { tool: 'ask' } },
+    },
+    end: { toolCallId: 'casper-tool-14', status: 'completed', content: [text('SQLite')] },
+  },
 ]

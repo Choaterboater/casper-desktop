@@ -299,5 +299,54 @@
         "truncated": false
       }
     }
+  },
+  {
+    "case": "casper_check failed",
+    "name": "casper_check",
+    "args": {
+      "title": "casper_check test",
+      "description": "test",
+      "check": "test"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "casper_check test failed: npm run test (exit code 1)\n{\"name\":\"test\",\"command\":\"npm run test\",\"cwd\":\"/work/project\",\"status\":\"fail\",\"exitCode\":1,\"coverage\":\"not-certified\"}"
+        }
+      ],
+      "isError": true
+    }
+  },
+  {
+    "case": "ask",
+    "name": "ask_user_question",
+    "args": {
+      "questions": [
+        {
+          "id": "casper-question",
+          "question": "Which database?",
+          "options": [
+            {
+              "label": "SQLite"
+            },
+            {
+              "label": "Postgres"
+            }
+          ],
+          "multi_select": false
+        }
+      ],
+      "description": "Which database?"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "SQLite"
+        }
+      ],
+      "isError": false
+    }
   }
 ]

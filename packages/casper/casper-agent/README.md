@@ -119,12 +119,12 @@ Casper names each step in `_meta.casper.tool`, and its `rawInput` holds the mode
 | `find`, `ls` | `glob` | `pattern` (`*` for `ls`), `path` | meta `shape: paths`, `paths`, `total`, `truncated` |
 | `web_search` | `web_search` | `queries` | meta `sources`, `truncated`, `answer` |
 | `web_fetch` | `web_fetch` | `url` | meta `url`, `statusCode`, `truncated` |
-| `ask` | `ask_user_question` | one question with id `casper-question`: `question`, `options`, `multi_select` | the answers given in the app as `{answers}`, else Casper's words |
+| `ask` | `ask_user_question` | one question with id `casper-question`: `question`, `options`, `multi_select`; and the question as `description`, the row's summary | the answers given in the app as `{answers}`, else Casper's words |
 | an [app tool](#app-tools) | the app tool's own name | the MCP arguments; for a call through `call_capability`, the `arguments` it carries | the app tool's own result and meta |
-| another MCP tool | `casper_mcp` | `title`, the input, and `preview` | Casper's words |
-| any other tool | `casper_<tool>`, or the tool's own name when it already starts with `casper_`, such as `casper_check` | `title`, the input, and `preview` | Casper's words, or its raw output as JSON |
+| another MCP tool | `casper_mcp` | `title`, `description`, the input, and `preview` | Casper's words |
+| any other tool | `casper_<tool>`, or the tool's own name when it already starts with `casper_`, such as `casper_check` | `title`, `description` (what the step acts on, else its title without the tool's name), the input, and `preview` | Casper's words, or its raw output as JSON |
 
-A shell step that ran is never an error, whatever its exit code. Any other failed step is an error with Casper's words, or `Casper reported that this step failed.` when it sent none. A meta path is recorded only when Casper reports an absolute one, so the turn's deliverables list the files its edits and writes produced. A step whose result does not have the expected shape keeps Casper's text with no meta, which draws the plain card.
+A shell step that ran is never an error, whatever its exit code. Any other failed step is an error with Casper's words, or `Casper reported that this step failed.` when it sent none; words that are one JSON report, such as a failed check's, come after a first line the row shows instead: the step's title, `failed`, and the report's command and exit code. A meta path is recorded only when Casper reports an absolute one, so the turn's deliverables list the files its edits and writes produced. A step whose result does not have the expected shape keeps Casper's text with no meta, which draws the plain card.
 
 <a id="approvals"></a>
 ### Approvals

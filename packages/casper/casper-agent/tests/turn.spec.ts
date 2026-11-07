@@ -274,9 +274,9 @@ describe('TurnWriter', () => {
     expect(['casper-question-1', 'casper-question-3', 'casper-question-9'].map(id => writer.finished(id))).toEqual([true, true, false])
     writer.close(false)
     expect(ofType(events(), 'tool/call').map(event => [event.data.name, parsed(event.data.arguments)])).toEqual([
-      ['ask_user_question', { questions: [{ id: 'casper-question', question: 'Which database?', options: [{ label: 'SQLite' }, { label: 'Postgres', description: 'a server' }], multi_select: false }] }],
-      ['ask_user_question', { questions: [{ id: 'casper-question', question: 'Name?', options: [], multi_select: true }] }],
-      ['ask_user_question', { questions: [{ id: 'casper-question', question: 'Port?', options: [], multi_select: false }] }],
+      ['ask_user_question', { questions: [{ id: 'casper-question', question: 'Which database?', options: [{ label: 'SQLite' }, { label: 'Postgres', description: 'a server' }], multi_select: false }], description: 'Which database?' }],
+      ['ask_user_question', { questions: [{ id: 'casper-question', question: 'Name?', options: [], multi_select: true }], description: 'Name?' }],
+      ['ask_user_question', { questions: [{ id: 'casper-question', question: 'Port?', options: [], multi_select: false }], description: 'Port?' }],
     ])
     expect(ofType(events(), 'tool/result').map(event => [event.data.message.isError, event.data.message.content, event.data.error])).toEqual([
       [false, [{ type: 'text', text: JSON.stringify({ answers: [{ id: 'casper-question', selected: ['Postgres'], custom: 'version 16' }] }) }], undefined],
@@ -295,7 +295,7 @@ describe('TurnWriter', () => {
     writer.toolCall({ toolCallId: 'c', title: 'Bare', status: 'in_progress' })
     writer.close(false)
     expect(ofType(events(), 'tool/call').map(event => event.data.name)).toEqual(['casper_fetch', 'casper_web_search_', 'casper_tool'])
-    expect(JSON.parse(ofType(events(), 'tool/call')[0]?.data.arguments ?? '{}')).toEqual({ title: 'Web fetch' })
+    expect(JSON.parse(ofType(events(), 'tool/call')[0]?.data.arguments ?? '{}')).toEqual({ title: 'Web fetch', description: 'Web fetch' })
   })
 
   it('records an edit as Standard\'s edit with the patch hunks as its meta diffs', () => {

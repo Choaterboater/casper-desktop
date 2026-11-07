@@ -1619,7 +1619,7 @@ describe('Casper\'s forms', { timeout: 60_000 }, () => {
     expect(replies(fake)).toEqual([{ action: 'accept', content: { answer: '8080' } }])
     const call = eventsOf(agent).find(event => event.type === 'tool/call')
     expect(call?.type === 'tool/call' && [call.data.name, parsed(call.data.arguments)]).toEqual([
-      'ask_user_question', { questions: [{ id: 'casper-question', question: 'Which port?', options: [], multi_select: false }] },
+      'ask_user_question', { questions: [{ id: 'casper-question', question: 'Which port?', options: [], multi_select: false }], description: 'Which port?' },
     ])
   })
 
@@ -1636,7 +1636,7 @@ describe('Casper\'s forms', { timeout: 60_000 }, () => {
     const calls = eventsOf(agent).flatMap(event => event.type === 'tool/call' ? [[event.data.name, parsed(event.data.arguments)]] : [])
     expect(calls).toEqual([[
       'ask_user_question',
-      { questions: [{ id: 'casper-question', question: 'Which databases?', options: [{ label: 'SQLite', description: 'one file' }, { label: 'Postgres' }], multi_select: true }] },
+      { questions: [{ id: 'casper-question', question: 'Which databases?', options: [{ label: 'SQLite', description: 'one file' }, { label: 'Postgres' }], multi_select: true }], description: 'Which databases?' },
     ]])
     expect(results(agent)).toEqual([{ isError: false, text: JSON.stringify({ answers: [{ id: 'casper-question', selected: ['Postgres', 'SQLite'] }] }) }])
   })

@@ -195,7 +195,7 @@ describe('standardCall and standardResult', () => {
     expect(shape(capability({ id: 'mcp:acp-app:cordis_inspect_list' }), done()).args).toEqual({})
     const other = { content: [{ type: 'content' as const, content: { type: 'text' as const, text: 'preview' } }] }
     expect(shape(call('mcp', { q: 1 }, { ...other, casper: { mcp: { server: 'acp-docs', tool: 'search' } } }), done({ rawOutput: { hits: 2 } }))).toEqual({
-      name: CASPER_MCP, args: { title: 'mcp step', q: 1, preview: 'preview' }, result: { text: '{"hits":2}', isError: false },
+      name: CASPER_MCP, args: { title: 'mcp step', description: 'step', q: 1, preview: 'preview' }, result: { text: '{"hits":2}', isError: false },
     })
     expect(standardCall(call('mcp', {}, { casper: { mcp: { server: 'acp-app', tool: 'unknown' } } })).name).toBe(CASPER_MCP)
     expect(standardCall(call('mcp', {}, { casper: { mcp: { server: 'acp-app' } } })).name).toBe(CASPER_MCP)
@@ -203,7 +203,7 @@ describe('standardCall and standardResult', () => {
 
   it('keeps any other Casper tool as casper_<tool> with its title and arguments', () => {
     expect(shape(call('Delegate-Agent', { goal: 'g' }), done({ rawOutput: null }))).toEqual({
-      name: 'casper_delegate_agent', args: { title: 'Delegate-Agent step', goal: 'g' }, result: { text: '', isError: false },
+      name: 'casper_delegate_agent', args: { title: 'Delegate-Agent step', description: 'step', goal: 'g' }, result: { text: '', isError: false },
     })
   })
 
@@ -211,18 +211,18 @@ describe('standardCall and standardResult', () => {
     const options = [{ label: 'SQLite', description: 'one file' }, { label: 'Postgres', description: '' }, { label: '' }, 'MySQL']
     expect(shape(call('ask', { question: 'Which database?', options, multi: true }), done({ content: words('{"answers":["SQLite"]}') }))).toEqual({
       name: 'ask_user_question',
-      args: { questions: [{ id: 'casper-question', question: 'Which database?', options: [{ label: 'SQLite', description: 'one file' }, { label: 'Postgres' }], multi_select: true }] },
+      args: { questions: [{ id: 'casper-question', question: 'Which database?', options: [{ label: 'SQLite', description: 'one file' }, { label: 'Postgres' }], multi_select: true }], description: 'Which database?' },
       result: { text: '{"answers":["SQLite"]}', isError: false },
     })
     expect(parsed(standardCall(call('ask', { options: 'none' })).arguments)).toEqual({
-      questions: [{ id: 'casper-question', question: 'ask step', options: [], multi_select: false }],
+      questions: [{ id: 'casper-question', question: 'ask step', options: [], multi_select: false }], description: 'ask step',
     })
     expect(standardResult(standardCall(call('ask', {})), done())).toEqual({ text: '', isError: false })
   })
 
   it('keeps a Casper tool already named casper_<tool> without doubling the prefix', () => {
     expect(shape(call('casper_check', { check: 'test' }), done({ content: words('passed') }))).toEqual({
-      name: 'casper_check', args: { title: 'casper_check step', check: 'test' }, result: { text: 'passed', isError: false },
+      name: 'casper_check', args: { title: 'casper_check step', description: 'step', check: 'test' }, result: { text: 'passed', isError: false },
     })
     expect(standardCall(call('Casper-Check', {})).name).toBe('casper_check')
   })
@@ -237,7 +237,7 @@ describe('standardCall and standardResult', () => {
     expect(standardCall(legacy({ tool: 'read' }))).toMatchObject({ name: 'read', arguments: '{}' })
     expect(standardCall(legacy({ tool: 'grep', target: 'sum' }))).toMatchObject({ name: 'grep', arguments: '{"pattern":"sum"}' })
     expect(standardCall(legacy({ tool: 'plugin_manager', target: 'install' }))).toMatchObject({
-      kind: 'casper', name: 'casper_plugin_manager', arguments: JSON.stringify({ title: 'step', tool: 'plugin_manager', target: 'install' }),
+      kind: 'casper', name: 'casper_plugin_manager', arguments: JSON.stringify({ title: 'step', description: 'step', tool: 'plugin_manager', target: 'install' }),
     })
     expect(standardCall(legacy(undefined, 'edit'))).toMatchObject({ name: 'edit', arguments: '{}' })
     expect(standardCall(legacy([], 'execute'))).toMatchObject({ name: 'casper_execute' })
