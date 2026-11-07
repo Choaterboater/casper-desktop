@@ -17,7 +17,7 @@ import type {} from '@deepseek-ai/dsh-tool-todo'
 import type { AskUserQuestionAnswer } from '@deepseek-ai/dsh-user-questions'
 import type { BridgedCall } from './app-tools.ts'
 import { reviewedPlan, toolCallText } from './permission.ts'
-import { CASPER_RECEIPT } from './receipt.ts'
+import { CASPER_RECEIPT, receiptAcpId } from './receipt.ts'
 import type { CasperReceipt } from './receipt.ts'
 import { ASK_USER_QUESTION, askArguments, questionStep, standardCall, standardResult } from './views.ts'
 import type { CasperQuestion, Json, StandardView } from './views.ts'
@@ -312,7 +312,7 @@ export class TurnWriter {
    * @param receipt - the receipt Casper sent on its last message.
    */
   receipt(receipt: CasperReceipt): void {
-    const acpId = `casper-receipt-${String(this.options.turn)}`
+    const acpId = receiptAcpId(this.options.turn)
     this.startCall(acpId, CASPER_RECEIPT, JSON.stringify({ verdict: receipt.verdict }), undefined)
     this.finishCall(acpId, () => ({ content: [{ type: 'text', text: receipt.text }], isError: false, meta: receiptMeta(receipt) }))
   }

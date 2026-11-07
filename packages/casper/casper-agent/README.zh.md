@@ -66,7 +66,8 @@ kind: "package-reference"
 | [`src/permission.ts`](src/permission.ts) | 把审批框变成标题为 `Casper` 的用户问题，detail 中带有发起步骤的差异行，并把答案映射回去；计划 Build 框变成计划审阅 |
 | [`src/box.ts`](src/box.ts) | 审批框的问题 id、标题与卡片上限，由两半共用 |
 | [`src/receipt.ts`](src/receipt.ts) | 从 ACP `_meta` 读取 Casper 的回执与一次响应的 token，由两半共用 |
-| [`src/client/index.ts`](src/client/index.ts) | 客户端一半：把 Casper 的审批卡片注册为对话输入框链的第一项，并把回执卡片注册为 `casper_receipt` 的工具视图 |
+| [`src/client/index.ts`](src/client/index.ts) | 客户端一半：把 Casper 的审批卡片注册为对话输入框链的第一项，把回执卡片注册到已完成一轮的尾部，并把回执卡片注册为 `casper_receipt` 的工具视图 |
+| [`src/client/receipt-turn.ts`](src/client/receipt-turn.ts) | 在 Chat 目标上认领 `casper_receipt` 调用及其结果，使其不属于任何步骤，并把回执发布到它所在的一轮 |
 | [`src/client/CasperBoxCard.tsx`](src/client/CasperBoxCard.tsx) | Casper 的审批卡片：它接管哪些问题、它的行、按键与回答 |
 | [`src/client/ReceiptRow.tsx`](src/client/ReceiptRow.tsx) | Casper 的回执卡片：结论、已更改的文件、检查与模型用量，文案在 [`src/client/locales.ts`](src/client/locales.ts) |
 | [`src/elicitation.ts`](src/elicitation.ts) | 把 Casper 的表单（`elicitation/create`）变成用户问题，并把答案映射回去 |
@@ -98,7 +99,7 @@ kind: "package-reference"
 | 检查 `tool_call`（已完成或已失败） | 立即写入名为 `casper_check` 的 `tool/call` 及其结果 |
 | `plan` | 带完整列表的 `todo/write` |
 | 模型响应后的 `usage_update` | 其上下文窗口（`size`，为正整数时）记为 `request/context`，provider 为 `casper`，model 为 `_meta.casper.model` 中的 `<provider>/<model>`，仅在与会话已有的不同时追加；其 token（`_meta.casper.response`，输入与输出均为计数时）作为 `usage` 块和结算该响应的 `assistant/message` 的 `usage`：带 `toolUse` 的响应由其第一个调用提交，纯文本响应立即提交，因此之后的文本开启新步骤 |
-| 带 `_meta.casper.receipt` 的 `agent_message_chunk` | 一个立即结束的 `casper_receipt` 工具调用，结果是回执文本，meta 是回执（不含 `json` 事件），显示为回执卡片；无法解析的 meta 按文本处理 |
+| 带 `_meta.casper.receipt` 的 `agent_message_chunk` | 一个立即结束的 `casper_receipt` 工具调用，结果是回执文本，meta 是回执（不含 `json` 事件），显示为该轮尾部的回执卡片，位于该轮步骤之外，无需展开步骤即可看到结论；无法解析的 meta 按文本处理 |
 | 引导消息的 `user_message_chunk` 已读通知 | 该消息的 `user/message`，在该步骤未结束的调用结束后开启下一步；若 Casper 在该步骤中尚未写入任何内容，则并入该步骤 |
 | 提示结束（停止、退出或回复）时仍未结束的调用 | 在 `step/end` 之前写入带 `TOOL_OUTCOME_UNKNOWN` 的错误 `tool/result`，与 agent-loop 对失败步骤的记录一致 |
 

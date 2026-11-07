@@ -10,6 +10,24 @@ import { z } from 'zod'
 /** Tool name of the call that records Casper's receipt, and the key of its card. */
 export const CASPER_RECEIPT = 'casper_receipt'
 
+/**
+ * ACP id of a turn's receipt call; the Session's call id ends with it.
+ * @param turn - the turn the receipt ends.
+ * @returns the id the turn writer records the call under.
+ */
+export function receiptAcpId(turn: number): string {
+  return `casper-receipt-${String(turn)}`
+}
+
+/**
+ * Test whether a call id is a receipt call's, so its result is known without its call.
+ * @param callId - a recorded call id.
+ * @returns whether it ends with a receipt's ACP id.
+ */
+export function isReceiptCallId(callId: string): boolean {
+  return /(?:^|:)casper-receipt-\d+$/.test(callId)
+}
+
 const count = z.number().int().nonnegative()
 
 /** How a receipt's cost is paid: OpenRouter's is charged, another provider's a catalog estimate, a subscription's has none. */

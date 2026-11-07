@@ -1,21 +1,26 @@
 /**
- * Casper's receipt card: the `casper_receipt` call's row. Collapsed it shows
- * the verdict; open it lists the changed files (each opens against the
- * receipt's folder), the checks run and not run, and the model use. A
- * result whose meta is not a receipt shows the receipt's text, as the
- * generic row does.
+ * Casper's receipt card, at its Turn's tail and as the `casper_receipt`
+ * call's row. Collapsed it shows the verdict; open it lists the changed
+ * files (each opens against the receipt's folder), the checks run and not
+ * run, and the model use. A result whose meta is not a receipt shows the
+ * receipt's text, as the generic row does.
  * @module @deepseek-ai/dsh-casper-agent/client/ReceiptRow
  */
-import { useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
+import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import { DisclosureRow, IconChecklistOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client'
-import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
+import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { recordedReceipt, type CasperReceipt } from '../receipt.ts'
 import type { NS } from './locales.ts'
+import { resultText } from './receipt-turn.ts'
 import css from './ReceiptRow.module.css'
 
 /** Props of the keyed `casper_receipt` row. */
 export type ReceiptRowProps = ToolCallViewProps & PropsLocale<typeof NS>
+
+/** Props of the receipt's entry in a completed Turn's tail. */
+export type ReceiptTailProps = PropsRuntime<'conversation.chat.turnTail'> & PropsLocale<typeof NS>
 
 type Translate = ReceiptRowProps['t']
 
@@ -77,14 +82,34 @@ export function ReceiptRow(props: ReceiptRowProps) {
   }
   const receipt = recordedReceipt(props.block.meta)
   return receipt === undefined
-    ? <PlainReceipt {...props} />
+    ? <PlainReceipt text={resultText(props.block.content)} inspect={props.inspect} t={props.t} />
     : <ReceiptCard receipt={receipt} openFile={props.openFile} inspect={props.inspect} t={props.t} />
 }
 
+/**
+ * Render the Turn's receipt at its tail, so the verdict shows without opening the Turn's steps.
+ * @param props - the closing Turn, the file and call openers, and the card's translate.
+ * @returns the receipt card, the receipt's text when its meta does not parse, or null for a Turn without one.
+ */
+export function ReceiptTail({ turn, openFile, inspectCall, t }: ReceiptTailProps) {
+  const source = turn.data.source('casper-receipt')
+  const data = useSyncExternalStore(source.subscribe, source.getSnapshot)
+  if (data === undefined) return null
+  const inspect = inspectCall === undefined ? undefined : () => { inspectCall(data.callId) }
+  return data.receipt === undefined
+    ? <PlainReceipt text={data.text} inspect={inspect} t={t} />
+    : <ReceiptCard receipt={data.receipt} openFile={openFile} inspect={inspect} t={t} />
+}
+
+interface PlainReceiptProps {
+  readonly text: string
+  readonly inspect: ReceiptRowProps['inspect']
+  readonly t: Translate
+}
+
 /** The generic shape: the receipt's text behind the verdict-less title. */
-function PlainReceipt({ block, inspect, t }: Extract<ReceiptRowProps, { phase: 'result' }>) {
+function PlainReceipt({ text, inspect, t }: PlainReceiptProps) {
   const [open, setOpen] = useState(false)
-  const text = block.content.map(item => item.type === 'text' ? item.text : JSON.stringify(item)).join('\n')
   return <div data-tool="casper_receipt" data-state="plain">
     <DisclosureRow title={t('row.title')} icon={<IconChecklistOutlineRegular size={14} />}
       open={open && text !== ''} expandable={text !== ''} expandOnRowClick keepContentWhenOpen

@@ -1,0 +1,399 @@
+{
+  "receipt": {
+    "outcome": "verified",
+    "verdict": "Verified: 1 check passed.",
+    "exitCode": 0,
+    "changed": [
+      "src/a.ts"
+    ],
+    "checksRun": [
+      {
+        "name": "test",
+        "status": "pass",
+        "command": "npm test",
+        "exit": 0,
+        "ms": 12,
+        "fresh": true
+      }
+    ],
+    "checksNotRun": [],
+    "text": "Verified: 1 check passed.\nChanged: src/a.ts",
+    "root": "/work/project"
+  },
+  "events": [
+    {
+      "type": "turn/start",
+      "seq": 0,
+      "time": 0,
+      "data": {
+        "turn": 1
+      }
+    },
+    {
+      "type": "step/start",
+      "seq": 1,
+      "time": 0,
+      "data": {
+        "turn": 1,
+        "step": 1
+      }
+    },
+    {
+      "type": "assistant/message",
+      "seq": 2,
+      "time": 0,
+      "data": {
+        "turn": 1,
+        "step": 1,
+        "message": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "tool-call",
+              "id": "casper:epoch:casper-tool-1",
+              "name": "bash",
+              "arguments": "{\"command\":\"casper-tool-1\",\"description\":\"casper-tool-1\"}"
+            }
+          ],
+          "source": {
+            "kind": "model",
+            "provider": "casper",
+            "model": "casper"
+          },
+          "id": "message"
+        },
+        "stream": [
+          {
+            "type": "chunk",
+            "time": 0,
+            "chunk": {
+              "type": "block-start",
+              "index": 0,
+              "blockType": "tool-call"
+            }
+          },
+          {
+            "type": "tool-call-chunks",
+            "time0": 0,
+            "index": 0,
+            "dt": [],
+            "id": "casper:epoch:casper-tool-1",
+            "name": "bash",
+            "args": [
+              "{\"command\":\"casper-tool-1\",\"description\":\"casper-tool-1\"}"
+            ]
+          },
+          {
+            "type": "chunk",
+            "time": 0,
+            "chunk": {
+              "type": "block-end",
+              "index": 0,
+              "block": {
+                "type": "tool-call",
+                "id": "casper:epoch:casper-tool-1",
+                "name": "bash",
+                "arguments": "{\"command\":\"casper-tool-1\",\"description\":\"casper-tool-1\"}"
+              }
+            }
+          }
+        ]
+      },
+      "surfaceOp": "append"
+    },
+    {
+      "type": "tool/call",
+      "seq": 3,
+      "time": 0,
+      "data": {
+        "turn": 1,
+        "step": 1,
+        "callId": "casper:epoch:casper-tool-1",
+        "name": "bash",
+        "arguments": "{\"command\":\"casper-tool-1\",\"description\":\"casper-tool-1\"}"
+      }
+    },
+    {
+      "type": "tool/result",
+      "seq": 4,
+      "time": 0,
+      "data": {
+        "turn": 1,
+        "step": 1,
+        "message": {
+          "role": "tool",
+          "source": {
+            "kind": "tool",
+            "callId": "casper:epoch:casper-tool-1"
+          },
+          "toolCallId": "casper:epoch:casper-tool-1",
+          "content": [
+            {
+              "type": "text",
+              "text": ""
+            }
+          ],
+          "isError": false,
+          "id": "message"
+        }
+      },
+      "sourceEventSeqs": [
+        3
+      ],
+      "surfaceOp": "append"
+    },
+    {
+      "type": "step/end",
+      "seq": 5,
+      "time": 0,
+      "data": {
+        "turn": 1,
+        "step": 1
+      }
+    },
+    {
+      "type": "step/start",
+      "seq": 6,
+      "time": 0,
+      "data": {
+        "turn": 1,
+        "step": 2
+      }
+    },
+    {
+      "type": "assistant/message",
+      "seq": 7,
+      "time": 0,
+      "data": {
+        "turn": 1,
+        "step": 2,
+        "message": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "text",
+              "text": "Done."
+            }
+          ],
+          "source": {
+            "kind": "model",
+            "provider": "casper",
+            "model": "casper"
+          },
+          "id": "message"
+        },
+        "stream": [
+          {
+            "type": "chunk",
+            "time": 0,
+            "chunk": {
+              "type": "block-start",
+              "index": 0,
+              "blockType": "text"
+            }
+          },
+          {
+            "type": "text-chunks",
+            "time0": 0,
+            "index": 0,
+            "dt": [],
+            "texts": [
+              "Done."
+            ]
+          },
+          {
+            "type": "chunk",
+            "time": 0,
+            "chunk": {
+              "type": "block-end",
+              "index": 0,
+              "block": {
+                "type": "text",
+                "text": "Done."
+              }
+            }
+          },
+          {
+            "type": "chunk",
+            "time": 0,
+            "chunk": {
+              "type": "usage",
+              "usage": {
+                "inputTokens": 5,
+                "outputTokens": 7
+              }
+            }
+          }
+        ],
+        "usage": {
+          "inputTokens": 5,
+          "outputTokens": 7
+        }
+      },
+      "surfaceOp": "append"
+    },
+    {
+      "type": "step/end",
+      "seq": 8,
+      "time": 0,
+      "data": {
+        "turn": 1,
+        "step": 2
+      }
+    },
+    {
+      "type": "step/start",
+      "seq": 9,
+      "time": 0,
+      "data": {
+        "turn": 1,
+        "step": 3
+      }
+    },
+    {
+      "type": "assistant/message",
+      "seq": 10,
+      "time": 0,
+      "data": {
+        "turn": 1,
+        "step": 3,
+        "message": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "tool-call",
+              "id": "casper:epoch:casper-receipt-1",
+              "name": "casper_receipt",
+              "arguments": "{\"verdict\":\"Verified: 1 check passed.\"}"
+            }
+          ],
+          "source": {
+            "kind": "model",
+            "provider": "casper",
+            "model": "casper"
+          },
+          "id": "message"
+        },
+        "stream": [
+          {
+            "type": "chunk",
+            "time": 0,
+            "chunk": {
+              "type": "block-start",
+              "index": 0,
+              "blockType": "tool-call"
+            }
+          },
+          {
+            "type": "tool-call-chunks",
+            "time0": 0,
+            "index": 0,
+            "dt": [],
+            "id": "casper:epoch:casper-receipt-1",
+            "name": "casper_receipt",
+            "args": [
+              "{\"verdict\":\"Verified: 1 check passed.\"}"
+            ]
+          },
+          {
+            "type": "chunk",
+            "time": 0,
+            "chunk": {
+              "type": "block-end",
+              "index": 0,
+              "block": {
+                "type": "tool-call",
+                "id": "casper:epoch:casper-receipt-1",
+                "name": "casper_receipt",
+                "arguments": "{\"verdict\":\"Verified: 1 check passed.\"}"
+              }
+            }
+          }
+        ]
+      },
+      "surfaceOp": "append"
+    },
+    {
+      "type": "tool/call",
+      "seq": 11,
+      "time": 0,
+      "data": {
+        "turn": 1,
+        "step": 3,
+        "callId": "casper:epoch:casper-receipt-1",
+        "name": "casper_receipt",
+        "arguments": "{\"verdict\":\"Verified: 1 check passed.\"}"
+      }
+    },
+    {
+      "type": "tool/result",
+      "seq": 12,
+      "time": 0,
+      "data": {
+        "turn": 1,
+        "step": 3,
+        "message": {
+          "role": "tool",
+          "source": {
+            "kind": "tool",
+            "callId": "casper:epoch:casper-receipt-1"
+          },
+          "toolCallId": "casper:epoch:casper-receipt-1",
+          "content": [
+            {
+              "type": "text",
+              "text": "Verified: 1 check passed.\nChanged: src/a.ts"
+            }
+          ],
+          "isError": false,
+          "id": "message"
+        },
+        "meta": {
+          "outcome": "verified",
+          "verdict": "Verified: 1 check passed.",
+          "exitCode": 0,
+          "changed": [
+            "src/a.ts"
+          ],
+          "checksRun": [
+            {
+              "name": "test",
+              "status": "pass",
+              "command": "npm test",
+              "exit": 0,
+              "ms": 12,
+              "fresh": true
+            }
+          ],
+          "checksNotRun": [],
+          "text": "Verified: 1 check passed.\nChanged: src/a.ts",
+          "root": "/work/project"
+        }
+      },
+      "sourceEventSeqs": [
+        11
+      ],
+      "surfaceOp": "append"
+    },
+    {
+      "type": "step/end",
+      "seq": 13,
+      "time": 0,
+      "data": {
+        "turn": 1,
+        "step": 3
+      }
+    },
+    {
+      "type": "turn/end",
+      "seq": 14,
+      "time": 0,
+      "data": {
+        "turn": 1,
+        "reason": {
+          "kind": "completed"
+        }
+      }
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import type { ToolCall } from '@agentclientprotocol/sdk'
 import type { AssistantStreamFrame } from '@deepseek-ai/dsh-agent'
@@ -6,6 +7,7 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type { BridgedCall } from '../src/app-tools.ts'
+import type { CasperReceipt } from '../src/receipt.ts'
 import { OPEN_CALL_RESULT, TurnWriter } from '../src/turn.ts'
 import { STEP_FAILED } from '../src/views.ts'
 import { parsed } from './support.ts'
@@ -38,6 +40,20 @@ function tool(id: string, extra: Partial<ToolCall> = {}): ToolCall {
 
 function ofType<T extends SessionEvent['type']>(events: readonly SessionEvent[], type: T): Extract<SessionEvent, { type: T }>[] {
   return events.filter((event): event is Extract<SessionEvent, { type: T }> => event.type === type)
+}
+
+const MESSAGE_ID = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/
+
+/**
+ * An event as `fixtures/receipt-turn.json` keeps it: its times and message ids, which change per run, are fixed.
+ * @param event - a recorded event.
+ * @returns the event with stable values.
+ */
+function recorded(event: SessionEvent): unknown {
+  return JSON.parse(JSON.stringify(event, (key, value: unknown) => {
+    if (key === 'time' || key === 'time0') return 0
+    return key === 'id' && typeof value === 'string' && MESSAGE_ID.test(value) ? 'message' : value
+  }))
 }
 
 describe('TurnWriter', () => {
@@ -729,6 +745,20 @@ describe('TurnWriter', () => {
       writer.receipt(receipt)
       writer.close(false)
       expect(ofType(events(), 'tool/result')[0]?.data.meta).toStrictEqual(receipt)
+    })
+
+    it('a turn ending with a receipt writes the events of fixtures/receipt-turn.json, which the receipt card\'s tests read', () => {
+      const golden = JSON.parse(readFileSync(new URL('./fixtures/receipt-turn.json', import.meta.url), 'utf8')) as { receipt: CasperReceipt }
+      const { session, open, events } = setup()
+      const writer = open(1)
+      writer.toolCall(tool('casper-tool-1'))
+      writer.toolUpdate({ toolCallId: 'casper-tool-1', status: 'completed' })
+      writer.text('Done.')
+      writer.usage(LATER, false)
+      writer.receipt(golden.receipt)
+      writer.close(false)
+      session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+      expect({ receipt: golden.receipt, events: events().map(recorded) }).toEqual(golden)
     })
   })
 })

@@ -126,7 +126,8 @@ describe('ReceiptRow', () => {
     const register = vi.fn((_options: Record<string, unknown>, _component: unknown) => () => {})
     const slots = { inject: vi.fn((_name: string, mount: () => () => void) => mount()), register }
     const locale = { register: vi.fn(() => () => {}) }
-    apply({ slots, effect: (run: () => unknown) => run(), locale } as never)
+    const uiConversation = { events: { register: vi.fn(() => () => {}) } }
+    apply({ slots, effect: (run: () => unknown) => run(), locale, uiConversation } as never)
     expect(locale.register).toHaveBeenCalledWith(NS, { zh, en, ja, es, fr, de, ru, pt })
     expect(register.mock.calls.map(([options, component]) => [options, component])).toContainEqual([{ name: 'tool.call.toolview', key: 'casper_receipt', locale: NS }, ReceiptRow])
     for (const dictionary of [zh, ja, es, fr, de, ru, pt]) expect(Object.keys(dictionary)).toEqual(Object.keys(en))

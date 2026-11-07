@@ -11,7 +11,7 @@ import { useEffect, useMemo } from 'react'
 import { useMarkdownDelegate, type MarkdownMenuTarget } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
   AssistantMessageNode, ChatFlowHookContext, ChatFlowOwnerProps, ChatFlowSlotProps,
-  ChatNode, ChatNodeHookContext, ChatNodeOwnerProps, ChatSnapshot, UserBeforeOwnerProps,
+  ChatNode, ChatNodeHookContext, ChatNodeOwnerProps, ChatSnapshot, TurnTailOwnerProps, UserBeforeOwnerProps,
   ChatViewSlotProps, CommandNode, CompactionSummaryNode, ContextMessageNode, ConversationNode,
   LegacyConversationSlice, ModelRetryNode, StartedToolCall, SteeringMessageNode,
   ToolCallBlock, ToolResultNode, TurnErrorNode, TurnMaxTokensNode,
@@ -284,7 +284,14 @@ type ToolOwner = Pick<ChatNodeOwnerProps, 'openFile' | 'inspectCall'> & {
 
 const renderCommandSlot: React.ComponentProps<typeof CommandNodeView>['renderSlot'] =
   (_key, _owner, opts) => opts?.fallback ?? null
-const renderTurnTailSlot: React.ComponentProps<typeof TurnTailNodeView>['renderSlot'] = () => null
+/** Records each Turn tail owner, so a test reads what tail entries receive. */
+function turnTailSlot(tailOwners: TurnTailOwnerProps[]): React.ComponentProps<typeof TurnTailNodeView>['renderSlot'] {
+  return (name, owner) => {
+    // The generic owner does not narrow by the Slot name.
+    if (name === 'conversation.chat.turnTail') tailOwners.push(owner as unknown as TurnTailOwnerProps)
+    return null
+  }
+}
 
 function HarnessChatFlow({ standard, owner, hookContext, renderSlot, useConnectionState }: {
   readonly standard: HarnessStandardProps
@@ -312,13 +319,14 @@ function HarnessUserOrigin({ useRenderer, owner, options }: {
 }
 
 function HarnessChatNode({
-  standard, owner, hookContext, usePerformanceUsage, toolOwners, fallback, renderAssistantSlot, renderUserChain,
+  standard, owner, hookContext, usePerformanceUsage, toolOwners, tailOwners, fallback, renderAssistantSlot, renderUserChain,
 }: {
   readonly standard: HarnessStandardProps
   readonly owner: RoutedChatNodeOwner
   readonly hookContext: ChatNodeHookContext
   readonly usePerformanceUsage: React.ComponentProps<typeof TurnTailNodeView>['usePerformanceUsage']
   readonly toolOwners: ToolOwner[]
+  readonly tailOwners: TurnTailOwnerProps[]
   readonly fallback: React.ReactNode
   readonly renderAssistantSlot: React.ComponentProps<typeof AssistantNodeView>['renderSlot']
   readonly renderUserChain: PropsRenderSlots<'conversation.chat.user.before'>['renderSlotChain']
@@ -357,7 +365,7 @@ function HarnessChatNode({
       return <SystemPromptNodeView {...nodeProps} node={owner.node} />
     case 'turn-tail':
       return <TurnTailNodeView {...nodeProps} node={owner.node}
-        usePerformanceUsage={usePerformanceUsage} renderSlot={renderTurnTailSlot} />
+        usePerformanceUsage={usePerformanceUsage} renderSlot={turnTailSlot(tailOwners)} />
     case 'unknown':
       return <UnknownNodeView {...nodeProps} node={owner.node} />
     case 'tool-call': {
@@ -442,6 +450,7 @@ function makeHarness(
   const originRenderer = createSnapshotStore<UserChainState>({ renderer: undefined })
   const t = makeTranslate(zh, commonZh)
   const toolOwners: ToolOwner[] = []
+  const tailOwners: TurnTailOwnerProps[] = []
   const usePerformanceUsage = bindSnapshotSelector(performanceUsage)
   const useOriginRenderer = bindSnapshotSelector(originRenderer)
   let nodeSlotOverride: NodeRenderer | undefined
@@ -458,7 +467,7 @@ function makeHarness(
     if (nodeSlotOverride !== undefined) return nodeSlotOverride(key, owner, opts)
     return <HarnessChatNode standard={props} owner={owner}
       hookContext={opts.hookContext} usePerformanceUsage={usePerformanceUsage}
-      toolOwners={toolOwners} fallback={opts.fallback} renderAssistantSlot={renderAssistantSlot}
+      toolOwners={toolOwners} tailOwners={tailOwners} fallback={opts.fallback} renderAssistantSlot={renderAssistantSlot}
       renderUserChain={renderUserChain} />
   }
   const renderFlowSlot: ChatFlowSlotProps['renderSlot'] = (key: string, owner: object, opts?: {
@@ -577,7 +586,7 @@ function makeHarness(
     setConnection: (state: ConnectionState) => { connection.set(state) },
     openFile, openUserFile, loadOlder, loadThrough, openView,
     setOutline: (value: unknown) => { outlineValue = value },
-    chatScroll, forkAt, toolOwners,
+    chatScroll, forkAt, toolOwners, tailOwners,
     setPerformanceUsage: (mode: 'compact' | 'detailed') => { performanceUsage.set(mode) },
     setGrouped: (value: ConversationGroupedView<ProcessGroupData> | undefined) => {
       grouped = value
@@ -2654,6 +2663,17 @@ describe('ChatView', () => {
     render(<h.ChatView {...h.props} />)
     h.toolOwners[0]?.inspectCall?.('a')
     expect(h.openView).toHaveBeenCalledWith('trajectory', 'a')
+  })
+
+  it('hands the trajectory callback to Turn tail entries, and none without the view', () => {
+    const nodes = [user(1, 'hi'), assistant(2, 'answer', 1, 1)]
+    const h = makeHarness({ nodes, turnEnds: new Map([[1, 3]]) })
+    const view = render(<h.ChatView {...h.props} inspectCall={undefined} />)
+    expect(h.tailOwners.at(-1)).toBeDefined()
+    expect(h.tailOwners.at(-1)?.inspectCall).toBeUndefined()
+    view.rerender(<h.ChatView {...h.props} />)
+    h.tailOwners.at(-1)?.inspectCall?.('receipt')
+    expect(h.openView).toHaveBeenCalledWith('trajectory', 'receipt')
   })
 
   it('shows assistant IconActions only on the last content message of each turn', () => {

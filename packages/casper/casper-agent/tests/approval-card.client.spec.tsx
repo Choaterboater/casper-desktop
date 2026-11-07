@@ -110,13 +110,14 @@ describe('selectCasperBox', () => {
     expect(selectCasperBox(yesOnly)).toBeNull()
   })
 
-  it('registers first in the composer chain with the Slot registry and the locale injected', () => {
+  it('registers first in the composer chain with the Slot registry, the locale and the conversation Definitions injected', () => {
     type Options = { name: string; priority: number; select: (owner: { pendingInteraction: unknown }) => unknown }
     const register = vi.fn((_options: Options) => () => {})
     const slots = { inject: vi.fn((_name: string, mount: () => () => void) => mount()), register }
     const effect = vi.fn((run: () => unknown) => run())
-    apply({ slots, effect, locale: { register: vi.fn(() => () => {}) } } as never)
-    expect(inject).toEqual(['slots', 'locale'])
+    const uiConversation = { events: { register: vi.fn(() => () => {}) } }
+    apply({ slots, effect, locale: { register: vi.fn(() => () => {}) }, uiConversation } as never)
+    expect(inject).toEqual(['slots', 'locale', 'uiConversation'])
     expect(slots.inject).toHaveBeenCalledWith('conversation.composer', expect.any(Function))
     const options = register.mock.calls[0]?.[0]
     expect(options).toMatchObject({ name: 'conversation.composer', priority: -1 })

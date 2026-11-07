@@ -66,7 +66,8 @@ A turn that cannot run ends with an error on `turn/end`: `CASPER_NOT_FOUND` when
 | [`src/permission.ts`](src/permission.ts) | Turns an approval box into a user question headed `Casper`, with the raising step's diff lines in its detail, and maps the answer back; a plan Build box becomes a plan review |
 | [`src/box.ts`](src/box.ts) | The box's question id, header, and card limit, shared by both halves |
 | [`src/receipt.ts`](src/receipt.ts) | Reads Casper's receipt and a response's tokens from ACP `_meta`, shared by both halves |
-| [`src/client/index.ts`](src/client/index.ts) | Client half: registers Casper's approval card first in the conversation composer chain, and the receipt card as the `casper_receipt` tool view |
+| [`src/client/index.ts`](src/client/index.ts) | Client half: registers Casper's approval card first in the conversation composer chain, the receipt card in a completed turn's tail, and the receipt card as the `casper_receipt` tool view |
+| [`src/client/receipt-turn.ts`](src/client/receipt-turn.ts) | Claims the `casper_receipt` call and its result on the Chat target, so no step holds them, and publishes the receipt on its turn |
 | [`src/client/CasperBoxCard.tsx`](src/client/CasperBoxCard.tsx) | Casper's approval card: which questions it takes, its rows, keys, and answer |
 | [`src/client/ReceiptRow.tsx`](src/client/ReceiptRow.tsx) | Casper's receipt card: the verdict, changed files, checks, and model use, with its words in [`src/client/locales.ts`](src/client/locales.ts) |
 | [`src/elicitation.ts`](src/elicitation.ts) | Turns one of Casper's forms (`elicitation/create`) into a user question and maps the answer back |
@@ -98,7 +99,7 @@ A line steered in during a prompt goes to a Casper whose `initialize` reply sets
 | check `tool_call` (already completed or failed) | `tool/call` named `casper_check` and its result at once |
 | `plan` | `todo/write` with the whole list |
 | `usage_update` after a model response | its window (`size`, when a positive integer) as `request/context` with provider `casper` and model `<provider>/<model>` from `_meta.casper.model`, appended only when it differs from the Session's; its tokens (`_meta.casper.response`, when input and output are counts) as a `usage` chunk and the `usage` of the `assistant/message` that settles the response: a response with `toolUse` is committed by its first call, a text-only one at once, so the next text opens a new step |
-| `agent_message_chunk` carrying `_meta.casper.receipt` | a `casper_receipt` tool call closed at once, its result the receipt's text and its meta the receipt (without the `json` event), shown as the receipt card; meta that does not parse is text |
+| `agent_message_chunk` carrying `_meta.casper.receipt` | a `casper_receipt` tool call closed at once, its result the receipt's text and its meta the receipt (without the `json` event), shown as the receipt card in the turn's tail, outside the turn's steps, so the verdict shows without opening them; meta that does not parse is text |
 | `user_message_chunk` read notice for a steered line | that line's `user/message`, opening the next step once the step's open calls close, or joining the step when Casper has written nothing in it yet |
 | a call still open when the prompt ends (Stop, exit, or reply) | an error `tool/result` with `TOOL_OUTCOME_UNKNOWN`, as agent-loop records for a failed step, before `step/end` |
 

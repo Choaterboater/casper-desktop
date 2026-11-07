@@ -61,6 +61,8 @@ export interface TurnTailOwnerProps {
   turn: TurnLocation
   seq: number
   openFile: (path: string) => void
+  /** Inspect one of the Turn's calls in the trajectory view; absent while that view is unavailable. */
+  inspectCall?: ((callId: ToolCallId) => void) | undefined
 }
 
 /** Owner currency of finalized-assistant actions. */
