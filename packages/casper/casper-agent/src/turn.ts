@@ -12,7 +12,7 @@ import { createAssistantMessage, createToolResultMessage } from '@deepseek-ai/ds
 import { EXIT_PLAN_MODE } from '@deepseek-ai/dsh-plan-mode'
 import type { ContentBlock, ToolCallId } from '@deepseek-ai/dsh-llm'
 import { TOOL_OUTCOME_UNKNOWN } from '@deepseek-ai/dsh-session'
-import type { Session, SessionSeq } from '@deepseek-ai/dsh-session'
+import type { Session, SessionSeq, UserMessage } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-tool-todo'
 import type { AskUserQuestionAnswer } from '@deepseek-ai/dsh-user-questions'
 import type { BridgedCall } from './app-tools.ts'
@@ -59,6 +59,11 @@ interface OpenCall {
   answers?: AskUserQuestionAnswer['answers'] | undefined
 }
 
+/** An update held while calls of the step are open, written in order once they close. */
+type Buffered =
+  | { readonly kind: 'text'; readonly text: string }
+  | { readonly kind: 'user'; readonly message: UserMessage }
+
 /** One `tool/result` to append. */
 interface ResultBody {
   readonly content: ContentBlock[]
@@ -75,7 +80,9 @@ interface ResultBody {
  * its block, before its `tool/call`, so every call is advertised once as a
  * stored log requires. Text after a committed step opens the next step once
  * every open call has its result; text that arrives while calls are open waits
- * for them.
+ * for them. A line the user steered in, once Casper says the AI read it,
+ * opens the next step as its `user/message`, as agent-loop records steering at
+ * a step boundary; it waits for open calls like text does.
  */
 export class TurnWriter {
   private currentStep: number
@@ -88,7 +95,7 @@ export class TurnWriter {
   private readonly earlyBridged = new Map<string, BridgedCall>()
   /** ACP ids of the steps this prompt has closed. */
   private readonly closed = new Set<string>()
-  private buffered: string[] = []
+  private buffered: Buffered[] = []
 
   /** @param options - the Session, frame publisher, positions, counters, and id mapping. */
   constructor(private readonly options: TurnWriterOptions) {
@@ -108,7 +115,7 @@ export class TurnWriter {
     if (text === '') return
     if (this.committed) {
       if (this.openCalls.size > 0) {
-        this.buffered.push(text)
+        this.buffered.push({ kind: 'text', text })
         return
       }
       this.nextStep()
@@ -235,6 +242,25 @@ export class TurnWriter {
   }
 
   /**
+   * Record a line the user steered in, once Casper says the AI read it. The
+   * step's text so far is settled, and the line opens the next step as its
+   * `user/message`; a line read before Casper's first words of the step joins
+   * that step instead. While calls are open it waits, in order with the text.
+   * @param message - the user message, as it was sent to Casper.
+   */
+  steered(message: UserMessage): void {
+    if (this.openCalls.size > 0) {
+      this.buffered.push({ kind: 'user', message })
+      return
+    }
+    if (this.attempt !== undefined || this.committed) {
+      this.settleAttempt(false)
+      this.nextStep()
+    }
+    this.options.session.append('user/message', message, { surfaceOp: 'append' })
+  }
+
+  /**
    * Record a whole plan as the Session's todo list.
    * @param entries - the ACP plan entries, in order.
    */
@@ -256,25 +282,39 @@ export class TurnWriter {
     for (const call of open) {
       this.appendResult(call, textResult(OPEN_CALL_RESULT, true), { name: 'ToolOutcomeUnknownError', code: TOOL_OUTCOME_UNKNOWN })
     }
-    if (this.buffered.length > 0) {
-      const waiting = this.buffered
-      this.buffered = []
-      for (const text of waiting) this.text(text)
-    }
-    const attempt = this.attempt
-    if (attempt !== undefined && !attempt.ended) {
-      if (!interrupted) this.closeText(attempt)
-      // An attempt starts only with a text block, so an unsettled one always has visible content.
-      const content = interrupted ? attempt.interruptedBlocks() : attempt.blocks()
-      attempt.settle('assistant/message', () => this.options.session.append('assistant/message', {
-        turn: this.options.turn,
-        step: this.currentStep,
-        message: createAssistantMessage({ content, source: { provider: CASPER_PROVIDER, model: this.options.model } }),
-        ...interrupted ? { interrupted: true as const } : {},
-        stream: attempt.stream,
-      }, { surfaceOp: 'append' }).seq)
-    }
+    this.writeBuffered()
+    this.settleAttempt(interrupted)
     this.options.session.append('step/end', { turn: this.options.turn, step: this.currentStep })
+  }
+
+  /**
+   * Settle the open attempt as `assistant/message`, when it has not been
+   * committed by a tool call.
+   * @param interrupted - whether the attempt is cut off, so its open blocks are kept as interrupted.
+   */
+  private settleAttempt(interrupted: boolean): void {
+    const attempt = this.attempt
+    if (attempt === undefined || attempt.ended) return
+    if (!interrupted) this.closeText(attempt)
+    // An attempt starts only with a text block, so an unsettled one always has visible content.
+    const content = interrupted ? attempt.interruptedBlocks() : attempt.blocks()
+    attempt.settle('assistant/message', () => this.options.session.append('assistant/message', {
+      turn: this.options.turn,
+      step: this.currentStep,
+      message: createAssistantMessage({ content, source: { provider: CASPER_PROVIDER, model: this.options.model } }),
+      ...interrupted ? { interrupted: true as const } : {},
+      stream: attempt.stream,
+    }, { surfaceOp: 'append' }).seq)
+  }
+
+  /** Write the text and steered lines that waited for open calls, in order. */
+  private writeBuffered(): void {
+    const waiting = this.buffered
+    this.buffered = []
+    for (const entry of waiting) {
+      if (entry.kind === 'text') this.text(entry.text)
+      else this.steered(entry.message)
+    }
   }
 
   private ensureAttempt(): AssistantStreamAttempt {
@@ -354,10 +394,7 @@ export class TurnWriter {
     this.closed.add(acpId)
     const result = resultOf(open)
     this.appendResult(open, result, result.isError ? { name: 'CasperToolFailed', code: 'CASPER_TOOL_FAILED' } : undefined)
-    if (this.openCalls.size > 0 || this.buffered.length === 0) return
-    const waiting = this.buffered
-    this.buffered = []
-    for (const chunk of waiting) this.text(chunk)
+    if (this.openCalls.size === 0) this.writeBuffered()
   }
 
   private appendResult(open: OpenCall, result: ResultBody, error: { name: string; code: string } | undefined): void {

@@ -35,6 +35,8 @@ export interface FakeLogEntry {
   readonly reply?: { action: string; content?: Record<string, unknown> }
   /** Whether Casper stopped waiting for a form. */
   readonly timedOut?: boolean
+  /** Casper's reply to a steer. */
+  readonly steered?: boolean
 }
 
 /** One step of the stand-in's prompt script; see `fake-casper-acp.ts`. */
@@ -68,6 +70,12 @@ export interface FakeScript {
   readonly setModeError?: string
   /** Change the mode and send a `current_mode_update` during a `session/load` replay. */
   readonly replayMode?: string
+  /** Say in `initialize` that `_casper/steer` takes steering. */
+  readonly steer?: boolean
+  /** The reply to each steer in order; a missing one is true. */
+  readonly steerReplies?: readonly boolean[]
+  /** Wait this long before replying to a steer. */
+  readonly steerReplyDelayMs?: number
 }
 
 /** One command the stand-in offers, in ACP's `available_commands_update` shape. */

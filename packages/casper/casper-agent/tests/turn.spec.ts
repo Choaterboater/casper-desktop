@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { ToolCall } from '@agentclientprotocol/sdk'
 import type { AssistantStreamFrame } from '@deepseek-ai/dsh-agent'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type { BridgedCall } from '../src/app-tools.ts'
@@ -428,5 +429,69 @@ describe('TurnWriter', () => {
     const revisions = frames.map(frame => frame.revision)
     expect(revisions).toEqual(revisions.map((_, index) => index + 1))
     expect(new Set(frames.filter(frame => frame.type === 'start').map(frame => frame.attemptId)).size).toBe(3)
+  })
+
+  describe('steered', () => {
+    const line = (text: string) => createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } })
+
+    /** Each event's type, and the step and text of each message. */
+    function written(events: readonly SessionEvent[]): string[] {
+      return events.filter(event => event.type !== 'turn/start').map((event) => {
+        if (event.type === 'user/message') return `user ${event.data.content.map(block => block.type === 'text' ? block.text : '').join('')}`
+        if (event.type === 'assistant/message') {
+          const text = event.data.message.content.map(block => block.type === 'text' ? block.text : block.type).join('')
+          return `assistant ${event.data.step} ${text}`
+        }
+        if (event.type === 'step/start' || event.type === 'step/end') return `${event.type} ${event.data.step}`
+        return event.type
+      })
+    }
+
+    it('steered is buffered while calls are open', () => {
+      const { open, events } = setup()
+      const writer = open(1)
+      writer.toolCall(tool('casper-tool-1'))
+      writer.text('a')
+      const steer = line('one')
+      writer.steered(steer)
+      writer.text('b')
+      expect(ofType(events(), 'user/message')).toEqual([])
+      writer.toolUpdate({ toolCallId: 'casper-tool-1', status: 'completed' })
+      writer.toolCall(tool('casper-tool-2'))
+      writer.steered(line('two'))
+      writer.close(true)
+      expect(written(events())).toEqual([
+        'step/start 1', 'assistant 1 tool-call', 'tool/call', 'tool/result', 'step/end 1',
+        'step/start 2', 'assistant 2 a', 'step/end 2',
+        'step/start 3', 'user one', 'assistant 3 btool-call', 'tool/call', 'tool/result', 'step/end 3',
+        // A line read while a call was still open at the end opens the last step.
+        'step/start 4', 'user two', 'step/end 4',
+      ])
+      expect(ofType(events(), 'user/message')[0]?.data).toEqual(steer)
+    })
+
+    it('steered settles uncommitted text before the new step and user message', () => {
+      const { frames, open, events } = setup()
+      const writer = open(1)
+      writer.text('Looking')
+      writer.steered(line('also this'))
+      writer.text('Ok')
+      writer.close(false)
+      expect(written(events())).toEqual([
+        'step/start 1', 'assistant 1 Looking', 'step/end 1', 'step/start 2', 'user also this', 'assistant 2 Ok', 'step/end 2',
+      ])
+      const ends = frames.filter(frame => frame.type === 'end').map(frame => frame.type === 'end' && frame.outcome)
+      expect(ends).toEqual(ofType(events(), 'assistant/message').map(event => ({ kind: 'committed', eventType: 'assistant/message', seq: event.seq })))
+    })
+
+    it('a line read before Casper writes anything in the step joins that step', () => {
+      const { open, events } = setup()
+      const writer = open(1)
+      writer.steered(line('first'))
+      writer.steered(line('second'))
+      writer.text('Ok')
+      writer.close(false)
+      expect(written(events())).toEqual(['step/start 1', 'user first', 'user second', 'assistant 1 Ok', 'step/end 1'])
+    })
   })
 })

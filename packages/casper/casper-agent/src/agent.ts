@@ -30,7 +30,7 @@ import { ReactLoopInbox } from '@deepseek-ai/dsh-agent-loop'
 import { getDshRuntimeVersion } from '@deepseek-ai/dsh-app-boot'
 import type {} from '@deepseek-ai/dsh-attachment'
 import type { CommandResult } from '@deepseek-ai/dsh-commands'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, MessageId } from '@deepseek-ai/dsh-llm'
 import type { LlmFailure } from '@deepseek-ai/dsh-llm'
 import { CUSTOM_PRESET } from '@deepseek-ai/dsh-permission-presets'
 // Type-only: the `plan/mode` event and the `plan` projection the composer's plan chip reads.
@@ -80,11 +80,27 @@ export interface CasperAgentReaders {
   readonly plan: () => PlanUnitState
 }
 
+/** The steering one prompt has sent to Casper. */
+interface PromptSteers {
+  /** Ids of the lines sent, whatever Casper replied. */
+  readonly forwarded: Set<MessageId>
+  /** Each line as it was sent, until Casper says the AI read it or refuses it. */
+  readonly accepted: Map<MessageId, UserMessage>
+  /** Set once Casper refuses a line: later lines wait for the next turn too, so the lines keep their order. */
+  closed: boolean
+  /** The sends in flight, one at a time in queue order. */
+  chain: Promise<void>
+}
+
 /** Where the current prompt's updates go: its connection, turn writer, and turn signal. */
 interface PromptSink {
   readonly connection: CasperConnection
   readonly writer: TurnWriter
   readonly signal: AbortSignal
+  /** The turn the prompt belongs to; a steered line Casper reads is claimed for it. */
+  readonly turn: number
+  /** The steering sent during this prompt. */
+  readonly steers: PromptSteers
   /**
    * Stop the prompt so the turn ends with `error` instead of Casper's reply.
    * @param error - the turn's error.
@@ -120,8 +136,11 @@ function cancelCauseOf(signal: AbortSignal): AgentCancelCause | undefined {
 /**
  * Drives one Session through Casper. Each turn claims queued input, sends its
  * text as one `session/prompt`, and records Casper's updates as steps.
- * Casper takes no input during a prompt, so steering waits for the next turn.
- * The process starts at the first prompt and restarts after an exit.
+ * Steering during a prompt goes to a Casper that takes it (`_casper/steer`)
+ * and is recorded as a step's `user/message` once Casper says the AI read it;
+ * a line Casper refuses or never reads, and any line for an older Casper, run
+ * as the next turn. The process starts at the first prompt and restarts after
+ * an exit.
  */
 export class CasperAgent implements Agent {
   readonly model: CasperModel
@@ -165,6 +184,8 @@ export class CasperAgent implements Agent {
    * Until then a restarted Casper's own default is never recorded.
    */
   private readonly planRestored = new WeakSet<CasperConnection>()
+  /** Ids of the pending lines queued by {@link steer}; only these go to Casper during a prompt. */
+  private readonly steerIds = new Set<MessageId>()
 
   /**
    * @param pluginCtx - the Casper plugin context whose services the Agent uses.
@@ -246,10 +267,15 @@ export class CasperAgent implements Agent {
   followup(prompt: UserMessage): void { this.send(prompt, 'next-turn', true) }
 
   /**
-   * Queue steering; Casper takes no input during a prompt, so the next turn claims it.
+   * Queue steering and send it to the prompt in flight when Casper takes
+   * steering; otherwise, or when Casper does not read it, the next turn claims it.
    * @param prompt - the user message.
    */
-  steer(prompt: UserMessage): void { this.send(prompt, 'next-step', true) }
+  steer(prompt: UserMessage): void {
+    this.steerIds.add(prompt.id)
+    this.send(prompt, 'next-step', true)
+    this.forwardSteers()
+  }
 
   /**
    * Queue context for the next turn without waking the driver.
@@ -376,6 +402,8 @@ export class CasperAgent implements Agent {
 
   private async runTurn(turn: number, signal: AbortSignal, onStep: (step: number) => void): Promise<TurnEndReason> {
     const claimed = this.inbox.claim('next-turn', turn)
+    // A claimed line is this turn's prompt, never steering.
+    for (const message of claimed) this.steerIds.delete(message.id)
     if (claimed.length === 0) return { kind: 'completed' }
     this.session.append('step/start', { turn, step: 1 })
     onStep(1)
@@ -394,6 +422,7 @@ export class CasperAgent implements Agent {
       callId: acpId => (connection as CasperConnection).toolCallId(acpId),
     })
     let interrupted = true
+    let sink: PromptSink | undefined
     try {
       if (!hasPromptContent(claimed)) throw new CasperError('CASPER_EMPTY_PROMPT', 'The request is empty, so nothing was sent to Casper.')
       // The prompt and its turn are durable before Casper can change files.
@@ -427,13 +456,15 @@ export class CasperAgent implements Agent {
       this.updateFailure = undefined
       const stopper = new AbortController()
       const promptSignal = AbortSignal.any([signal, stopper.signal])
-      this.sink = {
-        connection, writer, signal: promptSignal,
+      sink = {
+        connection, writer, signal: promptSignal, turn,
+        steers: { forwarded: new Set(), accepted: new Map(), closed: false, chain: Promise.resolve() },
         stop: (error) => {
           this.updateFailure ??= error
           stopper.abort({ kind: 'user' } satisfies AgentCancelCause)
         },
       }
+      this.sink = sink
       if (accessNote !== undefined) writer.text(accessNote)
       if (lateNote !== undefined) writer.text(lateNote)
       for (const note of content.notes) writer.text(note)
@@ -453,6 +484,8 @@ export class CasperAgent implements Agent {
       this.sink = undefined
       for (const ask of this.asks.values()) ask.abort()
       this.asks.clear()
+      // A send still in flight settles first, so the next turn's claim and its own prompt come after its reply.
+      if (sink !== undefined) await settlesWithin(sink.steers.chain, this.config.cancelGraceMs)
       onStep(writer.step)
       writer.close(interrupted)
     }
@@ -461,6 +494,8 @@ export class CasperAgent implements Agent {
   /** Send the prompt; on abort send `session/cancel` and wait the cancel grace before killing Casper. */
   private async promptUntilSettled(connection: CasperConnection, blocks: Parameters<CasperConnection['prompt']>[0], signal: AbortSignal): Promise<StopReason> {
     const reply = connection.prompt(blocks)
+    // Steering queued while the prompt was prepared goes after it, so Casper has a prompt to steer.
+    this.forwardSteers()
     const aborted = Promise.withResolvers<'aborted'>()
     const onAbort = (): void => { aborted.resolve('aborted') }
     signal.addEventListener('abort', onAbort, { once: true })
@@ -933,6 +968,88 @@ export class CasperAgent implements Agent {
     )
   }
 
+  /** Send the queued steering to the prompt in flight, after any send already running. */
+  private forwardSteers(): void {
+    const sink = this.sink
+    if (sink === undefined) return
+    sink.steers.chain = sink.steers.chain.then(() => this.sendSteers(sink))
+  }
+
+  /**
+   * Send each steered line still pending, in queue order, while this prompt is
+   * open and Casper takes them. A line is marked sent before its request, so a
+   * read notice that comes before the reply finds it. A refusal, a failure, or
+   * a line with a part that would go as a placeholder keeps it, and every line
+   * after it, for the next turn.
+   */
+  private async sendSteers(sink: PromptSink): Promise<void> {
+    const { connection, steers } = sink
+    for (;;) {
+      if (this.sink !== sink || steers.closed || sink.signal.aborted || !connection.acceptsSteer) return
+      const pending = [...this.inbox.nextTurn, ...this.inbox.nextStep]
+      for (const id of this.steerIds) if (!pending.some(message => message.id === id)) this.steerIds.delete(id)
+      const first = this.inbox.nextStep.find(item => this.steerIds.has(item.id) && !steers.forwarded.has(item.id))
+      if (first === undefined) return
+      const { id } = first
+      steers.forwarded.add(id)
+      steers.accepted.set(id, first)
+      let taken = false
+      try {
+        const read = (line: UserMessage) => promptContent([line], { attachments: this.pluginCtx.get('attachments'), images: connection.acceptsImages, signal: sink.signal })
+        const queued = () => this.inbox.nextStep.find(item => item.id === id)
+        let message = first
+        let content = await read(message)
+        // A picture's read takes a while: a line removed meanwhile is not sent, and an edited one sends its new content.
+        let current = queued()
+        while (current !== undefined && current !== message) {
+          message = current
+          steers.accepted.set(id, message)
+          content = await read(message)
+          current = queued()
+        }
+        if (current === undefined) {
+          steers.forwarded.delete(id)
+          steers.accepted.delete(id)
+          continue
+        }
+        // A placeholder's note belongs at the head of a turn's reply, so such a line runs as the next turn.
+        taken = content.readable && content.notes.length === 0 && this.sink === sink && await connection.steer(content.blocks, message.id)
+      } catch (error: unknown) {
+        this.pluginCtx.logger.debug(`casper agent "${this.id}": steering not sent: ${errorText(error)}`)
+      }
+      if (!taken) {
+        steers.accepted.delete(id)
+        steers.closed = true
+        return
+      }
+    }
+  }
+
+  /**
+   * Record a steered line Casper says the AI read: claim it from the queue for
+   * this turn and write it, as it was sent, as the next step's `user/message`.
+   * The rest of the queue goes back unchanged. The notice may come before
+   * Casper's reply to the send.
+   * @param sink - the prompt's sink.
+   * @param messageId - the id the notice carries.
+   */
+  private steerRead(sink: PromptSink, messageId: string | null | undefined): void {
+    if (messageId == null) return
+    const id = MessageId(messageId)
+    const message = sink.steers.forwarded.has(id) ? sink.steers.accepted.get(id) : undefined
+    if (message === undefined) return
+    sink.steers.accepted.delete(id)
+    this.steerIds.delete(id)
+    if (!this.inbox.nextStep.some(item => item.id === id)) {
+      // Removed from the queue after it was sent: the AI read it all the same.
+      sink.writer.steered(message)
+      return
+    }
+    const batch = this.inbox.claim('next-step', sink.turn)
+    sink.writer.steered(message)
+    this.inbox.splice('next-step', 0, 0, batch.filter(item => item.id !== id))
+  }
+
   /** Forget the current connection and start killing it. */
   private dropConnection(connection: CasperConnection): void {
     this.connection = undefined
@@ -986,6 +1103,10 @@ export class CasperAgent implements Agent {
           return
         case 'plan':
           sink.writer.plan(update.entries)
+          return
+        case 'user_message_chunk':
+          // Only Casper's notice for a line this prompt sent counts; a replay never reaches here.
+          this.steerRead(sink, update.messageId)
           return
         default:
           // Casper sends no other update kinds; the rest of ACP's set is not shown.

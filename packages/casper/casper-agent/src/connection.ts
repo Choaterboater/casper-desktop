@@ -243,6 +243,15 @@ export class CasperConnection {
   }
 
   /**
+   * Whether Casper's `initialize` reply sets `agentCapabilities._meta.casper.steer` to true, so a line the user
+   * sends during a prompt may go to Casper with {@link steer}.
+   */
+  get acceptsSteer(): boolean {
+    const casper = this.initialized?.agentCapabilities?._meta?.casper
+    return typeof casper === 'object' && casper !== null && (casper as { steer?: unknown }).steer === true
+  }
+
+  /**
    * The option list of Casper's latest `session/new` or `session/load` reply,
    * `config_option_update`, or `session/set_config_option` reply; undefined for
    * a Casper that offers none.
@@ -348,6 +357,27 @@ export class CasperConnection {
     const { stopReason } = await this.request(this.requireConnection().agent.request(methods.agent.session.prompt, { sessionId, prompt }))
     await drainInbound()
     return stopReason
+  }
+
+  /**
+   * Send a line during the prompt in flight with `_casper/steer`; Casper reads it at the AI's next step and says so
+   * with a `user_message_chunk` carrying `messageId`. Casper queues nothing: a line it refuses stays the app's.
+   * @param prompt - the line's blocks.
+   * @param messageId - the line's message id, which Casper's read notice carries.
+   * @returns whether Casper took the line; false for a refusal, an error reply, or an exit.
+   */
+  async steer(prompt: AcpContentBlock[], messageId: string): Promise<boolean> {
+    if (this.dead) return false
+    try {
+      const reply = await this.request(this.requireConnection().agent.request<{ steered?: unknown }>(
+        '_casper/steer', { sessionId: this.requireSession(), prompt, messageId },
+      ))
+      return reply.steered === true
+    } catch (error: unknown) {
+      // A line Casper did not take runs as the next turn.
+      void error
+      return false
+    }
   }
 
   /**

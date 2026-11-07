@@ -57,7 +57,7 @@ A turn that cannot run ends with an error on `turn/end`: `CASPER_NOT_FOUND` when
 | [`src/index.ts`](src/index.ts) | Plugin entry: registers the projections, opens the sidecar, and registers the factory route |
 | [`src/route.ts`](src/route.ts) | Selects root Sessions on the configured presets; delegated children stay on agent-loop |
 | [`src/factory.ts`](src/factory.ts) | Creates and resumes Agents with agent-loop's publication order, refuses forks, and tears every Agent down in parallel on unload |
-| [`src/agent.ts`](src/agent.ts) | `CasperAgent`: inbox, phases, one prompt per turn, cancel, and process restart |
+| [`src/agent.ts`](src/agent.ts) | `CasperAgent`: inbox, phases, one prompt per turn, steering sent to the prompt in flight, cancel, and process restart |
 | [`src/connection.ts`](src/connection.ts) | One `casper acp` process: lookup, spawn, ACP client, `session/new` or `session/load`, prompt, cancel, and disposal |
 | [`src/turn.ts`](src/turn.ts) | Writes Casper's updates as steps, assistant messages, tool calls, results, and the todo list |
 | [`src/views.ts`](src/views.ts) | Records a Casper tool step under the Standard tool that does the same job: its name, arguments, result text, and meta |
@@ -77,7 +77,9 @@ A turn that cannot run ends with an error on `turn/end`: `CASPER_NOT_FOUND` when
 
 ### Turns and events
 
-Each turn claims the queued input and appends `turn/start`, `step/start`, and the claimed `user/message` events unchanged, then flushes the Session before Casper can change files. The claimed messages go to Casper as one `session/prompt`, their blocks in order: text as `text`; a picture as an `image` block holding its stored normalized bytes in base64 with the stored media type, when Casper's `initialize` reply sets `promptCapabilities.image` to true; and a file as a `resource_link` to the attachment service's read-only host copy (`file:` URI, name, and byte size), which Casper reads with its own file tools. A picture an older Casper cannot take, a picture the attachment service cannot read, and a file with no host path are sent as one line of placeholder text each, and the turn's reply opens with a note saying so. An abort during a picture read ends the turn as aborted and sends no prompt, even when the attachment service finishes the read. Casper takes no input while a prompt runs, so steering waits for the next turn.
+Each turn claims the queued input and appends `turn/start`, `step/start`, and the claimed `user/message` events unchanged, then flushes the Session before Casper can change files. The claimed messages go to Casper as one `session/prompt`, their blocks in order: text as `text`; a picture as an `image` block holding its stored normalized bytes in base64 with the stored media type, when Casper's `initialize` reply sets `promptCapabilities.image` to true; and a file as a `resource_link` to the attachment service's read-only host copy (`file:` URI, name, and byte size), which Casper reads with its own file tools. A picture an older Casper cannot take, a picture the attachment service cannot read, and a file with no host path are sent as one line of placeholder text each, and the turn's reply opens with a note saying so. An abort during a picture read ends the turn as aborted and sends no prompt, even when the attachment service finishes the read.
+
+A line steered in during a prompt goes to a Casper whose `initialize` reply sets `agentCapabilities._meta.casper.steer`, as `_casper/steer` with the Session's Casper conversation id, the line's blocks, and its message id: right after the prompt is sent, one line at a time in queue order. The line stays queued until Casper sends its read notice, a `user_message_chunk` carrying that `messageId`; the line is then claimed for the turn and recorded, as it was sent, as the `user/message` that opens the next step. A line Casper refuses or never reads, or one with a part that would go as a placeholder, runs as the next turn with every line queued after it, and so does every line for an older Casper. Stop clears an unread line with the rest of the queue.
 
 | Casper update | Session events |
 |---|---|
@@ -88,6 +90,7 @@ Each turn claims the queued input and appends `turn/start`, `step/start`, and th
 | `tool_call_update` still in progress | nothing: the call stays open and an asked approval box stays asked |
 | check `tool_call` (already completed or failed) | `tool/call` named `casper_check` and its result at once |
 | `plan` | `todo/write` with the whole list |
+| `user_message_chunk` read notice for a steered line | that line's `user/message`, opening the next step once the step's open calls close, or joining the step when Casper has written nothing in it yet |
 | a call still open when the prompt ends (Stop, exit, or reply) | an error `tool/result` with `TOOL_OUTCOME_UNKNOWN`, as agent-loop records for a failed step, before `step/end` |
 
 The receipt is the last text chunk, so it ends the final assistant message. A prompt reply resolves only after every update received before it has been written. Stop sends `session/cancel` and ends the turn as aborted; Casper is killed when it has not replied within `cancelGraceMs`. Tool call ids carry a random per-process prefix, so a restarted Casper's ids never fold into earlier cards.
@@ -198,7 +201,7 @@ The plugin sends no model request, so it has no cache effect; Casper's own reque
 - In a packaged app `app_read_file` reaches each installed package's `README.md`, `package.json` and built `lib/*.js`, the skill files, and `ui-theme`'s `lib/styles`. The Desktop runtime copy drops every `.d.ts`, packages publish no `src/`, and the repository's `docs/` ship in no package, so `lib/types`, `ui-sidebar`'s `slots.ts`, `docs/cordis-tutorial` and `docs/web-styling.md` cannot be read there; slot props and theme tokens come from `cordis_inspect_query` instead. Shipping those guides with the app is not done.
 - Casper's approval card shows a diff as plain `- ` and `+ ` lines, at most 120, not as a diff view.
 - A mode Casper picks itself is not shown: the access control keeps showing the preset.
-- Steering is delivered as the next prompt.
+- Steering reaches an older Casper, whose `initialize` reply does not set `agentCapabilities._meta.casper.steer`, as the next prompt.
 - Before any Casper has sent its command list in this app, Casper's commands are missing from the `/` menu until the Session's first prompt starts Casper.
 - Forking a Casper Session is refused.
 - Headless, SDK server, ACP, and webhook resumes do not pass a preset, so a Casper Session reopened by them runs on agent-loop.

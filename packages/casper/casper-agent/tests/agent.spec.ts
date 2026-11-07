@@ -157,18 +157,232 @@ describe('CasperAgent', { timeout: 60_000 }, () => {
     expect(host.errors.filter(entry => entry.agent === agent)).toHaveLength(1)
   })
 
-  it('runs steering sent during a prompt as the next turn', async () => {
-    const { fake, host } = await setup({ prompts: [] })
-    const hold = gate(fake, 'hold')
-    fake.script({ prompts: [[{ waitFile: hold.path }], []] })
-    const { agent } = await host.create('casper-steer')
-    agent.followup(prompt('first'))
-    await waitFor(() => fake.calls('session/prompt').length === 1)
-    agent.steer(prompt('also this'))
-    hold.open()
-    await agent.whenIdle()
-    expect(promptTexts(fake)).toEqual(['first', 'also this'])
-    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }, { kind: 'completed' }])
+  describe('steering', () => {
+    /** The user messages recorded in the Session, as their text, with their step. */
+    function userMessages(agent: Agent): { step: number; text: string }[] {
+      let step = 0
+      return eventsOf(agent).flatMap((event) => {
+        if (event.type === 'step/start') step = event.data.step
+        if (event.type !== 'user/message') return []
+        return [{ step, text: event.data.content.map(block => block.type === 'text' ? block.text : '').join('') }]
+      })
+    }
+
+    function steerTexts(fake: FakeCasper): string[] {
+      return fake.calls('_casper/steer').map(entry => (entry.params?.prompt as { text: string }[]).map(block => block.text).join('|'))
+    }
+
+    it('sends steering during a prompt to Casper and records it where Casper reads it', async () => {
+      const { fake, host } = await setup({ steer: true, prompts: [[{ text: 'Working.\n' }, { steerRead: 1 }, { text: 'Adjusted.\n' }]] })
+      const { agent } = await host.create('casper-steer')
+      agent.followup(prompt('first'))
+      await waitFor(() => fake.calls('session/prompt').length === 1)
+      const line = prompt('also this')
+      agent.steer(line)
+      await agent.whenIdle()
+      expect(promptTexts(fake)).toEqual(['first'])
+      expect(fake.calls('_casper/steer').map(entry => entry.params)).toEqual([{
+        sessionId: fake.calls('session/prompt')[0]?.params?.sessionId, prompt: [{ type: 'text', text: 'also this' }], messageId: line.id,
+      }])
+      expect(types(agent)).toEqual([
+        'plugin:casper-agent/models', 'turn/start', 'step/start', 'user/message', 'assistant/message', 'step/end',
+        'step/start', 'user/message', 'assistant/message', 'step/end', 'turn/end',
+      ])
+      expect(eventsOf(agent).filter(event => event.type === 'user/message').at(-1)?.data).toEqual(line)
+      const words = eventsOf(agent).flatMap(event => event.type === 'assistant/message' ? [event.data.message.content] : [])
+      expect(words).toEqual([[{ type: 'text', text: 'Working.\n' }], [{ type: 'text', text: 'Adjusted.\n\nReceipt: verified\n' }]])
+      expect([...agent.inbox.nextTurn, ...agent.inbox.nextStep]).toEqual([])
+      expect(turnEnds(agent)).toEqual([{ kind: 'completed' }])
+    })
+
+    it('a refused steer, an old Casper or an unread steer runs as the next turn', async () => {
+      for (const [name, script] of [
+        ['refused', { steer: true, steerReplies: [false] }],
+        ['old', {}],
+        ['unread', { steer: true }],
+      ] as const) {
+        const { fake, host } = await setup({ prompts: [] })
+        const hold = gate(fake, 'hold')
+        fake.script({ ...script, prompts: [[{ waitFile: hold.path }], []] })
+        const { agent } = await host.create(`casper-steer-${name}`)
+        agent.followup(prompt('first'))
+        await waitFor(() => fake.calls('session/prompt').length === 1)
+        agent.steer(prompt('also this'))
+        if (name === 'old') await new Promise((resolve) => { setTimeout(resolve, 100) })
+        else await waitFor(() => fake.log().some(entry => entry.event === 'steer-reply'))
+        hold.open()
+        await agent.whenIdle()
+        expect(steerTexts(fake), name).toEqual(name === 'old' ? [] : ['also this'])
+        expect(promptTexts(fake), name).toEqual(['first', 'also this'])
+        expect(userMessages(agent).map(entry => entry.text), name).toEqual(['first', 'also this'])
+        expect(turnEnds(agent), name).toEqual([{ kind: 'completed' }, { kind: 'completed' }])
+      }
+    })
+
+    it('forwards no steer after a refused one, so the lines keep their order', async () => {
+      const { fake, host } = await setup({ prompts: [] })
+      const hold = gate(fake, 'hold')
+      fake.script({ steer: true, steerReplies: [false], prompts: [[{ waitFile: hold.path }], []] })
+      const { agent } = await host.create('casper-steer-order')
+      agent.followup(prompt('first'))
+      await waitFor(() => fake.calls('session/prompt').length === 1)
+      agent.steer(prompt('one'))
+      agent.steer(prompt('two'))
+      await waitFor(() => fake.log().some(entry => entry.event === 'steer-reply'))
+      await new Promise((resolve) => { setTimeout(resolve, 100) })
+      hold.open()
+      await agent.whenIdle()
+      expect(steerTexts(fake)).toEqual(['one'])
+      expect(promptTexts(fake)).toEqual(['first', 'one|two'])
+    })
+
+    it('a read notice that comes before the steer reply is recorded once with no second turn', async () => {
+      const { fake, host } = await setup({ steer: true, steerReplyDelayMs: 300, prompts: [[{ steerRead: 1 }, { text: 'ok\n' }]] })
+      const { agent } = await host.create('casper-steer-early')
+      agent.followup(prompt('first'))
+      await waitFor(() => fake.calls('session/prompt').length === 1)
+      agent.steer(prompt('also this'))
+      await agent.whenIdle()
+      // The prompt waited for the late reply, so it came before the turn ended.
+      expect(fake.log().filter(entry => entry.event === 'steer-reply').map(entry => entry.steered)).toEqual([true])
+      expect(userMessages(agent)).toEqual([{ step: 1, text: 'first' }, { step: 1, text: 'also this' }])
+      expect(promptTexts(fake)).toEqual(['first'])
+      expect(turnEnds(agent)).toEqual([{ kind: 'completed' }])
+    })
+
+    it('two steers read at separate steps are recorded in order', async () => {
+      const { fake, host } = await setup({ steer: true, prompts: [[
+        { text: 'Reading.\n' }, { steerRead: 1 }, { tool: 'bash', target: 'ls' }, { toolEnd: 1 }, { steerRead: 2 }, { text: 'Done.\n' },
+      ]] })
+      const { agent } = await host.create('casper-steer-two')
+      agent.followup(prompt('first'))
+      await waitFor(() => fake.calls('session/prompt').length === 1)
+      agent.steer(prompt('one'))
+      agent.steer(prompt('two'))
+      await agent.whenIdle()
+      expect(steerTexts(fake)).toEqual(['one', 'two'])
+      expect(userMessages(agent)).toEqual([{ step: 1, text: 'first' }, { step: 2, text: 'one' }, { step: 3, text: 'two' }])
+      expect(promptTexts(fake)).toEqual(['first'])
+      expect([...agent.inbox.nextTurn, ...agent.inbox.nextStep]).toEqual([])
+    })
+
+    it('Stop clears an unread steer and keepInbox runs it next turn', async () => {
+      const { fake, host } = await setup({ steer: true, prompts: [[{ hang: true }], [{ hang: true }], []] })
+      const { agent } = await host.create('casper-steer-stop')
+      agent.followup(prompt('first'))
+      await waitFor(() => fake.calls('session/prompt').length === 1)
+      agent.steer(prompt('dropped'))
+      await waitFor(() => fake.log().some(entry => entry.event === 'steer-reply'))
+      agent.cancel({ kind: 'user' })
+      await agent.whenIdle()
+      expect([...agent.inbox.nextTurn, ...agent.inbox.nextStep]).toEqual([])
+      agent.followup(prompt('second'))
+      await waitFor(() => fake.calls('session/prompt').length === 2)
+      agent.steer(prompt('kept'))
+      await waitFor(() => fake.log().filter(entry => entry.event === 'steer-reply').length === 2)
+      agent.cancel({ kind: 'user' }, { keepInbox: true })
+      await agent.whenIdle()
+      expect(agent.inbox.nextStep.map(message => message.content)).toEqual([[{ type: 'text', text: 'kept' }]])
+      await run(agent, 'third')
+      expect(steerTexts(fake)).toEqual(['dropped', 'kept'])
+      expect(promptTexts(fake)).toEqual(['first', 'second', 'kept|third'])
+      expect(userMessages(agent).map(entry => entry.text)).toEqual(['first', 'second', 'kept', 'third'])
+    })
+
+    it('an edited pending line records the original that was sent', async () => {
+      const { fake, host } = await setup({ prompts: [] })
+      const hold = gate(fake, 'hold')
+      fake.script({ steer: true, prompts: [[{ waitFile: hold.path }, { steerRead: 1 }, { text: 'ok\n' }]] })
+      const { agent } = await host.create('casper-steer-edit')
+      agent.followup(prompt('first'))
+      await waitFor(() => fake.calls('session/prompt').length === 1)
+      const line = prompt('also this')
+      agent.steer(line)
+      await waitFor(() => fake.log().some(entry => entry.event === 'steer-reply'))
+      expect(agent.inbox.replace(line.id, { ...line, content: [{ type: 'text', text: 'edited' }] })).toBe(true)
+      hold.open()
+      await agent.whenIdle()
+      expect(userMessages(agent).map(entry => entry.text)).toEqual(['first', 'also this'])
+      expect([...agent.inbox.nextTurn, ...agent.inbox.nextStep]).toEqual([])
+      expect(promptTexts(fake)).toEqual(['first'])
+    })
+
+    it('a steer typed while preparing reaches Casper after the prompt', async () => {
+      const held = heldPictureStore()
+      const { fake, host } = await setupWithAttachments({ steer: true, promptCapabilities: { image: true }, prompts: [[{ steerRead: 1 }, { text: 'ok\n' }]] }, held.store)
+      const { agent } = await host.create('casper-steer-preparing')
+      agent.followup(prompt('', 'rpc-steer-picture', [{ type: 'text', text: 'look' }, { type: 'image', attachment: PICTURE }]))
+      await waitFor(() => held.reading())
+      agent.steer(prompt('also this'))
+      await new Promise((resolve) => { setTimeout(resolve, 50) })
+      expect(fake.calls('_casper/steer')).toEqual([])
+      held.release()
+      await agent.whenIdle()
+      const methods = fake.log().flatMap(entry => entry.method === 'session/prompt' || entry.method === '_casper/steer' ? [entry.method] : [])
+      expect(methods).toEqual(['session/prompt', '_casper/steer'])
+      expect(userMessages(agent).map(entry => entry.text)).toEqual(['look', 'also this'])
+      expect(turnEnds(agent)).toEqual([{ kind: 'completed' }])
+    })
+
+    it('a picture line removed while its picture is read is never sent or recorded', async () => {
+      const held = heldPictureStore()
+      const { fake, host } = await setupWithAttachments({ prompts: [] }, held.store)
+      const hold = gate(fake, 'hold')
+      fake.script({ steer: true, promptCapabilities: { image: true }, prompts: [[{ waitFile: hold.path }, { text: 'ok\n' }]] })
+      const { agent } = await host.create('casper-steer-removed-reading')
+      agent.followup(prompt('first'))
+      await waitFor(() => fake.calls('session/prompt').length === 1)
+      const line = prompt('', 'rpc-steer-removed', [{ type: 'text', text: 'look' }, { type: 'image', attachment: PICTURE }])
+      agent.steer(line)
+      await waitFor(() => held.reading())
+      expect(agent.inbox.remove(line.id)).toBe(true)
+      held.release()
+      await new Promise((resolve) => { setTimeout(resolve, 100) })
+      hold.open()
+      await agent.whenIdle()
+      expect(fake.calls('_casper/steer')).toEqual([])
+      expect(userMessages(agent).map(entry => entry.text)).toEqual(['first'])
+      expect(promptTexts(fake)).toEqual(['first'])
+      expect(turnEnds(agent)).toEqual([{ kind: 'completed' }])
+    })
+
+    it('a picture line edited while its picture is read sends and records the edit', async () => {
+      const held = heldPictureStore()
+      const { fake, host } = await setupWithAttachments({ steer: true, promptCapabilities: { image: true }, prompts: [[{ steerRead: 1 }, { text: 'ok\n' }]] }, held.store)
+      const { agent } = await host.create('casper-steer-edited-reading')
+      agent.followup(prompt('first'))
+      await waitFor(() => fake.calls('session/prompt').length === 1)
+      const line = prompt('', 'rpc-steer-edited', [{ type: 'text', text: 'look' }, { type: 'image', attachment: PICTURE }])
+      agent.steer(line)
+      await waitFor(() => held.reading())
+      expect(agent.inbox.replace(line.id, { ...line, content: [{ type: 'text', text: 'edited' }] })).toBe(true)
+      held.release()
+      await agent.whenIdle()
+      expect(steerTexts(fake)).toEqual(['edited'])
+      expect(userMessages(agent).map(entry => entry.text)).toEqual(['first', 'edited'])
+      expect(promptTexts(fake)).toEqual(['first'])
+      expect([...agent.inbox.nextTurn, ...agent.inbox.nextStep]).toEqual([])
+    })
+
+    it('a late reply after the prompt ended causes no duplicate', async () => {
+      const { fake, host } = await setup({ prompts: [] }, { cancelGraceMs: 100 })
+      const hold = gate(fake, 'hold')
+      fake.script({ steer: true, steerReplyDelayMs: 600, prompts: [[{ waitFile: hold.path }], [{ text: 'ok\n' }]] })
+      const { agent } = await host.create('casper-steer-late')
+      agent.followup(prompt('first'))
+      await waitFor(() => fake.calls('session/prompt').length === 1)
+      agent.steer(prompt('also this'))
+      await waitFor(() => fake.calls('_casper/steer').length === 1)
+      hold.open()
+      await agent.whenIdle()
+      await waitFor(() => fake.log().some(entry => entry.event === 'steer-reply'))
+      await new Promise((resolve) => { setTimeout(resolve, 100) })
+      await agent.whenIdle()
+      expect(promptTexts(fake)).toEqual(['first', 'also this'])
+      expect(userMessages(agent).map(entry => entry.text)).toEqual(['first', 'also this'])
+      expect(turnEnds(agent)).toEqual([{ kind: 'completed' }, { kind: 'completed' }])
+      expect([...agent.inbox.nextTurn, ...agent.inbox.nextStep]).toEqual([])
+    })
   })
 
   it('gives a tool that is still running at a Stop an outcome-unknown result', async () => {

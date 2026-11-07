@@ -96,6 +96,15 @@
  * `$/cancel_request` after that delay and treats it as skipped. Each reply is
  * logged as `{ event: 'elicitation', reply }` (or `error`, or `timedOut`).
  *
+ * Steering as C10 sends it: with `steer: true` the `initialize` reply sets
+ * `agentCapabilities._meta.casper.steer`, and `_casper/steer` (logged like any
+ * request) answers `{steered, messageId}` with `steerReplies[n]` for the n-th
+ * steer of this process (default true), after `steerReplyDelayMs`; the reply
+ * is logged as `{ event: 'steer-reply', steered }`. A `{ steerRead: n }` step
+ * waits until the n-th steer has arrived, then sends Casper's read notice: a
+ * `user_message_chunk` with the steer's words, its `messageId`, and
+ * `_meta.casper.steered: true`.
+ *
  * @module @deepseek-ai/dsh-casper-agent/tests/fake-casper-acp
  */
 
@@ -166,6 +175,7 @@ interface Step {
   configUpdate?: SessionConfigOption[]
   mode?: string
   elicit?: Elicit
+  steerRead?: number
 }
 
 /** A question Casper asks as a form; see the module comment. */
@@ -211,6 +221,9 @@ interface Script {
   modes?: SessionModeState
   setModeError?: string
   replayMode?: string
+  steer?: boolean
+  steerReplies?: boolean[]
+  steerReplyDelayMs?: number
 }
 
 const logFile = process.env.FAKE_CASPER_LOG ?? ''
@@ -269,6 +282,8 @@ let ignoreCancel = false
 let configOptions: SessionConfigOption[] | undefined = script.configOptions
 /** This process's mode state; a set changes it. */
 let modes: SessionModeState | undefined = script.modes
+/** The steers this process received, in order: their words and message ids. */
+const steered: { text: string; messageId: string }[] = []
 
 /** Change the access mode in both the `mode` option and the mode state. */
 function setModeTo(modeId: string): void {
@@ -408,6 +423,7 @@ async function run(step: Step, params: PromptRequest, client: AgentContext, outc
     if (step.planBox !== undefined) await planBox(step.planBox, step.during ?? [], params, client, outcome)
     if (step.elicit !== undefined) await elicit(step.elicit, step.during ?? [], params, client, outcome)
     if (step.mcp !== undefined) await callMcp(step.mcp, step.args ?? {})
+    if (step.steerRead !== undefined) await steerRead(step.steerRead, client)
     if (step.waitFile !== undefined) await until(step.waitFile)
     if (step.stderr !== undefined) process.stderr.write(`${step.stderr}\n`)
     if (step.fail !== undefined) throw new RequestError(-32603, step.fail)
@@ -544,6 +560,22 @@ async function elicit(asked: Elicit, during: Step[], params: PromptRequest, clie
   await update(client, { sessionUpdate: 'tool_call_update', toolCallId, status: 'completed', content: [{ type: 'content', content: { type: 'text', text: reply } }] })
 }
 
+/** Wait for the n-th steer, then send Casper's notice that the AI read it. */
+async function steerRead(n: number, client: AgentContext): Promise<void> {
+  while (steered.length < n) await new Promise((resolve) => { setTimeout(resolve, 10) })
+  const entry = steered[n - 1]
+  if (entry === undefined) return
+  await update(client, {
+    sessionUpdate: 'user_message_chunk', content: { type: 'text', text: entry.text }, messageId: entry.messageId, _meta: { casper: { steered: true } },
+  })
+}
+
+/** The words of a steer's prompt, as Casper reads them. */
+function steerText(prompt: unknown): string {
+  const blocks = Array.isArray(prompt) ? prompt as { type?: unknown; text?: unknown }[] : []
+  return blocks.flatMap(block => block.type === 'text' && typeof block.text === 'string' ? [block.text] : []).join('\n').trim()
+}
+
 /** Call one tool on the app's MCP server the way Casper's MCP client does. */
 async function callMcp(name: string, args: Record<string, unknown>): Promise<void> {
   const server = mcpServers[0]
@@ -574,6 +606,7 @@ createAcpAgent({ name: 'fake-casper' })
         loadSession: true,
         promptCapabilities: script.promptCapabilities ?? { image: false, audio: false, embeddedContext: false },
         mcpCapabilities: { http: false, sse: false },
+        ...script.steer === true ? { _meta: { casper: { steer: true } } } : {},
       },
       agentInfo: { name: 'casper', title: 'Casper', version: '0.0.0-test' },
       authMethods: [],
@@ -636,6 +669,14 @@ createAcpAgent({ name: 'fake-casper' })
     }
     setModeTo(params.modeId)
     return {}
+  })
+  .onRequest('_casper/steer', params => params as { sessionId: string; prompt: unknown; messageId: string }, async ({ params }) => {
+    log({ method: '_casper/steer', params })
+    steered.push({ text: steerText(params.prompt), messageId: params.messageId })
+    const answer = script.steerReplies?.[steered.length - 1] ?? true
+    if (script.steerReplyDelayMs !== undefined) await new Promise((resolve) => { setTimeout(resolve, script.steerReplyDelayMs) })
+    log({ event: 'steer-reply', steered: answer })
+    return { steered: answer, messageId: params.messageId }
   })
   .onNotification(methods.agent.session.cancel, ({ params }) => {
     log({ method: 'session/cancel', params })

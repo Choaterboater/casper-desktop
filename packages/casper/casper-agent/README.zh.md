@@ -57,7 +57,7 @@ kind: "package-reference"
 | [`src/index.ts`](src/index.ts) | 插件入口：注册投影、打开 sidecar，并注册工厂路由 |
 | [`src/route.ts`](src/route.ts) | 选择配置预设上的根会话；委派的子会话仍使用 agent-loop |
 | [`src/factory.ts`](src/factory.ts) | 按 agent-loop 的发布顺序创建与恢复 Agent，拒绝 fork，并在卸载时并行销毁所有 Agent |
-| [`src/agent.ts`](src/agent.ts) | `CasperAgent`：收件箱、阶段、每轮一条提示、取消与进程重启 |
+| [`src/agent.ts`](src/agent.ts) | `CasperAgent`：收件箱、阶段、每轮一条提示、把引导消息发给正在运行的提示、取消与进程重启 |
 | [`src/connection.ts`](src/connection.ts) | 一个 `casper acp` 进程：查找、启动、ACP 客户端、`session/new` 或 `session/load`、提示、取消与释放 |
 | [`src/turn.ts`](src/turn.ts) | 把 Casper 的更新写成步骤、助手消息、工具调用、结果与待办列表 |
 | [`src/views.ts`](src/views.ts) | 把 Casper 的工具步骤记录为做同样事情的 Standard 工具：名称、参数、结果文本与 meta |
@@ -77,7 +77,9 @@ kind: "package-reference"
 
 ### 轮次与事件
 
-每轮领取排队的输入，原样追加 `turn/start`、`step/start` 与领取的 `user/message` 事件，然后在 Casper 能改动文件之前刷写会话。领取的消息作为一条 `session/prompt` 发给 Casper，各块保持原有顺序：文本为 `text`；当 Casper 的 `initialize` 回复将 `promptCapabilities.image` 设为 true 时，图片为 `image` 块，内容是其存储的规范化字节的 base64，并带存储的媒体类型；文件为指向附件服务只读宿主副本的 `resource_link`（`file:` URI、名称与字节大小），由 Casper 用自己的文件工具读取。旧版 Casper 无法接收的图片、附件服务无法读取的图片，以及没有宿主路径的文件，各以一行占位文本发送，且该轮回复开头会有一条说明。读取图片期间中止，则该轮以中止结束且不发送提示，即使附件服务仍完成了读取。提示运行期间 Casper 不接受输入，因此引导消息会等到下一轮。
+每轮领取排队的输入，原样追加 `turn/start`、`step/start` 与领取的 `user/message` 事件，然后在 Casper 能改动文件之前刷写会话。领取的消息作为一条 `session/prompt` 发给 Casper，各块保持原有顺序：文本为 `text`；当 Casper 的 `initialize` 回复将 `promptCapabilities.image` 设为 true 时，图片为 `image` 块，内容是其存储的规范化字节的 base64，并带存储的媒体类型；文件为指向附件服务只读宿主副本的 `resource_link`（`file:` URI、名称与字节大小），由 Casper 用自己的文件工具读取。旧版 Casper 无法接收的图片、附件服务无法读取的图片，以及没有宿主路径的文件，各以一行占位文本发送，且该轮回复开头会有一条说明。读取图片期间中止，则该轮以中止结束且不发送提示，即使附件服务仍完成了读取。
+
+提示运行期间插入的引导消息，会以 `_casper/steer` 发给 `initialize` 回复中设置了 `agentCapabilities._meta.casper.steer` 的 Casper，带上该会话的 Casper 对话 id、该消息的块及其消息 id：在提示发出后立即发送，按队列顺序一次一条。该消息会一直留在队列中，直到 Casper 发来已读通知，即带有该 `messageId` 的 `user_message_chunk`；此时该消息被本轮领取，并按发送时的内容记录为开启下一步的 `user/message`。Casper 拒绝或始终未读的消息，以及含有会以占位文本发送的部分的消息，会连同其后排队的所有消息作为下一轮运行；旧版 Casper 收到的所有消息也是如此。停止会把未读的消息与队列其余部分一起清除。
 
 | Casper 更新 | 会话事件 |
 |---|---|
@@ -88,6 +90,7 @@ kind: "package-reference"
 | 仍在进行中的 `tool_call_update` | 不写入任何内容：调用保持打开，已提出的审批框仍在等待回答 |
 | 检查 `tool_call`（已完成或已失败） | 立即写入名为 `casper_check` 的 `tool/call` 及其结果 |
 | `plan` | 带完整列表的 `todo/write` |
+| 引导消息的 `user_message_chunk` 已读通知 | 该消息的 `user/message`，在该步骤未结束的调用结束后开启下一步；若 Casper 在该步骤中尚未写入任何内容，则并入该步骤 |
 | 提示结束（停止、退出或回复）时仍未结束的调用 | 在 `step/end` 之前写入带 `TOOL_OUTCOME_UNKNOWN` 的错误 `tool/result`，与 agent-loop 对失败步骤的记录一致 |
 
 回执是最后一个文本块，因此它结束最后一条助手消息。提示回复只有在其之前收到的所有更新都写入后才会完成。停止会发送 `session/cancel` 并以中止结束该轮；若 Casper 在 `cancelGraceMs` 内未回复则被结束。工具调用 id 带有每个进程随机的前缀，因此重启后的 Casper 的 id 不会并入先前的卡片。
@@ -198,7 +201,7 @@ Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打�
 - 在打包的应用中，`app_read_file` 能读到每个已安装包的 `README.md`、`package.json` 与构建出的 `lib/*.js`、技能文件，以及 `ui-theme` 的 `lib/styles`。Desktop 运行时副本会去掉所有 `.d.ts`，各包不发布 `src/`，仓库的 `docs/` 也不在任何包中，因此那里无法读取 `lib/types`、`ui-sidebar` 的 `slots.ts`、`docs/cordis-tutorial` 与 `docs/web-styling.md`；插槽属性与主题令牌改由 `cordis_inspect_query` 获得。尚未随应用提供这些指南。
 - Casper 的审批卡片以纯文本的 `- ` 与 `+ ` 行显示差异，最多 120 行，而不是差异视图。
 - Casper 自己选择的模式不会显示：权限控件仍显示预设。
-- 引导消息作为下一条提示送达。
+- 对 `initialize` 回复中未设置 `agentCapabilities._meta.casper.steer` 的旧版 Casper，引导消息作为下一条提示送达。
 - 在本应用中还没有任何 Casper 发送过命令列表之前，Casper 的命令不会出现在 `/` 菜单中，直到会话的第一条提示启动 Casper。
 - 拒绝 fork Casper 会话。
 - Headless、SDK 服务器、ACP 与 webhook 恢复不传预设，因此由它们重新打开的 Casper 会话运行在 agent-loop 上。
