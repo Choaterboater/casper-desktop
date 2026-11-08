@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for 2026-11-07-casper-checks-source.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-11-07-casper-checks-source.md
+/:
+  en: 3d5a424ae7d7e46b
+  zh: c22a8e4a62d8cc1a
+/2026-11-07-casper-checks-source:
+  en: 51246ebc8164a646
+  zh: 21b3e9997add885c
+/2026-11-07-casper-checks-source/summary:
+  en: bdb801352986cb11
+  zh: a20a02a4030a0ec5
+/2026-11-07-casper-checks-source/table-of-contents:
+  en: 6cf314a069ceb451
+  zh: 9adff678e9ecab3b
+/2026-11-07-casper-checks-source/declaration:
+  en: 6907136f28e48c90
+  zh: 02f8298485f3d8e7
+/2026-11-07-casper-checks-source/compatibility:
+  en: f7a713249ab35ab9
+  zh: 5892b7ded9c62225
+/2026-11-07-casper-checks-source/verification:
+  en: 00f4ab458bcab103
+  zh: a0a87afbda89acad
+/2026-11-07-casper-checks-source/dev-note:
+  en: b75c8458928b72b9
+  zh: 003ba4e17b4b5269
