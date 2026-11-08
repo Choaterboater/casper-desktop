@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { CommandDefinitionId } from '../src/brand.ts'
-import { builtinCommandName, builtinCommandTokens, isPromptCommand, PROMPT_COMMAND_ID_PREFIX, resolveCommand } from '../src/builtin.ts'
+import { builtinCommandName, builtinCommandTokens, resolveCommand } from '../src/builtin.ts'
 import type { CommandDescriptor } from '../src/types.ts'
 
 const definitions = [
@@ -35,17 +35,5 @@ describe('builtin command resolution', () => {
     expect(resolveCommand('计划', [builtin, replacement])).toBe(builtin)
     expect(resolveCommand('missing', [builtin])).toBeUndefined()
     expect(resolveCommand('plan', [])).toBeUndefined()
-  })
-
-  it('marks only definitions under the prompt-command prefix as prompt commands', () => {
-    const casper: CommandDescriptor = {
-      name: 'status', definitionId: CommandDefinitionId(`${PROMPT_COMMAND_ID_PREFIX}status`), description: 'Casper status',
-    }
-    expect(PROMPT_COMMAND_ID_PREFIX).toBe('@deepseek-ai/dsh-casper-agent/')
-    expect(isPromptCommand(casper)).toBe(true)
-    expect(builtinCommandName(casper)).toBeUndefined()
-    expect(isPromptCommand({ name: 'plan', definitionId: CommandDefinitionId('@deepseek-ai/dsh-plan-mode'), description: 'Plan' })).toBe(false)
-    expect(isPromptCommand({ name: 'status', definitionId: CommandDefinitionId('@deepseek-ai/dsh-casper-agent'), description: 'No slash' })).toBe(false)
-    expect(isPromptCommand({ name: 'status', description: 'No identity' })).toBe(false)
   })
 })

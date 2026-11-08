@@ -29,22 +29,8 @@ export function builtinCommandName(descriptor: CommandDescriptor): BuiltinComman
     .find(name => descriptor.definitionId === BUILTINS[name])
 }
 
-/**
- * Definition identity prefix of commands that run as ordinary prompt text: the
- * agent behind the Session reads the typed `/name …` line itself, so a client
- * inserts and sends the line instead of executing it. The Casper agent
- * registers each command Casper offers as this prefix plus its name.
- */
-export const PROMPT_COMMAND_ID_PREFIX = '@deepseek-ai/dsh-casper-agent/'
-
-/**
- * Identify a command whose line is sent as a prompt rather than executed.
- * @param descriptor - effective descriptor from the receiving Agent's catalog.
- * @returns whether its definition identity starts with {@link PROMPT_COMMAND_ID_PREFIX}.
- */
-export function isPromptCommand(descriptor: CommandDescriptor): boolean {
-  return descriptor.definitionId?.startsWith(PROMPT_COMMAND_ID_PREFIX) === true
-}
+/** Definition id prefix of a command the Session's agent reads from the prompt: a client sends its line, never executes it. */
+export const PROMPT_COMMAND_ID_PREFIX = 'prompt:'
 
 const TOKEN_ALIASES = new Map<string, BuiltinCommandName>(
   (Object.keys(BUILTINS) as BuiltinCommandName[]).flatMap(name =>

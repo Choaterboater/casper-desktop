@@ -43,7 +43,7 @@ First-party command definitions carry stable `definitionId` values. The client s
 
 ### Prompt commands
 
-A host command whose `definitionId` starts with `PROMPT_COMMAND_ID_PREFIX` from [`dsh-commands/builtin`](../../interaction/commands/README.md) is read by the Session's agent from the prompt itself; the Casper agent registers Casper's commands this way. The agent reads one only at the start of the prompt, so a mid-sentence `/` menu leaves these commands out. Picking one inserts `/name`, followed by a space when it declares input. Space makes no claim, a decoration never applies, and Enter returns no outcome, so the typed line, attachments included, is sent as an ordinary prompt. The row keeps the agent's own description.
+A host command whose `definitionId` starts with `PROMPT_COMMAND_ID_PREFIX` from [`dsh-commands/builtin`](../../interaction/commands/README.md) is read by the Session's agent from the prompt itself. The agent reads one only at the start of the prompt, so a mid-sentence `/` menu leaves these commands out. Picking one inserts `/name`, followed by a space when it declares input. Space makes no claim, a decoration never applies, and Enter returns no outcome, so the typed line, attachments included, is sent as an ordinary prompt. The row keeps the agent's own description.
 
 ### Attachment-carrying submissions
 

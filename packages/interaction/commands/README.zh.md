@@ -61,7 +61,7 @@ ctx.commands.register({
 
 交互式适配器调用 `execute(agent, line, attachments, signal)`，传入确切的接收 agent、完整命令行与本次提交的有序附件。它返回已结算的 `CommandExecution`——规范化结果加生命周期配对 `commandId`——语法无效或名称未知时返回 `undefined`。`list(agent)` 与 `find(agent, name)` 在应用 agent 作用域遮蔽后用于命令发现。
 
-无状态入口 `@deepseek-ai/dsh-commands/builtin` 为 Host 和 Client 适配器共享第一方身份、中英文输入 token 及描述符解析。`builtinCommandName()` 根据定义识别能力，不依赖注册名；`resolveCommand()` 保留精确名称优先级，并按定义 ID 解析别名。`isPromptCommand()` 标记 ID 以 `PROMPT_COMMAND_ID_PREFIX`（`@deepseek-ai/dsh-casper-agent/`）开头的定义：会话的 Agent 从提示中读取这类命令，因此客户端把输入的这一行作为提示发送，而不是执行它。支持范围由适配器决定，注册器本身仍接受任意定义。
+无状态入口 `@deepseek-ai/dsh-commands/builtin` 为 Host 和 Client 适配器共享第一方身份、中英文输入 token 及描述符解析。`builtinCommandName()` 根据定义识别能力，不依赖注册名；`resolveCommand()` 保留精确名称优先级，并按定义 ID 解析别名。定义 ID 以 `PROMPT_COMMAND_ID_PREFIX`（`prompt:`）开头，表示会话的 Agent 从提示中读取该命令，因此客户端发送输入的这一行，而不是执行它。支持范围由适配器决定，注册器本身仍接受任意定义。
 
 ### 取消
 

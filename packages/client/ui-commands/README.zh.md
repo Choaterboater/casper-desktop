@@ -43,7 +43,7 @@ popupSelect 规格可提供 `searchLabels()`，在每次打开时解析占位文
 
 ### 提示命令
 
-`definitionId` 以 [`dsh-commands/builtin`](../../interaction/commands/README.zh.md) 中 `PROMPT_COMMAND_ID_PREFIX` 开头的 Host 命令，由会话的 Agent 直接从提示中读取；Casper Agent 就以这种方式注册 Casper 的命令。Agent 只在提示开头读取这类命令，因此句子中间打开的 `/` 菜单不列出它们。选择这类命令会插入 `/name`，命令声明了输入时后面带一个空格。空格不产生认领，装饰从不生效，Enter 不返回任何结果，因此输入的这一行连同附件会作为普通提示发送。该行保留 Agent 自己的描述。
+`definitionId` 以 [`dsh-commands/builtin`](../../interaction/commands/README.zh.md) 中 `PROMPT_COMMAND_ID_PREFIX` 开头的 Host 命令，由会话的 Agent 直接从提示中读取。Agent 只在提示开头读取这类命令，因此句子中间打开的 `/` 菜单不列出它们。选择这类命令会插入 `/name`，命令声明了输入时后面带一个空格。空格不产生认领，装饰从不生效，Enter 不返回任何结果，因此输入的这一行连同附件会作为普通提示发送。该行保留 Agent 自己的描述。
 
 ### 带附件提交
 

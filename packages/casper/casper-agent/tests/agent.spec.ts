@@ -1033,10 +1033,10 @@ describe('Casper\'s commands in the command menu', { timeout: 60_000 }, () => {
     await waitFor(() => menu(host, agent).length === 5)
     expect(menu(host, agent)).toEqual([
       'export app/export',
-      'hint @deepseek-ai/dsh-casper-agent/hint',
+      'hint prompt:@deepseek-ai/dsh-casper-agent/hint',
       'permission app/permission',
-      'review @deepseek-ai/dsh-casper-agent/review [branch|commit]',
-      'status @deepseek-ai/dsh-casper-agent/status',
+      'review prompt:@deepseek-ai/dsh-casper-agent/review [branch|commit]',
+      'status prompt:@deepseek-ai/dsh-casper-agent/status',
     ])
     expect(menu(host, other)).toEqual(['export app/export', 'permission app/permission'])
     // A surface that executes the command instead of sending its line queues the line for Casper.
@@ -1054,10 +1054,10 @@ describe('Casper\'s commands in the command menu', { timeout: 60_000 }, () => {
     })
     const { agent } = await host.create('casper-menu-first')
     await run(agent, 'first')
-    await waitFor(() => menu(host, agent).includes('diff @deepseek-ai/dsh-casper-agent/diff'))
+    await waitFor(() => menu(host, agent).includes('diff prompt:@deepseek-ai/dsh-casper-agent/diff'))
     expect(menu(host, agent)).toEqual([
-      'diff @deepseek-ai/dsh-casper-agent/diff', 'export app/export', 'permission app/permission',
-      'review @deepseek-ai/dsh-casper-agent/review [branch|commit]',
+      'diff prompt:@deepseek-ai/dsh-casper-agent/diff', 'export app/export', 'permission app/permission',
+      'review prompt:@deepseek-ai/dsh-casper-agent/review [branch|commit]',
     ])
     await waitFor(() => JSON.stringify(cached(host)) === JSON.stringify({ commands: [
       { name: 'diff', description: 'Show the changes' }, { name: 'review', description: 'Review your changes', hint: '[branch|commit]' },
@@ -1067,7 +1067,7 @@ describe('Casper\'s commands in the command menu', { timeout: 60_000 }, () => {
     await run(agent, 'second')
     expect(changes).toBe(0)
     const { agent: next } = await host.create('casper-menu-next')
-    await waitFor(() => menu(host, next).includes('diff @deepseek-ai/dsh-casper-agent/diff'))
+    await waitFor(() => menu(host, next).includes('diff prompt:@deepseek-ai/dsh-casper-agent/diff'))
     expect(menu(host, next)).toEqual(menu(host, agent))
     expect(fake.pids()).toHaveLength(1)
   })
@@ -1087,7 +1087,7 @@ describe('Casper\'s commands in the command menu', { timeout: 60_000 }, () => {
     }
     expect(live).toEqual([])
     const { agent } = await host.create('casper-menu-late')
-    expect(menu(host, agent)).toContain('status @deepseek-ai/dsh-casper-agent/status')
+    expect(menu(host, agent)).toContain('status prompt:@deepseek-ai/dsh-casper-agent/status')
     expect(live).toEqual([true])
   })
 
@@ -1101,8 +1101,8 @@ describe('Casper\'s commands in the command menu', { timeout: 60_000 }, () => {
     const set = vi.spyOn(global, 'set').mockRejectedValue(new Error('disk full'))
     await run(agent, 'again')
     await waitFor(() => set.mock.calls.length === 1)
-    await waitFor(() => menu(host, agent).includes('diff @deepseek-ai/dsh-casper-agent/diff'))
-    expect(menu(host, agent)).toEqual(['diff @deepseek-ai/dsh-casper-agent/diff', 'export app/export', 'permission app/permission'])
+    await waitFor(() => menu(host, agent).includes('diff prompt:@deepseek-ai/dsh-casper-agent/diff'))
+    expect(menu(host, agent)).toEqual(['diff prompt:@deepseek-ai/dsh-casper-agent/diff', 'export app/export', 'permission app/permission'])
     expect(cached(host)).toEqual({ commands: [{ name: 'status', description: STATUS.description }] })
     expect(turnEnds(agent)).toEqual([{ kind: 'completed' }, { kind: 'completed' }])
     set.mockRestore()

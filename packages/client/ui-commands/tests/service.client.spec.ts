@@ -813,8 +813,8 @@ describe('matchEnter (enter column)', () => {
 describe('prompt commands (a command the agent reads from the prompt)', () => {
   const signal = () => new AbortController().signal
   const PROMPT_CMDS: CommandDescriptor[] = [
-    { definitionId: CommandDefinitionId('@deepseek-ai/dsh-casper-agent/status'), name: 'status', description: 'Inspect project, model, auth and integrations' },
-    { definitionId: CommandDefinitionId('@deepseek-ai/dsh-casper-agent/review'), name: 'review', description: 'A read-only reviewer looks at your changes', input: { hint: '[branch|commit]' } },
+    { definitionId: CommandDefinitionId('prompt:example/status'), name: 'status', description: 'Inspect project, model, auth and integrations' },
+    { definitionId: CommandDefinitionId('prompt:example/review'), name: 'review', description: 'A read-only reviewer looks at your changes', input: { hint: '[branch|commit]' } },
   ]
   const promptBench = () => bench({ commands: () => Promise.resolve({ commands: PROMPT_CMDS }) })
 

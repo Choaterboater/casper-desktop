@@ -50,10 +50,10 @@ export function casperCommands(list: readonly AvailableCommand[]): CasperCommand
 /**
  * The definition identity of one Casper command; clients send its line as a prompt.
  * @param name - the command name.
- * @returns {@link PROMPT_COMMAND_ID_PREFIX} followed by the name.
+ * @returns {@link PROMPT_COMMAND_ID_PREFIX}, this package's name, a slash, and the command name.
  */
 export function casperCommandId(name: string): CommandDefinitionId {
-  return CommandDefinitionId(`${PROMPT_COMMAND_ID_PREFIX}${name}`)
+  return CommandDefinitionId(`${PROMPT_COMMAND_ID_PREFIX}@deepseek-ai/dsh-casper-agent/${name}`)
 }
 
 const commandSchema = z.object({ name: z.string(), description: z.string(), hint: z.string().exactOptional() })

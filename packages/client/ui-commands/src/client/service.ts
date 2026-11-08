@@ -24,7 +24,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { WeakMapWithValues } from '@deepseek-ai/dsh-util-values'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 import { rankByName } from '@deepseek-ai/dsh-client-ui-primitives'
-import { isPromptCommand } from '@deepseek-ai/dsh-commands/builtin'
+import { PROMPT_COMMAND_ID_PREFIX } from '@deepseek-ai/dsh-commands/builtin'
 import type {
   CandidateRequest, ClientSessionContext, CommandClaim, PickOutcome, InputTriggerCandidate, InputTriggerPick,
   SubmitAttachment, SubmitEnvelope, SubmitOutcome,
@@ -70,6 +70,11 @@ function submittedCommandName(line: string): string {
   const trimmed = line.trim()
   const separator = trimmed.search(/\s/u)
   return (separator === -1 ? trimmed : trimmed.slice(0, separator)).slice(1)
+}
+
+/** A command the Session's agent reads from the prompt: the menu inserts its line and Enter sends it. */
+function isPromptCommand(desc: CommandDescriptor): boolean {
+  return desc.definitionId?.startsWith(PROMPT_COMMAND_ID_PREFIX) === true
 }
 
 /** Live mutable state in one holder (service methods run behind the caller-ctx tracker). */
