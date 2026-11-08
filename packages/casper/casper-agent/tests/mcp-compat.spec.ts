@@ -1,4 +1,7 @@
-/** The app tools server, built on MCP server 2.x, serves the MCP 1.x client Casper uses, at the exact version Casper ships. */
+/**
+ * The app tools server, built on MCP server 2.x, serves the MCP 1.x client Casper uses. The app's 1.x
+ * client offers the same protocol versions as the one Casper ships.
+ */
 
 import { readFileSync } from 'node:fs'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -14,8 +17,12 @@ import type { AppToolsServer } from '../src/app-tools.ts'
 import { boot } from './harness.ts'
 import { fakeCasper } from './support.ts'
 
-/** The MCP client version Casper ships; these checks are only worth what this pin is. */
-const CASPER_SDK = '1.32.0'
+/**
+ * The protocol versions the MCP 1.x client Casper ships (1.32.2) offers. The app locks the 1.x
+ * client its other packages use, so it can differ from Casper's in patch details (1.32 adds redirect
+ * handling); these checks are only worth as much as this list matches the client's.
+ */
+const CASPER_PROTOCOLS = { latest: '2025-11-25', supported: ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05', '2024-10-07'] }
 
 const cleanups: (() => Promise<void> | void)[] = []
 afterEach(async () => {
@@ -83,9 +90,10 @@ async function rpc(target: AppToolsServer, body: unknown, version?: string): Pro
 }
 
 describe('MCP 1.x compatibility', { timeout: 60_000 }, () => {
-  it(`runs against the ${CASPER_SDK} client Casper ships`, () => {
+  it('runs against a 1.x client that offers the protocol versions of the one Casper ships', () => {
     const manifest = JSON.parse(readFileSync(new URL('../node_modules/@modelcontextprotocol/sdk/package.json', import.meta.url), 'utf8')) as { version: string }
-    expect(manifest.version).toBe(CASPER_SDK)
+    expect(manifest.version).toMatch(/^1\./)
+    expect({ latest: LATEST_PROTOCOL_VERSION, supported: [...SUPPORTED_PROTOCOL_VERSIONS] }).toEqual(CASPER_PROTOCOLS)
   })
 
   it('agrees on every protocol version the 1.x client offers', async () => {
