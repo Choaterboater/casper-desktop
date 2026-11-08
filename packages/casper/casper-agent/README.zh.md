@@ -196,7 +196,7 @@ Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打�
 
 三个资源工具总会列出，使用固定的 schema，其描述按 Casper 的命名（`acp-<name>`）列出此进程获得的设置服务器。调用会把 `acp-<name>` 映射为应用的服务器 `<name>`，并且只在此进程获得的服务器上运行。应用中没有服务器提供资源时，应用没有这些工具，调用返回 "No MCP server in the app offers resources right now."
 
-`present` 来自 Casper 预设的 `@deepseek-ai/dsh-tool-present` 行。调用会针对当前的 Casper 轮次、以发起调用的 Casper 步骤的调用 id 记录 `deliverables/presented`，因此应用会像在 Standard 中一样，在该轮次中把每个文件显示为卡片；轮次结束后到达的调用会得到轮次已结束的错误，并且不记录任何内容。这里的调用方是 Casper 的模型，因此离开 Session 文件夹的路径（文件夹之外的绝对路径、`../` 或 `~` 路径、像应用一样按驱动器解析的 Windows 驱动器相对路径（如 `C:..\x` 或 `D:x`），或经由链接后真实路径在文件夹之外的路径）会先以该步骤的调用 id 询问应用自己的审批，即桥接安装所用的卡片；被拒绝、取消或不可用的回答，或者应用没有审批服务时，不显示任何内容并返回错误。文件夹内的路径无需询问即可显示，Standard 自己的 `present` 不变。Casper 只保留四个置顶工具，因此 `present` 占用了 `cordis_inspect_query` 原先的置顶位置，Casper 通过 find_capability 找到 `cordis_inspect_query`。
+`present` 来自 Casper 预设的 `@deepseek-ai/dsh-tool-present` 行。调用会针对当前的 Casper 轮次、以发起调用的 Casper 步骤的调用 id 记录 `deliverables/presented`，因此应用会像在 Standard 中一样，在该轮次中把每个文件显示为卡片；轮次结束后到达的调用会得到轮次已结束的错误，并且不记录任何内容。Casper 只保留四个置顶工具，因此 `present` 占用了 `cordis_inspect_query` 原先的置顶位置，Casper 通过 find_capability 找到 `cordis_inspect_query`。
 
 每次调用都通过 `ctx.tools.execute` 运行，并以 Casper Agent 作为 `agent`，因此工具看到的会话、profile 与审批与在 DeepSeek 循环中相同。调用 id 是发起该调用的 Casper 步骤的会话调用 id，取自 `_meta["casper/acpToolCallId"]`；没有该字段的调用会得到新的 id。只有在 Casper 轮次运行期间才接受调用，并随轮次一起中止；轮次结束后到达的调用会得到说明这一点的错误。未完成的调用每 10 秒发送一次进度通知，使 Casper 的空闲计时器不会到期。结果中的文本块作为 MCP 文本传递；其他任何块（例如图片）会变成一行说明，如 `[image result not sent]`。
 

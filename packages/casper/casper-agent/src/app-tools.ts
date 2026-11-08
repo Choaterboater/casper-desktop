@@ -10,8 +10,6 @@ import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { homedir } from 'node:os'
-import { isAbsolute, sep, win32 } from 'node:path'
 import type { McpServer as AcpMcpServer } from '@agentclientprotocol/sdk'
 import { toNodeHandler, type NodeIncomingMessageLike } from '@modelcontextprotocol/node'
 import {
@@ -27,7 +25,7 @@ import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { SkillRegistry } from '@deepseek-ai/dsh-skill'
 import type { ToolResult, ToolsService } from '@deepseek-ai/dsh-tools'
-import { contained, readAppFile, READ_MAX_LINES } from './app-read.ts'
+import { readAppFile, READ_MAX_LINES } from './app-read.ts'
 
 /** Name Casper gets the app's server under; Casper prefixes it with `acp-`. */
 export const APP_SERVER_NAME = 'app'
@@ -151,57 +149,6 @@ export function dshNameOf(mcp: string): string | undefined {
   return RESOURCE_TOOLS.some(entry => entry.mcp === mcp) ? mcp : undefined
 }
 
-/** The outcomes of one ask of the app's approval; only `allowed-once` allows. */
-export type AppApprovalOutcome = 'allowed-once' | 'rejected' | 'cancelled' | 'unavailable'
-
-/** The app's approval service (`ctx.approval`), as the bridge asks it; its card is the one a bridged install asks with. */
-export interface AppApproval {
-  /**
-   * Ask the user about one call.
-   * @param request - the Agent, the tool, the call id of the Casper step, why, and the call's signal.
-   * @returns the user's answer.
-   */
-  request(request: { agent: Agent; toolName: string; callId: ToolCallId; reason: string; signal: AbortSignal }): Promise<AppApprovalOutcome>
-}
-
-/**
- * The paths of a `present` call that leave the workspace: absolute ones
- * outside it, `../` ones, `~` ones, and ones whose real path is outside it.
- * A path is read as the app's file system reads it: relative ones from the
- * workspace, `..` through links, and Windows drive-relative ones by drive.
- * @param cwd - the Session folder.
- * @param args - the call's arguments.
- * @returns the paths as Casper wrote them, in call order; none for arguments the tool itself refuses.
- */
-export async function presentOutside(cwd: string, args: Record<string, unknown>): Promise<string[]> {
-  const files = Array.isArray(args.files) ? args.files as unknown[] : []
-  const outside: string[] = []
-  for (const file of files) {
-    const path: unknown = typeof file === 'object' && file !== null ? Reflect.get(file, 'path') : undefined
-    if (typeof path !== 'string' || path.trim() === '') continue
-    if (!await contained([cwd], presentTarget(cwd, path))) outside.push(path)
-  }
-  return outside
-}
-
-/**
- * Where one `present` path points, spelled as the app's file system reads it:
- * `~` is the home folder; on Windows the path is resolved with drive
- * semantics, so `C:..\x` or `D:x` leaves the workspace; elsewhere a relative
- * path is joined to the workspace and its `..` left for the real path to walk.
- * @param cwd - the Session folder.
- * @param path - the path as Casper wrote it.
- * @param platform - the platform whose path rules apply; the host's by default.
- * @returns the path to check against the workspace.
- */
-export function presentTarget(cwd: string, path: string, platform: NodeJS.Platform = process.platform): string {
-  const home = path === '~' || path.startsWith('~/') || (platform === 'win32' && path.startsWith('~\\'))
-    ? `${homedir()}${path.slice(1)}`
-    : path
-  if (platform === 'win32') return win32.resolve(cwd, home)
-  return isAbsolute(home) ? home : `${cwd}${sep}${home}`
-}
-
 /** One app tool call the server ran for a Casper step. */
 export interface BridgedCall {
   /** The app tool that ran. */
@@ -247,8 +194,6 @@ export interface AppToolsOptions {
   readonly version: string | undefined
   /** Folders `app_read_file` reads from. */
   readonly roots: readonly string[]
-  /** The app's approval, which a `present` call outside {@link cwd} asks first; such a call shows nothing without it. */
-  readonly approval?: AppApproval | undefined
   /** Whether the app runs from installed packages, which carry no `lib/types`, `src/` or repository `docs/`. */
   readonly installed: boolean
   /**
@@ -397,27 +342,6 @@ function heartbeat(ctx: ServerContext, onError: (error: Error) => void): () => v
   return () => { clearInterval(timer) }
 }
 
-/**
- * Ask the app's approval before a `present` call shows paths outside the
- * workspace; the caller is Casper's model, not the app's own loop.
- * @returns why nothing is shown, or undefined when the call may run.
- */
-async function askOutside(
-  options: AppToolsOptions, args: Record<string, unknown>, callId: ToolCallId, signal: AbortSignal,
-): Promise<string | undefined> {
-  const outside = await presentOutside(options.cwd, args)
-  if (outside.length === 0) return undefined
-  const named = outside.join(', ')
-  const outcome = options.approval === undefined
-    ? 'unavailable'
-    : await options.approval.request({
-      agent: options.agent, toolName: 'present', callId, signal,
-      reason: `Casper asks to show files outside the workspace (${options.cwd}): ${named}`,
-    })
-  if (outcome === 'allowed-once') return undefined
-  return `present needs the user's approval to show ${named}, outside the workspace, and did not get it (${outcome}); nothing was shown.`
-}
-
 /** This package's version, the server version when the app gave none. */
 function packageVersion(): string {
   const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version?: unknown }
@@ -442,15 +366,10 @@ async function mcpServer(options: AppToolsOptions, version: string): Promise<Mcp
     const acpId = acpIdOf(ctx.mcpReq._meta)
     const id = acpId === undefined ? ToolCallId(`casper-app:${randomUUID()}`) : options.callId(acpId)
     const stop = heartbeat(ctx, options.onError)
-    const signal = AbortSignal.any([ctx.mcpReq.signal, turn])
     try {
-      if (tool.mcp === 'present') {
-        const refused = await askOutside(options, args, id, signal)
-        if (refused !== undefined) return errorResult(refused)
-      }
       const batch = await options.tools.execute({
         calls: [{ type: 'tool-call', id, name: dsh, arguments: JSON.stringify(args) }],
-        signal,
+        signal: AbortSignal.any([ctx.mcpReq.signal, turn]),
         agent: options.agent,
       })
       const result = batch.results[0]?.result

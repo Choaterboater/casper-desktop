@@ -1,9 +1,8 @@
 /** The app tools server: its listener checks, the tools it lists, and how a call reaches the app's tools. */
 
-import { readFileSync, symlinkSync, writeFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { request as httpRequest } from 'node:http'
-import { homedir, networkInterfaces } from 'node:os'
-import { dirname, join, win32 } from 'node:path'
+import { networkInterfaces } from 'node:os'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
@@ -21,8 +20,6 @@ import {
   mcpContent,
   NO_RESOURCES,
   PLUGIN_SKILL,
-  presentOutside,
-  presentTarget,
   PROGRESS_INTERVAL_MS,
   skillDescription,
   startAppTools,
@@ -486,127 +483,5 @@ describe('app tools over MCP', { timeout: 60_000 }, () => {
     expect(other.isError).toBe(true)
     expect(other.content[0]?.text).toBe('The app hands Casper no MCP server named acp-network. Servers: acp-docs.')
     expect(seen).toHaveLength(1)
-  })
-})
-
-describe('present from Casper outside the workspace', { timeout: 60_000 }, () => {
-  /** One ask the stand-in approval saw. */
-  interface Asked { agent: unknown; toolName: string; callId: unknown; reason: string; signal: unknown }
-
-  /** A stand-in for the app's approval service that answers `outcome` and keeps every ask. */
-  function approval(outcome: 'allowed-once' | 'rejected' | 'cancelled' | 'unavailable') {
-    const asked: Asked[] = []
-    return {
-      asked,
-      service: {
-        request: (request: Asked) => { asked.push(request); return Promise.resolve(outcome) },
-      },
-    }
-  }
-
-  /** The workspace and a file beside it, outside it. */
-  function layout(agent: Agent) {
-    const cwd = agent.session.header.cwd ?? ''
-    writeFileSync(join(cwd, 'report.md'), '# Report\n')
-    const outside = join(dirname(cwd), 'secret.txt')
-    writeFileSync(outside, 'not for the model\n')
-    return { cwd, outside }
-  }
-
-  it('shows a path inside the workspace with no ask, as before', async () => {
-    const { ctx, agent, seen } = await host()
-    const { cwd } = layout(agent)
-    const { asked, service } = approval('rejected')
-    const mcp = await client(await serve(agent, ctx, { approval: service }))
-    const files = [{ path: 'report.md' }, { path: join(cwd, 'report.md') }, { path: './sub/../report.md' }]
-    const result = await mcp.callTool({ name: 'present', arguments: { files }, _meta: { 'casper/acpToolCallId': 'casper-tool-1' } })
-    expect(result).toEqual({ content: [{ type: 'text', text: 'presented' }], isError: false })
-    expect(asked).toEqual([])
-    expect(seen.map(entry => [entry.name, entry.args])).toEqual([['present', { files }]])
-  })
-
-  it('asks the app\'s approval as the Casper Agent before it shows an absolute path outside the workspace', async () => {
-    const { ctx, agent, seen } = await host()
-    const { outside } = layout(agent)
-    const { asked, service } = approval('allowed-once')
-    const mcp = await client(await serve(agent, ctx, { approval: service }))
-    const files = [{ path: 'report.md' }, { path: outside }]
-    const result = await mcp.callTool({ name: 'present', arguments: { files }, _meta: { 'casper/acpToolCallId': 'casper-tool-2' } })
-    expect(result).toEqual({ content: [{ type: 'text', text: 'presented' }], isError: false })
-    expect(asked).toHaveLength(1)
-    expect(asked[0]?.agent).toBe(agent)
-    expect(asked[0]).toMatchObject({ toolName: 'present', callId: 'casper:test:casper-tool-2' })
-    // Only the path outside is named, and the ask rides the call's signal.
-    expect(asked[0]?.reason).toContain(outside)
-    expect(asked[0]?.reason).not.toContain('report.md')
-    expect(asked[0]?.signal).toBeInstanceOf(AbortSignal)
-    expect(seen.map(entry => [entry.name, entry.args])).toEqual([['present', { files }]])
-  })
-
-  it('asks before it shows a ../ path, or a path through a link, that leaves the workspace', async () => {
-    const { ctx, agent, seen } = await host()
-    const { cwd, outside } = layout(agent)
-    symlinkSync(dirname(outside), join(cwd, 'up'))
-    const { asked, service } = approval('allowed-once')
-    const mcp = await client(await serve(agent, ctx, { approval: service }))
-    // A home path leaves the workspace too, since the app's file system reads ~ as the home folder.
-    const paths = ['../secret.txt', 'up/secret.txt', 'up/../../secret.txt', '~/secret.txt']
-    for (const path of paths) {
-      await mcp.callTool({ name: 'present', arguments: { files: [{ path }] } })
-    }
-    expect(asked.map((entry, index) => entry.reason.includes(paths[index] ?? ''))).toEqual([true, true, true, true])
-    expect(seen).toHaveLength(4)
-  })
-
-  it('leaves to present itself the entries it refuses, so they ask nothing', async () => {
-    const { agent } = await host()
-    const { cwd } = layout(agent)
-    expect(await presentOutside(cwd, {})).toEqual([])
-    expect(await presentOutside(cwd, { files: [null, 'x', { path: 3 }, { path: ' ' }, { path: '~' }] })).toEqual(['~'])
-  })
-
-  it('reads a Windows drive-relative path by its drive, as the app does, so it leaves the workspace', () => {
-    const cwd = 'C:\\ws'
-    for (const [path, target] of [
-      ['C:..\\secret.docx', 'C:\\secret.docx'],
-      ['..\\secret.docx', 'C:\\secret.docx'],
-      ['C:\\other\\secret.docx', 'C:\\other\\secret.docx'],
-      ['notes\\a.md', 'C:\\ws\\notes\\a.md'],
-      ['C:notes\\a.md', 'C:\\ws\\notes\\a.md'],
-    ] as const) {
-      expect(presentTarget(cwd, path, 'win32')).toBe(target)
-    }
-    // Another drive's folder is that drive's own, never the workspace.
-    expect(presentTarget(cwd, 'D:Users\\me\\secret.docx', 'win32')).toMatch(/^D:\\(?:.*\\)?Users\\me\\secret\.docx$/u)
-    expect(presentTarget(cwd, '~\\a.md', 'win32')).toBe(win32.resolve(cwd, homedir(), 'a.md'))
-    expect(presentTarget('/ws', '~\\a.md', 'linux')).toBe('/ws/~\\a.md')
-  })
-
-  it.runIf(process.platform === 'win32')('asks for a drive-relative path that leaves the workspace on Windows', async () => {
-    const { agent } = await host()
-    const { cwd } = layout(agent)
-    const drive = cwd.slice(0, 2)
-    expect(await presentOutside(cwd, { files: [{ path: `${drive}..\\secret.docx` }, { path: `${drive}a.md` }] })).toEqual([`${drive}..\\secret.docx`])
-  })
-
-  it('a denied, cancelled or unavailable ask shows nothing, and so does an app without an approval service', async () => {
-    const { ctx, agent, seen } = await host()
-    const { outside } = layout(agent)
-    const recorded: unknown[] = []
-    for (const outcome of ['rejected', 'cancelled', 'unavailable'] as const) {
-      const { asked, service } = approval(outcome)
-      const mcp = await client(await serve(agent, ctx, { approval: service, record: (...call) => { recorded.push(call) } }))
-      const result = await mcp.callTool({ name: 'present', arguments: { files: [{ path: outside }] }, _meta: { 'casper/acpToolCallId': 'casper-tool-5' } }) as { content: { text: string }[]; isError: boolean }
-      expect(asked).toHaveLength(1)
-      expect(result.isError).toBe(true)
-      expect(result.content[0]?.text).toContain(outside)
-      expect(result.content[0]?.text).toContain('nothing was shown')
-    }
-    const mcp = await client(await serve(agent, ctx, { approval: undefined }))
-    const result = await mcp.callTool({ name: 'present', arguments: { files: [{ path: '../secret.txt' }] } }) as { content: { text: string }[]; isError: boolean }
-    expect(result.isError).toBe(true)
-    expect(result.content[0]?.text).toContain('nothing was shown')
-    expect(seen).toEqual([])
-    expect(recorded).toEqual([])
   })
 })
