@@ -11,6 +11,8 @@ import type { FileAttachmentRef, ImageAttachmentLimits, ImageAttachmentRef, Stor
 import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import SessionQueryEngine from '@deepseek-ai/dsh-session-query'
+import SessionTitleService, { SessionTitleProviderId } from '@deepseek-ai/dsh-session-title'
+import type { SessionTitleProviderRequest } from '@deepseek-ai/dsh-session-title'
 import SessionReferenceResolver, { encodeSessionReferenceUri, formatSessionReferenceMention } from '@deepseek-ai/dsh-session-reference'
 import { planProjectionDefinition } from '@deepseek-ai/dsh-plan-mode'
 import { UserQuestionError } from '@deepseek-ai/dsh-user-questions'
@@ -2785,5 +2787,54 @@ describe('Closing an idle Casper', { timeout: 60_000 }, () => {
       ['session/prompt', null, null],
     ])
     expect(turnEnds(agent)).toEqual([COMPLETED, COMPLETED])
+  })
+})
+
+describe('A Casper session\'s written title', { timeout: 60_000 }, () => {
+  /** The app's default model, which a new Standard session sends its first request on. */
+  const DEFAULT_ROUTE = { provider: 'default-provider', model: 'default-model' }
+
+  /** A Host with the title service and a first-prompt provider that writes a title on the route it is given. */
+  async function withTitles(script: FakeScript) {
+    const fake = fakeCasper(script)
+    cleanups.push(() => { fake.remove() })
+    const generate = vi.fn(async (request: SessionTitleProviderRequest) => ({
+      title: 'Written title',
+      messageSeqs: [request.messages[0]!.seq],
+      ...request.route === undefined ? {} : { model: request.route },
+    }))
+    const host = await boot(fake, {}, undefined, true, async (ctx) => {
+      await ctx.plugin(SessionTitleService, { fallbackMaxWords: 8, fallbackMaxBytes: 64, maxTitleBytes: 64 })
+      ctx.sessionTitle.register({ id: SessionTitleProviderId('first-prompt'), automatic: 'first-prompt', generate })
+    })
+    cleanups.push(() => host.ctx.fiber.dispose())
+    const create = (id: string) => host.ctx.agents.create({
+      sessionId: SessionId(id), meta: { cwd: fake.cwd, agentPreset: 'casper' }, agentOptions: { ...DEFAULT_ROUTE },
+    })
+    return { host, generate, create }
+  }
+
+  it('the first prompt gets a model-written title on the app\'s default model', async () => {
+    const { host, generate, create } = await withTitles({ prompts: [[{ text: 'Done.\n' }]] })
+    const { agent } = await create('casper-title')
+    await run(agent, 'please explain how the cache picks its key and fix the miss')
+    await waitFor(() => host.ctx.sessionTitle.get(agent.session)?.source.kind === 'provider')
+    expect(generate).toHaveBeenCalledOnce()
+    expect(generate.mock.calls[0]![0].route).toEqual(DEFAULT_ROUTE)
+    expect(host.ctx.sessionTitle.get(agent.session)).toMatchObject({
+      title: 'Written title',
+      source: { kind: 'provider', provider: 'first-prompt', model: DEFAULT_ROUTE },
+    })
+  })
+
+  it('a title the user renamed is never written over', async () => {
+    const { host, generate, create } = await withTitles({ prompts: [[{ text: 'One.\n' }], [{ text: 'Two.\n' }]] })
+    const { agent } = await create('casper-title-renamed')
+    agent.followup(prompt('first prompt of the session'))
+    host.ctx.sessionTitle.rename(agent.session, 'My own name')
+    await agent.whenIdle()
+    await run(agent, 'second prompt of the session')
+    expect(generate).not.toHaveBeenCalled()
+    expect(host.ctx.sessionTitle.get(agent.session)).toMatchObject({ title: 'My own name', source: { kind: 'user' } })
   })
 })

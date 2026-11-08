@@ -47,6 +47,8 @@ import type { Session, SessionId, TurnEndReason, UserMessage } from '@deepseek-a
 import type {} from '@deepseek-ai/dsh-session-persistence'
 // Type-only: `ctx.sessionReferenceResolver`, which reads the Sessions a message mentions.
 import type {} from '@deepseek-ai/dsh-session-reference'
+// Type-only: `ctx.sessionTitle`, which writes the Session's title.
+import type {} from '@deepseek-ai/dsh-session-title'
 import type {} from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-tools'
@@ -231,7 +233,7 @@ export class CasperAgent implements Agent {
   /**
    * @param pluginCtx - the Casper plugin context whose services the Agent uses.
    * @param id - the Session and Agent identity.
-   * @param options - Agent options; Casper chooses its own model, so they are kept unread.
+   * @param options - Agent options; Casper chooses its own model, so only the title reads their route.
    * @param session - the Session this Agent drives.
    * @param readers - model-selection and inbox projection readers.
    * @param lastTurn - the last turn number recorded in the Session.
@@ -682,7 +684,20 @@ export class CasperAgent implements Agent {
       const line = read?.get(message.id)
       if (line?.message === message && line.reference !== undefined) this.session.append('user/message', line.reference.context, { surfaceOp: 'append' })
     }
+    this.startTitle()
     return claimed
+  }
+
+  /**
+   * Start the title the prompt queued. A Standard Session's title starts when
+   * its first model request is logged; Casper's requests never are, so it
+   * starts here on the app's default model, the route a new Standard Session
+   * sends its first request on. A renamed title queues nothing.
+   */
+  private startTitle(): void {
+    const { provider, model } = this.options
+    if (provider === undefined || model === undefined) return
+    this.pluginCtx.get('sessionTitle')?.startQueued(this.session, { provider, model })
   }
 
   /** Send the prompt; on abort send `session/cancel` and wait the cancel grace before killing Casper. */

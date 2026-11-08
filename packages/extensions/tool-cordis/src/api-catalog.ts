@@ -241,7 +241,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: '@Remote(\'select\') async select(agent: Agent, agentPreset: string): Promise<string>',
-        description: 'Select a preset before a session starts its first turn. A Session whose log records the preset and whose Agent runs its current revision keeps its composition; nothing is logged or announced.',
+        description: 'Select a preset before a session starts its first turn. A Session whose log records the preset and whose Agent runs its current revision keeps its composition; nothing is logged or announced. A preset whose Agent factory route (`ctx.agents.servesRoute`) differs from the one that built the Agent is refused as `agent-preset/locked` with `newSession: true`, because the Agent\'s driver cannot change; the caller starts a new Session instead.',
         parameters: [{ name: 'agent', description: 'Target Agent.' }, { name: 'agentPreset', description: 'Requested identity.' }],
         returns: 'Committed preset identity.',
       },
@@ -262,7 +262,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
   {
     key: 'agents',
     summary: 'Agent service (`ctx.agents`): tracks live agents and carries the initiating Agent through one process-local asynchronous driver chain.',
-    description: 'Agent service (`ctx.agents`): tracks live agents and carries the initiating Agent through one process-local asynchronous driver chain. Agent *creation* is provided by whichever plugin implements the AgentFactory (`@deepseek-ai/dsh-agent-loop`), registered via setFactory.\n\nInitiator methods provide same-process causal attribution only. Ambient presence is neither liveness proof nor authorization; subjects and owners remain explicit, as does identity at worker, process, persistence, and wire boundaries. Returned Promise boundaries drain during teardown, except a nested lineage that starts an owning-fiber unload is excluded from its own drain.',
+    description: 'Agent service (`ctx.agents`): tracks live agents and carries the initiating Agent through one process-local asynchronous driver chain. Agent *creation* is provided by whichever plugin implements the AgentFactory (`@deepseek-ai/dsh-agent-loop`), registered via setFactory; a route serves only the Sessions it selects.\n\nInitiator methods provide same-process causal attribution only. Ambient presence is neither liveness proof nor authorization; subjects and owners remain explicit, as does identity at worker, process, persistence, and wire boundaries. Returned Promise boundaries drain during teardown, except a nested lineage that starts an owning-fiber unload is excluded from its own drain.',
     methods: [
       {
         signature: 'turnBoundaryOf(session: Session): TurnBoundaryProjection',
@@ -305,14 +305,32 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the disposer that clears the factory slot. The exact Cordis effect disposer (single-shot): composite (generator) effects may yield it directly — exact identity nests the teardown in order.',
       },
       {
+        signature: 'route(route: AgentFactoryRoute): () => void',
+        description: 'Register a factory that serves only the Sessions its `selects` accepts. Routes are consulted in registration order before the default factory; the first selecting route wins. A traced Cordis service is canonicalized as in setFactory.',
+        parameters: [{ name: 'route', description: 'the factory and its selection predicate.' }],
+        returns: 'the exact Cordis effect disposer that removes the route; live Agents the route already built are unaffected.',
+      },
+      {
+        signature: 'sameRoute(a: AgentRouteFacts, b: AgentRouteFacts): boolean',
+        description: 'Whether two Sessions would be served by the same factory.',
+        parameters: [{ name: 'a', description: 'facts of the first Session.' }, { name: 'b', description: 'facts of the second Session.' }],
+        returns: 'true when both select the same route, or both fall to the default factory (also when none is registered).',
+      },
+      {
+        signature: 'servesRoute(agent: Agent, facts: AgentRouteFacts): boolean',
+        description: 'Whether a live Agent was built by the factory that would serve a Session with these facts, so a composition change cannot move it to another driver.',
+        parameters: [{ name: 'agent', description: 'a live Agent.' }, { name: 'facts', description: 'facts of the Session the caller wants the Agent to run.' }],
+        returns: 'true when that factory built the Agent or this registry did not build it.',
+      },
+      {
         signature: 'async create(options: CreateAgentOptions): Promise<AgentHandle>',
-        description: 'Create and publish a new agent through the registered factory. Distinct from register (which records an already-constructed agent): this constructs the agent and its session. Rejects if no factory is registered or creation/setup fails. The resolved AgentHandle lets the owner tear down exactly this agent.',
+        description: 'Create and publish a new agent through the factory routes or the default factory select from `meta.agentPreset`, `meta.origin`, and `meta.isSeeded`. Distinct from register (which records an already-constructed agent): this constructs the agent and its session. Rejects if no factory is registered or creation/setup fails. The resolved AgentHandle lets the owner tear down exactly this agent.',
         parameters: [{ name: 'options', description: 'shared identity, session seed/metadata, and agent options.' }],
         returns: 'the handle after setup, rollback-covered publication, and loop start complete.',
       },
       {
         signature: 'async resume(options: ResumeAgentOptions): Promise<AgentHandle>',
-        description: 'Load a persisted session and resume an agent on it through the registered factory. Rejects if no factory is registered; the factory rejects if session persistence is not configured or persistence/setup fails.',
+        description: 'Load a persisted session and resume an agent on it through the factory selected from `agentPreset` (see route). Rejects if no factory is registered; the factory rejects if session persistence is not configured or persistence/setup fails.',
         parameters: [{ name: 'options', description: 'persisted identity, configuration, and setup.' }],
         returns: 'the handle after setup, rollback-covered publication, and loop start complete.',
       },
@@ -3331,6 +3349,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'latest accepted title, or `undefined` when no eligible text exists.',
       },
       {
+        signature: 'startQueued(session: Session, route: SessionTitleModelIdentity): boolean',
+        description: 'Start queued automatic work on `route`, for an agent whose model requests the app never logs (so no `request/header` starts it). Queued work is dropped by a user rename, so a renamed title is never overwritten.',
+        parameters: [{ name: 'session', description: 'exact live session whose queued work starts.' }, { name: 'route', description: 'provider and model the title call uses.' }],
+        returns: 'whether queued work was started.',
+      },
+      {
         signature: 'register(provider: SessionTitleProvider): () => Promise<void>',
         description: 'Register the sole optional title provider. Disposal aborts its pending and active work; a replacement may register once disposal has started, and the closing provider\'s late results never commit.',
         parameters: [{ name: 'provider', description: 'provider identity, cadence, and generation function.' }],
@@ -5563,6 +5587,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface AgentFactory {\n    createAgent(ownerCtx: Context, options: CreateAgentOptions): Promise<AgentHandle>;\n    resume(ownerCtx: Context, options: ResumeAgentOptions): Promise<AgentHandle>;\n}',
   },
   {
+    name: 'AgentFactoryRoute',
+    declaration: 'export interface AgentFactoryRoute {\n    readonly factory: AgentFactory;\n    selects(facts: AgentRouteFacts): boolean;\n}',
+  },
+  {
     name: 'AgentHandle',
     declaration: 'export interface AgentHandle {\n    agent: Agent;\n    dispose(): Promise<void>;\n}',
   },
@@ -5597,6 +5625,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'AgentResolver',
     declaration: 'export type AgentResolver = (sessionId: SessionId) => Promise<Agent>;',
+  },
+  {
+    name: 'AgentRouteFacts',
+    declaration: 'export interface AgentRouteFacts {\n    readonly agentPreset?: string | undefined;\n    readonly origin?: \'subagent\' | undefined;\n    readonly isSeeded?: boolean | undefined;\n}',
   },
   {
     name: 'AgentSetup',
@@ -8100,7 +8132,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ResumeAgentOptions',
-    declaration: 'export interface ResumeAgentOptions {\n    readonly resumeSessionId: SessionId;\n    readonly agentOptions?: AgentOptions;\n    readonly signal?: AbortSignal;\n    readonly setup?: AgentSetup;\n}',
+    declaration: 'export interface ResumeAgentOptions {\n    readonly resumeSessionId: SessionId;\n    readonly agentOptions?: AgentOptions;\n    readonly signal?: AbortSignal;\n    readonly agentPreset?: string;\n    readonly setup?: AgentSetup;\n}',
   },
   {
     name: 'ReviewDecision',

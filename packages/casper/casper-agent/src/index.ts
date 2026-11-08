@@ -46,7 +46,7 @@ export const name = 'casper-agent'
 
 /**
  * Services the factory and its Agents use; the Agent scope inherits them. `userQuestions`, `skills`,
- * `profileContext`, `attachments`, `commands`, `permissionPresets`, and the optional `sessionReferenceResolver`,
+ * `profileContext`, `attachments`, `commands`, `permissionPresets`, `sessionTitle`, and the optional `sessionReferenceResolver`,
  * which reads the Sessions a message mentions, are read when present.
  */
 export const inject = ['agents', 'sessions', 'sessionProjections', 'sessionPersistence', 'subprocess', 'storageDomain', 'tools']

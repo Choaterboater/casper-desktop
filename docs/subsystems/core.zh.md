@@ -683,7 +683,10 @@ async recompose(ctx: Context, id: string): Promise<AgentPreset>
 
 /** Select a preset before a session starts its first turn. A Session whose
  * log records the preset and whose Agent runs its current revision keeps its
- * composition; nothing is logged or announced.
+ * composition; nothing is logged or announced. A preset whose Agent factory
+ * route (`ctx.agents.servesRoute`) differs from the one that built the Agent
+ * is refused as `agent-preset/locked` with `newSession: true`, because the
+ * Agent's driver cannot change; the caller starts a new Session instead.
  * @param agent Target Agent.
  * @param agentPreset Requested identity.
  * @returns Committed preset identity.
@@ -710,7 +713,7 @@ Source: [`packages/preset/agent-preset-registry/src/index.ts`](../../packages/pr
 
 ### `ctx.agents` — `AgentRegistry`
 
-Agent service (`ctx.agents`): tracks live agents and carries the initiating Agent through one process-local asynchronous driver chain. Agent *creation* is provided by whichever plugin implements the AgentFactory (`@deepseek-ai/dsh-agent-loop`), registered via setFactory.
+Agent service (`ctx.agents`): tracks live agents and carries the initiating Agent through one process-local asynchronous driver chain. Agent *creation* is provided by whichever plugin implements the AgentFactory (`@deepseek-ai/dsh-agent-loop`), registered via setFactory; a route serves only the Sessions it selects.
 
 Initiator methods provide same-process causal attribution only. Ambient presence is neither liveness proof nor authorization; subjects and owners remain explicit, as does identity at worker, process, persistence, and wire boundaries. Returned Promise boundaries drain during teardown, except a nested lineage that starts an owning-fiber unload is excluded from its own drain.
 
@@ -787,7 +790,36 @@ withoutInitiator<T>(operation: () => T): T
 setFactory(factory: AgentFactory): () => void
 
 /**
- * Create and publish a new agent through the registered factory.
+ * Register a factory that serves only the Sessions its `selects` accepts.
+ * Routes are consulted in registration order before the default factory;
+ * the first selecting route wins. A traced Cordis service is canonicalized
+ * as in {@link setFactory}.
+ * @param route - the factory and its selection predicate.
+ * @returns the exact Cordis effect disposer that removes the route; live
+ *   Agents the route already built are unaffected.
+ */
+route(route: AgentFactoryRoute): () => void
+
+/**
+ * Whether two Sessions would be served by the same factory.
+ * @param a - facts of the first Session.
+ * @param b - facts of the second Session.
+ * @returns true when both select the same route, or both fall to the default factory (also when none is registered).
+ */
+sameRoute(a: AgentRouteFacts, b: AgentRouteFacts): boolean
+
+/**
+ * Whether a live Agent was built by the factory that would serve a Session
+ * with these facts, so a composition change cannot move it to another driver.
+ * @param agent - a live Agent.
+ * @param facts - facts of the Session the caller wants the Agent to run.
+ * @returns true when that factory built the Agent or this registry did not build it.
+ */
+servesRoute(agent: Agent, facts: AgentRouteFacts): boolean
+
+/**
+ * Create and publish a new agent through the factory {@link route}s or the
+ * default factory select from `meta.agentPreset`, `meta.origin`, and `meta.isSeeded`.
  * Distinct from {@link register} (which records an already-constructed
  * agent): this constructs the agent and its session. Rejects if no factory is
  * registered or creation/setup fails. The resolved {@link AgentHandle} lets
@@ -798,8 +830,9 @@ setFactory(factory: AgentFactory): () => void
 async create(options: CreateAgentOptions): Promise<AgentHandle>
 
 /**
- * Load a persisted session and resume an agent on it through the registered
- * factory. Rejects if no factory is registered; the factory rejects if
+ * Load a persisted session and resume an agent on it through the factory
+ * selected from `agentPreset` (see {@link route}). Rejects if no factory is
+ * registered; the factory rejects if
  * session persistence is not configured or persistence/setup fails.
  * @param options - persisted identity, configuration, and setup.
  * @returns the handle after setup, rollback-covered publication, and loop start complete.

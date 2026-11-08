@@ -473,6 +473,23 @@ export class SessionTitleService extends Service {
   }
 
   /**
+   * Start queued automatic work on `route`, for an agent whose model requests
+   * the app never logs (so no `request/header` starts it). Queued work is
+   * dropped by a user rename, so a renamed title is never overwritten.
+   * @param session - exact live session whose queued work starts.
+   * @param route - provider and model the title call uses.
+   * @returns whether queued work was started.
+   */
+  startQueued(session: Session, route: SessionTitleModelIdentity): boolean {
+    if (!this.serviceActive()) return false
+    const state = this.work.get(session)
+    const pending = state?.pending
+    if (state === undefined || pending === undefined) return false
+    this.startPending(session, state, pending, { provider: route.provider, model: route.model })
+    return true
+  }
+
+  /**
    * Register the sole optional title provider. Disposal aborts its pending and
    * active work; a replacement may register once disposal has started, and the
    * closing provider's late results never commit.

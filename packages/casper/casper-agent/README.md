@@ -86,6 +86,8 @@ A turn that cannot run ends with an error on `turn/end`: `CASPER_NOT_FOUND` when
 
 Each turn claims the queued input and appends `turn/start`, `step/start`, and the claimed `user/message` events unchanged, then flushes the Session before Casper can change files. The claimed messages go to Casper as one `session/prompt`, their blocks in order: text as `text`; a picture as an `image` block holding its stored normalized bytes in base64 with the stored media type, when Casper's `initialize` reply sets `promptCapabilities.image` to true; and a file as a `resource_link` to the attachment service's read-only host copy (`file:` URI, name, and byte size), which Casper reads with its own file tools. A picture an older Casper cannot take, a picture the attachment service cannot read, and a file with no host path are sent as one line of placeholder text each, and the turn's reply opens with a note saying so. An abort during a picture read ends the turn as aborted and sends no prompt, even when the attachment service finishes the read.
 
+When `ctx.sessionTitle` is mounted, the turn starts the title work its prompt queued right after logging the claimed messages, on the route of the Agent's options: the app's default model, which a new Standard Session sends its first request on. A Standard Session's title starts when its first model request is logged, and Casper's requests never are, so without this a Casper Session keeps the fallback title of its first words. The title is written as for a Standard Session, and a title the user renamed is never written over.
+
 A line steered in during a prompt goes to a Casper whose `initialize` reply sets `agentCapabilities._meta.casper.steer`, as `_casper/steer` with the Session's Casper conversation id, the line's blocks, and its message id: right after the prompt is sent, one line at a time in queue order. The line stays queued until Casper sends its read notice, a `user_message_chunk` carrying that `messageId`; the line is then recorded, as it was sent, as the `user/message` that opens the next step, claimed for the turn right before it. While calls of the step are open the line waits for them and stays queued, and Stop does not clear it. A line Casper refuses or never reads, or one with a part that would go as a placeholder or with a session mention, runs as the next turn with every line queued after it, and so does every line for an older Casper. Stop clears an unread line with the rest of the queue.
 
 | Casper update | Session events |
@@ -248,7 +250,7 @@ The plugin sends no model request, so it has no cache effect; Casper's own reque
 - Only Desktop on macOS and Linux is covered; the Windows lookup is untested.
 - A deleted Session's sidecar record goes only at the next start, and an archived Session keeps its process until it is idle for `idleExitMs`. A Casper from before decision 91 is never closed while idle.
 - Subagent, team, and goal features do not run inside Casper Sessions.
-- Host-plane title generation may still call a DeepSeek model for Casper Sessions.
+- A Casper Session's written title is made on the app's default model, which may be a DeepSeek model, not on the model Casper runs.
 - `packages/casper/tool-checks` stays until Casper Sessions are proven live.
 
 <a id="dev-note"></a>

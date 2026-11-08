@@ -594,3 +594,71 @@ describe('SessionTitleService Provider lifecycle', () => {
     warn.mockRestore()
   })
 })
+
+describe('SessionTitleService startQueued', () => {
+  async function setup() {
+    const ctx = new Context()
+    onTestFinished(() => ctx.fiber.dispose())
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(SessionProjectionRegistry)
+    await ctx.plugin(AgentRegistry)
+    await ctx.plugin(SessionTitleService, CONFIG)
+    const generate = vi.fn(async (request: SessionTitleProviderRequest): Promise<SessionTitleProviderResult> => ({
+      title: 'Written title',
+      messageSeqs: [request.messages[0]!.seq],
+      ...request.route === undefined ? {} : { model: request.route },
+    }))
+    ctx.sessionTitle.register({ id: SessionTitleProviderId('first'), automatic: 'first-prompt', generate })
+    return { ctx, generate }
+  }
+
+  it('starts queued first-prompt work on the given route when no model request is logged', async () => {
+    const { ctx, generate } = await setup()
+    const session = ctx.sessions.create(SessionId('engine-session'))
+    const message = appendHumanPrompt(session, 'Explain how the engine titles sessions')
+    await settle()
+    expect(ctx.sessionTitle.get(session)?.source.kind).toBe('fallback')
+
+    expect(ctx.sessionTitle.startQueued(session, { provider: 'default-route', model: 'default-model' })).toBe(true)
+    await settle()
+
+    expect(generate).toHaveBeenCalledOnce()
+    expect(generate.mock.calls[0]![0].route).toEqual({ provider: 'default-route', model: 'default-model' })
+    expect(ctx.sessionTitle.get(session)).toMatchObject({
+      title: 'Written title',
+      messageSeqs: [message.seq],
+      source: { kind: 'provider', provider: SessionTitleProviderId('first') },
+    })
+    // The work was consumed: a second call has nothing to start.
+    expect(ctx.sessionTitle.startQueued(session, { provider: 'default-route', model: 'default-model' })).toBe(false)
+    await settle()
+    expect(generate).toHaveBeenCalledOnce()
+  })
+
+  it('starts nothing over a user rename', async () => {
+    const { ctx, generate } = await setup()
+    const session = ctx.sessions.create(SessionId('renamed-session'))
+    appendHumanPrompt(session, 'A prompt the user renames')
+    await settle()
+    ctx.sessionTitle.rename(session, 'My own title')
+
+    expect(ctx.sessionTitle.startQueued(session, { provider: 'default-route', model: 'default-model' })).toBe(false)
+    await settle()
+
+    expect(generate).not.toHaveBeenCalled()
+    expect(ctx.sessionTitle.get(session)).toMatchObject({ title: 'My own title', source: { kind: 'user' } })
+  })
+
+  it('starts nothing once the service is disposed', async () => {
+    const { ctx, generate } = await setup()
+    const titles = ctx.sessionTitle
+    const session = ctx.sessions.create(SessionId('disposed-session'))
+    appendHumanPrompt(session, 'A prompt before shutdown')
+    await settle()
+    await ctx.fiber.dispose()
+
+    expect(titles.startQueued(session, { provider: 'default-route', model: 'default-model' })).toBe(false)
+    await settle()
+    expect(generate).not.toHaveBeenCalled()
+  })
+})

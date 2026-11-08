@@ -3550,6 +3550,9 @@ importers:
       '@deepseek-ai/dsh-session-reference':
         specifier: workspace:*
         version: link:../../context/session-reference
+      '@deepseek-ai/dsh-session-title':
+        specifier: workspace:*
+        version: link:../../session/session-title
       '@deepseek-ai/dsh-skill':
         specifier: workspace:*
         version: link:../../skill/skill
