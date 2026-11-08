@@ -804,6 +804,8 @@ export class CasperAgent implements Agent {
       // The desktop app ships the dsh runtime of its own version.
       version: getDshRuntimeVersion(),
       roots: appReadRoots(selfAnchor(), profile?.dir),
+      // The app's approval card, which plugin_manager asks with; present asks it for a file outside the workspace.
+      approval: this.pluginCtx.get('approval'),
       installed: isInstalled(selfAnchor()),
       turn: () => this.sinkFor(connection)?.signal,
       callId: acpId => connection.toolCallId(acpId),

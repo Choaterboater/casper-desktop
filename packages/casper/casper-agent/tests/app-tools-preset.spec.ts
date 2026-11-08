@@ -314,10 +314,12 @@ it('a bridged present call shows a file card in the Casper turn', { timeout: 60_
   const fake = fakeCasper({ prompts: [[PRESENT_STEP, { mcp: 'present', args: PRESENT_ARGS }, { toolEnd: 1 }]] })
   cleanups.push(() => { fake.remove() })
   writeFileSync(join(fake.cwd, 'report.md'), '# Report\n')
-  const { create } = await host(fake)
+  const { create, seen } = await host(fake)
   const agent = await create('casper-preset-present')
   agent.followup(prompt('write the report and hand it to me'))
   await agent.whenIdle()
+  // A file inside the workspace is shown with no ask.
+  expect(seen.approvals).toEqual([])
 
   const [present] = results(fake.log())
   expect(present?.name).toBe('present')
@@ -333,6 +335,27 @@ it('a bridged present call shows a file card in the Casper turn', { timeout: 60_
   const presented = events.flatMap(event => event.type === 'deliverables/presented' ? [event.data] : [])
   expect(presented).toEqual([{ turn, callId: ids[0], files: [{ path: report, description: 'The report' }] }])
   expect(turn).toBe(1)
+})
+
+it('a bridged present call for a file outside the workspace asks the app\'s approval as the Casper Agent first', { timeout: 60_000 }, async () => {
+  const args = { files: [{ path: '../outside.md' }] }
+  const step = { ...PRESENT_STEP, target: '../outside.md', rawInput: args }
+  const fake = fakeCasper({ prompts: [[step, { mcp: 'present', args }, { toolEnd: 1 }]] })
+  cleanups.push(() => { fake.remove() })
+  writeFileSync(join(fake.root, 'outside.md'), '# Outside\n')
+  const { create, seen, asked } = await host(fake)
+  const agent = await create('casper-preset-present-outside')
+  agent.followup(prompt('hand me the file beside the project'))
+  await agent.whenIdle()
+
+  // The app's own approval card asked once, under the call id of the Casper step; Casper's question box never opened.
+  expect(seen.approvals).toEqual([{ agent, callId: callIds(agent)[0], toolName: 'present' }])
+  expect(asked).toEqual([])
+  // The stand-in allowed it, so the file card shows the file.
+  const [present] = results(fake.log())
+  expect(present?.result).toMatchObject({ isError: false })
+  const presented = eventsOf(agent).flatMap(event => event.type === 'deliverables/presented' ? [event.data.files] : [])
+  expect(presented).toEqual([[{ path: join(fake.root, 'outside.md') }]])
 })
 
 it('a present call after the turn ended returns TURN_OVER and appends nothing', { timeout: 60_000 }, async () => {

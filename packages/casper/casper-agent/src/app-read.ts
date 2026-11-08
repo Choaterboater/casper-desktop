@@ -101,8 +101,13 @@ async function realOrUndefined(path: string): Promise<string | undefined> {
   }
 }
 
-/** Whether `path` is inside one of `roots`, lexically and, when real paths resolve, by real path too. */
-async function contained(roots: readonly string[], path: string): Promise<boolean> {
+/**
+ * Whether `path` is inside one of `roots`, lexically and, when real paths resolve, by real path too.
+ * @param roots - absolute folders.
+ * @param path - absolute path; `..` segments are read through links, as the file system reads them.
+ * @returns true when no root's real folder is left.
+ */
+export async function contained(roots: readonly string[], path: string): Promise<boolean> {
   const real = await realOrUndefined(path)
   for (const root of roots) {
     const realRoot = await realOrUndefined(root) ?? root
