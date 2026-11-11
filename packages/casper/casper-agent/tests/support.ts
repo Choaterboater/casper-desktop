@@ -168,6 +168,7 @@ export function fakeCasper(script: FakeScript = { prompts: [] }): FakeCasper {
       forwardMcpServers: true,
       forwardPluginMcpServers: true,
       modePill: true,
+      liveOutput: true,
       // Tests that close an idle Casper set their own idle time.
       idleExitMs: 0,
       ...overrides,

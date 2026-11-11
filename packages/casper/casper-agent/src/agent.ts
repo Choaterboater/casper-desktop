@@ -32,6 +32,7 @@ import { getDshRuntimeVersion } from '@deepseek-ai/dsh-app-boot'
 import type {} from '@deepseek-ai/dsh-attachment'
 import type { CommandResult } from '@deepseek-ai/dsh-commands'
 import type { CredentialRef } from '@deepseek-ai/dsh-credentials'
+import type { JobRegistry } from '@deepseek-ai/dsh-jobs'
 import { createUserMessage, MessageId } from '@deepseek-ai/dsh-llm'
 import type { LlmFailure } from '@deepseek-ai/dsh-llm'
 // Type-only: `ctx.mcpManager`, whose Settings and plugin-registered servers are handed to Casper.
@@ -72,6 +73,7 @@ import type { ForkPoint } from './conversation.ts'
 import { answerElicitation, elicitationQuestion, elicitationStep } from './elicitation.ts'
 import { forwardedServers } from './forward-servers.ts'
 import type { ForwardedServers } from './forward-servers.ts'
+import { LiveOutput } from './live-output.ts'
 import { CasperModel } from './model.ts'
 import { effortState, reportOf, valueOf } from './models.ts'
 import type { CasperModelsCache } from './models-cache.ts'
@@ -137,6 +139,8 @@ interface PromptSink {
   readonly turn: number
   /** The steering sent during this prompt. */
   readonly steers: PromptSteers
+  /** The Jobs panel rows of the prompt's running commands; undefined with `liveOutput` off. */
+  readonly live: LiveOutput | undefined
   /**
    * Stop the prompt so the turn ends with `error` instead of Casper's reply.
    * @param error - the turn's error.
@@ -222,6 +226,8 @@ export class CasperAgent implements Agent {
   private commandRegistry: Pick<Context, 'commands'> | undefined
   /** Disposers of the current command registrations. */
   private readonly commandOffs: (() => void)[] = []
+  /** The job registry once it is mounted, with this Agent's controller attached; only with `liveOutput` on. */
+  private jobs: JobRegistry | undefined
   /** Whether the factory published this Agent; commands are registered only from then on. */
   private published = false
   /** Reader of Casper's reported models and a pick not yet applied. */
@@ -333,6 +339,15 @@ export class CasperAgent implements Agent {
       }, 'casperAgent.commands()')
       this.registerCommands()
     })
+    // The Jobs panel shows a running command's latest lines. The controller is attached through this Agent's own
+    // scope, so the registry takes jobs owned by this Agent only, and no other Session's agent can start one.
+    if (config.liveOutput) {
+      this.ctx.inject(['jobs'], (jobsCtx) => {
+        this.jobs = jobsCtx.jobs
+        jobsCtx.jobs.attachController('casper-agent')
+        jobsCtx.effect(() => () => { this.jobs = undefined }, 'casperAgent.jobs()')
+      })
+    }
     // The access chip: a preset, sandbox, or approval switch reaches a running Casper at once, even mid-prompt.
     this.ctx.on('session/event', (subject, event) => {
       /* v8 ignore next -- agent-scoped dispatch delivers only this Agent's Session; the check keeps it so under a shared scope. */
@@ -705,9 +720,10 @@ export class CasperAgent implements Agent {
       this.updateFailure = undefined
       const stopper = new AbortController()
       const promptSignal = AbortSignal.any([signal, stopper.signal])
-      sink = {
+      const open: PromptSink = sink = {
         connection, writer, signal: promptSignal, turn,
         steers: { forwarded: new Set(), accepted: new Map(), closed: false, chain: Promise.resolve() },
+        live: this.config.liveOutput ? this.liveOutput(connection, () => open) : undefined,
         stop: (error) => {
           this.updateFailure ??= error
           stopper.abort({ kind: 'user' } satisfies AgentCancelCause)
@@ -731,6 +747,8 @@ export class CasperAgent implements Agent {
       return turnEndFor(answered.stopReason)
     } finally {
       this.sink = undefined
+      // No command's job outlives its prompt.
+      sink?.live?.close(sink.signal.aborted ? 'killed' : 'failed')
       for (const asks of this.asks.values()) for (const ask of asks) ask.abort()
       this.asks.clear()
       // A send still in flight settles first, so the next turn's claim and its own prompt come after its reply.
@@ -1615,6 +1633,26 @@ export class CasperAgent implements Agent {
     return set === undefined || mode === undefined || mode === set ? null : mode
   }
 
+  /**
+   * The Jobs panel rows of one prompt's running commands. Stop on a row stops
+   * the whole request, as the composer's Stop does, while that prompt is the
+   * one running and the Agent is open.
+   * @param connection - the prompt's connection, whose call ids the rows carry.
+   * @param sink - the prompt.
+   * @returns the prompt's live output.
+   */
+  private liveOutput(connection: CasperConnection, sink: () => PromptSink): LiveOutput {
+    return new LiveOutput({
+      jobs: () => this.jobs,
+      owner: this.id,
+      callId: acpId => connection.toolCallId(acpId),
+      stop: () => {
+        if (!this.closed && this.sink === sink()) this.cancel({ kind: 'user' }, { keepInbox: true })
+      },
+      warn: (message) => { this.pluginCtx.logger.warn(`casper agent "${this.id}": ${message}`) },
+    })
+  }
+
   /** The current prompt's sink when `connection` is the one prompting; updates outside a prompt are dropped. */
   private sinkFor(connection: CasperConnection | undefined): PromptSink | undefined {
     const sink = this.sink
@@ -1660,14 +1698,20 @@ export class CasperAgent implements Agent {
           if (update.content.type === 'text') sink.writer.thought(update.content.text)
           return
         case 'tool_call':
+          sink.live?.noteCall(update)
           sink.writer.toolCall(update)
           // Each Casper step that changes the workspace is made durable without waiting for the turn.
           void this.flush()
           return
         case 'tool_call_update':
           // Only a final update closes the step; an in-progress one leaves an open box and the write path alone.
-          if (update.status !== 'completed' && update.status !== 'failed') return
+          // A running command's latest lines go to its row in the Jobs panel, never to the step's card.
+          if (update.status !== 'completed' && update.status !== 'failed') {
+            if (!sink.writer.finished(update.toolCallId)) sink.live?.update(update)
+            return
+          }
           for (const ask of this.asks.get(update.toolCallId) ?? []) ask.abort()
+          sink.live?.end(update.toolCallId, update.status)
           sink.writer.toolUpdate(update)
           void this.flush()
           return

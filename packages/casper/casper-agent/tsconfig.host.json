@@ -20,6 +20,7 @@
     { "path": "../../attachment/attachment" },
     { "path": "../../interaction/commands" },
     { "path": "../../credentials/credentials" },
+    { "path": "../../jobs/jobs" },
     { "path": "../../mcp/mcp-client" },
     { "path": "../../mcp/mcp-manager" },
     { "path": "../../interaction/permission-presets" },

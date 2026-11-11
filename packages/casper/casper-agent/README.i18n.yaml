@@ -15,14 +15,17 @@
   en: 76368b6b1da79c80
   zh: 52384aee991ac542
 /deepseek-ai-dsh-casper-agent/use-this-package:
-  en: d314ea51308e24d0
-  zh: 0b7829831b417953
+  en: 98d62900f6ffde2d
+  zh: b5aa6c3e031a2f9a
 /deepseek-ai-dsh-casper-agent/understand-the-implementation:
-  en: 6ea83a4ed741c66a
-  zh: 8db0f55dd499ad31
+  en: 987a202be52c8de6
+  zh: b93112a45df73f60
 /deepseek-ai-dsh-casper-agent/understand-the-implementation/turns-and-events:
-  en: b0ff8f6c49513dee
-  zh: aa8425aa831ac4d5
+  en: 5bf4ae0e3b104656
+  zh: f6e17476b3368dc7
+/deepseek-ai-dsh-casper-agent/understand-the-implementation/jobs-panel:
+  en: 778f1b3aea7b57b6
+  zh: bcb22d26ec586126
 /deepseek-ai-dsh-casper-agent/understand-the-implementation/tool-cards:
   en: ce6952efdc3afb19
   zh: e05f2fdd1cf345dc
