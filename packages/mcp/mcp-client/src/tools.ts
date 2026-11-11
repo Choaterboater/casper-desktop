@@ -149,6 +149,8 @@ export async function syncTools(
       inputSchema: tool.inputSchema,
       outputSchema: tool.outputSchema,
       taskRequired: tool.execution?.taskSupport === 'required',
+      server: opts.serverName,
+      annotations: tool.annotations,
       call: async (args, execution) => {
         try {
           const result = await client.callTool(
@@ -232,6 +234,10 @@ export interface McpToolDefinitionOptions {
   outputSchema?: unknown
   /** Whether the upstream tool requires the unsupported task execution extension. */
   taskRequired?: boolean
+  /** Server the tool came from; when given, the definition carries an {@link McpToolOrigin}. */
+  server?: string
+  /** The server's `annotations` for the tool, as listed; only the four boolean hints are kept. */
+  annotations?: unknown
   /**
    * Obtain one raw MCP result from the provider.
    * @param args - model arguments admitted by the ToolRuntime.
@@ -241,23 +247,75 @@ export interface McpToolDefinitionOptions {
   call(args: Record<string, unknown>, execution: ToolExecution): Promise<unknown>
 }
 
+/** The MCP tool hints a server may state, kept only when the server sent a boolean. */
+export interface McpToolHints {
+  readonly readOnlyHint?: boolean
+  readonly destructiveHint?: boolean
+  readonly idempotentHint?: boolean
+  readonly openWorldHint?: boolean
+}
+
+/** Where an MCP tool came from: app-side data that never reaches the model's tool schema. */
+export interface McpToolOrigin {
+  /** The configured server name. */
+  readonly server: string
+  /** The tool's name on that server. */
+  readonly rawName: string
+  /** The server's own hints for the tool; empty when it sent none. */
+  readonly annotations: McpToolHints
+}
+
+/** A ToolRuntime definition built from an MCP tool, carrying its origin when the server is known. */
+export type McpToolDefinition = ToolDefinition & { readonly mcpOrigin?: McpToolOrigin }
+
+const HINT_KEYS = ['readOnlyHint', 'destructiveHint', 'idempotentHint', 'openWorldHint'] as const
+
+/** Keep the four boolean hints from a server's `annotations`, dropping everything else. */
+function pickHints(annotations: unknown): McpToolHints {
+  const hints: Partial<Record<typeof HINT_KEYS[number], boolean>> = {}
+  if (typeof annotations !== 'object' || annotations === null) return Object.freeze(hints)
+  for (const key of HINT_KEYS) {
+    const value: unknown = Reflect.get(annotations, key)
+    if (typeof value === 'boolean') hints[key] = value
+  }
+  return Object.freeze(hints)
+}
+
+/**
+ * Read the MCP origin a definition carries.
+ * @param definition - a registered ToolRuntime definition, or undefined.
+ * @returns its server, raw name and hints, or undefined for a tool that did not come from a known MCP server.
+ */
+export function mcpToolOrigin(definition: ToolDefinition | undefined): McpToolOrigin | undefined {
+  if (definition === undefined) return undefined
+  const origin: unknown = Reflect.get(definition, 'mcpOrigin')
+  if (typeof origin !== 'object' || origin === null) return undefined
+  const server: unknown = Reflect.get(origin, 'server')
+  const rawName: unknown = Reflect.get(origin, 'rawName')
+  if (typeof server !== 'string' || typeof rawName !== 'string') return undefined
+  return { server, rawName, annotations: pickHints(Reflect.get(origin, 'annotations')) }
+}
+
 /**
  * Adapt an upstream MCP tool to canonical values and durable image content.
  * Registration, provider lifetime, deadlines, and transport belong to the caller.
  * @param ctx - plugin context carrying optional attachment and model services.
  * @param options - upstream tool fields and its raw-result callback.
- * @returns the unregistered ToolRuntime definition.
+ * @returns the unregistered ToolRuntime definition, with an `mcpOrigin` when `options.server` is given.
  */
 export function createMcpToolDefinition(
   ctx: Context,
   options: McpToolDefinitionOptions,
-): ToolDefinition {
+): McpToolDefinition {
   const { name, rawName, description, inputSchema } = options
   const projections = new WeakMap<ToolExecution, PreparedProjection>()
   return {
     name,
     description,
     parameters: inputSchema,
+    ...options.server === undefined
+      ? {}
+      : { mcpOrigin: Object.freeze({ server: options.server, rawName, annotations: pickHints(options.annotations) }) },
     output: createOutput(rawName, supportedOutputSchema(options.outputSchema)),
     execute: createExecutor(ctx, options, projections),
     projectContent(exec: Readonly<ToolExecution>, result: Readonly<ToolExecutionResult>) {
