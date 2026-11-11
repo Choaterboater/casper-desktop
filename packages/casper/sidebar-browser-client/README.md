@@ -5,6 +5,8 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-casper-sidebar-browser-client
 
+English | [中文](README.zh.md)
+
 ## Summary
 
 This Client plugin runs the browser operations of [`@deepseek-ai/dsh-casper-sidebar-browser`](../tool-sidebar-browser/README.md) in the Casper desktop app. For each `casper-sidebar-browser/request` it resolves the Session the request belongs to and drives that Session's browser tabs through `sidebarBrowserControl`. It sends input only while the tab still shows the origin the user allowed, and answers a request replayed after a reconnect without sending its input twice.

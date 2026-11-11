@@ -5,6 +5,8 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-casper-checks
 
+English | [中文](README.zh.md)
+
 ## Summary
 
 After a top-level turn changes files, this plugin runs the project's own checks, from `.casper/project.yaml` or detected from its manifests, before the turn ends. Real failures go back to the agent for bounded repair rounds; a check the sandbox blocked, that timed out, or that could not start is reported as "could not check", never as passed. The turn closes with a receipt of what changed and what was proven. The `check_record`, `check_replay` and `check_list` tools keep checks the model records itself.

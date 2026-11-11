@@ -1,0 +1,43 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/casper/sidebar-browser-client/README.md
+/:
+  en: 68360681646d92cb
+  zh: c25af955bba2b155
+/deepseek-ai-dsh-casper-sidebar-browser-client:
+  en: da3ca57a2ca6082b
+  zh: c433984df3095c0d
+/deepseek-ai-dsh-casper-sidebar-browser-client/summary:
+  en: 61b0db536a07b9da
+  zh: 8b517dcb87c51167
+/deepseek-ai-dsh-casper-sidebar-browser-client/table-of-contents:
+  en: 76368b6b1da79c80
+  zh: 52384aee991ac542
+/deepseek-ai-dsh-casper-sidebar-browser-client/use-this-package:
+  en: e14e3bf642994b13
+  zh: 695deea70d9111ff
+/deepseek-ai-dsh-casper-sidebar-browser-client/understand-the-implementation:
+  en: 94eaa20a461bd8a7
+  zh: ced97835731867b6
+/deepseek-ai-dsh-casper-sidebar-browser-client/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-casper-sidebar-browser-client/model-experience/browser-tool-results:
+  en: d548120dafda9a91
+  zh: 126b8b28b66fee09
+/deepseek-ai-dsh-casper-sidebar-browser-client/model-experience/browser-tool-results/what-the-model-sees:
+  en: dda6f03aa5851613
+  zh: c954362d9ca5ea9e
+/deepseek-ai-dsh-casper-sidebar-browser-client/model-experience/browser-tool-results/token-effect:
+  en: cac3d847298a6c7a
+  zh: 4c321d2f67e72c3d
+/deepseek-ai-dsh-casper-sidebar-browser-client/model-experience/browser-tool-results/kv-cache-effect:
+  en: bfcf93c7c1801e19
+  zh: fa36927bee20d332
+/deepseek-ai-dsh-casper-sidebar-browser-client/known-limitations-and-deferred-work:
+  en: c587938430636a83
+  zh: 201eb4bb82580875
+/deepseek-ai-dsh-casper-sidebar-browser-client/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

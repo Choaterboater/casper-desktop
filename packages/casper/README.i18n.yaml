@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/casper/README.md
+/:
+  en: 70cf4211ec7f2105
+  zh: f94047eb36a38f5c
+/casper-casper-agent-checks-and-sidebar-browser:
+  en: 08dc9371f1d75374
+  zh: a6f4e02043600c00
+/casper-casper-agent-checks-and-sidebar-browser/summary:
+  en: c05f3e41453dc77d
+  zh: 1ef7338c837607d1
+/casper-casper-agent-checks-and-sidebar-browser/table-of-contents:
+  en: 1eb35b015a6c423f
+  zh: a8a3dceee2c9e943
+/casper-casper-agent-checks-and-sidebar-browser/packages:
+  en: 19f1d48c172d5354
+  zh: 54105d74d56f7246
+/casper-casper-agent-checks-and-sidebar-browser/related-documentation:
+  en: 5afc63712de5fb9b
+  zh: d673d509a030b830
+/casper-casper-agent-checks-and-sidebar-browser/dev-note:
+  en: b75c8458928b72b9
+  zh: 003ba4e17b4b5269
