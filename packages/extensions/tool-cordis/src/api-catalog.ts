@@ -2106,6 +2106,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'configured entries in document order, then registered entries, then retained records for removed entries.',
       },
       {
+        signature: 'registeredEntries(): Readonly<Record<string, VolatileSnapshot<McpManagedServerEntry>>>',
+        description: 'Read the entries plugins registered, without mounting or probing.',
+        parameters: [],
+        returns: 'a fresh frozen record of each registered entry by name in registration order (names made only of digits come first, as in any record), enabled and with schema defaults filled in; configured entries and retained records are not included.',
+      },
+      {
         signature: 'register(name: string, entry: McpServerRegistration): () => void',
         description: 'Contribute one server for the calling plugin\'s lifetime. A registered entry is enabled while registered; its removal awaits the instance\'s unmount, so plugin disposal withdraws the server\'s tools before settling.',
         parameters: [{ name: 'name', description: 'server key and tool namespace, unique across configured and registered servers.' }, { name: 'entry', description: 'transport, endpoint, and budgets, validated like a configured entry.' }],
@@ -7255,6 +7261,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type McpConnectionStatus = {\n    state: \'closed\';\n    result: McpCloseResult;\n} | {\n    state: \'waiting-credentials\';\n    lastError: string;\n} | {\n    state: \'connecting\';\n    attempt: number;\n} | {\n    state: \'connected\';\n    toolCount: number;\n    connectedAt: number;\n} | {\n    state: \'reconnecting\';\n    attempt: number;\n    maxAttempts: number;\n    nextRetryAtMs: number;\n    lastError: string;\n} | {\n    state: \'failed\';\n    reason: \'gave-up\' | \'reconnect-disabled\' | \'unclosed-generation\';\n    lastError?: string;\n};',
   },
   {
+    name: 'McpManagedServerEntry',
+    declaration: 'export interface McpManagedServerEntry {\n    transport: \'stdio\' | \'streamable-http\';\n    command: string;\n    args: string[];\n    env: Record<string, string>;\n    cwd: string;\n    url: string;\n    headers: Record<string, string>;\n    enabled: boolean;\n    toolCallTimeoutMs?: number;\n    startupTimeoutMs: number;\n    closeTimeoutMs?: number;\n    reconnect: ReconnectConfig;\n}',
+  },
+  {
     name: 'McpManagedServerStatus',
     declaration: 'export type McpManagedServerStatus = McpConnectionStatus | {\n    state: \'disabled\';\n} | {\n    state: \'failed\';\n    reason: \'load\';\n    lastError: string;\n} | {\n    state: \'failed\';\n    reason: \'cleanup\';\n    result: McpCloseResult;\n};',
   },
@@ -7937,6 +7947,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'RecommendationDetails',
     declaration: 'export type RecommendationDetails = {\n    readonly status: \'available\';\n    readonly title: LocalizedText;\n    readonly description: LocalizedText;\n    readonly enabled: boolean;\n} | {\n    readonly status: \'refused\';\n    readonly reason: \'unknown\' | \'unavailable\' | \'not-live-root\' | \'closing\';\n};',
+  },
+  {
+    name: 'ReconnectConfig',
+    declaration: 'export interface ReconnectConfig {\n    enabled?: boolean;\n    initialDelayMs?: number;\n    maxDelayMs?: number;\n    maxAttempts?: number;\n}',
   },
   {
     name: 'RecurringScheduleRecord',
