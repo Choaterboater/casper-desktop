@@ -989,6 +989,7 @@ export const FOUNDATION_TYPE_NAMES: ReadonlySet<string> = new Set([
   'ServerResponse',
   'ReturnType',
   'Uint8Array',
+  'VolatileSnapshot',
 ])
 
 /** Project types deliberately documented outside the subsystems catalog. */
@@ -1027,6 +1028,7 @@ export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
   AgentHandle: 'agent ownership handle is owned by packages/core/agent/README.md',
   McpManagedServerStatus: 'managed-server status union is owned by packages/mcp/mcp-manager/README.md',
   McpManagedServerView: 'managed-server list view is owned by packages/mcp/mcp-manager/README.md',
+  McpManagedServerEntry: 'managed-server entry is owned by packages/mcp/mcp-manager/README.md',
   McpServerRegistration: 'plugin-registered server entry is owned by packages/mcp/mcp-manager/README.md',
   McpProbeOptions: 'probe options are owned by packages/mcp/mcp-client/README.md',
   McpProbeResult: 'probe outcome union is owned by packages/mcp/mcp-client/README.md',

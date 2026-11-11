@@ -105,7 +105,7 @@ export function apply(ctx: Context): void {
 
 ### Observing and recovering
 
-`ctx.mcpManager.list()` returns each server's `name`, `configured` flag, and live `status`, listing configured entries before registered ones. The list includes removed entries whose cleanup is still pending or failed, with `configured: false`; a cleanup failure retains the row until the Host restarts. Cleanup status retains the first diagnostic and reports `closeConfirmed: false` if any instance or probe could not confirm closure. Published status changes emit `mcp-manager/status` while the manager is live, including cleanup failures after an entry's removal. Lifecycle operations do not wait for listeners; synchronous throws and returned promise rejections are logged without skipping other listeners.
+`ctx.mcpManager.list()` returns each server's `name`, `configured` flag, and live `status`, listing configured entries before registered ones. `registeredEntries()` returns the entries plugins registered, by name in registration order, as read-only data; it starts nothing and, like `list()`, is not on the Remote. `list()` also includes removed entries whose cleanup is still pending or failed, with `configured: false`; a cleanup failure retains the row until the Host restarts. Cleanup status retains the first diagnostic and reports `closeConfirmed: false` if any instance or probe could not confirm closure. Published status changes emit `mcp-manager/status` while the manager is live, including cleanup failures after an entry's removal. Lifecycle operations do not wait for listeners; synchronous throws and returned promise rejections are logged without skipping other listeners.
 
 Reconnection stays inside mcp-client. `restart(name)` replaces an instance and resets its reconnect budget, including after that budget runs out. Unconfirmed transport closure or a local cleanup error blocks replacement and further probes for that server; restart the Host to recover. `probe(name, options)` resolves templates, connects, reads server identity and tool names, and closes without registering tools or reserving a namespace. Disabled entries can be probed. The probe has its own deadline and cancellation signal, and reports connection/listing success separately from closure and cleanup results.
 
@@ -136,7 +136,7 @@ This section explains the design decisions and points at the code; the observabl
 
 | File | Role |
 |---|---|
-| [`src/index.ts`](src/index.ts) | The service: schema, validation, registrations, reconcile, restart, probe, watch, status registry |
+| [`src/index.ts`](src/index.ts) | The service: schema, validation, registrations and registered entries, reconcile, restart, probe, watch, status registry |
 | [`src/types.ts`](src/types.ts) | The status union, list view, and the `mcp-manager/status` event declaration (`./types`) |
 
 ### Lifecycle notes
