@@ -1,7 +1,8 @@
 /**
- * The app's Settings > MCP servers as ACP `mcpServers` entries for Casper:
- * each enabled server Casper would take, with its credentials resolved, so
- * Casper connects to it for the session with its own boxes.
+ * The app's Settings > MCP servers, then the servers plugins register with
+ * the MCP manager, as ACP `mcpServers` entries for Casper: each enabled server
+ * Casper would take, with its credentials resolved, so Casper connects to it
+ * for the session with its own boxes.
  * @module @deepseek-ai/dsh-casper-agent/forward-servers
  */
 
@@ -20,7 +21,7 @@ export const FORWARD_TIMEOUT_MS = 5_000
 /** `_meta` key on a stdio entry: the absolute folder Casper starts it in. */
 export const CWD_META = 'casper/cwd'
 
-/** Why a Settings server was not forwarded. Every reason is fixed text or a name, never a value. */
+/** Why a Settings or plugin-registered server was not forwarded. Every reason is fixed text or a name, never a value. */
 export const SKIP = {
   disabled: 'it is turned off in Settings',
   appName: `the name ${APP_SERVER_NAME} is the app's own server`,
@@ -38,7 +39,7 @@ export const SKIP = {
 /** Reasons that may pass by the next turn: a slow or failing credential store or command lookup, not a Settings change. */
 const PASSING: ReadonlySet<string> = new Set([SKIP.unreadable, SKIP.unresolved, SKIP.timeout])
 
-/** The fields of one Settings entry that are forwarded, as the manager's resolved snapshot holds them. */
+/** The fields of one Settings or registered entry that are forwarded, as the manager's resolved snapshot holds them. */
 export interface ForwardEntry {
   readonly transport: McpManagedServerEntry['transport']
   readonly command: string
@@ -54,6 +55,11 @@ export interface ForwardEntry {
 export interface ForwardOptions {
   /** The Settings entries keyed by server name, in Settings order. */
   readonly entries: Readonly<Record<string, ForwardEntry>>
+  /**
+   * The servers plugins registered with the MCP manager, in registration order; they take the slots the Settings
+   * entries leave. The manager keeps their names apart from the Settings names.
+   */
+  readonly registered?: Readonly<Record<string, ForwardEntry>>
   /**
    * Resolve one credential reference.
    * @param ref - the name inside `${credential:…}`.
@@ -186,8 +192,9 @@ async function oneServer(name: string, entry: ForwardEntry, options: ForwardOpti
 }
 
 /**
- * Build the forwarded list: enabled Settings servers only, never one named
- * `app`, at most {@link MAX_FORWARDED} in Settings order. Casper's name rules
+ * Build the forwarded list: enabled Settings servers, then registered ones,
+ * never one named `app`, at most {@link MAX_FORWARDED} in that order, so
+ * Settings servers take the slots first. Casper's name rules
  * apply first; a credential may sit only in an env or header value, as the
  * whole value or after an auth scheme. Each server resolves in parallel under
  * its own time limit. No entry carries `casper/clientAsks`, so Casper asks
@@ -204,7 +211,10 @@ export async function forwardedServers(options: ForwardOptions): Promise<Forward
     if (value !== undefined && value !== '') secrets.add(value).add(encodeURIComponent(value))
     return value
   }
-  const built = await Promise.all(Object.entries(options.entries).map(async ([name, entry]): Promise<[string, McpServer | string]> => {
+  // Two lists joined, not one merged record: a record puts digit-only names first, which would let a registered `7`
+  // take a slot ahead of every Settings server.
+  const all = [...Object.entries(options.entries), ...Object.entries(options.registered ?? {})]
+  const built = await Promise.all(all.map(async ([name, entry]): Promise<[string, McpServer | string]> => {
     if (!entry.enabled) return [name, SKIP.disabled]
     if (name === APP_SERVER_NAME) return [name, SKIP.appName]
     const problem = (NAME.test(name) ? undefined : 'a name Casper does not take') ?? nameProblem(entry) ?? placementProblem(entry)

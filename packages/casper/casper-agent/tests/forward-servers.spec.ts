@@ -1,4 +1,7 @@
-/** The Settings > MCP servers the app hands Casper: which go, how their credentials resolve, and why one is left out. */
+/**
+ * The Settings > MCP servers and plugin-registered servers the app hands Casper: which go, how their credentials
+ * resolve, and why one is left out.
+ */
 
 import { describe, expect, it } from 'vitest'
 import { SubprocessExecutableNotFoundError } from '@deepseek-ai/dsh-subprocess'
@@ -155,5 +158,38 @@ describe('forwardedServers', () => {
       docs: http({ headers: { Authorization: 'Bearer ${credential:DOCS_KEY}', 'X-Team': 'blue' } }),
     }, { credential: ref => Promise.resolve(ref === 'GITHUB_TOKEN' ? 'ghp/secret value' : 'docs-secret-value') })
     expect([...secrets].sort()).toEqual(['docs-secret-value', 'ghp%2Fsecret%20value', 'ghp/secret value'])
+  })
+})
+
+describe('forwardedServers with plugin-registered servers', () => {
+  /** `count` Settings stdio entries named set0, set1, ... */
+  const settings = (count: number): Record<string, ForwardEntry> =>
+    Object.fromEntries(Array.from({ length: count }, (_, at) => [`set${at}`, stdio()]))
+
+  it('registered servers follow the Settings ones, and a registered one past the cap is dropped like any other', async () => {
+    const { names, skipped } = await build(settings(MAX_FORWARDED), { registered: { plug: stdio() } })
+    expect(names).toEqual(Object.keys(settings(MAX_FORWARDED)))
+    expect(skipped).toEqual([['plug', SKIP.tooMany]])
+  })
+
+  it('a Settings server that is turned off frees its slot for a registered one', async () => {
+    const entries = { ...settings(MAX_FORWARDED - 2), off: stdio({ enabled: false }) }
+    const { names, skipped } = await build(entries, { registered: { plugA: stdio(), plugB: http() } })
+    expect(names).toEqual([...Object.keys(settings(MAX_FORWARDED - 2)), 'plugA', 'plugB'])
+    expect(skipped).toEqual([['off', SKIP.disabled]])
+  })
+
+  it('a registered server gets the same rules: the name app is left out and a credential resolves', async () => {
+    const { entries, names, skipped } = await build({}, {
+      registered: { app: stdio(), docs: http({ headers: { Authorization: 'Bearer ${credential:DOCS_KEY}' } }) },
+    })
+    expect(skipped).toEqual([['app', SKIP.appName]])
+    expect(names).toEqual(['docs'])
+    expect(entries).toEqual([{ type: 'http', name: 'docs', url: 'https://mcp.example/mcp', headers: [{ name: 'Authorization', value: 'Bearer docs-secret-value' }] }])
+  })
+
+  it('a registered server named only with digits still follows every Settings server', async () => {
+    const { names } = await build({ zeta: stdio(), alpha: stdio() }, { registered: { 7: stdio(), plug: stdio() } })
+    expect(names).toEqual(['zeta', 'alpha', '7', 'plug'])
   })
 })
