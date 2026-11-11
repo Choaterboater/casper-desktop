@@ -43,6 +43,7 @@ kind: "package-reference"
 | `accessModes` | `{ read-only: read, workspace-write: ask, danger-full-access: full }` | 每个权限预设设置的[访问模式](#access-control)；不能列出 `custom` 与 `auto` |
 | `approvalCard` | `true` | 用 [Casper 的审批卡片](#approvals)显示 Casper 的审批框；`false` 时显示通用问题卡片 |
 | `forwardMcpServers` | `true` | 把已启用的[「设置 > MCP 服务器」](#settings-mcp-servers)交给 Casper；`false` 时只发送应用工具服务器 |
+| `forwardPluginMcpServers` | `true` | 同时把[插件向 MCP 管理器注册的服务器](#settings-mcp-servers)交给 Casper，排在设置中的服务器之后，并共用同样的 7 个名额；需要 `forwardMcpServers`，`false` 时不交给 Casper |
 | `idleExitMs` | `900000` | 空闲多久后询问 Casper 能否[关闭](#process-lifetime-and-resume)其进程（15 分钟）；`0` 时保留进程直到会话关闭 |
 
 子进程不会收到 `DEEPSEEK_*` 或 `DSH_*` 名称，也不会收到 `env` 未列出的凭据类名称。唯一的例外是应用 profile：应用带 profile 运行时，Casper 会收到 `DSH_PROFILE` 与 `DSH_PROFILE_DIR`，使它构建的 bundle 能指明要安装到的 profile。
@@ -194,7 +195,7 @@ Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打�
 | `list_mcp_resource_templates` | dsh `list_mcp_resource_templates` | 只读 |
 | `read_mcp_resource` | dsh `read_mcp_resource` | 只读 |
 
-三个资源工具总会列出，使用固定的 schema，其描述按 Casper 的命名（`acp-<name>`）列出此进程获得的设置服务器。调用会把 `acp-<name>` 映射为应用的服务器 `<name>`，并且只在此进程获得的服务器上运行。应用中没有服务器提供资源时，应用没有这些工具，调用返回 "No MCP server in the app offers resources right now."
+三个资源工具总会列出，使用固定的 schema，其描述按 Casper 的命名（`acp-<name>`）列出此进程获得的设置服务器与插件注册的服务器。调用会把 `acp-<name>` 映射为应用的服务器 `<name>`，并且只在此进程获得的服务器上运行。应用中没有服务器提供资源时，应用没有这些工具，调用返回 "No MCP server in the app offers resources right now."
 
 `present` 来自 Casper 预设的 `@deepseek-ai/dsh-tool-present` 行。调用会针对当前的 Casper 轮次、以发起调用的 Casper 步骤的调用 id 记录 `deliverables/presented`，因此应用会像在 Standard 中一样，在该轮次中把每个文件显示为卡片；轮次结束后到达的调用会得到轮次已结束的错误，并且不记录任何内容。Casper 只保留四个置顶工具，因此 `present` 占用了 `cordis_inspect_query` 原先的置顶位置，Casper 通过 find_capability 找到 `cordis_inspect_query`。
 
@@ -209,9 +210,11 @@ Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打�
 
 当 Casper 的 `initialize` 回复把 `mcpCapabilities.http` 设为 true 时（除非 Casper 的 `acp_mcp` 为 off，否则都会如此），每个进程还会在应用工具服务器之后获得「设置 > MCP 服务器」中已启用的服务器（`ctx.mcpManager` 配置的条目），按设置中的顺序最多 7 个。Casper 在该会话中以 `acp-<name>` 连接它们，并在它们做出每项更改前用自己的框询问：这些条目从不带 `casper/clientAsks`。命令不是绝对路径的 stdio 服务器会像应用启动它时那样查找命令，其 `env` 变为 ACP 的列表，设置了的 `cwd` 作为 `_meta["casper/cwd"]` 发送；streamable-http 服务器以 `type: "http"` 及其请求头发送。
 
+插件向 MCP 管理器注册的服务器（`ctx.mcpManager.registeredEntries()`）排在其后，按注册顺序，并共用同样的 7 个名额：设置中的服务器先占名额，第七个之后的服务器会被略过，日志中留下与其他服务器相同的一行 `at most 7 servers are forwarded`。因其他原因被略过的服务器会把名额让给下一个。插件注册的服务器遵守下面的全部规则；插件加载或卸载时，与设置中的更改一样，会在下一轮到达 Casper。内置的 network 服务器是自成一行的 MCP 客户端条目，不是注册的服务器，因此不在其中。
+
 凭据（`${credential:NAME}`）通过 `ctx.credentials` 解析，其值在 ACP 请求中发送，从不出现在 argv、env、日志或会话事件中；Casper 会在其显示的内容中隐藏每个这样的值及其 URL 编码形式。凭据只能是整个 env 或请求头的值，或者跟在 `Bearer`、`Basic`、`Token`、`Bot` 或 `ApiKey` 和一个空格之后。以下情况下服务器会被略过，并在应用日志中留下一行，写明其名称和固定原因但不含任何值：已停用、名为 `app`、命令、args、cwd 或 url 中带有凭据或凭据位于更长的值中、设置了 `PATH`、`NODE_OPTIONS`、`LD_*` 或 `DYLD_*`、设置了由连接自己管理的请求头（`Host`、`Content-*`、`Connection`、`Transfer-Encoding`、`Mcp-*`、`Cookie`、`Origin`）、cwd 为相对路径、引用的凭据未设置或无法读取、命令找不到，或 5 秒内未准备好。
 
-共有三个关闭开关：设置中服务器自己的开关、本插件的 `forwardMcpServers: false`，以及 Casper 的 `acp_mcp: off`。设置中的更改或凭据的变化会在下一轮到达 Casper：在发送提示之前会重新构建列表，若与之前不同（以保存在内存中的 SHA-256 比较），进程会被关闭，该轮通过 `session/load` 用新列表重新打开对话。这次重新打开会结束 Casper 的「本会话内都同意」回答。无法构建的列表会保留正在运行的进程；若列表因凭据无法读取、命令查找失败或 5 秒内未就绪而漏掉 Casper 已获得的服务器，也会保留该进程。更改从不打断提示。每个对话都运行各 stdio 服务器自己的副本。
+共有四个关闭开关：设置中服务器自己的开关、本插件的 `forwardMcpServers: false`（同时略过插件注册的服务器）、只针对插件注册服务器的 `forwardPluginMcpServers: false`，以及 Casper 的 `acp_mcp: off`。设置中的更改、插件的加载或卸载，或凭据的变化会在下一轮到达 Casper：在发送提示之前会重新构建列表，若与之前不同（以保存在内存中的 SHA-256 比较），进程会被关闭，该轮通过 `session/load` 用新列表重新打开对话。这次重新打开会结束 Casper 的「本会话内都同意」回答。无法构建的列表会保留正在运行的进程；若列表因凭据无法读取、命令查找失败或 5 秒内未就绪而漏掉 Casper 已获得的服务器，也会保留该进程。更改从不打断提示。每个对话都运行各 stdio 服务器自己的副本。
 
 <a id="session-mentions"></a>
 ### 会话提及
@@ -223,7 +226,7 @@ Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打�
 <a id="model-experience"></a>
 ## 模型体验
 
-无，因为 Casper 进程自行构造模型请求，本插件不向任何 DeepSeek 请求添加内容。应用工具的名称、描述与结果会进入 Casper 自己的请求，资源工具的描述还会列出交给 Casper 的设置服务器，被提及会话的快照也会作为上下文进入 Casper 的请求。
+无，因为 Casper 进程自行构造模型请求，本插件不向应用自己的 agent 循环的任何请求添加内容。应用工具的名称、描述与结果会进入 Casper 自己的请求，资源工具的描述还会列出交给 Casper 的服务器，被提及会话的快照也会作为上下文进入 Casper 的请求。
 
 #### KV Cache 影响
 
@@ -237,7 +240,7 @@ Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打�
 - 选择按 Casper 最后发送的列表检查；Casper 之后发现已退出登录的模型，会在发送选择时被拒绝。
 - 自身既无文本也无调用的响应，其用量计入下一个调用的步骤；若接着出现的是文本，则不计入；不发送 `usage_update` 的 Casper 不显示上下文环与 token 数。提示看起来与模型文本相同。推理只显示 Casper 作为思考发送的标题与重试，不显示模型自身的推理。`session/load` 的回放也不显示。
 - 正在运行的 shell 步骤在结束前不显示输出。
-- 插件向 MCP 管理器注册的服务器，以及自成一行的 MCP 客户端条目（例如内置的 network 服务器），尚不会交给 Casper；只有「设置 > MCP 服务器」会。每个对话都会启动各 stdio 服务器自己的副本。
+- 自成一行的 MCP 客户端条目（例如内置的 network 服务器）尚不会交给 Casper；只有「设置 > MCP 服务器」和插件向 MCP 管理器注册的服务器会。每个对话都会启动各 stdio 服务器自己的副本。
 - 应用工具的结果只以文本形式到达 Casper：图片或其他非文本块会变成一行说明。目前提供的工具都不返回图片。
 - 在打包的应用中，`app_read_file` 能读到每个已安装包的 `README.md`、`package.json` 与构建出的 `lib/*.js`、技能文件，以及 `ui-theme` 的 `lib/styles`。Desktop 运行时副本会去掉所有 `.d.ts`，各包不发布 `src/`，仓库的 `docs/` 也不在任何包中，因此那里无法读取 `lib/types`、`ui-sidebar` 的 `slots.ts`、`docs/cordis-tutorial` 与 `docs/web-styling.md`；插槽属性与主题令牌改由 `cordis_inspect_query` 获得。尚未随应用提供这些指南。
 - Casper 的审批卡片以纯文本的 `- ` 与 `+ ` 行显示差异，最多 120 行，而不是差异视图。

@@ -2192,16 +2192,17 @@ describe('Settings MCP servers in a Casper session', { timeout: 60_000 }, () => 
   const stored = (ref: string) => Promise.resolve(ref === 'DOCS_TOKEN' ? { value: SECRET, source: 'test' } : undefined)
 
   /**
-   * Boot with a stand-in MCP manager over `entries` and a credentials provider; `network` also mounts the
-   * bundled-style row, and `resolve` replaces the provider's lookup.
+   * Boot with a stand-in MCP manager over `entries` (Settings) and `registered` (plugin-registered) and a credentials
+   * provider; `network` also mounts the bundled-style row, and `resolve` replaces the provider's lookup.
    */
   async function withServers(
     script: FakeScript, entries: Record<string, Entry>, overrides: Overrides = {}, network = false, resolve = stored,
+    registered: Record<string, Entry> = {},
   ) {
     const fake = fakeCasper(script)
     cleanups.push(() => { fake.remove() })
     const host = await boot(fake, overrides, undefined, true, async (ctx) => {
-      ctx.provide('mcpManager', { config: { servers: { get: () => entries } } } as never)
+      ctx.provide('mcpManager', { config: { servers: { get: () => entries } }, registeredEntries: () => ({ ...registered }) } as never)
       ctx.provide('credentials', { resolve: (ref: string) => resolve(ref) } as never)
       // A row of its own, as the shipped network server is: never one of the Settings servers.
       if (network) {
@@ -2227,6 +2228,30 @@ describe('Settings MCP servers in a Casper session', { timeout: 60_000 }, () => 
     const { agent } = await host.create('casper-forward-off')
     await run(agent, 'hi')
     expect(offered(fake)).toEqual([{ method: 'session/new', pid: fake.pids()[0], names: ['app'] }])
+  })
+
+  it('a plugin-registered server follows the Settings one, and forwardPluginMcpServers false leaves it out', async () => {
+    const plug = { plug: docs(['plug-server.js']) }
+    const on = await withServers({ prompts: [[]], mcpHttp: true }, { docs: docs() }, {}, false, stored, plug)
+    await run((await on.host.create('casper-forward-plugin')).agent, 'hi')
+    expect(offered(on.fake).map(entry => entry.names)).toEqual([['docs', 'plug']])
+    const pluginsOff = { forwardPluginMcpServers: false }
+    const off = await withServers({ prompts: [[]], mcpHttp: true }, { docs: docs() }, pluginsOff, false, stored, plug)
+    await run((await off.host.create('casper-forward-plugin-off')).agent, 'hi')
+    expect(offered(off.fake).map(entry => entry.names)).toEqual([['docs']])
+  })
+
+  it('a plugin that registers a server between turns reaches Casper at the next turn through session/load', async () => {
+    const registered: Record<string, Entry> = {}
+    const { fake, host } = await withServers({ prompts: [[], []], mcpHttp: true }, { docs: docs() }, {}, false, stored, registered)
+    const { agent } = await host.create('casper-forward-plugin-load')
+    await run(agent, 'first')
+    registered.plug = docs(['plug-server.js'])
+    await run(agent, 'second')
+    expect(offered(fake).map(entry => [entry.method, entry.names])).toEqual([
+      ['session/new', ['docs']], ['session/load', ['docs', 'plug']],
+    ])
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }, { kind: 'completed' }])
   })
 
   it('a Settings server reaches session/new and the bundled network row does not', async () => {
