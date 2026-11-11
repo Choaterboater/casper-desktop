@@ -6,8 +6,9 @@ import type { AskUserQuestionItem } from '@deepseek-ai/dsh-user-questions/types'
 import { PendingQuestion, createWaterfallRequest } from '@deepseek-ai/dsh-client-ui-user-questions/src/client/contract/slots.ts'
 import type { QuestionAnswer, QuestionCardSnapshot } from '@deepseek-ai/dsh-client-ui-user-questions/src/client/contract/slots.ts'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
-import { ARM_DELAY_MS, CasperBoxCard, selectCasperBox, type CasperBox } from '../src/client/CasperBoxCard.tsx'
+import { ARM_DELAY_MS, CasperBoxCard, selectCasperBox, type CasperBox, type CasperBoxCardProps } from '../src/client/CasperBoxCard.tsx'
 import { apply, inject } from '../src/client/index.ts'
+import { de, en, es, fr, ja, NS, pt, ru, zh } from '../src/client/locales.ts'
 
 const SESSION = 's1' as SessionId
 
@@ -61,8 +62,11 @@ function carrier(question: AskUserQuestionItem, answer: (value: QuestionAnswer) 
   }
 }
 
+/** The card's translate over the English dictionary. */
+const t = ((key: string) => (en as Record<string, string>)[key] ?? key) as CasperBoxCardProps['t']
+
 function show(value: CasperBox) {
-  return render(<CasperBoxCard matched={value} />)
+  return render(<CasperBoxCard matched={value} t={t} />)
 }
 
 /** A key as a browser delivers it: Enter on a focused button clicks it unless the page took the key. */
@@ -110,17 +114,20 @@ describe('selectCasperBox', () => {
     expect(selectCasperBox(yesOnly)).toBeNull()
   })
 
-  it('registers first in the composer chain with the Slot registry, the locale and the conversation Definitions injected', () => {
-    type Options = { name: string; priority: number; select: (owner: { pendingInteraction: unknown }) => unknown }
+  it('registers first in the composer chain with its copy, the Slot registry, the locale and the conversation Definitions injected', () => {
+    type Options = { name: string; priority: number; locale: string; select: (owner: { pendingInteraction: unknown }) => unknown }
     const register = vi.fn((_options: Options) => () => {})
     const slots = { inject: vi.fn((_name: string, mount: () => () => void) => mount()), register }
     const effect = vi.fn((run: () => unknown) => run())
     const uiConversation = { events: { register: vi.fn(() => () => {}) } }
-    apply({ slots, effect, locale: { register: vi.fn(() => () => {}) }, uiConversation } as never)
+    const locale = { register: vi.fn(() => () => {}) }
+    apply({ slots, effect, locale, uiConversation } as never)
     expect(inject).toEqual(['slots', 'locale', 'uiConversation'])
+    expect(locale.register).toHaveBeenCalledWith(NS, { zh, en, ja, es, fr, de, ru, pt })
+    for (const dictionary of [zh, ja, es, fr, de, ru, pt]) expect(dictionary['box.details']).not.toBe(en['box.details'])
     expect(slots.inject).toHaveBeenCalledWith('conversation.composer', expect.any(Function))
     const options = register.mock.calls[0]?.[0]
-    expect(options).toMatchObject({ name: 'conversation.composer', priority: -1 })
+    expect(options).toMatchObject({ name: 'conversation.composer', priority: -1, locale: NS })
     const mine = new PendingQuestion(SESSION, [box()], ToolCallId('casper:epoch:casper-approval-3'))
     expect(options?.select({ pendingInteraction: mine })).toBe(mine)
     expect(options?.select({ pendingInteraction: undefined })).toBeNull()
@@ -193,7 +200,7 @@ describe('CasperBoxCard', () => {
 
   it('leaves focus in another field where it was, and a key typed there answers nothing', async () => {
     const { value, answers } = carrier(box())
-    const view = render(<><input aria-label="Address" /><CasperBoxCard matched={value} /></>)
+    const view = render(<><input aria-label="Address" /><CasperBoxCard matched={value} t={t} /></>)
     const field = screen.getByLabelText('Address')
     field.focus()
     await arm()
@@ -217,7 +224,7 @@ describe('CasperBoxCard', () => {
       <div data-conversation-session="s1" data-conversation-region="chat">
         <div data-conversation-region="composer">
           <textarea aria-label="Message" />
-          <CasperBoxCard matched={value} />
+          <CasperBoxCard matched={value} t={t} />
         </div>
       </div>,
     )

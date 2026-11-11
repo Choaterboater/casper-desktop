@@ -1,10 +1,11 @@
-/** `casper-receipt` namespace dictionaries for Casper's receipt card. */
+/** `casper-receipt` namespace dictionaries for Casper's receipt card and approval card. */
 
-/** Dictionary namespace owned by the receipt card. */
+/** Dictionary namespace owned by the receipt card and the approval card. */
 export const NS = 'casper-receipt'
 
 /** English dictionary (the key-set source of truth). */
 export const en = {
+  'box.details': 'Box details',
   'row.title': 'Receipt',
   'row.running': 'Writing the receipt',
   'row.changed': 'Changed files',
@@ -31,13 +32,14 @@ export type CasperReceiptKey = keyof typeof en
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
-    /** Casper's receipt card copy. */
+    /** Casper's receipt card and approval card copy. */
     'casper-receipt': CasperReceiptKey
   }
 }
 
 /** Simplified Chinese dictionary. */
 export const zh = {
+  'box.details': '确认框详情',
   'row.title': '回执',
   'row.running': '正在生成回执',
   'row.changed': '已更改的文件',
@@ -61,6 +63,7 @@ export const zh = {
 
 /** Japanese dictionary. */
 export const ja = {
+  'box.details': '確認ボックスの詳細',
   'row.title': 'レシート',
   'row.running': 'レシートを作成中',
   'row.changed': '変更されたファイル',
@@ -84,6 +87,7 @@ export const ja = {
 
 /** Spanish dictionary. */
 export const es = {
+  'box.details': 'Detalles del cuadro',
   'row.title': 'Recibo',
   'row.running': 'Escribiendo el recibo',
   'row.changed': 'Archivos modificados',
@@ -107,6 +111,7 @@ export const es = {
 
 /** French dictionary. */
 export const fr = {
+  'box.details': 'Détails de la boîte',
   'row.title': 'Reçu',
   'row.running': 'Rédaction du reçu',
   'row.changed': 'Fichiers modifiés',
@@ -130,6 +135,7 @@ export const fr = {
 
 /** German dictionary. */
 export const de = {
+  'box.details': 'Box-Details',
   'row.title': 'Beleg',
   'row.running': 'Beleg wird erstellt',
   'row.changed': 'Geänderte Dateien',
@@ -153,6 +159,7 @@ export const de = {
 
 /** Russian dictionary. */
 export const ru = {
+  'box.details': 'Подробности окна',
   'row.title': 'Отчёт',
   'row.running': 'Составляется отчёт',
   'row.changed': 'Изменённые файлы',
@@ -176,6 +183,7 @@ export const ru = {
 
 /** Portuguese dictionary. */
 export const pt = {
+  'box.details': 'Detalhes da caixa',
   'row.title': 'Recibo',
   'row.running': 'Escrevendo o recibo',
   'row.changed': 'Arquivos alterados',
