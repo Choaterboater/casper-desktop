@@ -787,8 +787,8 @@ export class CasperAgent implements Agent {
   }
 
   /**
-   * The route the app's step checks read for this Agent: Casper's model, or
-   * the configured label before Casper reported one.
+   * The route the app's step and tool checks read for this Agent: Casper's
+   * model, or the configured label before Casper reported one.
    * @returns a detached selection.
    */
   private routeSelection(): ModelSelection {
@@ -946,6 +946,8 @@ export class CasperAgent implements Agent {
       resourceServers: () => connection.forwardedNames,
       subagents: this.config.appSubagents,
       goals: this.config.appGoals,
+      teams: this.config.appTeams,
+      route: () => this.routeSelection(),
       // A child the app's subagent tool starts is attributed to this Agent, as a Standard parent's tool call is.
       initiate: operation => this.pluginCtx.agents.withInitiator(this, operation),
       onError: (error) => { this.pluginCtx.logger.debug(`casper agent "${this.id}": app tools: ${error.message}`) },

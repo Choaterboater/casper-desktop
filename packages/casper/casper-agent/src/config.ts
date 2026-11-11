@@ -49,6 +49,12 @@ export interface Config {
    */
   appGoals: boolean
   /**
+   * Serve Casper the app's Team task-board tools with the app tools (`team_task_create`, `team_task_list`,
+   * `team_task_get`, `team_task_update`), which work while the Session's Team switch is on; false leaves them out.
+   * Teammates are the app's subagents, so it needs appTools, and appSubagents to start them.
+   */
+  appTeams: boolean
+  /**
    * Run a child the app's subagent tool starts on Casper's current model when the app has a route with the same
    * provider and model id, keeping Casper's effort only when that model lists it; otherwise, and when false, the child
    * runs on the app's default model.
@@ -101,6 +107,7 @@ export const Config: z<Config> = z.object({
   appTools: z.boolean().default(true),
   appSubagents: z.boolean().default(true),
   appGoals: z.boolean().default(true),
+  appTeams: z.boolean().default(true),
   casperChildModel: z.boolean().default(true),
   accessModes: z.dict(z.union(ACCESS_MODE_IDS as AccessModeId[])).default({ ...DEFAULT_ACCESS_MODES }),
   approvalCard: z.boolean().default(true),

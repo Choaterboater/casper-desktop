@@ -33,20 +33,14 @@ export function TeamModeToggle(props: TeamModeToggleProps) {
   return <RootTeamModeToggle {...props} />
 }
 
-/**
- * Read and change the selection only for root Sessions whose Agent runs Team
- * mode. An Agent that picks among its own models (a non-null `agentModels`
- * view, such as Casper) runs its own loop without the app's team, so the
- * switch is hidden there.
- */
+/** Read and change the selection only for root Sessions. */
 function RootTeamModeToggle({
   useProjection, locked, dismiss, reportFailure, selectTeamMode, requestDisableConfirmation, t,
 }: TeamModeToggleProps) {
   const mode = useProjection('agentTeam')
   const modelSelection = useProjection('modelSelection')
-  const agentModels = useProjection('agentModels')
   const [pending, setPending] = useState(false)
-  if (mode === undefined || (agentModels !== undefined && agentModels !== null)) return null
+  if (mode === undefined) return null
   const select = (enabled: boolean): void => {
     if (!enabled && modelSelection !== undefined && modelSelection.lastUsed !== null) {
       dismiss()

@@ -61,6 +61,7 @@ async function server(release?: Promise<void>): Promise<{ target: AppToolsServer
   const target = await startAppTools({
     tools: booted.ctx.tools, skills: undefined, agent, cwd: fake.cwd, profile: undefined, version: '0.0.0-compat', roots: [fake.root], installed: false,
     turn: () => new AbortController().signal, callId: acpId => ToolCallId(`casper:compat:${acpId}`), record: () => {}, onError: () => {},
+    route: () => ({ provider: 'casper', model: 'casper' }),
   })
   cleanups.push(() => target.close())
   return { target, seen }
