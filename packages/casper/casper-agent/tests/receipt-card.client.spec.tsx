@@ -38,7 +38,7 @@ function settled(meta: unknown, extra: Partial<ReceiptRowProps> = {}): ReceiptRo
     kind: 'tool-result', seq: 2, time: 2, callId: 'r', name: 'casper_receipt', args: {}, call: { name: 'casper_receipt', argsRaw: '{}' }, callTime: 1,
     content: [{ type: 'text', text: RECEIPT.text }], isError: false, meta, subCalls: [],
   }
-  return { phase: 'result', block, callId: 'r', toolName: 'casper_receipt', openFile: vi.fn(), t, ...extra } as unknown as ReceiptRowProps
+  return { phase: 'result', block, callId: 'r', toolName: 'casper_receipt', openFile: vi.fn(), t, ...extra } as ReceiptRowProps
 }
 
 function expand(): void {
@@ -117,7 +117,7 @@ describe('ReceiptRow', () => {
   })
 
   it('shows a call still open as running', () => {
-    render(<ReceiptRow {...{ phase: 'start', block: { argsRaw: '{}' }, callId: 'r', toolName: 'casper_receipt', openFile: vi.fn(), t } as unknown as ReceiptRowProps} />)
+    render(<ReceiptRow {...{ phase: 'start', block: { argsRaw: '{}' }, callId: 'r', toolName: 'casper_receipt', openFile: vi.fn(), t } as ReceiptRowProps} />)
     expect(screen.getAllByText('Writing the receipt').length).toBeGreaterThan(0)
     expect(document.querySelector('[data-tool="casper_receipt"]')?.getAttribute('data-state')).toBe('running')
   })

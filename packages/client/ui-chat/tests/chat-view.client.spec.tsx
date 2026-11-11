@@ -284,11 +284,14 @@ type ToolOwner = Pick<ChatNodeOwnerProps, 'openFile' | 'inspectCall'> & {
 
 const renderCommandSlot: React.ComponentProps<typeof CommandNodeView>['renderSlot'] =
   (_key, _owner, opts) => opts?.fallback ?? null
+/** The generic owner does not narrow by the Slot name, so a Turn tail owner is told by its fields. */
+function isTurnTailOwner(owner: object): owner is TurnTailOwnerProps {
+  return 'turn' in owner && 'seq' in owner && 'openFile' in owner
+}
 /** Records each Turn tail owner, so a test reads what tail entries receive. */
 function turnTailSlot(tailOwners: TurnTailOwnerProps[]): React.ComponentProps<typeof TurnTailNodeView>['renderSlot'] {
   return (name, owner) => {
-    // The generic owner does not narrow by the Slot name.
-    if (name === 'conversation.chat.turnTail') tailOwners.push(owner as unknown as TurnTailOwnerProps)
+    if (name === 'conversation.chat.turnTail' && isTurnTailOwner(owner)) tailOwners.push(owner)
     return null
   }
 }

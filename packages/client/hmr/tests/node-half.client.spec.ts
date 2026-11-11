@@ -108,11 +108,11 @@ describe('hmr node half', () => {
     const fiber = await mount(fakeClientModuleHost(new Map()), fakeHttpServer(routes), POLL_MS)
     const connect = async () => {
       const lines: string[] = []
-      const response = Object.assign(new EventEmitter(), {
-        writeHead: vi.fn(), write: (line: string) => { lines.push(line) },
+      const response: EventEmitter & Pick<ServerResponse, 'writeHead' | 'write' | 'destroy' | 'end'> = Object.assign(new EventEmitter(), {
+        writeHead: vi.fn(), write: (line: string) => { lines.push(line); return true },
         destroy: vi.fn(), end: vi.fn(),
       })
-      await routes[0]!.handler({ method: 'GET' } as IncomingMessage, response as unknown as ServerResponse)
+      await routes[0]!.handler({ method: 'GET' } as IncomingMessage, response as ServerResponse)
       return { lines, response }
     }
     const idle = await connect()

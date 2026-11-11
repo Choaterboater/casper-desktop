@@ -37,7 +37,7 @@ const RECEIPT_CALL = `casper:epoch:${receiptAcpId(1)}`
 const RECEIPT_STEP = 3
 
 function at(seq: number, type: string, data: unknown, extra: Record<string, unknown> = {}): SessionLiveEventEntry {
-  return { type: 'event', event: { seq, time: 1_700_000_000_000 + seq, type, data, ...extra } as unknown as SessionEvent }
+  return { type: 'event', event: { seq, time: 1_700_000_000_000 + seq, type, data, ...extra } as SessionEvent }
 }
 
 function result(callId: string, text: string) {
@@ -89,7 +89,7 @@ function closedTurn(snapshot: ChatSnapshot): TurnLocation {
  */
 function tailProps(turn: TurnLocation, inspect = true): ReceiptTailProps {
   const inspectCall = inspect ? vi.fn() : undefined
-  return { turn, seq: TURN.events.at(-1)?.seq, openFile: vi.fn(), inspectCall, t: translate } as unknown as ReceiptTailProps
+  return { turn, seq: TURN.events.at(-1)?.seq, openFile: vi.fn(), inspectCall, t: translate } as ReceiptTailProps
 }
 
 describe('the receipt at the turn\'s tail', () => {
