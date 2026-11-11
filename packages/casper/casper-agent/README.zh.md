@@ -67,6 +67,7 @@ kind: "package-reference"
 | [`src/permission.ts`](src/permission.ts) | 把审批框变成标题为 `Casper` 的用户问题，detail 中带有发起步骤的差异行，并把答案映射回去；计划 Build 框变成计划审阅 |
 | [`src/box.ts`](src/box.ts) | 审批框的问题 id、标题与卡片上限，由两半共用 |
 | [`src/receipt.ts`](src/receipt.ts) | 从 ACP `_meta` 读取 Casper 的回执与一次响应的 token，由两半共用 |
+| [`src/conversation.ts`](src/conversation.ts) | `plugin:casper-agent/conversation` 记录，以及对提示回复 `_meta` 中 Casper 标记的检查 |
 | [`src/client/index.ts`](src/client/index.ts) | 客户端一半：把 Casper 的审批卡片注册为对话输入框链的第一项，把回执卡片注册到已完成一轮的尾部，并把回执卡片注册为 `casper_receipt` 的工具视图 |
 | [`src/client/receipt-turn.ts`](src/client/receipt-turn.ts) | 在 Chat 目标上认领 `casper_receipt` 调用及其结果，使其不属于任何步骤，并把回执发布到它所在的一轮 |
 | [`src/client/CasperBoxCard.tsx`](src/client/CasperBoxCard.tsx) | Casper 的审批卡片：它接管哪些问题、它的行、按键与回答 |
@@ -83,6 +84,7 @@ kind: "package-reference"
 | [`src/models-cache.ts`](src/models-cache.ts) | 保存最后一份模型列表的 Host 存储域 `casper_agent_models` |
 | [`src/access.ts`](src/access.ts) | 把权限预设映射为 Casper 的访问模式 |
 
+<a id="turns-and-events"></a>
 ### 轮次与事件
 
 每轮领取排队的输入，原样追加 `turn/start`、`step/start` 与领取的 `user/message` 事件，然后在 Casper 能改动文件之前刷写会话。领取的消息作为一条 `session/prompt` 发给 Casper，各块保持原有顺序：文本为 `text`；当 Casper 的 `initialize` 回复将 `promptCapabilities.image` 设为 true 时，图片为 `image` 块，内容是其存储的规范化字节的 base64，并带存储的媒体类型；文件为指向附件服务只读宿主副本的 `resource_link`（`file:` URI、名称与字节大小），由 Casper 用自己的文件工具读取。旧版 Casper 无法接收的图片、附件服务无法读取的图片，以及没有宿主路径的文件，各以一行占位文本发送，且该轮回复开头会有一条说明。读取图片期间中止，则该轮以中止结束且不发送提示，即使附件服务仍完成了读取。
@@ -105,6 +107,7 @@ kind: "package-reference"
 | 带 `_meta.casper.receipt` 的 `agent_message_chunk` | 一个立即结束的 `casper_receipt` 工具调用，结果是回执文本，meta 是回执（不含 `json` 事件），显示为该轮尾部的回执卡片，位于该轮步骤之外，无需展开步骤即可看到结论；无法解析的 meta 按文本处理 |
 | 引导消息的 `user_message_chunk` 已读通知 | 该消息的 `user/message`，在该步骤未结束的调用结束后开启下一步；若 Casper 在该步骤中尚未写入任何内容，则并入该步骤 |
 | 提示结束（停止、退出或回复）时仍未结束的调用 | 在 `step/end` 之前写入带 `TOOL_OUTCOME_UNKNOWN` 的错误 `tool/result`，与 agent-loop 对失败步骤的记录一致 |
+| `session/prompt` 的回复 | 在该轮最后一个 `step/end` 之后、`turn/end` 之前写入 `plugin:casper-agent/conversation` 记录 `{acpSessionId, mark?}`：提示发往的 Casper 对话，以及仅当 Casper 在 `_meta.casper.mark` 中以 `session/fork` 接受的形式（字母、数字、`_` 和 `-`，最多 128 个）发送标记时才有的 `mark`；旧版 Casper 的记录只有 id，被停止或没有回复的提示不写记录 |
 
 回执是最后一个块，因此它的卡片结束该轮；旧脚本只带简单回执 meta 时按文本处理，结束最后一条助手消息。Casper 用 `_meta.casper.note` 标记的提示与模型文本一样按文本显示。提示回复只有在其之前收到的所有更新都写入后才会完成。停止会发送 `session/cancel` 并以中止结束该轮；若 Casper 在 `cancelGraceMs` 内未回复则被结束。工具调用 id 带有每个进程随机的前缀，因此重启后的 Casper 的 id 不会并入先前的卡片。
 
@@ -171,6 +174,8 @@ Casper 在 `session/new` 与 `session/load` 的回复中发送它的选项，并
 ### 进程生命周期与恢复
 
 Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打开会话。`session/new` 之后，对话 id 会在发送提示前存入 sidecar。之后的进程用 `session/load` 重新打开它，并丢弃回放的更新，因为会话已经保存了历史；只有 Casper 的“没有已保存对话”回复（`-32002`，消息中含不区分大小写的 "no saved conversation"）会开启新对话，且该轮以一行说明开头，即使该轮随后什么也没有发送。Casper 只在第一次回复后保存对话，因此进程在此之前就停止的对话会以这种方式重新开始。其他加载失败会结束该轮并保留记录。只有当会话的项目文件夹仍是存入记录时的文件夹时，才会使用该记录：文件夹已改变的会话会开启新的 Casper 对话，且该轮没有说明这一点的行。释放时关闭 stdin，等待 `exitGraceMs`，然后终止进程，符合桌面端 10 秒的 Host 退出时限。恢复会像 agent-loop 一样修复中断的轮次，且不启动进程。
+
+每次提示回复还会在会话日志中留下一条 `plugin:casper-agent/conversation` 记录（见[轮次与事件](#turns-and-events)）：该轮发往哪个 Casper 对话，以及 Casper 为其回复在该对话中停下的位置给出的标记。它的用途是让之后的分叉能在该轮处截断 Casper 对话；目前没有任何地方读取它，重新打开仍使用 sidecar。它是插件记录，因此没有此包的应用构建会保留并跳过它，仍能打开会话。无法写入的记录会记为一条警告，该轮照常结束。
 
 会话在 Casper 运行时空闲满 `idleExitMs` 后，插件用 `_casper/idle`（Casper 的决策 91）询问 Casper 能否关闭进程。回复只列出工作的种类：没有提示或模型更改正在进行，也没有开发服务器、命令、调试器、助手或检查仍在工作（包括写给 AI 的说明仍在写入的命令）时，Casper 才算空闲；Casper 自己的 `acp_idle_exit: off` 总是回答不空闲。Casper 回答空闲且期间没有任何工作开始时，进程会像释放时一样被关闭。检查期间的一轮、一次模型选择、一次访问切换或一次「先计划」设置都会保留进程并重新开始计时；Casper 不空闲、10 秒内没有回答或不认识该请求（`-32601`）时也会保留，并在下一个空闲时长后再次询问。下一条提示要等旧进程退出后才启动 Casper，并用 `session/load` 重新打开对话，不会出现新对话的那一行。加载时 Casper 沿用对话自己的模型；若它不是被关闭的进程所用的模型，该轮以 `[Casper reopened on <model>; it was <model>.]` 开头，插件不发送模型设置。被关闭的进程只为本会话允许的内容随之结束：「本会话内都同意」的回答，以及 Casper 自己选的访问模式。重新打开的 Casper 在第一条提示之前会再次得到访问控制的模式和会话的「先计划」值。
 

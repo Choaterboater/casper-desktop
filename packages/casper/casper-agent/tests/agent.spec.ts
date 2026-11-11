@@ -9,7 +9,7 @@ import * as McpClient from '@deepseek-ai/dsh-mcp-client'
 import AttachmentStore, { AttachmentId } from '@deepseek-ai/dsh-attachment'
 import type { FileAttachmentRef, ImageAttachmentLimits, ImageAttachmentRef, StoredImageAttachment } from '@deepseek-ai/dsh-attachment'
 import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
-import { SessionId } from '@deepseek-ai/dsh-session'
+import { pluginRecordOf, SessionId } from '@deepseek-ai/dsh-session'
 import SessionQueryEngine from '@deepseek-ai/dsh-session-query'
 import SessionTitleService, { SessionTitleProviderId } from '@deepseek-ai/dsh-session-title'
 import type { SessionTitleProviderRequest } from '@deepseek-ai/dsh-session-title'
@@ -20,6 +20,7 @@ import { contextPressureProjectionDefinition, tokenUsageProjectionDefinition } f
 import { CasperAgent, FRESH_CONVERSATION_NOTICE } from '../src/agent.ts'
 import { CasperCommandCache } from '../src/commands.ts'
 import { CasperConnection } from '../src/connection.ts'
+import { CONVERSATION_RECORD } from '../src/conversation.ts'
 import { reportOf } from '../src/models.ts'
 import { CasperModelsCache } from '../src/models-cache.ts'
 import { FORK_UNSUPPORTED } from '../src/factory.ts'
@@ -109,6 +110,14 @@ function types(agent: Agent): string[] {
   return eventsOf(agent).map(event => event.type).filter(type => !type.startsWith('agent/inbox'))
 }
 
+/** The conversation records in an Agent's Session, in log order. */
+function conversations(agent: Agent): unknown[] {
+  return eventsOf(agent).flatMap((event) => {
+    const record = pluginRecordOf(event)
+    return record?.type === CONVERSATION_RECORD ? [record.data] : []
+  })
+}
+
 function promptTexts(fake: FakeCasper): string[] {
   return fake.calls('session/prompt').map(entry => (entry.params?.prompt as { text: string }[]).map(block => block.text).join('|'))
 }
@@ -134,7 +143,7 @@ describe('CasperAgent', { timeout: 60_000 }, () => {
     expect(types(agent)).toEqual([
       'plugin:casper-agent/models', 'turn/start', 'step/start', 'user/message', 'assistant/message', 'tool/call', 'tool/result', 'step/end',
       'step/start', 'assistant/message', 'tool/call', 'tool/result', 'todo/write', 'step/end',
-      'step/start', 'assistant/message', 'step/end', 'turn/end',
+      'step/start', 'assistant/message', 'step/end', 'plugin:casper-agent/conversation', 'turn/end',
     ])
     const user = eventsOf(agent).find(event => event.type === 'user/message')
     expect(user?.data).toEqual(message)
@@ -162,6 +171,46 @@ describe('CasperAgent', { timeout: 60_000 }, () => {
       { kind: 'error', error: { code: 'CASPER_RPC_-32603', message: 'Casper failed: runtime failed' } },
     ])
     expect(host.errors.filter(entry => entry.agent === agent)).toHaveLength(1)
+  })
+
+  describe('conversation record', () => {
+    it('records the conversation after each prompt reply, with Casper\'s mark only in the shape session/fork takes', async () => {
+      const { fake, host } = await setup({ prompts: [
+        [{ mark: 'entry_1-A' }], [], [{ mark: 7 }], [{ mark: 'a/b' }], [{ mark: 'x'.repeat(129) }], [{ mark: 'y'.repeat(128), stop: 'max_turn_requests' }],
+      ] })
+      const { agent } = await host.create('casper-conversation')
+      for (const text of ['one', 'two', 'three', 'four', 'five', 'six']) await run(agent, text)
+      const acpSessionId = fake.calls('session/prompt')[0]?.params?.sessionId
+      expect(acpSessionId).toEqual(expect.any(String))
+      // An older Casper sends no mark, and a mark session/fork would refuse is left out; the turns still complete.
+      expect(conversations(agent)).toEqual([
+        { acpSessionId, mark: 'entry_1-A' }, { acpSessionId }, { acpSessionId }, { acpSessionId }, { acpSessionId },
+        { acpSessionId, mark: 'y'.repeat(128) },
+      ])
+      expect(turnEnds(agent)).toMatchObject([
+        { kind: 'completed' }, { kind: 'completed' }, { kind: 'completed' }, { kind: 'completed' }, { kind: 'completed' }, { kind: 'error' },
+      ])
+      // Each record sits right before its turn's end.
+      const kinds = types(agent)
+      expect(kinds.flatMap((type, index) => type === CONVERSATION_RECORD ? [kinds[index + 1]] : [])).toEqual(Array(6).fill('turn/end'))
+    })
+
+    it('records nothing for a stopped prompt or one Casper never answered, and a fresh conversation\'s own id', async () => {
+      const { fake, host } = await setup({ prompts: [[{ crash: 1 }], [{ mark: 'stopped', hang: true }], [{ mark: 'entry-3' }]] })
+      const { agent } = await host.create('casper-conversation-fresh')
+      await run(agent, 'first')
+      agent.followup(prompt('long'))
+      await waitFor(() => fake.calls('session/prompt').length === 2)
+      agent.cancel({ kind: 'user' })
+      await agent.whenIdle()
+      await run(agent, 'again')
+      expect(turnEnds(agent)).toMatchObject([{ kind: 'error' }, { kind: 'aborted' }, { kind: 'completed' }])
+      const [crashed, fresh] = fake.calls('session/prompt').map(entry => entry.params?.sessionId)
+      // Casper never saved the first conversation, so the next process opened a fresh one.
+      expect(fake.calls('session/new')).toHaveLength(2)
+      expect(fresh).not.toBe(crashed)
+      expect(conversations(agent)).toEqual([{ acpSessionId: fresh, mark: 'entry-3' }])
+    })
   })
 
   describe('steering', () => {
@@ -205,7 +254,7 @@ describe('CasperAgent', { timeout: 60_000 }, () => {
       }])
       expect(types(agent)).toEqual([
         'plugin:casper-agent/models', 'turn/start', 'step/start', 'user/message', 'assistant/message', 'step/end',
-        'step/start', 'user/message', 'assistant/message', 'step/end', 'turn/end',
+        'step/start', 'user/message', 'assistant/message', 'step/end', 'plugin:casper-agent/conversation', 'turn/end',
       ])
       expect(eventsOf(agent).filter(event => event.type === 'user/message').at(-1)?.data).toEqual(line)
       // The claim comes right before the line it logs, so the app shows the line as steering.

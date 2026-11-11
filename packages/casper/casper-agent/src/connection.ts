@@ -32,6 +32,7 @@ import type { SubprocessHandle, SubprocessOutcome, SubprocessRuntime } from '@de
 import { appToolsEntry } from './app-tools.ts'
 import type { AppToolsServer } from './app-tools.ts'
 import type { Config } from './config.ts'
+import { conversationMarkOf } from './conversation.ts'
 import type { ForwardedServers } from './forward-servers.ts'
 import { findCasper, lookupDetail } from './lookup.ts'
 
@@ -48,6 +49,16 @@ const IDLE_CHECK_MS = 10_000
  * prefix matches another id.
  */
 const NO_SAVED_CONVERSATION = /no saved conversation/i
+
+/**
+ * A prompt's reply: Casper's stop reason, the ACP session it was sent on, and
+ * Casper's mark when it sent one in the shape `session/fork` takes.
+ */
+export interface PromptReply {
+  readonly stopReason: StopReason
+  readonly acpSessionId: string
+  readonly mark: string | undefined
+}
 
 /**
  * Failure codes a Casper turn can end with. `CASPER_TEXT_ONLY` is no longer
@@ -387,15 +398,15 @@ export class CasperConnection {
    * Send one prompt. Resolves after every update received before the reply
    * has been delivered to the handlers.
    * @param prompt - the prompt blocks.
-   * @returns Casper's stop reason.
+   * @returns Casper's stop reason, the conversation the prompt was sent on, and Casper's mark when it sent one.
    * @throws CasperError `CASPER_EXITED` when the process exits first, `CASPER_RPC_<code>` for an error reply.
    */
-  async prompt(prompt: AcpContentBlock[]): Promise<StopReason> {
+  async prompt(prompt: AcpContentBlock[]): Promise<PromptReply> {
     const sessionId = this.requireSession()
     this.cancelSent = false
-    const { stopReason } = await this.request(this.requireConnection().agent.request(methods.agent.session.prompt, { sessionId, prompt }))
+    const reply = await this.request(this.requireConnection().agent.request(methods.agent.session.prompt, { sessionId, prompt }))
     await drainInbound()
-    return stopReason
+    return { stopReason: reply.stopReason, acpSessionId: sessionId, mark: conversationMarkOf(reply._meta) }
   }
 
   /**

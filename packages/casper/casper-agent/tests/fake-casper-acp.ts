@@ -50,6 +50,9 @@
  * sent, as when the close overtakes the request; `timeoutMs` withdraws the
  * request with `$/cancel_request` after that delay, logged as
  * `timedOut: true`, and closes the box as No), `{ receipt }`, `{ stop }`,
+ * `{ mark }` (the prompt reply's `_meta.casper.mark`, any JSON value, as a
+ * Casper with conversation marks sends it; without it the reply has none, as
+ * an older Casper),
  * `{ hang: true }` (waits for session/cancel), `{ ignoreCancel: true }` (with
  * hang: never replies), `{ crash }` (exits with that code),
  * `{ waitFile }` (waits until the file exists), `{ stderr }` (writes a
@@ -187,6 +190,7 @@ interface Step {
   timeoutMs?: number
   planBox?: string
   receipt?: string
+  mark?: unknown
   stop?: StopReason
   hang?: boolean
   ignoreCancel?: boolean
@@ -398,6 +402,8 @@ async function update(client: AgentContext, item: SessionUpdate & Record<string,
 interface Outcome {
   stop: StopReason
   receipt: string
+  /** The reply's `_meta.casper.mark`; none when undefined. */
+  mark?: unknown
   /** A whole receipt's fields, as C12 sends it. */
   full?: Record<string, unknown>
 }
@@ -423,7 +429,7 @@ async function play(params: PromptRequest, client: AgentContext): Promise<Prompt
     const after = late
     setTimeout(() => { void run(after, params, client, { stop: 'end_turn', receipt: 'late' }) }, 50)
   }
-  return { stopReason: outcome.stop, _meta: { casper: { receipt } } }
+  return { stopReason: outcome.stop, _meta: { casper: { receipt, ...(outcome.mark === undefined ? {} : { mark: outcome.mark }) } } }
 }
 
 async function run(step: Step, params: PromptRequest, client: AgentContext, outcome: Outcome): Promise<void> {
@@ -550,6 +556,7 @@ async function run(step: Step, params: PromptRequest, client: AgentContext, outc
     if (step.fail !== undefined) throw new RequestError(-32603, step.fail)
     if (step.crash !== undefined) process.exit(step.crash)
     if (step.receipt !== undefined) outcome.receipt = step.receipt
+    if (step.mark !== undefined) outcome.mark = step.mark
     if (step.stop !== undefined) outcome.stop = step.stop
     if (step.hang === true) {
       ignoreCancel = step.ignoreCancel === true
