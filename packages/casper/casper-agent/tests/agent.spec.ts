@@ -9,7 +9,7 @@ import * as McpClient from '@deepseek-ai/dsh-mcp-client'
 import AttachmentStore, { AttachmentId } from '@deepseek-ai/dsh-attachment'
 import type { FileAttachmentRef, ImageAttachmentLimits, ImageAttachmentRef, StoredImageAttachment } from '@deepseek-ai/dsh-attachment'
 import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
-import { pluginRecordOf, SessionId } from '@deepseek-ai/dsh-session'
+import { appendPluginRecord, pluginRecordOf, SessionId } from '@deepseek-ai/dsh-session'
 import SessionQueryEngine from '@deepseek-ai/dsh-session-query'
 import SessionTitleService, { SessionTitleProviderId } from '@deepseek-ai/dsh-session-title'
 import type { SessionTitleProviderRequest } from '@deepseek-ai/dsh-session-title'
@@ -17,6 +17,7 @@ import SessionReferenceResolver, { encodeSessionReferenceUri, formatSessionRefer
 import { planProjectionDefinition } from '@deepseek-ai/dsh-plan-mode'
 import { UserQuestionError } from '@deepseek-ai/dsh-user-questions'
 import { contextPressureProjectionDefinition, tokenUsageProjectionDefinition } from '@deepseek-ai/dsh-token-meter/src/usage-projection.ts'
+import { ACCESS_RECORD, casperOwnAccessSchema } from '../src/access-record.ts'
 import { CasperAgent, FRESH_CONVERSATION_NOTICE } from '../src/agent.ts'
 import { CasperCommandCache } from '../src/commands.ts'
 import { CasperConnection } from '../src/connection.ts'
@@ -1424,6 +1425,15 @@ describe('Casper\'s models in the model picker', { timeout: 60_000 }, () => {
   })
 })
 
+/** The access modes the app sent, through either set method. */
+function accessSets(fake: FakeCasper): unknown[] {
+  return fake.log().flatMap((entry) => {
+    if (entry.method === 'session/set_mode') return [entry.params?.modeId]
+    if (entry.method === 'session/set_config_option' && entry.params?.configId === 'mode') return [entry.params.value]
+    return []
+  })
+}
+
 describe('The access chip in a Casper session', { timeout: 60_000 }, () => {
   async function setupChip(script: FakeScript) {
     const fake = fakeCasper(script)
@@ -1436,15 +1446,6 @@ describe('The access chip in a Casper session', { timeout: 60_000 }, () => {
   /** Pick a preset on the chip, as the app's `/permission` does. */
   function chip(host: { ctx: Context }, agent: Agent, preset: string): void {
     host.ctx.permissionPresets.set(agent.session, preset)
-  }
-
-  /** The access modes the app sent, through either set method. */
-  function accessSets(fake: FakeCasper): unknown[] {
-    return fake.log().flatMap((entry) => {
-      if (entry.method === 'session/set_mode') return [entry.params?.modeId]
-      if (entry.method === 'session/set_config_option' && entry.params?.configId === 'mode') return [entry.params.value]
-      return []
-    })
   }
 
   /** The methods Casper received after initialize, in order. */
@@ -1629,6 +1630,129 @@ describe('The access chip in a Casper session', { timeout: 60_000 }, () => {
     expect(turnEnds(agent).at(-1)).toMatchObject({ kind: 'error', error: { code: 'CASPER_EXITED' } })
     expect(accessSets(fake)).toEqual(['read', 'read'])
     expect(promptTexts(fake)).toEqual(['first'])
+  })
+})
+
+describe('The mode pill in a Casper session', { timeout: 60_000 }, () => {
+  async function setupPill(script: FakeScript, overrides: Overrides = {}) {
+    const fake = fakeCasper(script)
+    cleanups.push(() => { fake.remove() })
+    const host = await boot(fake, overrides, undefined, true, mountPermissionPresets)
+    cleanups.push(() => host.ctx.fiber.dispose())
+    return { fake, host }
+  }
+
+  /** The modes the access records name, in log order. */
+  function ownModes(agent: Agent): unknown[] {
+    return eventsOf(agent).flatMap((event) => {
+      const record = pluginRecordOf(event)
+      return record?.type === ACCESS_RECORD ? [casperOwnAccessSchema.parse(record.data).mode] : []
+    })
+  }
+
+  /** What the pill reads: the `casperAccess` view. */
+  function pill(host: { ctx: Context }, agent: Agent): unknown {
+    return host.ctx.sessionProjections.snapshot(agent.session).values.casperAccess
+  }
+
+  it('records each change of a mode Casper picks itself, clears it when Casper goes back or the chip sets that mode, and never moves the chip', async () => {
+    const { fake, host } = await setupPill({
+      configOptions: casperOptions(),
+      prompts: [[{ mode: 'full' }, { text: 'one\n' }], [{ text: 'two\n' }], [{ mode: 'ask' }, { text: 'three\n' }], [{ mode: 'full' }, { text: 'four\n' }]],
+    })
+    const { agent } = await host.create('casper-pill-own')
+    await run(agent, 'first')
+    await waitFor(() => ownModes(agent).length === 1)
+    expect(ownModes(agent)).toEqual(['full'])
+    expect(pill(host, agent)).toEqual({ mode: 'full' })
+    // Display only: the chip keeps the person's pick and nothing is sent to Casper.
+    expect(host.ctx.permissionPresets.current(agent.session)).toBe('workspace-write')
+    expect(accessSets(fake)).toEqual([])
+    // An unchanged mode writes nothing more.
+    await run(agent, 'second')
+    expect(ownModes(agent)).toEqual(['full'])
+    // Casper goes back to the chip's mode by itself.
+    await run(agent, 'third')
+    await waitFor(() => ownModes(agent).length === 2)
+    expect(ownModes(agent)).toEqual(['full', null])
+    expect(pill(host, agent)).toBeNull()
+    await run(agent, 'fourth')
+    await waitFor(() => ownModes(agent).length === 3)
+    // The person picks the same mode on the chip: the app set it, so the pill clears.
+    host.ctx.permissionPresets.set(agent.session, 'danger-full-access')
+    await waitFor(() => ownModes(agent).length === 4)
+    expect(ownModes(agent)).toEqual(['full', null, 'full', null])
+    expect(pill(host, agent)).toBeNull()
+    expect(accessSets(fake)).toEqual(['full'])
+    expect(host.ctx.permissionPresets.current(agent.session)).toBe('danger-full-access')
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }, { kind: 'completed' }, { kind: 'completed' }, { kind: 'completed' }])
+  })
+
+  it('clears the pill when the process that picked the mode exits, or is closed while idle', async () => {
+    const crashed = await setupPill({ configOptions: casperOptions(), prompts: [[{ mode: 'full' }, { text: 'one\n' }], [{ crash: 3 }]] })
+    const { agent } = await crashed.host.create('casper-pill-crash')
+    await run(agent, 'first')
+    await waitFor(() => ownModes(agent).length === 1)
+    await run(agent, 'second')
+    await waitFor(() => ownModes(agent).length === 2)
+    expect(ownModes(agent)).toEqual(['full', null])
+    expect(pill(crashed.host, agent)).toBeNull()
+
+    const idle = await setupPill({ configOptions: casperOptions(), prompts: [[{ mode: 'full' }, { text: 'one\n' }], [{ text: 'two\n' }]] }, { idleExitMs: 200 })
+    const quiet = (await idle.host.create('casper-pill-idle')).agent
+    await run(quiet, 'first')
+    const [first] = idle.fake.pids()
+    await waitFor(() => !alive(first ?? 0))
+    await waitFor(() => ownModes(quiet).length === 2)
+    expect(ownModes(quiet)).toEqual(['full', null])
+    // The reopened process starts in the chip's mode, so nothing is shown.
+    await run(quiet, 'second')
+    expect(ownModes(quiet)).toEqual(['full', null])
+    expect(idle.host.ctx.permissionPresets.current(quiet.session)).toBe('workspace-write')
+  })
+
+  it('a reopened Session clears a mode a killed app left recorded, and a closed Session leaves none', async () => {
+    const fake = fakeCasper({ configOptions: casperOptions(), prompts: [[{ mode: 'full' }, { text: 'one\n' }], [{ text: 'two\n' }]] })
+    cleanups.push(() => { fake.remove() })
+    const first = await boot(fake, {}, undefined, true, mountPermissionPresets)
+    const { agent } = await first.create('casper-pill-reopen')
+    await run(agent, 'first')
+    await waitFor(() => ownModes(agent).length === 1)
+    // A killed app writes nothing on its way out.
+    const quiet = vi.spyOn(CasperAgent.prototype, 'noteOwnAccess').mockImplementation(() => {})
+    await first.ctx.fiber.dispose()
+    quiet.mockRestore()
+    expect(ownModes(agent)).toEqual(['full'])
+
+    const second = await boot(fake, {}, undefined, true, mountPermissionPresets)
+    cleanups.push(() => second.ctx.fiber.dispose())
+    const resumed = (await second.ctx.agents.resume({ resumeSessionId: SessionId('casper-pill-reopen'), agentPreset: 'casper' })).agent
+    expect(ownModes(resumed)).toEqual(['full', null])
+    expect(pill(second, resumed)).toBeNull()
+    await run(resumed, 'second')
+    expect(ownModes(resumed)).toEqual(['full', null])
+
+    // A Session closed normally clears its own pill on the way out.
+    const closing = await setupPill({ configOptions: casperOptions(), prompts: [[{ mode: 'full' }, { text: 'one\n' }]] })
+    const open = (await closing.host.create('casper-pill-close')).agent
+    await run(open, 'first')
+    await waitFor(() => ownModes(open).length === 1)
+    if (!(open instanceof CasperAgent)) throw new Error('not a Casper agent')
+    await open.closeConnection()
+    expect(ownModes(open)).toEqual(['full', null])
+  })
+
+  it('records nothing with modePill off, and clears a pill already shown', async () => {
+    const { host } = await setupPill({ configOptions: casperOptions(), prompts: [[{ mode: 'full' }, { text: 'one\n' }], [{ text: 'two\n' }]] }, { modePill: false })
+    const { agent } = await host.create('casper-pill-off')
+    // A pill recorded while the switch was on.
+    appendPluginRecord(agent.session, ACCESS_RECORD, { mode: 'full' })
+    expect(pill(host, agent)).toEqual({ mode: 'full' })
+    await run(agent, 'first')
+    await run(agent, 'second')
+    expect(ownModes(agent)).toEqual(['full', null])
+    expect(pill(host, agent)).toBeNull()
+    expect(host.ctx.permissionPresets.current(agent.session)).toBe('workspace-write')
   })
 })
 

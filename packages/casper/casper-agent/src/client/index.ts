@@ -4,7 +4,9 @@
  * `casper-permission` and header `Casper`) shows Casper's own rows instead of
  * the generic question card. Every other pending interaction passes on. The
  * receipt card is an entry in a completed Turn's tail, outside the Turn's
- * steps, and the keyed tool view of `casper_receipt` calls.
+ * steps, and the keyed tool view of `casper_receipt` calls. The mode pill, an
+ * entry beside the composer's access control, names an access mode Casper
+ * picked itself.
  * @module @deepseek-ai/dsh-casper-agent/client
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
@@ -20,10 +22,13 @@ import type {} from '@deepseek-ai/dsh-client-ui-tool/client'
 import { CASPER_RECEIPT } from '../receipt.ts'
 import { CasperBoxCard, selectCasperBox } from './CasperBoxCard.tsx'
 import { de, en, es, fr, ja, NS, pt, ru, zh } from './locales.ts'
+import { ModePill } from './ModePill.tsx'
 import { receiptDefinition } from './receipt-turn.ts'
 import { ReceiptRow, ReceiptTail } from './ReceiptRow.tsx'
 
 export { ARM_DELAY_MS, CasperBoxCard, selectCasperBox } from './CasperBoxCard.tsx'
+export { ModePill } from './ModePill.tsx'
+export type { ModePillProps } from './ModePill.tsx'
 export type { CasperBox, CasperBoxCardProps } from './CasperBoxCard.tsx'
 export { receiptDefinition, resultText } from './receipt-turn.ts'
 export type { ReceiptTurnData } from './receipt-turn.ts'
@@ -36,7 +41,8 @@ export const inject = ['slots', 'locale', 'uiConversation']
 /**
  * Register Casper's approval card before the question composer (priority -1),
  * the receipt's Definition with its card in the Turn tail, and the receipt
- * card as the `casper_receipt` tool view.
+ * card as the `casper_receipt` tool view, and the mode pill after the
+ * composer's mode controls.
  * @param ctx - Client root context.
  */
 export function apply(ctx: ClientContext): void {
@@ -59,5 +65,9 @@ export function apply(ctx: ClientContext): void {
   ctx.slots.inject('tool.call.toolview', () => ctx.slots.register(
     { name: 'tool.call.toolview', key: CASPER_RECEIPT, locale: NS },
     ReceiptRow,
+  ))
+  ctx.slots.inject('conversation.input.left', () => ctx.slots.register(
+    { name: 'conversation.input.left', id: 'casper-mode-pill', locale: NS },
+    ModePill,
   ))
 }

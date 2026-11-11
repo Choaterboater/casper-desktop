@@ -529,6 +529,11 @@ export interface Config {
    */
   forwardPluginMcpServers: boolean
   /**
+   * Show the access mode Casper picks itself, such as "Yes to everything this session", as a pill next to the access
+   * control until Casper's process closes; the control never moves. Off records none and clears one already shown.
+   */
+  modePill: boolean
+  /**
    * Idle time after which the plugin asks Casper whether it may close the process (`_casper/idle`); a Casper that
    * says it is idle is closed and the next prompt reopens its conversation. 0 keeps the process until the Session closes.
    */
