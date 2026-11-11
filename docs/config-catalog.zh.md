@@ -570,6 +570,11 @@ export interface Config {
    */
   modePill: boolean
   /**
+   * Show each running Casper command's latest lines in the Jobs panel while it runs; Stop on that job stops the whole
+   * request, as the composer's Stop does. Off: a command shows only its final output in its card.
+   */
+  liveOutput: boolean
+  /**
    * Idle time after which the plugin asks Casper whether it may close the process (`_casper/idle`); a Casper that
    * says it is idle is closed and the next prompt reopens its conversation. 0 keeps the process until the Session closes.
    */

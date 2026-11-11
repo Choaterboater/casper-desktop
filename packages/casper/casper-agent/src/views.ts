@@ -378,7 +378,12 @@ export function readEnvelope(facts: ReadWindowFacts): ReadEnvelope | undefined {
 
 type Diff = Extract<ToolCallContent, { type: 'diff' }>
 
-function words(content: ToolCallUpdate['content']): string | undefined {
+/**
+ * The text parts of a step's content, joined by line breaks.
+ * @param content - the ACP tool call content.
+ * @returns the text, or undefined when there is none.
+ */
+export function words(content: ToolCallUpdate['content']): string | undefined {
   const parts = (content ?? []).flatMap(item => item.type === 'content' && item.content.type === 'text' ? [item.content.text] : [])
   const joined = parts.join('\n')
   return joined === '' ? undefined : joined

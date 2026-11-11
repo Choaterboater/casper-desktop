@@ -41,7 +41,10 @@
  * Steps: `{ text }`, `{ tool, target? }` (starts the next tool id, with an
  * older Casper's `rawInput: { tool, target }`), `{ toolEnd, ok }` (ends tool
  * N), `{ toolUpdate }` (an in-progress update of tool N, or of the open box
- * for `'box'`), `{ check, status }`, `{ plan }`, `{ permission, options,
+ * for `'box'`), `{ live: N, lines }` (tool N's latest whole lines as Casper
+ * sends a running shell step's: an in-progress update whose one text part is
+ * the lines in a ```text fence, with `_meta.casper.live: true`, each one
+ * replacing the one before), `{ check, status }`, `{ plan }`, `{ permission, options,
  * preview?, diffs?, locations?, onStep?, during? }` (`during` steps play while
  * the box waits for its answer; as C9 sends a box a running step raises, the
  * pending step and the request carry the preview text followed by `diffs` as
@@ -219,6 +222,9 @@ interface Step {
   mcp?: string
   args?: Record<string, unknown>
   toolUpdate?: number | 'box'
+  /** A running shell step's latest whole lines, as Casper sends them with `acp_live_output` on; see the module comment. */
+  live?: number
+  lines?: string[]
   during?: Step[]
   rawInput?: Record<string, unknown>
   meta?: Record<string, unknown>
@@ -492,6 +498,14 @@ async function run(step: Step, params: PromptRequest, client: AgentContext, outc
     if (step.toolUpdate !== undefined) {
       const toolCallId = step.toolUpdate === 'box' ? `casper-approval-${boxes}` : `casper-tool-${step.toolUpdate}`
       await update(client, { sessionUpdate: 'tool_call_update', toolCallId, status: 'in_progress', ...wire(step) })
+    }
+    if (step.live !== undefined) {
+      // Casper's liveUpdate: the window of whole lines in one ```text fence, replacing the one before.
+      const lines = (step.lines ?? []).join('\n')
+      await update(client, {
+        sessionUpdate: 'tool_call_update', toolCallId: `casper-tool-${step.live}`, status: 'in_progress',
+        content: [{ type: 'content', content: { type: 'text', text: `\`\`\`text\n${lines}\n\`\`\`` } }], _meta: { casper: { live: true } },
+      })
     }
     if (step.toolEnd !== undefined) {
       await update(client, {

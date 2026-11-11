@@ -24,7 +24,7 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-桌面端 profile 通过 `packages/bundle/web-app/cordis.patch.yml` 挂载本插件（条目 `casper-agent`，在桌面端以外和浏览器内预览中禁用），并在 `packages/bundle/web-app/presets/casper.patch.yml` 中声明 `casper` 预设。该预设挂载 `tool-todo`（用待办列表展示 Casper 的计划），以及应用工具所运行的条目：`tool-cordis`、`skill-filesystem`（使用 Cordis 预设的技能目录）、`tool-skill` 与 `tool-plugin-manager`；后者绑定应用已有的插件管理器，应用不带 profile 运行时关闭。该预设还挂载 `present`，以及 `tool-subagent-control` 与 `tool-subagent`（`spawn` 后端、`agentPreset: standard`，并开启模型选择与 `list_subagent_models`），它们把应用的[子代理](#subagents)交给 Casper；还挂载 `command-goal` 与 `tool-goal`，它们让 Casper 会话使用应用的[目标](#goals)。应用的[团队](#team)服务与任务板工具不需要预设条目：基础补丁为每个会话挂载它们。插件市场不会挂载。在桌面端，预设注册表的默认值为 `casper`；设置中保存的默认值仍然优先。本插件注入 `agents`、`sessions`、`sessionProjections`、`sessionPersistence`、`subprocess`、`storageDomain` 与 `tools`，并在挂载了 `userQuestions`、`skills`、`profileContext`、`attachments`、`commands`、`permissionPresets`、`sandboxPolicy`、`mcpManager`、`credentials` 与 `sessionReferenceResolver` 时使用它们。
+桌面端 profile 通过 `packages/bundle/web-app/cordis.patch.yml` 挂载本插件（条目 `casper-agent`，在桌面端以外和浏览器内预览中禁用），并在 `packages/bundle/web-app/presets/casper.patch.yml` 中声明 `casper` 预设。该预设挂载 `tool-todo`（用待办列表展示 Casper 的计划），以及应用工具所运行的条目：`tool-cordis`、`skill-filesystem`（使用 Cordis 预设的技能目录）、`tool-skill` 与 `tool-plugin-manager`；后者绑定应用已有的插件管理器，应用不带 profile 运行时关闭。该预设还挂载 `present`，以及 `tool-subagent-control` 与 `tool-subagent`（`spawn` 后端、`agentPreset: standard`，并开启模型选择与 `list_subagent_models`），它们把应用的[子代理](#subagents)交给 Casper；还挂载 `command-goal` 与 `tool-goal`，它们让 Casper 会话使用应用的[目标](#goals)。应用的[团队](#team)服务与任务板工具不需要预设条目：基础补丁为每个会话挂载它们。插件市场不会挂载。在桌面端，预设注册表的默认值为 `casper`；设置中保存的默认值仍然优先。本插件注入 `agents`、`sessions`、`sessionProjections`、`sessionPersistence`、`subprocess`、`storageDomain` 与 `tools`，并在挂载了 `userQuestions`、`skills`、`profileContext`、`attachments`、`commands`、`permissionPresets`、`sandboxPolicy`、`mcpManager`、`credentials`、`sessionReferenceResolver` 与 `jobs` 时使用它们。
 
 | 字段 | 默认值 | 含义 |
 |---|---|---|
@@ -52,6 +52,7 @@ kind: "package-reference"
 | `forwardMcpServers` | `true` | 把已启用的[「设置 > MCP 服务器」](#settings-mcp-servers)交给 Casper；`false` 时只发送应用工具服务器 |
 | `forwardPluginMcpServers` | `true` | 同时把[插件向 MCP 管理器注册的服务器](#settings-mcp-servers)交给 Casper，排在设置中的服务器之后，并共用同样的 7 个名额；需要 `forwardMcpServers`，`false` 时不交给 Casper |
 | `modePill` | `true` | 把 [Casper 自己选择的访问模式](#access-control)作为一个标签显示在权限控件旁边；`false` 时不记录，并清除已显示的标签 |
+| `liveOutput` | `true` | 在 Casper 命令运行时，于[后台任务面板](#jobs-panel)中显示其最新的几行；在该任务上点停止会停止整个请求。`false` 时命令只在其卡片中显示最终输出 |
 | `idleExitMs` | `900000` | 空闲多久后询问 Casper 能否[关闭](#process-lifetime-and-resume)其进程（15 分钟）；`0` 时保留进程直到会话关闭 |
 
 子进程不会收到 `DEEPSEEK_*` 或 `DSH_*` 名称，也不会收到 `env` 未列出的凭据类名称。唯一的例外是应用 profile：应用带 profile 运行时，Casper 会收到 `DSH_PROFILE` 与 `DSH_PROFILE_DIR`，使它构建的 bundle 能指明要安装到的 profile。
@@ -73,6 +74,7 @@ kind: "package-reference"
 | [`src/connection.ts`](src/connection.ts) | 一个 `casper acp` 进程：查找、启动、ACP 客户端、`session/new`、`session/load` 或 `session/fork`、提示、取消与释放 |
 | [`src/turn.ts`](src/turn.ts) | 把 Casper 的更新写成步骤、带推理的助手消息、工具调用、结果与待办列表 |
 | [`src/views.ts`](src/views.ts) | 把 Casper 的工具步骤记录为做同样事情的 Standard 工具：名称、参数、结果文本与 meta |
+| [`src/live-output.ts`](src/live-output.ts) | 把运行中命令的最新几行作为其任务显示在[后台任务面板](#jobs-panel)中，以及该任务上的停止 |
 | [`src/permission.ts`](src/permission.ts) | 把审批框变成标题为 `Casper` 的用户问题，detail 中带有发起步骤的差异行，并把答案映射回去；计划 Build 框变成计划审阅 |
 | [`src/box.ts`](src/box.ts) | 审批框的问题 id、标题与卡片上限，由两半共用 |
 | [`src/receipt.ts`](src/receipt.ts) | 从 ACP `_meta` 读取 Casper 的回执与一次响应的 token，由两半共用 |
@@ -117,6 +119,7 @@ kind: "package-reference"
 | 该步骤其他调用仍未结束时的 `tool_call` | 同一步骤中另一条只含该调用块的 `assistant/message`，随后是它的 `tool/call`，因此存储的每个调用都已声明，会话可以重新打开 |
 | `tool_call_update` 完成或失败 | 带 Standard 结果文本与 meta 的 `tool/result`，从不只写状态词；已运行的 shell 步骤记录其退出码且不是错误，其他失败的步骤是错误，被拒绝的审批不是 |
 | 仍在进行中的 `tool_call_update` | 不写入任何内容：调用保持打开，已提出的审批框仍在等待回答 |
+| 带 `_meta.casper.live` 的仍在进行中的 `tool_call_update`（运行中命令的最新几行） | 步骤中不写入任何内容；`liveOutput` 开启时，这些行进入该命令在[后台任务面板](#jobs-panel)中的任务，任务注册表追加其 `job/registered` 与 `job/settled` 记录 |
 | 检查 `tool_call`（已完成或已失败） | 立即写入名为 `casper_check` 的 `tool/call` 及其结果 |
 | `plan` | 带完整列表的 `todo/write` |
 | 带有 `title` 的 `session_info_update` | `casperTitles` 开启时，一个为会话命名的 `session/title` 事件（见上文），无论是否有提示在运行；缺少或为 null 的标题不改变任何东西 |
@@ -127,6 +130,13 @@ kind: "package-reference"
 | `session/prompt` 的回复 | 在该轮最后一个 `step/end` 之后、`turn/end` 之前写入 `plugin:casper-agent/conversation` 记录 `{acpSessionId, mark?}`：提示发往的 Casper 对话，以及仅当 Casper 在 `_meta.casper.mark` 中以 `session/fork` 接受的形式（字母、数字、`_` 和 `-`，最多 128 个）发送标记时才有的 `mark`；旧版 Casper 的记录只有 id，被停止或没有回复的提示不写记录 |
 
 回执是最后一个块，因此它的卡片结束该轮；旧脚本只带简单回执 meta 时按文本处理，结束最后一条助手消息。Casper 用 `_meta.casper.note` 标记的提示与模型文本一样按文本显示。提示回复只有在其之前收到的所有更新都写入后才会完成。停止会发送 `session/cancel` 并以中止结束该轮；若 Casper 在 `cancelGraceMs` 内未回复则被结束。工具调用 id 带有每个进程随机的前缀，因此重启后的 Casper 的 id 不会并入先前的卡片。
+
+<a id="jobs-panel"></a>
+### 后台任务面板
+
+shell 步骤运行期间，Casper 把它最新的完整几行作为仍在进行中的 `tool_call_update` 发送，标记为 `_meta.casper.live`，文本放在一个围栏中，每次更新替换上一次。Casper 只在其自身的 `acp_live_output` 设置开启（默认）时发送，使用 netconan 期间从不发送。`liveOutput` 开启且挂载了应用的任务注册表（`jobs`）时，Agent 在它自己的作用域中挂接一个任务控制器，因此只有该 Agent 的会话能持有这类任务，也不会有任务工具交给 Casper。步骤的首批行会启动一个类型为 `casper` 的任务，以其命令命名，关联到该步骤的调用，归该会话所有；后台任务面板把它与会话的其他任务一起列出。之后的每次更新只追加新的行：已显示的最后几行中，开启新窗口的最长一段视为已显示；与之毫无重合的窗口会在一个缺口标记之后追加。这些行只保存在内存中的 `log` 通道上，从不写入会话，应用按 Casper 发送的样子显示它们，密钥已由 Casper 隐藏。
+
+任务随步骤结束而结束，状态为 `completed` 或 `failed`；若提示先结束，则为 `killed` 或 `failed`。任务结束后其行即离开，与 Standard 的 shell 调用的行一样。会话日志中会有注册表的 `job/registered` 与 `job/settled` 记录，它们写有命令，与 `tool/call` 已写的一样。在该任务上点停止会停止整个请求，与输入框的停止相同：Casper 收到 `session/cancel`，该轮以中止结束，从不只停止该命令。Casper 没有为其发送任何行的步骤没有对应的行：很快结束的命令、较旧的 Casper、`acp_live_output: off`、被隐藏的命令、行中含有密钥的步骤，或注册表拒绝的任务（例如超过单个会话的上限）。无论哪种情况，步骤的卡片都会得到 Casper 的最终输出。`liveOutput: false` 时不挂接控制器，这些行被丢弃。
 
 <a id="tool-cards"></a>
 ### 工具卡片
