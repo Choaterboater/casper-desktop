@@ -1,8 +1,13 @@
 /** A Casper Session offers Casper the app's tools: Casper's calls run as the Casper Agent inside its turn, under its step's call id. */
 
+import { Buffer } from 'node:buffer'
 import { request as httpRequest } from 'node:http'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { Context } from '@deepseek-ai/cordis'
+import AttachmentStore, { AttachmentId } from '@deepseek-ai/dsh-attachment'
+import type { ImageAttachmentLimits, ImageAttachmentRef, StoredImageAttachment } from '@deepseek-ai/dsh-attachment'
+import type { Config } from '../src/config.ts'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { ToolExecution } from '@deepseek-ai/dsh-tools'
 import { TURN_OVER } from '../src/app-tools.ts'
@@ -62,6 +67,45 @@ function reachable(url: string, token: string): Promise<boolean> {
 
 const QUERY = { platform: 'client', provider: 'Slots', method: 'listSubTree' }
 
+/** A 1x1 PNG the stand-in store holds. */
+const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64')
+const SHOT: ImageAttachmentRef = { attachmentId: AttachmentId(`sha256:${'a'.repeat(64)}`), mediaType: 'image/png', bytes: PNG.length, width: 1, height: 1 }
+
+/** An attachment store that holds only {@link SHOT}. */
+class StandInAttachments extends AttachmentStore {
+  readonly imageLimits: ImageAttachmentLimits = {
+    maxImageBytes: 1024, maxImagesPerMessage: 4, maxMessageImageBytes: 4096, maxImagePixels: 4, maxImageDimension: 4, mediaTypes: ['image/png'],
+  }
+
+  validateImage(): Promise<void> {
+    return Promise.resolve()
+  }
+
+  saveImage(): Promise<ImageAttachmentRef> {
+    return Promise.resolve(SHOT)
+  }
+
+  readImage(ref: ImageAttachmentRef): Promise<StoredImageAttachment> {
+    return Promise.resolve({ ref, data: PNG })
+  }
+}
+
+/** A Host with the app tools on and a `cordis_inspect_query` whose result is a line of text and {@link SHOT}. */
+async function pictureHost(script: FakeScript, overrides: Partial<Config> = {}) {
+  const fake = fakeCasper(script)
+  cleanups.push(() => { fake.remove() })
+  const mount = async (ctx: Context) => { await ctx.plugin(StandInAttachments) }
+  const booted = await boot(fake, { appTools: true, ...overrides }, undefined, true, mount)
+  cleanups.push(() => booted.ctx.fiber.dispose())
+  booted.ctx.tools.register(defineTool({
+    name: 'cordis_inspect_query', description: 'Run a read-only query.',
+    parameters: { platform: { type: 'string', required: true }, provider: { type: 'string', required: true }, method: { type: 'string', required: true } },
+    output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }, { type: 'image', attachment: SHOT }] },
+    execute: args => Promise.resolve(`captured ${args.method}`),
+  }))
+  return { fake, booted }
+}
+
 describe('app tools in a Casper Session', { timeout: 60_000 }, () => {
   it('runs Casper\'s call as the Casper Agent under the call id of the step that made it, on a server named with the app version', async () => {
     const { fake, booted, seen } = await host({ prompts: [[
@@ -88,6 +132,28 @@ describe('app tools in a Casper Session', { timeout: 60_000 }, () => {
     expect(result?.type === 'tool/result' && result.data.message.content).toEqual([{ type: 'text', text: 'queried listSubTree' }])
     const [entry] = offered(fake)
     expect(JSON.stringify(eventsOf(agent))).not.toContain(entry?.token)
+  })
+
+  it('sends a picture in the app tool\'s result to Casper as MCP image content after its text, and the note with appToolImages off', async () => {
+    const steps: FakeScript = { prompts: [[{ mcp: 'cordis_inspect_query', args: QUERY }]] }
+    const { fake, booted } = await pictureHost(steps)
+    const { agent } = await booted.create('casper-app-picture')
+    agent.followup(prompt('show the slots'))
+    await agent.whenIdle()
+    const call = fake.log().find(entry => entry.event === 'mcp')
+    expect(call?.result).toEqual({
+      content: [{ type: 'text', text: 'captured listSubTree' }, { type: 'image', data: PNG.toString('base64'), mimeType: 'image/png' }],
+      isError: false,
+    })
+
+    const off = await pictureHost(steps, { appToolImages: false })
+    const { agent: offAgent } = await off.booted.create('casper-app-picture-off')
+    offAgent.followup(prompt('show the slots'))
+    await offAgent.whenIdle()
+    expect(off.fake.log().find(entry => entry.event === 'mcp')?.result).toEqual({
+      content: [{ type: 'text', text: 'captured listSubTree' }, { type: 'text', text: '[image result not sent]' }],
+      isError: false,
+    })
   })
 
   it('refuses a call that arrives after the turn ended', async () => {

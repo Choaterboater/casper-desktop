@@ -530,6 +530,12 @@ export interface Config {
    */
   appTeams: boolean
   /**
+   * Send the pictures in an app tool's result to Casper as MCP image content (their stored normalized bytes, base64,
+   * with the stored media type) in their place among the text, while the reply stays within 7 MiB of the 8 MiB Casper
+   * takes; a picture past that, and every picture when false, goes as a one-line note.
+   */
+  appToolImages: boolean
+  /**
    * Run a child the app's subagent tool starts on Casper's current model when the app has a route with the same
    * provider and model id, keeping Casper's effort only when that model lists it; otherwise, and when false, the child
    * runs on the app's default model.

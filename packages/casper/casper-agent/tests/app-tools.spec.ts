@@ -1,5 +1,6 @@
 /** The app tools server: its listener checks, the tools it lists, and how a call reaches the app's tools. */
 
+import { Buffer } from 'node:buffer'
 import { readFileSync } from 'node:fs'
 import { request as httpRequest } from 'node:http'
 import { networkInterfaces } from 'node:os'
@@ -8,6 +9,8 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
 import type { Agent } from '@deepseek-ai/dsh-agent'
+import { AttachmentId, type ImageAttachmentRef, type ImageMediaType } from '@deepseek-ai/dsh-attachment'
+import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import { createUserMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
 import { createMcpToolDefinition, type McpToolOrigin } from '@deepseek-ai/dsh-mcp-client'
 import type { SkillSummary } from '@deepseek-ai/dsh-skill'
@@ -19,8 +22,11 @@ import {
   dshNameOf,
   GOAL_RULES,
   INSTALLED_NOTE,
+  MAX_REPLY_BYTES,
   mcpContent,
   NO_RESOURCES,
+  PICTURE_OVER_BUDGET,
+  PICTURE_UNREADABLE,
   PLUGIN_SKILL,
   PROGRESS_INTERVAL_MS,
   servedAnnotations,
@@ -463,8 +469,8 @@ describe('app tools over MCP', { timeout: 60_000 }, () => {
     })
   })
 
-  it('sends text blocks and names the blocks MCP gets no form for', () => {
-    expect(mcpContent([{ type: 'text', text: 'shown' }, { type: 'reasoning', text: 'hidden' }])).toEqual([
+  it('sends text blocks and names the blocks MCP gets no form for', async () => {
+    expect(await mcpContent([{ type: 'text', text: 'shown' }, { type: 'reasoning', text: 'hidden' }])).toEqual([
       { type: 'text', text: 'shown' }, { type: 'text', text: '[reasoning result not sent]' },
     ])
   })
@@ -725,5 +731,179 @@ describe('the app\'s Team tools over MCP', { timeout: 60_000 }, () => {
     team.routes.length = 0
     expect(await mcp.callTool({ name: 'present', arguments: { files: [] } })).toMatchObject({ isError: false })
     expect(team.routes).toEqual([])
+  })
+})
+
+describe('pictures in an app tool result', { timeout: 60_000 }, () => {
+  /** A 1x1 PNG. */
+  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64')
+  /** Four MiB, the most the app stores for one picture. */
+  const LARGE = 4 * 1024 * 1024
+
+  function picture(id: string, bytes: number, mediaType: ImageMediaType = 'image/png'): ContentBlock {
+    const attachment: ImageAttachmentRef = { attachmentId: AttachmentId(`sha256:${id.repeat(64)}`), mediaType, bytes, width: 1, height: 1 }
+    return { type: 'image', attachment }
+  }
+
+  /** An attachment store whose pictures are `stored`, by attachment id; it records every read. */
+  function store(stored: Record<string, Uint8Array>) {
+    const reads: string[] = []
+    const readImage = vi.fn((ref: ImageAttachmentRef, signal?: AbortSignal) => {
+      reads.push(ref.attachmentId)
+      signal?.throwIfAborted()
+      const data = stored[ref.attachmentId]
+      return data === undefined ? Promise.reject(new Error('attachment-local/not-found')) : Promise.resolve({ ref, data })
+    })
+    return { attachments: { readImage }, reads }
+  }
+
+  /** How {@link withResult} answers: a failed result, deferred context, and server options. */
+  interface ResultOptions {
+    readonly isError?: boolean
+    readonly contexts?: ContentBlock[][]
+    readonly overrides?: Partial<AppToolsOptions>
+  }
+
+  /** Serve `present` as an app tool whose result is `content`, with `options.contexts` deferred to the next step. */
+  async function withResult(content: ContentBlock[], options: ResultOptions = {}) {
+    const { ctx, agent } = await host()
+    const tools: AppToolsOptions['tools'] = {
+      schemas: scope => ctx.tools.schemas(scope),
+      get: (name, scope) => ctx.tools.get(name, scope),
+      resolve: input => ctx.tools.resolve(input),
+      execute: input => Promise.resolve({
+        results: input.calls.map(call => ({
+          callId: call.id,
+          result: options.isError === true
+            ? { isError: true as const, error: { message: 'present failed' }, content }
+            : { isError: false as const, value: null, content },
+        })),
+        additionalContexts: (options.contexts ?? []).map(blocks => createUserMessage({ content: blocks, source: { kind: 'user' } })),
+        concluded: false,
+      }),
+    }
+    const mcp = await client(await serve(agent, ctx, { tools, ...options.overrides }))
+    return mcp.callTool({ name: 'present', arguments: { files: [{ path: 'shot.png' }] } })
+  }
+
+  it('sends a picture as MCP image content in its place among the text', async () => {
+    const { attachments, reads } = store({ [`sha256:${'a'.repeat(64)}`]: PNG })
+    const result = await withResult(
+      [{ type: 'text', text: 'before' }, picture('a', PNG.length), { type: 'text', text: 'after' }],
+      { overrides: { attachments } },
+    )
+    expect(result).toEqual({
+      content: [
+        { type: 'text', text: 'before' },
+        { type: 'image', data: PNG.toString('base64'), mimeType: 'image/png' },
+        { type: 'text', text: 'after' },
+      ],
+      isError: false,
+    })
+    expect(reads).toHaveLength(1)
+    // The signal is the call's own, so a turn that ends withdraws the read.
+    expect(attachments.readImage.mock.calls[0]?.[1]).toBeInstanceOf(AbortSignal)
+  })
+
+  it('keeps each stored media type', async () => {
+    const types: ImageMediaType[] = ['image/png', 'image/jpeg', 'image/webp', 'image/gif']
+    const ids = ['a', 'b', 'c', 'd']
+    const { attachments } = store(Object.fromEntries(ids.map(id => [`sha256:${id.repeat(64)}`, PNG])))
+    const pictures = ids.map((id, index) => picture(id, PNG.length, types[index]))
+    const result = await withResult(pictures, { overrides: { attachments } }) as { content: { mimeType?: string }[] }
+    expect(result.content.map(block => block.mimeType)).toEqual(types)
+  })
+
+  it('sends the one-line note with images off, as before', async () => {
+    const { attachments, reads } = store({ [`sha256:${'a'.repeat(64)}`]: PNG })
+    const result = await withResult([{ type: 'text', text: 'shot' }, picture('a', PNG.length)], { overrides: { attachments, images: false } })
+    expect(result).toEqual({ content: [{ type: 'text', text: 'shot' }, { type: 'text', text: '[image result not sent]' }], isError: false })
+    expect(reads).toEqual([])
+    // With no reader given at all, mcpContent keeps the old note too.
+    expect(await mcpContent([picture('a', PNG.length)])).toEqual([{ type: 'text', text: '[image result not sent]' }])
+  })
+
+  it('sends the unreadable note when the store fails or is missing', async () => {
+    const { attachments } = store({})
+    expect(await withResult([picture('a', PNG.length)], { overrides: { attachments } })).toEqual({
+      content: [{ type: 'text', text: PICTURE_UNREADABLE }], isError: false,
+    })
+    expect(await withResult([picture('a', PNG.length)])).toEqual({ content: [{ type: 'text', text: PICTURE_UNREADABLE }], isError: false })
+  })
+
+  it('fails the conversion when the call is withdrawn during a read', async () => {
+    const aborted = AbortSignal.abort()
+    const attachments = { readImage: () => Promise.reject(new Error('aborted')) }
+    await expect(mcpContent([picture('a', PNG.length)], { attachments, signal: aborted })).rejects.toThrow('aborted')
+  })
+
+  it('sends pictures in order while the reply stays within its budget, and the over-budget note after', async () => {
+    const big = new Uint8Array(LARGE)
+    const { attachments, reads } = store({ [`sha256:${'a'.repeat(64)}`]: big, [`sha256:${'b'.repeat(64)}`]: big, [`sha256:${'c'.repeat(64)}`]: PNG })
+    const result = await withResult([picture('a', LARGE), picture('b', LARGE), picture('c', PNG.length)], { overrides: { attachments } }) as { content: { type: string; text?: string; data?: string }[] }
+    expect(result.content.map(block => block.type)).toEqual(['image', 'text', 'image'])
+    expect(result.content[0]?.data).toHaveLength(Math.ceil(LARGE / 3) * 4)
+    expect(result.content[1]?.text).toBe(PICTURE_OVER_BUDGET)
+    // A picture whose stored size cannot fit is never read; a smaller one after it still goes.
+    expect(reads).toEqual([`sha256:${'a'.repeat(64)}`, `sha256:${'c'.repeat(64)}`])
+    expect(Math.ceil(LARGE / 3) * 4 * 2).toBeGreaterThan(MAX_REPLY_BYTES)
+    expect(MAX_REPLY_BYTES).toBeLessThan(8 * 1024 * 1024)
+  })
+
+  it('counts the text of the reply against the budget, and checks the bytes read as well as the stored size', async () => {
+    const text = 'x'.repeat(MAX_REPLY_BYTES - 8)
+    const { attachments, reads } = store({ [`sha256:${'a'.repeat(64)}`]: PNG })
+    expect(await mcpContent([{ type: 'text', text }, picture('a', PNG.length)], { attachments, signal: new AbortController().signal })).toEqual([
+      { type: 'text', text }, { type: 'text', text: PICTURE_OVER_BUDGET },
+    ])
+    expect(reads).toEqual([])
+    // Text counts as JSON on the wire: a newline is two bytes there, so half the budget of newlines leaves no room.
+    const lines = '\n'.repeat(MAX_REPLY_BYTES / 2)
+    expect(await mcpContent([{ type: 'text', text: lines }, picture('a', PNG.length)], { attachments, signal: new AbortController().signal })).toEqual([
+      { type: 'text', text: lines }, { type: 'text', text: PICTURE_OVER_BUDGET },
+    ])
+    expect(reads).toEqual([])
+    // An offloaded picture keeps its note and is never read.
+    const attachment: ImageAttachmentRef = { attachmentId: AttachmentId(`sha256:${'a'.repeat(64)}`), mediaType: 'image/png', bytes: PNG.length, width: 1, height: 1 }
+    expect(await mcpContent([{ type: 'image', attachment, offloaded: true }], { attachments, signal: new AbortController().signal })).toEqual([
+      { type: 'text', text: '[image result not sent]' },
+    ])
+    expect(reads).toEqual([])
+    // A stored size that understates the bytes read still cannot take the reply past the budget.
+    const understated = store({ [`sha256:${'b'.repeat(64)}`]: new Uint8Array(MAX_REPLY_BYTES) })
+    expect(await mcpContent([picture('b', 3)], { attachments: understated.attachments, signal: new AbortController().signal })).toEqual([
+      { type: 'text', text: PICTURE_OVER_BUDGET },
+    ])
+  })
+
+  it('reads no picture for a failed result, which keeps the note', async () => {
+    const { attachments, reads } = store({ [`sha256:${'a'.repeat(64)}`]: PNG })
+    expect(await withResult([{ type: 'text', text: 'failed' }, picture('a', PNG.length)], { isError: true, overrides: { attachments } })).toEqual({
+      content: [{ type: 'text', text: 'failed' }, { type: 'text', text: '[image result not sent]' }], isError: true,
+    })
+    expect(reads).toEqual([])
+  })
+
+  it('sends a picture in deferred context after the result, within the same budget', async () => {
+    const big = new Uint8Array(LARGE)
+    const { attachments, reads } = store({ [`sha256:${'a'.repeat(64)}`]: big, [`sha256:${'b'.repeat(64)}`]: big, [`sha256:${'c'.repeat(64)}`]: PNG })
+    const result = await withResult([picture('a', LARGE)], {
+      contexts: [[{ type: 'text', text: 'wrap up' }, picture('b', LARGE)], [picture('c', PNG.length)]],
+      overrides: { attachments },
+    }) as { content: { type: string; text?: string; data?: string }[] }
+    expect(result.content.map(block => block.text ?? block.type)).toEqual(['image', 'wrap up', PICTURE_OVER_BUDGET, 'image'])
+    expect(result.content[3]?.data).toBe(PNG.toString('base64'))
+    expect(reads).toEqual([`sha256:${'a'.repeat(64)}`, `sha256:${'c'.repeat(64)}`])
+  })
+
+  it('leaves a result with no picture as it was, and the pins as they were', async () => {
+    const { attachments, reads } = store({})
+    expect(await withResult([{ type: 'text', text: 'presented' }], { overrides: { attachments } })).toEqual({
+      content: [{ type: 'text', text: 'presented' }], isError: false,
+    })
+    expect(reads).toEqual([])
+    const { ctx, agent } = await host()
+    const { tools } = await (await client(await serve(agent, ctx, { attachments }))).listTools()
+    expect(tools.filter(tool => tool._meta?.['casper/pin'] === true).map(tool => tool.name)).toEqual(['app_skill', 'plugin_manager', 'app_read_file', 'present'])
   })
 })
