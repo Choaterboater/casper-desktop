@@ -41,6 +41,7 @@ kind: "package-reference"
 | `stderrTailBytes` | `4096` | 为失败信息保留的 Casper stderr 字节数 |
 | `appTools` | `true` | 向 Casper 提供应用工具；`false` 时发送空的 `mcpServers` 列表 |
 | `appSubagents` | `true` | 随应用工具向 Casper 提供应用的[子代理工具](#subagents)；需要 `appTools`，`false` 时不提供 |
+| `casperChildModel` | `true` | 应用有相同提供方与模型时，让[子代理](#subagents)在 Casper 当前的模型上运行；`false` 时所有子代理都在应用的默认模型上运行 |
 | `accessModes` | `{ read-only: read, workspace-write: ask, danger-full-access: full }` | 每个权限预设设置的[访问模式](#access-control)；不能列出 `custom` 与 `auto` |
 | `approvalCard` | `true` | 用 [Casper 的审批卡片](#approvals)显示 Casper 的审批框；`false` 时显示通用问题卡片 |
 | `approvalDiff` | `true` | 在 [Casper 的审批卡片](#approvals)中绘制编辑的审批框所带的差异；需要 `approvalCard`，`false` 时以文本行显示差异 |
@@ -80,6 +81,7 @@ kind: "package-reference"
 | [`src/sidecar.ts`](src/sidecar.ts) | Host 存储域 `casper_agent`，把每个会话映射到其 Casper 对话 |
 | [`src/commands.ts`](src/commands.ts) | 供 `/` 菜单使用的 Casper 命令，以及保存最后一份列表的 Host 存储域 `casper_agent_commands` |
 | [`src/app-tools.ts`](src/app-tools.ts) | 应用工具 MCP 服务器：监听、认证、工具列表，以及以 Casper Agent 身份运行的调用 |
+| [`src/child-route.ts`](src/child-route.ts) | 与 Casper 当前模型相符的应用路由，会话的子代理在其上运行 |
 | [`src/forward-servers.ts`](src/forward-servers.ts) | 交给 Casper 的「设置 > MCP 服务器」：哪些会发送、解析后的凭据、某个服务器被略过的原因，以及列表的摘要 |
 | [`src/references.ts`](src/references.ts) | 通过会话引用服务读取消息提及的会话，并把其失败映射为该轮的代码 |
 | [`src/app-read.ts`](src/app-read.ts) | `app_read_file`：对应用安装目录与 profile 目录的只读访问 |
@@ -232,7 +234,9 @@ Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打�
 
 这五个子代理工具来自预设的 `tool-subagent` 与 `tool-subagent-control` 条目，在 `appSubagents` 开启时提供。它们不置顶，因此 Casper 的固定提示大小不变；Casper 通过其工具搜索（find_capability）找到它们，就像找到 `cordis_inspect_query` 一样。关闭后，这些条目仍会挂载，但工具不会提供给 Casper。
 
-`subagent` 为 Casper 会话启动一个子代理，与标准会话中相同。子代理是运行在 DeepSeek 代理循环上的标准代理：它挂载 `standard` 预设，因为 `casper` 预设没有 shell 与文件工具；Casper 路由从不接收子代理，因此不会再启动第二个 `casper acp`。它在会话的文件夹中工作，并以 Casper 会话为父会话列在其下。该调用以 Casper Agent 的身份、在其发起者边界内运行，因此子代理与标准父会话的调用一样归属于 Casper 会话，Casper 的步骤显示应用的子代理卡片。子代理在会话的路由上运行，即应用的默认模型；调用中的 `provider` 与 `model` 只能在应用的模型设置允许时指定其他路由。
+`subagent` 为 Casper 会话启动一个子代理，与标准会话中相同。子代理是运行在 DeepSeek 代理循环上的标准代理：它挂载 `standard` 预设，因为 `casper` 预设没有 shell 与文件工具；Casper 路由从不接收子代理，因此不会再启动第二个 `casper acp`。它在会话的文件夹中工作，并以 Casper 会话为父会话列在其下。该调用以 Casper Agent 的身份、在其发起者边界内运行，因此子代理与标准父会话的调用一样归属于 Casper 会话，Casper 的步骤显示应用的子代理卡片。子代理在会话的路由上运行；调用中的 `provider` 与 `model` 只能在应用的模型设置允许时指定其他路由。
+
+当应用有一个提供方 id 相同的路由，且该路由的适配器认识同一个模型 id 时（例如 Casper 与应用都使用 `openrouter`），会话的路由就是 Casper 当前的模型。只有当应用为该模型列出了 Casper 的推理等级时，才会一并采用该等级，因此 Casper 的 `auto` 从不采用，而由模型自己的默认值生效。不按相近的名称匹配：提供方在应用中没有路由的 Casper 模型，例如 `claude-subscription`，或应用的模型页面没有 `openai-codex` 路由时的 `openai-codex`，会让子代理留在应用的默认模型上。每当 Casper 报告另一个模型、重新打开的会话启动以及应用的路由变化时，都会检查一次匹配；检查完成之前使用应用的默认模型。匹配只看路由而不看密钥，因此匹配到但未设置密钥的路由会让子代理的第一次请求失败，该失败作为子代理的通知返回。Casper 调用的、读取会话路由来检查图片或为图片计价的应用工具（例如 MCP 工具返回的图片结果）也会看到同一路由。标题仍使用应用的默认模型。设置 `casperChildModel: false` 时，所有子代理都在应用的默认模型上运行。
 
 该调用立即返回。子代理完成时，应用的完成通知会发给 Casper：Casper 一轮正在运行时作为引导消息，Casper 空闲时作为下一条提示，这会开始新的一轮 Casper。`send_message`、`interrupt_agent`、`list_agents` 与 `list_subagent_models` 对 Casper 的子代理的作用，与对标准父会话的子代理相同。`wait_agent` 不提供：无论发送多少进度，Casper 都会在 10 分钟后结束任何 MCP 调用，这会使更长的等待失败，并在本次任务剩余时间内失去应用工具；而且通知本来就会自行到达。
 
@@ -285,7 +289,7 @@ Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打�
 - 没有保存预设的定时任务在 Casper 中运行：在自动化任务页面创建的任务会在默认预设上创建其会话，而桌面端的默认预设是 Casper，除非设置中指定了其他预设。由 Standard 会话的提醒工具创建的任务会保留该会话的预设，指向现有 Casper 会话的任务会作为其下一条提示在那里运行。Casper 会话自身没有提醒工具。
 - 只有 macOS 与 Linux 上的桌面端运行过 Casper 会话。在 Windows 上，可执行文件查找只由单元测试检查，且应用不会读取安装程序保存的 Path，因此不在应用自身环境中的自定义安装文件夹要在应用重启后才能找到。
 - 已删除会话的 sidecar 记录要到下次启动时才会删除；已归档的会话会保留其进程，直到空闲满 `idleExitMs`。决策 91 之前的 Casper 在空闲时不会被关闭。
-- 团队与目标功能不在 Casper 会话中运行。Casper 的子代理是使用应用默认模型的标准代理，遵循应用的规则而不是 Casper 的私密位置，并且不能用 `wait_agent` 等待。
+- 团队与目标功能不在 Casper 会话中运行。Casper 的子代理是标准代理，只有应用有相同路由时才使用 Casper 的模型，否则使用应用的默认模型；它们遵循应用的规则而不是 Casper 的私密位置，并且不能用 `wait_agent` 等待。
 - Casper 会话的标题由应用的默认模型（可能是 DeepSeek 模型）生成，而不是由 Casper 所运行的模型生成。
 
 <a id="dev-note"></a>

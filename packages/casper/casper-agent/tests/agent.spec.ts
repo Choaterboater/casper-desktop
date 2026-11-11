@@ -9,6 +9,7 @@ import * as McpClient from '@deepseek-ai/dsh-mcp-client'
 import AttachmentStore, { AttachmentId } from '@deepseek-ai/dsh-attachment'
 import type { FileAttachmentRef, ImageAttachmentLimits, ImageAttachmentRef, StoredImageAttachment } from '@deepseek-ai/dsh-attachment'
 import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
+import type { LlmResolvedModelInfo } from '@deepseek-ai/dsh-llm'
 import { appendPluginRecord, pluginRecordOf, SessionId } from '@deepseek-ai/dsh-session'
 import SessionQueryEngine from '@deepseek-ai/dsh-session-query'
 import SessionTitleService, { SessionTitleProviderId } from '@deepseek-ai/dsh-session-title'
@@ -19,6 +20,7 @@ import { UserQuestionError } from '@deepseek-ai/dsh-user-questions'
 import { contextPressureProjectionDefinition, tokenUsageProjectionDefinition } from '@deepseek-ai/dsh-token-meter/src/usage-projection.ts'
 import { ACCESS_RECORD, casperOwnAccessSchema } from '../src/access-record.ts'
 import { CasperAgent, FRESH_CONVERSATION_NOTICE } from '../src/agent.ts'
+import { matchChildRoute, routedOptions } from '../src/child-route.ts'
 import { CasperCommandCache } from '../src/commands.ts'
 import { CasperConnection } from '../src/connection.ts'
 import { CONVERSATION_RECORD } from '../src/conversation.ts'
@@ -27,6 +29,7 @@ import { CasperModelsCache } from '../src/models-cache.ts'
 import { FORK_UNSUPPORTED } from '../src/factory.ts'
 import type { ForwardEntry } from '../src/forward-servers.ts'
 import { MAX_EMBEDDED_REFERENCE_BYTES, TEXT_ONLY_PICTURE } from '../src/prompt.ts'
+import { MockAdapter } from '../../../core/agent-loop/tests/mock-adapter.ts'
 import { boot, eventsOf, filesText, mountPermissionPresets, prompt, turnEnds } from './harness.ts'
 import { alive, casperModes, casperOptions, fakeCasper, gate, optionsWithoutMode, parsed, waitFor, withPlan } from './support.ts'
 import type { FakeCasper, FakeCommand, FakeScript } from './support.ts'
@@ -3049,5 +3052,128 @@ describe('A Casper session\'s written title', { timeout: 60_000 }, () => {
     await run(agent, 'second prompt of the session')
     expect(generate).not.toHaveBeenCalled()
     expect(host.ctx.sessionTitle.get(agent.session)).toMatchObject({ title: 'My own name', source: { kind: 'user' } })
+  })
+})
+
+describe('The model a Casper session\'s children run on', { timeout: 60_000 }, () => {
+  /** The app's default model, which the Session Controller hands every new Session through live getters. */
+  const APP_DEFAULT = { provider: 'app-provider', model: 'app-model' }
+  /** Casper's current model and effort, as `casperOptions` names them. */
+  const SOL = { provider: 'openai-codex', model: 'gpt-6.1-sol' }
+
+  /** An app route that knows only the listed models, each with its efforts. */
+  class Routes extends MockAdapter {
+    constructor(private readonly known: Readonly<Record<string, readonly string[]>>) {
+      super([])
+    }
+
+    override resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
+      const efforts = this.known[model]
+      if (efforts === undefined) return Promise.reject(new Error(`no model ${model} on ${provider}`))
+      const reasoning = { efforts: efforts.map(id => ({ id: ReasoningEffortId(id), name: id })) }
+      return Promise.resolve({ provider, id: model, name: model, reasoning })
+    }
+  }
+
+  /** A Host with the title service, whose Sessions get the app's default through live getters, as on Desktop. */
+  async function withRoutes(script: FakeScript, overrides: Overrides = {}) {
+    const fake = fakeCasper(script)
+    cleanups.push(() => { fake.remove() })
+    const generate = vi.fn((request: SessionTitleProviderRequest) => Promise.resolve({ title: 'Written', messageSeqs: [request.messages[0]!.seq] }))
+    const host = await boot(fake, overrides, undefined, true, async (ctx) => {
+      await ctx.plugin(SessionTitleService, { fallbackMaxWords: 8, fallbackMaxBytes: 64, maxTitleBytes: 64 })
+      ctx.sessionTitle.register({ id: SessionTitleProviderId('first-prompt'), automatic: 'first-prompt', generate })
+    })
+    cleanups.push(() => host.ctx.fiber.dispose())
+    let selection = { ...APP_DEFAULT }
+    const agentOptions = () => ({ get provider() { return selection.provider }, get model() { return selection.model }, maxTokens: 777 })
+    const create = (id: string) => host.ctx.agents.create({ sessionId: SessionId(id), meta: { cwd: fake.cwd, agentPreset: 'casper' }, agentOptions: agentOptions() })
+    const resume = (id: string) => host.ctx.agents.resume({ resumeSessionId: SessionId(id), agentPreset: 'casper', agentOptions: agentOptions() })
+    return { fake, host, generate, create, resume, setDefault: (next: typeof APP_DEFAULT) => { selection = next } }
+  }
+
+  /** The route fields of an Agent's options, as a child copies them. */
+  function route(agent: Agent): unknown {
+    const { provider, model, reasoningEffort, maxTokens } = { ...agent.options }
+    return { provider, model, reasoningEffort, maxTokens }
+  }
+
+  it('follows Casper\'s model and effort when the app has the same route, while the title stays on the app\'s default', async () => {
+    const { host, generate, create } = await withRoutes({ configOptions: casperOptions(undefined, 'high'), prompts: [[{ text: 'hi\n' }]] })
+    host.ctx.llm.registerAdapter([SOL.provider], new Routes({ [SOL.model]: ['low', 'high'] }))
+    const { agent } = await create('casper-child-model')
+    // Before Casper reports its model, the app's default.
+    expect(route(agent)).toEqual({ ...APP_DEFAULT, reasoningEffort: undefined, maxTokens: 777 })
+    await run(agent, 'hello')
+    await waitFor(() => agent.options.provider === SOL.provider)
+    expect(route(agent)).toEqual({ ...SOL, reasoningEffort: 'high', maxTokens: 777 })
+    // The written title still starts on the app's default model.
+    await waitFor(() => generate.mock.calls.length > 0)
+    expect(generate.mock.calls[0]![0].route).toEqual(APP_DEFAULT)
+  })
+
+  it('keeps the model but drops an effort the app\'s model does not list, such as Casper\'s auto', async () => {
+    const { host, create } = await withRoutes({ configOptions: casperOptions(), prompts: [[{ text: 'hi\n' }]] })
+    host.ctx.llm.registerAdapter([SOL.provider], new Routes({ [SOL.model]: ['low', 'high'] }))
+    const { agent } = await create('casper-child-effort')
+    await run(agent, 'hello')
+    await waitFor(() => agent.options.provider === SOL.provider)
+    expect(route(agent)).toEqual({ ...SOL, reasoningEffort: undefined, maxTokens: 777 })
+  })
+
+  it('uses the app\'s default, read live, when the app has no such provider or its adapter does not know the model', async () => {
+    const { host, create, setDefault } = await withRoutes({ configOptions: casperOptions(), prompts: [[{ text: 'one\n' }]] })
+    host.ctx.llm.registerAdapter(['other-provider'], new Routes({ [SOL.model]: ['high'] }))
+    const { agent } = await create('casper-child-no-route')
+    await run(agent, 'hello')
+    expect(route(agent)).toEqual({ ...APP_DEFAULT, reasoningEffort: undefined, maxTokens: 777 })
+    setDefault({ provider: 'app-provider', model: 'app-model-2' })
+    expect(agent.options.model).toBe('app-model-2')
+    // A route the app adds for the provider is checked at once: this one does not know Casper's model.
+    host.ctx.llm.registerAdapter([SOL.provider], new Routes({ 'other-model': [] }))
+    await new Promise(resolve => setTimeout(resolve, 50))
+    expect(agent.options.model).toBe('app-model-2')
+  })
+
+  it('matches a route the app adds later, and a resumed Session\'s recorded model before any prompt', async () => {
+    const { host, create, resume } = await withRoutes({ configOptions: casperOptions(undefined, 'high'), prompts: [[{ text: 'hi\n' }]] })
+    const handle = await create('casper-child-later')
+    await run(handle.agent, 'hello')
+    expect(handle.agent.options.provider).toBe(APP_DEFAULT.provider)
+    const added = host.ctx.llm.registerAdapter([SOL.provider], new Routes({ [SOL.model]: ['high'] }))
+    await waitFor(() => handle.agent.options.provider === SOL.provider)
+    expect(route(handle.agent)).toEqual({ ...SOL, reasoningEffort: 'high', maxTokens: 777 })
+    // The route going away again returns the app's default.
+    added()
+    await waitFor(() => handle.agent.options.provider === APP_DEFAULT.provider)
+    host.ctx.llm.registerAdapter([SOL.provider], new Routes({ [SOL.model]: ['high'] }))
+    await handle.dispose()
+    const { agent } = await resume('casper-child-later')
+    await waitFor(() => agent.options.provider === SOL.provider)
+    expect(route(agent)).toEqual({ ...SOL, reasoningEffort: 'high', maxTokens: 777 })
+  })
+
+  it('matches a model the app lists with no efforts, without Casper\'s effort, and keeps every other option live', async () => {
+    const llm = {
+      listProviders: () => [{ id: SOL.provider, name: 'OpenAI Codex' }],
+      resolveModelInfo: (provider: string, model: string) => Promise.resolve({ provider, id: model, name: model }),
+    }
+    expect(await matchChildRoute(llm, { ...SOL, reasoningEffort: ReasoningEffortId('high') })).toEqual(SOL)
+    let maxTokens = 100
+    const match: { route?: typeof SOL } = {}
+    const options = routedOptions({ ...APP_DEFAULT, reasoningEffort: ReasoningEffortId('low'), get maxTokens() { return maxTokens } }, () => match.route)
+    expect({ ...options }).toEqual({ ...APP_DEFAULT, reasoningEffort: 'low', maxTokens: 100 })
+    match.route = SOL
+    maxTokens = 200
+    expect({ ...options }).toEqual({ ...SOL, reasoningEffort: undefined, maxTokens: 200 })
+  })
+
+  it('with casperChildModel off, the options are the ones the Session was created with', async () => {
+    const { host, create } = await withRoutes({ configOptions: casperOptions(undefined, 'high'), prompts: [[{ text: 'hi\n' }]] }, { casperChildModel: false })
+    host.ctx.llm.registerAdapter([SOL.provider], new Routes({ [SOL.model]: ['high'] }))
+    const { agent } = await create('casper-child-off')
+    await run(agent, 'hello')
+    await new Promise(resolve => setTimeout(resolve, 50))
+    expect(route(agent)).toEqual({ ...APP_DEFAULT, reasoningEffort: undefined, maxTokens: 777 })
   })
 })

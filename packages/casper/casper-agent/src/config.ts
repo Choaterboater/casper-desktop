@@ -43,6 +43,12 @@ export interface Config {
    */
   appSubagents: boolean
   /**
+   * Run a child the app's subagent tool starts on Casper's current model when the app has a route with the same
+   * provider and model id, keeping Casper's effort only when that model lists it; otherwise, and when false, the child
+   * runs on the app's default model.
+   */
+  casperChildModel: boolean
+  /**
    * The app's permission presets and the Casper access mode each sets: `read`, `ask`, or `full`. A preset the
    * table does not list, the derived `custom`, and Auto set `ask`; a read-only sandbox always sets `read`.
    */
@@ -88,6 +94,7 @@ export const Config: z<Config> = z.object({
   stderrTailBytes: z.natural().min(1).default(4_096),
   appTools: z.boolean().default(true),
   appSubagents: z.boolean().default(true),
+  casperChildModel: z.boolean().default(true),
   accessModes: z.dict(z.union(ACCESS_MODE_IDS as AccessModeId[])).default({ ...DEFAULT_ACCESS_MODES }),
   approvalCard: z.boolean().default(true),
   approvalDiff: z.boolean().default(true),

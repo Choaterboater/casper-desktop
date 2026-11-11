@@ -518,6 +518,12 @@ export interface Config {
    */
   appSubagents: boolean
   /**
+   * Run a child the app's subagent tool starts on Casper's current model when the app has a route with the same
+   * provider and model id, keeping Casper's effort only when that model lists it; otherwise, and when false, the child
+   * runs on the app's default model.
+   */
+  casperChildModel: boolean
+  /**
    * The app's permission presets and the Casper access mode each sets: `read`, `ask`, or `full`. A preset the
    * table does not list, the derived `custom`, and Auto set `ask`; a read-only sandbox always sets `read`.
    */
