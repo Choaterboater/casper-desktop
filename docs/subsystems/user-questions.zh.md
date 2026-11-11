@@ -67,6 +67,20 @@ type AskUserQuestionIntent = {
 
 `AskUserQuestionItem` 是请求中的一个问题。调用方提供稳定的 `id`，它会随答案原样返回，使批量问题仍可路由。可选的 `detail` 携带辅助文本；提供方会将其随问题渲染，但不会放入可选选项标签。
 
+可选的 `diffs` 列出问题涉及的文件更改，使能够绘制差异的界面显示它们；`detail` 仍用文字为其他界面说明这些更改。Casper 的审批卡片会绘制它们。
+
+```ts type-equiv
+/** One file change a question is about: the path, the text before (null for a new file or an insertion) and after. */
+interface AskUserQuestionDiff {
+  /** The changed file's path. */
+  path: string
+  /** Text before the change, or null when there was none. */
+  oldText: string | null
+  /** Text after the change. */
+  newText: string
+}
+```
+
 ```ts type-equiv
 /** One question in a user-questions request. */
 interface AskUserQuestionItem {
@@ -84,6 +98,8 @@ interface AskUserQuestionItem {
   multiSelect?: boolean
   /** Optional presentation intent for capable UIs; absent asks for the generic option list. */
   intent?: AskUserQuestionIntent
+  /** File changes the question is about, for a UI that can draw them; `detail` still says them in words. */
+  diffs?: AskUserQuestionDiff[]
 }
 ```
 

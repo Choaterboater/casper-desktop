@@ -1,19 +1,38 @@
 /**
  * Casper's approval card: one of Casper's numbered boxes, shown with Casper's
  * own rows in Casper's order (No first), instead of the generic question card.
+ * A box that carries an edit's diffs draws them with the app's diff view.
  * @module @deepseek-ai/dsh-casper-agent/client/CasperBoxCard
  */
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
-import { Button, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, DiffBlock, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { DiffBlockLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ComposerChainProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { PendingQuestion, QuestionAnswer } from '@deepseek-ai/dsh-client-ui-user-questions/client'
-import { CASPER_BOX_HEADER, MAX_CARD_OPTIONS, PERMISSION_QUESTION_ID } from '../box.ts'
+import { CASPER_BOX_HEADER, diffLines, MAX_CARD_OPTIONS, PERMISSION_QUESTION_ID } from '../box.ts'
+import type { BoxDiff } from '../box.ts'
 import type { NS } from './locales.ts'
 import css from './CasperBoxCard.module.css'
 
 /** How long the card waits before a click or key counts, so a key meant for the composer answers nothing. */
 export const ARM_DELAY_MS = 300
+
+/** Diff lines the card shows before the middle folds: as many as Standard mode's edit cards. */
+export const BOX_DIFF_MAX_LINES = 9
+
+/**
+ * Cut the diff lines a box's detail ends with when the card draws the same
+ * diffs: the Host writes them with {@link diffLines} after the box's text.
+ * @param detail - the question's detail.
+ * @param diffs - the diffs the card draws.
+ * @returns the detail without those lines; unchanged when it does not end with them.
+ */
+export function detailWithoutDiff(detail: string, diffs: readonly BoxDiff[]): string {
+  const lines = diffLines(diffs)
+  if (lines === undefined || !detail.endsWith(lines)) return detail
+  return detail.slice(0, detail.length - lines.length).replace(/\n\n$/, '')
+}
 
 /**
  * Whether the armed card may move focus to No: only when focus would
@@ -125,7 +144,9 @@ function BoxFlow({ box, t }: { box: CasperBox; t: CasperBoxCardProps['t'] }) {
   }
   if (question === undefined) return null
   const [title = '', ...rest] = question.question.split('\n')
-  const body = [rest.join('\n').trim(), question.detail ?? ''].filter(part => part !== '').join('\n\n')
+  const diffs = question.diffs ?? []
+  const detail = diffs.length === 0 ? question.detail ?? '' : detailWithoutDiff(question.detail ?? '', diffs)
+  const body = [rest.join('\n').trim(), detail].filter(part => part !== '').join('\n\n')
   return (
     <div ref={root} className={css.root} data-casper-box={box.key} aria-busy={busy}
       onKeyDown={keydown}
@@ -137,6 +158,7 @@ function BoxFlow({ box, t }: { box: CasperBox; t: CasperBoxCardProps['t'] }) {
         <div className={css.body} tabIndex={0} role="group" aria-label={t('box.details')}>
           <div className={css.headline}>{title}</div>
           {body !== '' && <pre className={css.detail}>{body}</pre>}
+          {diffs.length > 0 && <DiffBlock diffs={diffs} labels={diffLabels(t)} maxLines={BOX_DIFF_MAX_LINES} className={css.diff} />}
         </div>
         <div className={css.options} role="group">
           {options.map((option, index) => {
@@ -162,4 +184,19 @@ function BoxFlow({ box, t }: { box: CasperBox; t: CasperBoxCardProps['t'] }) {
       </div>
     </div>
   )
+}
+
+/** The diff view's chrome in the card's own words. */
+function diffLabels(t: CasperBoxCardProps['t']): DiffBlockLabels {
+  return {
+    codeLabel: t('box.diff.code'),
+    wrapLabel: t('box.diff.wrap'),
+    unwrapLabel: t('box.diff.unwrap'),
+    copy: t('box.diff.copy'),
+    copied: t('box.diff.copied'),
+    collapse: t('box.diff.collapse'),
+    collapseAria: t('box.diff.collapseAria'),
+    expand: count => t('box.diff.expand', { count: String(count) }),
+    expandAria: count => t('box.diff.expandAria', { count: String(count) }),
+  }
 }

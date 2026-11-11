@@ -2025,7 +2025,7 @@ describe('Plan review and Plan first', { timeout: 60_000 }, () => {
 describe('Casper\'s approval card', () => {
   const FILE = '/work/project/sum.js'
 
-  it('a box a running step raises is headed Casper and shows the step\'s diff lines', async () => {
+  it('a box a running step raises is headed Casper and shows the step\'s diff lines, and carries the diffs for the card to draw', async () => {
     const { fake, host } = await setup({ prompts: [[
       { tool: 'edit', kind: 'edit', rawInput: { path: 'sum.js', edits: [{ oldText: 'a - b', newText: 'a + b' }] }, meta: { tool: 'edit', target: 'sum.js' } },
       {
@@ -2043,8 +2043,23 @@ describe('Casper\'s approval card', () => {
       detail: `The AI wants to change sum.js.\n\n${FILE}\n- return a - b\n+ return a + b`,
       options: [{ label: 'No' }, { label: 'Yes, this once' }, { label: 'Yes for this session' }],
       multiSelect: false,
+      diffs: [{ path: FILE, oldText: 'return a - b\n', newText: 'return a + b\n' }],
     }])
     expect(fake.log().filter(entry => entry.event === 'answer').map(entry => entry.outcome)).toEqual([{ outcome: 'selected', optionId: '2' }])
+    // approvalDiff off asks the same box with the same text and no diffs; the answer is the same.
+    const plain = await setup({ prompts: [[
+      { tool: 'edit', kind: 'edit', rawInput: { path: 'sum.js', edits: [{ oldText: 'a - b', newText: 'a + b' }] }, meta: { tool: 'edit', target: 'sum.js' } },
+      {
+        permission: 'Change sum.js outside the project?', preview: 'The AI wants to change sum.js.', onStep: 1, locations: [{ path: FILE }],
+        diffs: [{ path: FILE, oldText: 'return a - b\n', newText: 'return a + b\n' }],
+      },
+      { toolEnd: 1 },
+    ]] }, { approvalDiff: false })
+    await run((await plain.host.create('casper-card-diff-off')).agent, 'fix it')
+    expect(plain.host.asked[0]?.questions[0]?.header).toBe('Casper')
+    expect(plain.host.asked[0]?.questions[0]?.detail).toBe(`The AI wants to change sum.js.\n\n${FILE}\n- return a - b\n+ return a + b`)
+    expect(plain.host.asked[0]?.questions[0]).not.toHaveProperty('diffs')
+    expect(plain.fake.log().filter(entry => entry.event === 'answer').map(entry => entry.outcome)).toEqual([{ outcome: 'selected', optionId: '2' }])
     // approvalCard off asks the same box on the generic question card.
     const generic = await setup({ prompts: [[{ permission: 'Run it?' }]] }, { approvalCard: false })
     await run((await generic.host.create('casper-card-off')).agent, 'go')
