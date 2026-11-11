@@ -2,11 +2,13 @@
 
 English | [中文](README.zh.md)
 
-This is the desktop and web app of [Casper](https://github.com/Choaterboater/casper), published by Choaterboater. It is built on [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (`dsh`, MIT), the open-source agent harness developed by [DeepSeek AI](https://deepseek.com); it is not an official DeepSeek product. On top of the harness it adds Casper's checks (record, replay, never report a check that did not run as passed) and the read-only casper-network-mcp server.
+This is the desktop app of [Casper](https://github.com/Choaterboater/casper), published by Choaterboater. It is built on [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (`dsh`, MIT), the open-source agent harness developed by [DeepSeek AI](https://deepseek.com); it is not an official DeepSeek product.
+
+New sessions start in **Casper mode**, which runs the real Casper CLI over ACP (`casper acp`): Casper's own agent loop, models and checks (record, replay, never report a check that did not run as passed), with its approval boxes, questions, plans and receipt shown as the app's cards. The harness's own agent loop stays available as Standard mode. The app also ships the read-only casper-network-mcp server, and sends nothing to DeepSeek unless you add DeepSeek as a model provider.
 
 It is built on an **everything-is-a-plugin** architecture and powered by [Cordis](https://github.com/cordiverse/cordis), whose design is described in [_A Programming Paradigm for Spatiotemporal Composability_](https://arxiv.org/abs/2608.25512).
 
-Documentation: [https://deepseek-harness.github.io/deepseek-harness/](https://deepseek-harness.github.io/deepseek-harness/)
+Harness documentation: [https://deepseek-harness.github.io/deepseek-harness/](https://deepseek-harness.github.io/deepseek-harness/)
 
 ## Developer preview
 
@@ -16,35 +18,30 @@ Review the [safety notice](SAFETY.md) before running the project.
 
 ## Run
 
-### Run from `npm`
+<a id="run-from-source"></a>
 
-Install `Node.js`, then run:
+### Desktop app
 
-```sh
-npx @deepseek-ai/dsh web
-```
-
-The command starts the Web UI at `http://127.0.0.1:3080` by default and opens it in the default browser for a local launch. An SSH launch only prints the host URL because the SSH client or editor owns the local forwarded address. Pass `--no-open` to run the server without opening a browser. See [Web UI guide](docs/user/guide/index.md).
-
-### Run from source
-
-To run from a repository checkout:
+Install `Node.js` 24.9 or later and the [Casper CLI](https://github.com/Choaterboater/casper#install), then run:
 
 ```sh
-git clone https://github.com/deepseek-ai/deepseek-harness.git
-cd deepseek-harness
-pnpm install
-pnpm run build
-pnpm dsh web
+git clone https://github.com/Choaterboater/casper-desktop.git
+cd casper-desktop
+npx pnpm@11.28.5 install
+npx pnpm@11.28.5 run build
+npx pnpm@11.28.5 run start:desktop
 ```
 
-`pnpm run build` prepares the repository artifacts. `pnpm dsh web` uses those built artifacts without rebuilding.
+The app looks for `casper` on `PATH` and in `~/.local/bin`, and opens straight into a Casper session. Casper mode exists only in the desktop app. The desktop app is tested on macOS; Windows is not tested yet.
+
+### Web UI
+
+After the build, `npx pnpm@11.28.5 dsh web` starts the Web UI at `http://127.0.0.1:3080`. It offers the harness's own Standard mode, not Casper mode. See [Web UI guide](docs/user/guide/index.md).
 
 ## Community and support
 
-- Submit feedback or bug reports through [GitHub Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions).
-- Add the [`dsh-plugin`](https://github.com/topics/dsh-plugin) topic to your plugin repository for discoverability.
-- Join <a href="https://discord.gg/4MrtZUhpxg">upstream DeepSeek Harness Discord community</a>.
+- Report Casper desktop bugs in [GitHub Issues](https://github.com/Choaterboater/casper-desktop/issues), and Casper CLI bugs in the [Casper repository](https://github.com/Choaterboater/casper/issues).
+- Questions about the harness itself belong upstream: [DeepSeek Harness Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions) and its <a href="https://discord.gg/4MrtZUhpxg">Discord community</a>.
 
 ## Contributing
 
