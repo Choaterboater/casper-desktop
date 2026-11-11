@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { AskUserQuestionItem } from '@deepseek-ai/dsh-user-questions/types'
 import { PendingQuestion, createWaterfallRequest } from '@deepseek-ai/dsh-client-ui-user-questions/src/client/contract/slots.ts'
 import type { QuestionAnswer, QuestionCardSnapshot } from '@deepseek-ai/dsh-client-ui-user-questions/src/client/contract/slots.ts'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
-import { ARM_DELAY_MS, CasperBoxCard, selectCasperBox, type CasperBox, type CasperBoxCardProps } from '../src/client/CasperBoxCard.tsx'
+import { ARM_DELAY_MS, BOX_DIFF_MAX_LINES, CasperBoxCard, detailWithoutDiff, selectCasperBox, type CasperBox, type CasperBoxCardProps } from '../src/client/CasperBoxCard.tsx'
+import { diffLines } from '../src/box.ts'
 import { apply, inject } from '../src/client/index.ts'
 import { de, en, es, fr, ja, NS, pt, ru, zh } from '../src/client/locales.ts'
 
@@ -285,6 +286,50 @@ describe('CasperBoxCard', () => {
     fireEvent.click(rows[2]!)
     fireEvent.click(rows[1]!)
     expect(flaky.answers.map(answer => answer.answers[0]?.selected)).toEqual([['Yes, this once'], ['Yes, for this session']])
+  })
+
+  it('draws an edit\'s diffs with the app\'s diff view, leaves their lines out of the text, and the rows answer as before', async () => {
+    const diffs = [{ path: '/work/notes.txt', oldText: 'old\n', newText: 'new\n' }, { path: '/work/fresh.txt', oldText: null, newText: 'fresh' }]
+    const detail = `The AI wants to change notes.txt.\n\n${diffLines(diffs) ?? ''}`
+    const { value, answers } = carrier(box({ detail, diffs }))
+    const view = show(value)
+    const body = screen.getByRole('group', { name: 'Box details' })
+    expect(body.querySelector('pre')?.textContent).toBe('The AI wants to change notes.txt.')
+    const drawn = body.querySelector('[data-diff]')
+    expect(drawn).not.toBeNull()
+    expect(drawn?.textContent).toContain('/work/notes.txt')
+    expect(drawn?.textContent).toContain('/work/fresh.txt')
+    expect(drawn?.textContent).toContain('old')
+    expect(drawn?.textContent).toContain('fresh')
+    // The rows are the card's own, in the same order; the diff view's toolbar sits in the details.
+    const rows = within(view.container.querySelector('[role="group"]:not([aria-label])') as HTMLElement).getAllByRole('button')
+    expect(rows.map(row => row.textContent)).toEqual(['1No', '2Yes, this once', '3Yes, for this session'])
+    await arm()
+    expect(document.activeElement).toBe(rows[0])
+    press(view.container.firstElementChild!, '2')
+    expect(answers).toEqual([{ answers: [{ id: 'casper-permission', selected: ['Yes, this once'] }] }])
+  })
+
+  it('a box without diffs, or with approvalDiff off, shows today\'s text only', () => {
+    // With approvalDiff off the Host's question has the diff lines as its detail and no diffs (permission.spec.ts).
+    const off = box({ detail: '/work/notes.txt\n- old\n+ new' })
+    const first = show(carrier(off).value)
+    expect(document.querySelector('[data-diff]')).toBeNull()
+    expect(document.querySelector('pre')?.textContent).toBe('/work/notes.txt\n- old\n+ new')
+    first.unmount()
+    show(carrier(box()).value)
+    expect(document.querySelector('[data-diff]')).toBeNull()
+    expect(document.querySelector('pre')?.textContent).toBe('The AI wants to change notes.txt.\n\n/work/notes.txt\n- old\n+ new')
+  })
+
+  it('the Host\'s question draws as the card expects: only the diff lines are cut, and a detail that does not end with them is kept', () => {
+    // The question the Host builds for a text line and one diff (permission.spec.ts checks the same shape).
+    const question = box({ detail: 'Change one line.\n\n/work/notes.txt\n- old\n+ new', diffs: [{ path: '/work/notes.txt', oldText: 'old', newText: 'new' }] })
+    expect(question.diffs).toHaveLength(1)
+    expect(detailWithoutDiff(question.detail ?? '', question.diffs ?? [])).toBe('Change one line.')
+    expect(detailWithoutDiff('/work/notes.txt\n- old\n+ new', question.diffs ?? [])).toBe('')
+    expect(detailWithoutDiff('Something else', question.diffs ?? [])).toBe('Something else')
+    expect(BOX_DIFF_MAX_LINES).toBe(9)
   })
 
   it('answers through a real waterfall once', async () => {

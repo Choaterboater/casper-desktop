@@ -51,6 +51,16 @@ export type AskUserQuestionIntent = {
   }
 }
 
+/** One file change a question is about: the path, the text before (null for a new file or an insertion) and after. */
+export interface AskUserQuestionDiff {
+  /** The changed file's path. */
+  path: string
+  /** Text before the change, or null when there was none. */
+  oldText: string | null
+  /** Text after the change. */
+  newText: string
+}
+
 /** One question in a user-questions request. */
 export interface AskUserQuestionItem {
   /** Stable caller-provided question id, echoed in the answer. */
@@ -67,6 +77,8 @@ export interface AskUserQuestionItem {
   multiSelect?: boolean
   /** Optional presentation intent for capable UIs; absent asks for the generic option list. */
   intent?: AskUserQuestionIntent
+  /** File changes the question is about, for a UI that can draw them; `detail` still says them in words. */
+  diffs?: AskUserQuestionDiff[]
 }
 
 /** Answer to one question. */

@@ -42,6 +42,7 @@ kind: "package-reference"
 | `appTools` | `true` | 向 Casper 提供应用工具；`false` 时发送空的 `mcpServers` 列表 |
 | `accessModes` | `{ read-only: read, workspace-write: ask, danger-full-access: full }` | 每个权限预设设置的[访问模式](#access-control)；不能列出 `custom` 与 `auto` |
 | `approvalCard` | `true` | 用 [Casper 的审批卡片](#approvals)显示 Casper 的审批框；`false` 时显示通用问题卡片 |
+| `approvalDiff` | `true` | 在 [Casper 的审批卡片](#approvals)中绘制编辑的审批框所带的差异；需要 `approvalCard`，`false` 时以文本行显示差异 |
 | `forwardMcpServers` | `true` | 把已启用的[「设置 > MCP 服务器」](#settings-mcp-servers)交给 Casper；`false` 时只发送应用工具服务器 |
 | `idleExitMs` | `900000` | 空闲多久后询问 Casper 能否[关闭](#process-lifetime-and-resume)其进程（15 分钟）；`0` 时保留进程直到会话关闭 |
 
@@ -132,9 +133,9 @@ Casper 在 `_meta.casper.tool` 中给每个步骤命名，其 `rawInput` 是模�
 <a id="approvals"></a>
 ### 审批
 
-`session/request_permission` 变成一个 `ctx.userQuestions.ask` 问题，id 为 `casper-permission`，标题为 `Casper`，以 Casper 的选项为标签，拒绝项在前，并带有选项说明。其 detail 是审批框的文本，随后是发起该框的步骤的差异：每个文件的路径，旧行以 `- ` 开头，新行以 `+ ` 开头，最多 120 行，之后是 `… N more lines in the edit step`。较旧的 Casper 发来的审批框不带差异，只显示文本。选中一个标签即选择该选项。输入文本、未选择、问题失败或被中止，以及没有问题服务时，都回答 `cancelled`，Casper 将其视为“否”。当 Casper 自行关闭审批框或撤回请求，或提示结束时，问题随之关闭。Casper 已关闭的步骤发来的审批框不会打开卡片，并回答 `cancelled`。
+`session/request_permission` 变成一个 `ctx.userQuestions.ask` 问题，id 为 `casper-permission`，标题为 `Casper`，以 Casper 的选项为标签，拒绝项在前，并带有选项说明。其 detail 是审批框的文本，随后是发起该框的步骤的差异：每个文件的路径，旧行以 `- ` 开头，新行以 `+ ` 开头，最多 120 行，之后是 `… N more lines in the edit step`。标记给 Casper 卡片的审批框还把这些差异作为问题的 `diffs` 带上：路径、旧文本与新文本，每处更改一项。较旧的 Casper 发来的审批框不带差异，只显示文本。选中一个标签即选择该选项。输入文本、未选择、问题失败或被中止，以及没有问题服务时，都回答 `cancelled`，Casper 将其视为“否”。当 Casper 自行关闭审批框或撤回请求，或提示结束时，问题随之关闭。Casper 已关闭的步骤发来的审批框不会打开卡片，并回答 `cancelled`。
 
-本插件的客户端一半用 Casper 的审批卡片显示这样的问题，该卡片注册为对话输入框链的第一项（优先级 -1）。卡片只接管只有一项、带有上述 id 与标题、单选且有 1 到 4 个选项的问题；其他任何问题（包括计划审阅）保留各自的卡片。标题是问题的第一行，其余各行与 detail 以纯文本跟在后面。每个选项是一行，按 Casper 的顺序排列，“否”在前，带有编号，说明在其下方。卡片在最初 300 毫秒内不计任何操作，之后聚焦“否”；但若焦点位于输入框区域之外的其他字段，焦点保留在原处。只有焦点在卡片内时其按键才计入，可滚动的详情可以用 Tab 到达。Esc 回答“否”，数字选择对应的行；带修饰键的按键、重复按键以及输入法组字中的按键都不计。Enter 没有自己的处理，因此它点击获得焦点的行。回答只发送一次：卡片保持忙碌，直到 Casper 关闭审批框；发送失败时各行恢复可用。已关闭的问题不作任何回答。`approvalCard: false` 时，或审批框没有拒绝选项时（此时在第一行按 Esc 或 Enter 会回答“是”），审批框不带标题，由通用问题卡片询问。
+本插件的客户端一半用 Casper 的审批卡片显示这样的问题，该卡片注册为对话输入框链的第一项（优先级 -1）。卡片只接管只有一项、带有上述 id 与标题、单选且有 1 到 4 个选项的问题；其他任何问题（包括计划审阅）保留各自的卡片。标题是问题的第一行，其余各行与 detail 以纯文本跟在后面。问题带有 `diffs` 时，卡片用应用的差异视图（即 Standard 模式编辑步骤所用的那个）绘制它们，超过 9 行即折叠，并从文本中去掉这些差异行。只有编辑的审批框带差异：写入的审批框、含有密钥的编辑、某一侧大于 256 KB 的编辑以及 Casper 未检查的路径都只显示文本。`approvalDiff: false` 时，卡片以文本行显示差异。每个选项是一行，按 Casper 的顺序排列，“否”在前，带有编号，说明在其下方。卡片在最初 300 毫秒内不计任何操作，之后聚焦“否”；但若焦点位于输入框区域之外的其他字段，焦点保留在原处。只有焦点在卡片内时其按键才计入，可滚动的详情可以用 Tab 到达。Esc 回答“否”，数字选择对应的行；带修饰键的按键、重复按键以及输入法组字中的按键都不计。Enter 没有自己的处理，因此它点击获得焦点的行。回答只发送一次：卡片保持忙碌，直到 Casper 关闭审批框；发送失败时各行恢复可用。已关闭的问题不作任何回答。`approvalCard: false` 时，或审批框没有拒绝选项时（此时在第一行按 Esc 或 Enter 会回答“是”），审批框不带标题，由通用问题卡片询问。
 
 客户端的 `initialize` 提供 `clientCapabilities.elicitation.form`，因此 Casper 会把 AI 的问题以及它自己需要输入文字或多选的问题作为表单发来，而不是跳过。符合 Casper 形状的 `elicitation/create`（表单模式，一个 `answer` 字段，为带标题的单选、带标题的多选或一行输入文字，以及一个可选的 `other` 字段用于输入文字）变成一个 id 为 `casper-question` 的问题；AI 的问题标题为 `The AI asks`，其余为 `Casper asks`。选中的标签按选择顺序以其值发回，输入的文字以 `other` 发回，一行输入的问题则作为 `answer` 发回。在没有 `other` 的表单上输入文字，以及其他任何形状的表单，都回答 decline；没有回答、问题失败或被中止、提示之外的表单，以及没有问题服务时，都回答 cancel，Casper 视为跳过。表单所属的步骤记录为 `ask_user_question`：即 ask 工具自己的步骤，或 Casper 为自己的问题打开的待处理 `casper-question-N` 步骤。在应用中记录的答案会在 Casper 完成该步骤时成为其结果 `{answers}`，因此 Standard 的问题卡片会显示答案。当 Casper 关闭该步骤或撤回请求，或提示结束时，问题随之关闭。
 
@@ -240,7 +241,7 @@ Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打�
 - 插件向 MCP 管理器注册的服务器，以及自成一行的 MCP 客户端条目（例如内置的 network 服务器），尚不会交给 Casper；只有「设置 > MCP 服务器」会。每个对话都会启动各 stdio 服务器自己的副本。
 - 应用工具的结果只以文本形式到达 Casper：图片或其他非文本块会变成一行说明。目前提供的工具都不返回图片。
 - 在打包的应用中，`app_read_file` 能读到每个已安装包的 `README.md`、`package.json` 与构建出的 `lib/*.js`、技能文件，以及 `ui-theme` 的 `lib/styles`。Desktop 运行时副本会去掉所有 `.d.ts`，各包不发布 `src/`，仓库的 `docs/` 也不在任何包中，因此那里无法读取 `lib/types`、`ui-sidebar` 的 `slots.ts`、`docs/cordis-tutorial` 与 `docs/web-styling.md`；插槽属性与主题令牌改由 `cordis_inspect_query` 获得。尚未随应用提供这些指南。
-- Casper 的审批卡片以纯文本的 `- ` 与 `+ ` 行显示差异，最多 120 行，而不是差异视图。
+- Casper 的审批卡片只为编辑的审批框绘制差异。Casper 在写入的审批框中不发送差异，含有密钥、某一侧大于 256 KB 或涉及其未检查路径的编辑也不发送，因此这些审批框只显示文本。
 - Casper 自己选择的模式不会显示：权限控件仍显示预设。
 - 对 `initialize` 回复中未设置 `agentCapabilities._meta.casper.steer` 的旧版 Casper，引导消息作为下一条提示送达。
 - 在本应用中还没有任何 Casper 发送过命令列表之前，Casper 的命令不会出现在 `/` 菜单中，直到会话的第一条提示启动 Casper。

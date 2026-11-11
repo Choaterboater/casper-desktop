@@ -516,6 +516,8 @@ export interface Config {
   accessModes: Record<string, AccessModeId>
   /** Show Casper's boxes with Casper's approval card; off shows the generic question card. */
   approvalCard: boolean
+  /** Draw the diff an edit's box carries in Casper's approval card; needs approvalCard. Off shows the diff as text lines. */
+  approvalDiff: boolean
   /**
    * Hand Casper the enabled Settings > MCP servers, credentials resolved, when Casper takes HTTP servers; Casper
    * connects to them for the session and asks before their changes. A change reaches Casper at the next turn.
