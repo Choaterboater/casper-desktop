@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Casper checks",
+    "description": "Runs the project's own checks after the agent edits, sends real failures back for repair, and closes the turn with a receipt."
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Vérifications Casper",
+    "description": "Exécute les vérifications propres au projet après les modifications de l'agent, renvoie les vrais échecs pour réparation et clôt le tour par un reçu."
+  }
+}
