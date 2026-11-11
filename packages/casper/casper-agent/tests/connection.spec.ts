@@ -5,7 +5,7 @@ import { Context } from '@deepseek-ai/cordis'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import type { AvailableCommand, CreateElicitationRequest, CreateElicitationResponse, SessionConfigOption, SessionNotification } from '@agentclientprotocol/sdk'
 import { randomBytes } from 'node:crypto'
-import { appToolsEntry } from '../src/app-tools.ts'
+import { appToolsEntry, rowEntry } from '../src/app-tools.ts'
 import type { AppToolsServer } from '../src/app-tools.ts'
 import { CasperConnection, CasperError, casperArgv, casperEnv, profileEnv } from '../src/connection.ts'
 import type { CasperConnectionHandlers, CasperConnectionOptions } from '../src/connection.ts'
@@ -588,7 +588,32 @@ describe('the app\'s own MCP servers', { timeout: 30_000 }, () => {
     expect(fake.calls('session/new')[0]?.params).toEqual({ cwd: fake.cwd, mcpServers: [] })
     expect(reads()).toBe(0)
     expect(connection.forwardedNames).toEqual([])
+    expect(connection.forwardedRows).toEqual([])
     expect(connection.forwardedDigest).toBeUndefined()
+    expect(connection.appToolsServer).toBeUndefined()
+  })
+
+  it('the builder gets the app tools server, and the rows it places are the connection\'s forwarded rows', async () => {
+    const { fake, start } = await setup({ prompts: [], mcpHttp: true })
+    const bridge = stubServer()
+    const given: (AppToolsServer | undefined)[] = []
+    const build = (signal: AbortSignal, appTools: AppToolsServer | undefined): Promise<ForwardedServers> => {
+      given.push(appTools)
+      return forwardedServers({
+        entries: {},
+        rows: appTools === undefined ? [] : [{ name: 'network', entry: rowEntry(appTools, 'network'), tools: ['find_tool'] }],
+        credential: () => Promise.resolve(undefined),
+        resolveExecutable: command => Promise.resolve(command),
+        signal,
+        skip: () => {},
+      })
+    }
+    const { connection } = await start({}, undefined, undefined, { appTools: () => Promise.resolve(bridge), mcpServers: build })
+    expect(given).toEqual([bridge])
+    expect(connection.appToolsServer).toBe(bridge)
+    expect(connection.forwardedNames).toEqual(['network'])
+    expect(connection.forwardedRows).toEqual(['network'])
+    expect(fake.calls('session/new')[0]?.params).toEqual({ cwd: fake.cwd, mcpServers: [appToolsEntry(bridge), rowEntry(bridge, 'network')] })
   })
 
   it('no forwarded value appears in Casper\'s argv or env', async () => {

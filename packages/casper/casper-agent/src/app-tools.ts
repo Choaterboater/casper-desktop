@@ -2,7 +2,8 @@
  * The app's plugin tools for one Casper connection: an MCP Streamable HTTP
  * server on its own 127.0.0.1 listener, reachable only at a random path with a
  * random bearer token, that forwards calls to the app's tools as the Casper
- * Agent while a Casper turn is open.
+ * Agent while a Casper turn is open. The same listener serves each of the app's
+ * own MCP client rows handed to Casper at a path of its own below that one.
  * @module @deepseek-ai/dsh-casper-agent/app-tools
  */
 
@@ -20,6 +21,7 @@ import {
   type CallToolResult,
   type JsonSchemaType,
   type ServerContext,
+  specTypeSchemas,
 } from '@modelcontextprotocol/server'
 import type { Agent, ModelSelection } from '@deepseek-ai/dsh-agent'
 import type { AttachmentStore, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
@@ -46,6 +48,8 @@ export const PROGRESS_INTERVAL_MS = 10_000
 export const PLUGIN_SKILL = 'cordis-plugin-development'
 /** Result of a call that arrives while no Casper turn is open. */
 export const TURN_OVER = "Casper's turn is over; ask again in a prompt."
+/** The tool Casper calls on its own once per connection to a server, before any turn; see {@link isConnectCheck}. */
+export const ACCESS_CHECK = 'access_check'
 /** Result of a Team tool call while Team is off for the Session. */
 export const TEAM_OFF = 'Team is off for this Session; the person can turn on Enable agent teamwork in the model menu.'
 
@@ -231,7 +235,7 @@ export interface AppToolsProfile {
 /** What {@link startAppTools} serves and whom it runs calls as. */
 export interface AppToolsOptions {
   /** The app's tool registry; calls resolve in `agent`'s scope, and a Team call's admission is resolved for it. */
-  readonly tools: Pick<ToolsService, 'schemas' | 'execute' | 'get' | 'resolve'>
+  readonly tools: Pick<ToolsService, 'schemas' | 'execute' | 'get' | 'resolve' | 'definitions'>
   /** The app's skill registry, when composed. */
   readonly skills: Pick<SkillRegistry, 'list'> | undefined
   /** The Casper Agent every call runs as. */
@@ -282,6 +286,12 @@ export interface AppToolsOptions {
    * @returns their names, without Casper's `acp-` prefix; none when omitted.
    */
   readonly resourceServers?: (() => readonly string[]) | undefined
+  /**
+   * The app's own MCP client rows this connection hands Casper, each served at `<url>/<row>`; read at each request,
+   * so any other path below the server's is not found.
+   * @returns their server names; none when omitted.
+   */
+  readonly rows?: (() => readonly string[]) | undefined
   /**
    * The open Casper prompt's signal.
    * @returns the signal, or undefined while no Casper turn is open.
@@ -345,6 +355,61 @@ export function appToolsEntry(server: Pick<AppToolsServer, 'url' | 'token'>): Ac
     headers: [{ name: 'Authorization', value: `Bearer ${server.token}` }],
     _meta: { [CLIENT_ASKS_META]: true },
   }
+}
+
+/**
+ * The ACP `mcpServers` entry for one of the app's own MCP client rows, served by a running server. It carries no
+ * `casper/clientAsks`, so Casper asks before the row's changes in its own box, and none of its tools is pinned.
+ * @param server - the running server.
+ * @param row - the row's server name, which Casper names `acp-<row>`.
+ * @returns the HTTP entry for the row's own endpoint.
+ */
+export function rowEntry(server: Pick<AppToolsServer, 'url' | 'token'>, row: string): AcpMcpServer {
+  return {
+    type: 'http',
+    name: row,
+    url: `${server.url}/${row}`,
+    headers: [{ name: 'Authorization', value: `Bearer ${server.token}` }],
+  }
+}
+
+/**
+ * The app's own MCP client rows the app holds now, in tool registration order: every server a listed tool came
+ * from, except the names given, which the MCP manager owns, and the app's own server name.
+ * @param tools - the app's tool registry.
+ * @param agent - the scope the tools are listed in.
+ * @param owned - the Settings and plugin-registered server names.
+ * @returns each row's name and the raw names of the tools it lists.
+ */
+export function clientRows(
+  tools: Pick<ToolsService, 'definitions'>,
+  agent: Agent,
+  owned: ReadonlySet<string>,
+): { name: string; tools: string[] }[] {
+  const rows = new Map<string, string[]>()
+  for (const definition of tools.definitions(agent)) {
+    const origin = mcpToolOrigin(definition)
+    if (origin === undefined || origin.server === APP_SERVER_NAME || owned.has(origin.server)) continue
+    const listed = rows.get(origin.server) ?? []
+    listed.push(origin.rawName)
+    rows.set(origin.server, listed)
+  }
+  return [...rows].map(([name, listed]) => ({ name, tools: listed }))
+}
+
+/**
+ * Whether a call to a row's tool may run outside a Casper turn: only the check Casper makes on its own when it
+ * connects, before any prompt. That is Casper's own rule for it: named {@link ACCESS_CHECK}, marked read-only and not
+ * destructive by the server, and needing no arguments.
+ * @param origin - the tool's MCP origin.
+ * @param parameters - its input schema.
+ * @returns true for that check.
+ */
+export function isConnectCheck(origin: McpToolOrigin, parameters: unknown): boolean {
+  const { readOnlyHint, destructiveHint } = origin.annotations
+  if (origin.rawName !== ACCESS_CHECK || readOnlyHint !== true || destructiveHint === true) return false
+  const required: unknown = typeof parameters === 'object' && parameters !== null ? Reflect.get(parameters, 'required') : undefined
+  return !Array.isArray(required) || required.length === 0
 }
 
 /**
@@ -460,6 +525,37 @@ export async function mcpContent(blocks: readonly ContentBlock[], pictures?: Mcp
     }
   }
   return content
+}
+
+/**
+ * A row tool's own MCP result as its server sent it, base64 pictures included, so Casper reads and shrinks them
+ * itself. The other blocks and the structured content count first; then each picture goes while it fits within
+ * {@link MAX_REPLY_BYTES}, and {@link PICTURE_OVER_BUDGET} goes in place of one that does not.
+ * @param value - the app tool's canonical value: the server's `content` and `structuredContent`.
+ * @param images - whether pictures go; false sends a one-line note in place of each.
+ * @param after - context the app adds after the server's content, which shares the budget; none when omitted.
+ * @returns the result, or undefined for a value that is not an MCP result.
+ */
+export function rowResult(value: unknown, images: boolean, after: CallToolResult['content'] = []): CallToolResult | undefined {
+  const parsed = specTypeSchemas.CallToolResult['~standard'].validate(value)
+  if (parsed.issues !== undefined) return undefined
+  const { content, structuredContent } = parsed.value
+  let used = structuredContent === undefined ? 0 : Buffer.byteLength(JSON.stringify(structuredContent), 'utf8')
+  for (const block of [...content, ...after]) if (block.type !== 'image') used += Buffer.byteLength(JSON.stringify(block), 'utf8')
+  const sent: CallToolResult['content'] = []
+  for (const block of content) {
+    if (block.type !== 'image') {
+      sent.push(block)
+    } else if (!images) {
+      sent.push({ type: 'text', text: '[image result not sent]' })
+    } else if (block.data.length > MAX_REPLY_BYTES - used) {
+      sent.push({ type: 'text', text: PICTURE_OVER_BUDGET })
+    } else {
+      used += block.data.length
+      sent.push(block)
+    }
+  }
+  return { content: [...sent, ...after], ...structuredContent === undefined ? {} : { structuredContent } }
 }
 
 function errorResult(text: string): CallToolResult {
@@ -616,8 +712,71 @@ async function mcpServer(options: AppToolsOptions, version: string): Promise<Mcp
 }
 
 /**
+ * Run one call to a row's tool through the app's tools pipeline as the Casper Agent. It runs while a Casper turn is
+ * open, and outside one only when it is the row's connect check; it answers with the server's own result.
+ */
+async function rowCall(
+  options: AppToolsOptions,
+  name: string,
+  connect: boolean,
+  args: Record<string, unknown>,
+  ctx: ServerContext,
+): Promise<CallToolResult> {
+  const turn = options.turn()
+  const open = turn !== undefined && !turn.aborted
+  if (!open && !connect) return errorResult(TURN_OVER)
+  const stop = heartbeat(ctx, options.onError)
+  const initiate = options.initiate ?? (<T>(operation: () => T): T => operation())
+  // Casper makes its connect check before any prompt, so only the request's own signal ends it.
+  const signal = open ? AbortSignal.any([ctx.mcpReq.signal, turn]) : ctx.mcpReq.signal
+  try {
+    const batch = await initiate(() => options.tools.execute({
+      calls: [{ type: 'tool-call', id: ToolCallId(`casper-app:${randomUUID()}`), name, arguments: JSON.stringify(args) }],
+      signal,
+      agent: options.agent,
+    }))
+    const result = batch.results[0]?.result
+    /* v8 ignore next -- an executor returns one result per call. */
+    if (result === undefined) return errorResult(`${name} returned no result.`)
+    // Context a tool defers to the next step goes after the result and shares its reply budget.
+    const deferred = batch.additionalContexts.flatMap(context => context.content)
+    if (result.isError) return { content: await mcpContent([...result.content, ...deferred]), isError: true }
+    const raw = rowResult(result.value, options.images ?? true, await mcpContent(deferred))
+    if (raw !== undefined) return raw
+    // A value that is not an MCP result goes as the app's own content, its pictures read as for an app tool.
+    const pictures = (options.images ?? true) ? { attachments: options.attachments, signal } : undefined
+    return { content: await mcpContent([...result.content, ...deferred], pictures) }
+  } catch (error: unknown) {
+    return errorResult(`${name} failed in the app: ${String(error)}`)
+  } finally {
+    stop()
+  }
+}
+
+/**
+ * Build the per-request MCP server for one row: each tool the row lists now, under the server's own name for it,
+ * with its own schema and description and the server's own hints, never pinned.
+ */
+function rowServer(options: AppToolsOptions, row: string, version: string): McpServer {
+  const server = new McpServer({ name: `dsh-desktop/${row}`, version }, { capabilities: SERVER_CAPABILITIES })
+  for (const schema of options.tools.schemas(options.agent)) {
+    const origin = mcpToolOrigin(options.tools.get(schema.name, options.agent))
+    if (origin?.server !== row) continue
+    const annotations = servedAnnotations(false, origin)
+    const connect = isConnectCheck(origin, schema.parameters)
+    server.registerTool(origin.rawName, {
+      description: clipDescription(schema.description),
+      inputSchema: fromJsonSchema<Record<string, unknown>>(schema.parameters as JsonSchemaType),
+      ...annotations === undefined ? {} : { annotations },
+    }, (args, ctx) => rowCall(options, schema.name, connect, args, ctx))
+  }
+  return server
+}
+
+/**
  * Start one app tools server on a fresh 127.0.0.1 port with a fresh path and token.
- * Requests are checked in order: path (404), Host (403), any Origin (403), bearer token (401).
+ * Requests are checked in order: path (404), Host (403), any Origin (403), bearer token (401). A path below the
+ * server's is found only for a row {@link AppToolsOptions.rows} names at that request.
  * @param options - the registries, the Agent, the turn gate, and the call id mapping.
  * @returns the running server.
  */
@@ -628,24 +787,40 @@ export async function startAppTools(options: AppToolsOptions): Promise<AppToolsS
   const version = options.version ?? packageVersion()
   const handler = createMcpHandler(() => mcpServer(options, version), { onerror: options.onError })
   const serve = toNodeHandler(handler, { onerror: options.onError })
+  const handlers = [handler]
+  // One handler per row, made at the row's first request.
+  const rows = new Map<string, typeof serve>()
+  const rowServe = (row: string): typeof serve => {
+    let served = rows.get(row)
+    if (served === undefined) {
+      const made = createMcpHandler(() => rowServer(options, row, version), { onerror: options.onError })
+      handlers.push(made)
+      served = toNodeHandler(made, { onerror: options.onError })
+      rows.set(row, served)
+    }
+    return served
+  }
+  const base = `/mcp/${pathId}`
   let host = ''
-  const admit = (request: IncomingMessage): number | undefined => {
+  const admit = (request: IncomingMessage): number | typeof serve => {
     // An http.Server request always carries its target.
-    if (String(request.url).split('?')[0] !== `/mcp/${pathId}`) return 404
+    const path = String(request.url).split('?', 1).join('')
+    const row = path.startsWith(`${base}/`) ? path.slice(base.length + 1) : undefined
+    if (path !== base && (row === undefined || !(options.rows?.() ?? []).includes(row))) return 404
     if (request.headers.host !== host) return 403
     if (request.headers.origin !== undefined) return 403
     const given = Buffer.from(request.headers.authorization ?? '')
     if (given.length !== expected.length || !timingSafeEqual(given, expected)) return 401
-    return undefined
+    return row === undefined ? serve : rowServe(row)
   }
   const listener = createServer((request: IncomingMessage, response: ServerResponse) => {
-    const refused = admit(request)
-    if (refused !== undefined) {
-      response.writeHead(refused, refused === 401 ? { 'WWW-Authenticate': 'Bearer' } : {}).end()
+    const admitted = admit(request)
+    if (typeof admitted === 'number') {
+      response.writeHead(admitted, admitted === 401 ? { 'WWW-Authenticate': 'Bearer' } : {}).end()
       return
     }
     // The adapter's request type excludes explicit undefined on Node's optional fields.
-    serve(request as NodeIncomingMessageLike, response).catch(
+    admitted(request as NodeIncomingMessageLike, response).catch(
       /* v8 ignore start -- the adapter answers its own failures with 500; this guards a write after the socket closed. */
       (error: unknown) => {
         options.onError(new Error(`app tools request failed: ${String(error)}`))
@@ -669,7 +844,7 @@ export async function startAppTools(options: AppToolsOptions): Promise<AppToolsS
     close: () => (closing ??= (async () => {
       const stopped = new Promise<void>((resolve) => { listener.close(() => { resolve() }) })
       listener.closeAllConnections()
-      await handler.close()
+      await Promise.all(handlers.map(async (made) => { await made.close() }))
       await stopped
     })()),
   }

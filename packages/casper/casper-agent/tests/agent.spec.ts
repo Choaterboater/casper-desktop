@@ -2381,13 +2381,14 @@ describe('Settings MCP servers in a Casper session', { timeout: 60_000 }, () => 
    */
   async function withServers(
     script: FakeScript, entries: Record<string, Entry>, overrides: Overrides = {}, network = false, resolve = stored,
-    registered: Record<string, Entry> = {},
+    registered: Record<string, Entry> = {}, setup?: (ctx: Context) => void,
   ) {
     const fake = fakeCasper(script)
     cleanups.push(() => { fake.remove() })
     const host = await boot(fake, overrides, undefined, true, async (ctx) => {
       ctx.provide('mcpManager', { config: { servers: { get: () => entries } }, registeredEntries: () => ({ ...registered }) } as never)
       ctx.provide('credentials', { resolve: (ref: string) => resolve(ref) } as never)
+      setup?.(ctx)
       // A row of its own, as the shipped network server is: never one of the Settings servers.
       if (network) {
         await ctx.plugin(McpClient, {
@@ -2438,7 +2439,7 @@ describe('Settings MCP servers in a Casper session', { timeout: 60_000 }, () => 
     expect(turnEnds(agent)).toEqual([{ kind: 'completed' }, { kind: 'completed' }])
   })
 
-  it('a Settings server reaches session/new and the bundled network row does not', async () => {
+  it('a Settings server reaches session/new, and without the app tools server the bundled network row does not', async () => {
     const { fake, host } = await withServers({ prompts: [[]], mcpHttp: true }, { docs: docs(['docs-server.js']) }, {}, true)
     const { agent } = await host.create('casper-forward-docs')
     await run(agent, 'hi')
@@ -2493,6 +2494,63 @@ describe('Settings MCP servers in a Casper session', { timeout: 60_000 }, () => 
     expect(fake.pids()).toHaveLength(1)
     expect(offered(fake)).toEqual([{ method: 'session/new', pid: fake.pids()[0], names: ['docs'] }])
     expect(fake.calls('session/prompt').map(entry => entry.pid)).toEqual([fake.pids()[0], fake.pids()[0], fake.pids()[0]])
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }, { kind: 'completed' }, { kind: 'completed' }])
+  })
+
+  /** What each row tool call saw: its raw name, arguments and the Agent it ran as. */
+  const rowCalls: { name: string; args: unknown; agent: unknown }[] = []
+  /** Register one tool of the MCP client row `server` as the MCP client does, answering with its name and arguments. */
+  const rowTool = (ctx: Context, server: string, rawName: string) => ctx.tools.register(McpClient.createMcpToolDefinition(ctx, {
+    name: `mcp__${server}__${rawName}`, rawName, description: `${rawName} of ${server}`, inputSchema: { type: 'object' },
+    server, annotations: { readOnlyHint: true },
+    call: (args, execution) => {
+      rowCalls.push({ name: rawName, args, agent: execution.agent })
+      return Promise.resolve({ content: [{ type: 'text', text: `${rawName} ran` }], structuredContent: { args } })
+    },
+  }))
+  const rowsOn = { appTools: true }
+
+  it('an MCP client row goes after the Settings servers through the app tools server, and a call runs as the Agent', async () => {
+    rowCalls.length = 0
+    const call = { mcp: 'find_tool', args: { query: 'sites' }, mcpServer: 'network' }
+    const { fake, host } = await withServers({ prompts: [[call]], mcpHttp: true }, { docs: docs() }, rowsOn, false, stored, {}, (ctx) => {
+      rowTool(ctx, 'network', 'find_tool')
+      // The Settings server's own tools are its, never a row.
+      rowTool(ctx, 'docs', 'search')
+    })
+    const { agent } = await host.create('casper-forward-row')
+    await run(agent, 'hi')
+    expect(offered(fake).map(entry => entry.names)).toEqual([['app', 'docs', 'network']])
+    const servers = (fake.calls('session/new')[0]?.params?.['mcpServers'] ?? []) as { name: string; url?: string; headers?: unknown; _meta?: unknown }[]
+    const [app, , network] = servers
+    expect(network).toEqual({ type: 'http', name: 'network', url: `${app?.url ?? ''}/network`, headers: app?.headers })
+    expect(fake.log().find(entry => entry.event === 'mcp')?.result).toEqual({
+      content: [{ type: 'text', text: 'find_tool ran' }], structuredContent: { args: { query: 'sites' } },
+    })
+    expect(rowCalls).toEqual([{ name: 'find_tool', args: { query: 'sites' }, agent }])
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }])
+  })
+
+  it('forwardMcpClientRows false hands over no row', async () => {
+    const off = { ...rowsOn, forwardMcpClientRows: false }
+    const { fake, host } = await withServers({ prompts: [[]], mcpHttp: true }, { docs: docs() }, off, false, stored, {}, (ctx) => {
+      rowTool(ctx, 'network', 'find_tool')
+    })
+    await run((await host.create('casper-forward-row-off')).agent, 'hi')
+    expect(offered(fake).map(entry => entry.names)).toEqual([['app', 'docs']])
+  })
+
+  it('a row whose tools appear between turns reaches Casper at the next turn through session/load', async () => {
+    const { fake, host } = await withServers({ prompts: [[], [], []], mcpHttp: true }, { docs: docs() }, rowsOn)
+    const { agent } = await host.create('casper-forward-row-later')
+    await run(agent, 'first')
+    rowTool(host.ctx, 'network', 'find_tool')
+    await run(agent, 'second')
+    // An unchanged row keeps the live Casper.
+    await run(agent, 'third')
+    expect(offered(fake).map(entry => [entry.method, entry.names])).toEqual([
+      ['session/new', ['app', 'docs']], ['session/load', ['app', 'docs', 'network']],
+    ])
     expect(turnEnds(agent)).toEqual([{ kind: 'completed' }, { kind: 'completed' }, { kind: 'completed' }])
   })
 

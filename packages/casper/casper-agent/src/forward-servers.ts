@@ -1,8 +1,9 @@
 /**
  * The app's Settings > MCP servers, then the servers plugins register with
- * the MCP manager, as ACP `mcpServers` entries for Casper: each enabled server
- * Casper would take, with its credentials resolved, so Casper connects to it
- * for the session with its own boxes.
+ * the MCP manager, then the app's own MCP client rows, as ACP `mcpServers`
+ * entries for Casper: each enabled server Casper would take, with its
+ * credentials resolved, so Casper connects to it for the session with its own
+ * boxes. A row goes as the app tools server's own endpoint for it.
  * @module @deepseek-ai/dsh-casper-agent/forward-servers
  */
 
@@ -51,6 +52,16 @@ export interface ForwardEntry {
   readonly enabled: boolean
 }
 
+/** One of the app's own MCP client rows, proxied through the app tools server. */
+export interface ForwardRow {
+  /** The row's server name; Casper names it `acp-<name>`. */
+  readonly name: string
+  /** Its entry: the app tools server's endpoint for the row, with the bearer header. */
+  readonly entry: McpServer
+  /** The raw names of the tools it lists now; a change reaches Casper at the next turn. */
+  readonly tools: readonly string[]
+}
+
 /** What {@link forwardedServers} reads. */
 export interface ForwardOptions {
   /** The Settings entries keyed by server name, in Settings order. */
@@ -60,6 +71,11 @@ export interface ForwardOptions {
    * entries leave. The manager keeps their names apart from the Settings names.
    */
   readonly registered?: Readonly<Record<string, ForwardEntry>>
+  /**
+   * The app's own MCP client rows, in tool registration order; they take the slots the Settings and registered
+   * servers leave. They need no credentials: each entry is the app tools server's own endpoint.
+   */
+  readonly rows?: readonly ForwardRow[]
   /**
    * Resolve one credential reference.
    * @param ref - the name inside `${credential:…}`.
@@ -90,9 +106,14 @@ export interface ForwardOptions {
 export interface ForwardedServers {
   /** The entries for `session/new` and `session/load`, after the app's own server. */
   readonly entries: McpServer[]
-  /** The forwarded servers' names; Casper names them `acp-<name>`. */
+  /** The forwarded servers' names, rows included; Casper names them `acp-<name>`. */
   readonly names: string[]
-  /** SHA-256 of the entries, values included; kept in memory only, to see a change between turns. */
+  /** The names of the client rows that took a place, which the app tools server serves. */
+  readonly rows: string[]
+  /**
+   * SHA-256 of the entries, values included, and of each placed row's tool names; kept in memory only, to see a
+   * change between turns.
+   */
   readonly digest: string
   /** Servers left out for a reason that may pass: a credential that could not be read, a lookup error, or the time limit. */
   readonly passing: string[]
@@ -106,6 +127,7 @@ const STARTUP_ENV = /^(?:PATH|NODE_OPTIONS|LD_.*|DYLD_.*)$/i
 const HEADER_NAME = /^[A-Za-z0-9!#$%&'*+.^_`|~-]{1,64}$/
 const OWN_HEADERS = /^(?:host|content-.*|connection|transfer-encoding|mcp-.*|cookie|origin)$/i
 const NAME = /^[a-zA-Z0-9_.-]{1,60}$/
+const NAME_REFUSED = 'a name Casper does not take'
 /** The only places a credential may sit: a whole value, or one token after an auth scheme. */
 const WHOLE_CREDENTIAL = /^(?:(?:Bearer|Basic|Token|Bot|ApiKey) )?\$\{credential:[A-Za-z_][A-Za-z0-9_]*\}$/
 
@@ -193,8 +215,8 @@ async function oneServer(name: string, entry: ForwardEntry, options: ForwardOpti
 
 /**
  * Build the forwarded list: enabled Settings servers, then registered ones,
- * never one named `app`, at most {@link MAX_FORWARDED} in that order, so
- * Settings servers take the slots first. Casper's name rules
+ * then the app's own client rows, never one named `app`, at most
+ * {@link MAX_FORWARDED} in that order, so Settings servers take the slots first. Casper's name rules
  * apply first; a credential may sit only in an env or header value, as the
  * whole value or after an auth scheme. Each server resolves in parallel under
  * its own time limit. No entry carries `casper/clientAsks`, so Casper asks
@@ -217,7 +239,7 @@ export async function forwardedServers(options: ForwardOptions): Promise<Forward
   const built = await Promise.all(all.map(async ([name, entry]): Promise<[string, McpServer | string]> => {
     if (!entry.enabled) return [name, SKIP.disabled]
     if (name === APP_SERVER_NAME) return [name, SKIP.appName]
-    const problem = (NAME.test(name) ? undefined : 'a name Casper does not take') ?? nameProblem(entry) ?? placementProblem(entry)
+    const problem = (NAME.test(name) ? undefined : NAME_REFUSED) ?? nameProblem(entry) ?? placementProblem(entry)
     if (problem !== undefined) return [name, problem]
     const signal = AbortSignal.any([options.signal, AbortSignal.timeout(timeoutMs)])
     try {
@@ -234,6 +256,19 @@ export async function forwardedServers(options: ForwardOptions): Promise<Forward
   const entries: McpServer[] = []
   const names: string[] = []
   const passing: string[] = []
+  // A row is known by its entry, so a placed entry is a row's only when it is that row's own.
+  const ofEntry = new Map<McpServer, ForwardRow>()
+  const placed: ForwardRow[] = []
+  for (const row of options.rows ?? []) {
+    if (row.name === APP_SERVER_NAME) {
+      built.push([row.name, SKIP.appName])
+    } else if (NAME.test(row.name)) {
+      built.push([row.name, row.entry])
+      ofEntry.set(row.entry, row)
+    } else {
+      built.push([row.name, NAME_REFUSED])
+    }
+  }
   for (const [name, result] of built) {
     if (typeof result === 'string') {
       if (PASSING.has(result)) passing.push(name)
@@ -243,7 +278,11 @@ export async function forwardedServers(options: ForwardOptions): Promise<Forward
     } else {
       entries.push(result)
       names.push(name)
+      const row = ofEntry.get(result)
+      if (row !== undefined) placed.push(row)
     }
   }
-  return { entries, names, digest: createHash('sha256').update(JSON.stringify(entries)).digest('hex'), passing, secrets: [...secrets] }
+  const hash = createHash('sha256').update(JSON.stringify(entries))
+  for (const row of placed) hash.update(JSON.stringify([row.name, [...row.tools].sort()]))
+  return { entries, names, rows: placed.map(row => row.name), digest: hash.digest('hex'), passing, secrets: [...secrets] }
 }

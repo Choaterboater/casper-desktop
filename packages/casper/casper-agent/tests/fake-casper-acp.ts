@@ -73,8 +73,8 @@
  * `current_mode_update`, then a `config_option_update` when it has a `mode`
  * option), `{ late: Step }` (played 50 ms
  * after the reply), `{ exitAfterMs }` (exits with code 5 after that delay),
- * `{ mcp, args? }` (calls that tool on the first `mcpServers` entry with an
- * MCP 1.x client, carrying the current tool id as `casper/acpToolCallId`,
+ * `{ mcp, args?, mcpServer? }` (calls that tool on the first `mcpServers` entry, or on the entry named `mcpServer`,
+ * with an MCP 1.x client, carrying the current tool id as `casper/acpToolCallId`,
  * and logs `{ event: 'mcp', name, result, server }`, `server` being the answered serverInfo).
  * With `mcpHttp: true` the `initialize` reply sets `mcpCapabilities.http`, as
  * a Casper whose `acp_mcp` is not off does, so the app hands it its own
@@ -221,6 +221,7 @@ interface Step {
   exitAfterMs?: number
   mcp?: string
   args?: Record<string, unknown>
+  mcpServer?: string
   toolUpdate?: number | 'box'
   /** A running shell step's latest whole lines, as Casper sends them with `acp_live_output` on; see the module comment. */
   live?: number
@@ -590,7 +591,7 @@ async function run(step: Step, params: PromptRequest, client: AgentContext, outc
     }
     if (step.planBox !== undefined) await planBox(step.planBox, step.during ?? [], params, client, outcome)
     if (step.elicit !== undefined) await elicit(step.elicit, step.during ?? [], params, client, outcome)
-    if (step.mcp !== undefined) await callMcp(step.mcp, step.args ?? {})
+    if (step.mcp !== undefined) await callMcp(step.mcp, step.args ?? {}, step.mcpServer)
     if (step.steerRead !== undefined) await steerRead(step.steerRead, client)
     if (step.waitFile !== undefined) await until(step.waitFile)
     if (step.stderr !== undefined) process.stderr.write(`${step.stderr}\n`)
@@ -745,9 +746,9 @@ function steerText(prompt: unknown): string {
   return blocks.flatMap(block => block.type === 'text' && typeof block.text === 'string' ? [block.text] : []).join('\n').trim()
 }
 
-/** Call one tool on the app's MCP server the way Casper's MCP client does. */
-async function callMcp(name: string, args: Record<string, unknown>): Promise<void> {
-  const server = mcpServers[0]
+/** Call one tool on the app's MCP server, or on the entry named `entry`, the way Casper's MCP client does. */
+async function callMcp(name: string, args: Record<string, unknown>, entry?: string): Promise<void> {
+  const server = entry === undefined ? mcpServers[0] : mcpServers.find(candidate => candidate.name === entry)
   if (server === undefined || !('type' in server) || server.type !== 'http') {
     log({ event: 'mcp', name, error: 'no http MCP server offered' })
     return

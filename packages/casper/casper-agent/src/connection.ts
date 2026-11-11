@@ -189,9 +189,11 @@ export interface CasperConnectionOptions {
    * Build the app's own MCP servers this connection hands Casper after the app tools server; omitted hands none.
    * Called only when Casper's `initialize` reply sets `mcpCapabilities.http` to true.
    * @param signal - aborted when the start is stopped.
+   * @param appTools - this connection's app tools server, which serves the app's own MCP client rows; undefined
+   *   when it offers none, so no row is handed over.
    * @returns the entries, their names, and their digest.
    */
-  readonly mcpServers?: ((signal: AbortSignal) => Promise<ForwardedServers>) | undefined
+  readonly mcpServers?: ((signal: AbortSignal, appTools: AppToolsServer | undefined) => Promise<ForwardedServers>) | undefined
   /**
    * With no stored conversation, copy this one with `session/fork`, cut at `at` (Casper's mark), when Casper offers
    * `sessionCapabilities.fork`; Casper's refusal starts a fresh one instead. Omitted copies none.
@@ -320,6 +322,16 @@ export class CasperConnection {
   /** The names of the app's own servers handed to Casper at open; Casper names them `acp-<name>`. */
   get forwardedNames(): readonly string[] {
     return this.forwarded?.names ?? []
+  }
+
+  /** The app's own MCP client rows handed to Casper at open, which the app tools server serves. */
+  get forwardedRows(): readonly string[] {
+    return this.forwarded?.rows ?? []
+  }
+
+  /** The app tools server this connection offers Casper; undefined when it offers none. */
+  get appToolsServer(): AppToolsServer | undefined {
+    return this.appTools
   }
 
   /**
@@ -690,7 +702,7 @@ export class CasperConnection {
   /** Build the app's own servers when Casper takes HTTP servers and a builder is configured. */
   private async forwardServers(signal: AbortSignal): Promise<McpServer[]> {
     if (this.options.mcpServers === undefined || this.initialized?.agentCapabilities?.mcpCapabilities?.http !== true) return []
-    this.forwarded = await this.options.mcpServers(signal)
+    this.forwarded = await this.options.mcpServers(signal, this.appTools)
     return this.forwarded.entries
   }
 
