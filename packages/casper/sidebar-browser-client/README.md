@@ -15,6 +15,7 @@ This Client plugin runs the browser operations of [`@deepseek-ai/dsh-casper-side
 - [Understand the implementation](#understand-the-implementation)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
 
 -----
 
@@ -64,3 +65,13 @@ None directly: the Host tools append results after the latest step.
 
 - **Replay memory** — duplicate suppression lives in the Client page. A page reload loses it, and the reload also destroys the browser guests that the replayed input would reach.
 - **Origin check timing** — the origin check reads the tab list just before the command; a navigation between that read and the input reaching the page is not detected.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>
