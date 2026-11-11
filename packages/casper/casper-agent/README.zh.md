@@ -47,7 +47,7 @@ kind: "package-reference"
 
 子进程不会收到 `DEEPSEEK_*` 或 `DSH_*` 名称，也不会收到 `env` 未列出的凭据类名称。唯一的例外是应用 profile：应用带 profile 运行时，Casper 会收到 `DSH_PROFILE` 与 `DSH_PROFILE_DIR`，使它构建的 bundle 能指明要安装到的 profile。
 
-会话在 Casper 预设上创建时即成为 Casper 会话。空白会话不能在 Casper 与其他预设之间切换：预设注册表以 `agent-preset/locked` 与 `newSession: true` 拒绝这种切换，模式选择器则改为在所选预设上开启新会话。已存储的会话由其记录的预设所选择的工厂恢复；未记录预设的会话仍使用 agent-loop。
+会话在 Casper 预设上创建时即成为 Casper 会话。空白会话不能在 Casper 与其他预设之间切换：预设注册表以 `agent-preset/locked` 与 `newSession: true` 拒绝这种切换，模式选择器则改为在所选预设上开启新会话。桌面端重新打开已存储的会话时（从会话列表、为后续消息，或为指向它的定时任务），由其记录的预设所选择的工厂运行它，因此 Casper 会话会在 Casper 中重新打开；未记录预设的会话仍使用 agent-loop。其他会重新打开会话的应用列在[已知限制](#known-limitations-and-deferred-work)中。
 
 无法运行的轮次在 `turn/end` 上以错误结束：找不到命令时为 `CASPER_NOT_FOUND`，Casper 未能启动时为 `CASPER_START_FAILED`，轮次中途退出时为 `CASPER_EXITED`，提示中没有 Casper 能读取的内容时为 `CASPER_EMPTY_PROMPT`：没有文本、图片或文件，或只有无法发送的图片和文件（不会向 Casper 发送任何内容），达到 Casper 的轮次上限时为 `CASPER_TURN_LIMIT`，Casper 拒绝所选模型或推理等级时为 `CASPER_MODEL_UNAVAILABLE`（不发送提示），Casper 未接受仅可查看或工作区内修改时为 `CASPER_ACCESS_NOT_APPLIED`（不发送提示，或停止正在运行的提示），[提及的会话](#session-mentions)无法发送时为某个 `SESSION_REFERENCE_*` 代码（不启动 Casper），收到错误回复时为 `CASPER_RPC_<code>`。会话仍可使用；下一条提示会再次启动 Casper。`CASPER_TEXT_ONLY` 已不再产生，只出现在早期版本保存的轮次中。
 
@@ -169,7 +169,7 @@ Casper 在 `session/new` 与 `session/load` 的回复中发送它的选项，并
 <a id="process-lifetime-and-resume"></a>
 ### 进程生命周期与恢复
 
-Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打开会话。`session/new` 之后，对话 id 会在发送提示前存入 sidecar。之后的进程用 `session/load` 重新打开它，并丢弃回放的更新，因为会话已经保存了历史；只有 Casper 的“没有已保存对话”回复（`-32002`，消息中含不区分大小写的 "no saved conversation"）会开启新对话，且该轮以一行说明开头，即使该轮随后什么也没有发送。Casper 只在第一次回复后保存对话，因此进程在此之前就停止的对话会以这种方式重新开始。其他加载失败会结束该轮并保留记录。释放时关闭 stdin，等待 `exitGraceMs`，然后终止进程，符合桌面端 10 秒的 Host 退出时限。恢复会像 agent-loop 一样修复中断的轮次，且不启动进程。
+Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打开会话。`session/new` 之后，对话 id 会在发送提示前存入 sidecar。之后的进程用 `session/load` 重新打开它，并丢弃回放的更新，因为会话已经保存了历史；只有 Casper 的“没有已保存对话”回复（`-32002`，消息中含不区分大小写的 "no saved conversation"）会开启新对话，且该轮以一行说明开头，即使该轮随后什么也没有发送。Casper 只在第一次回复后保存对话，因此进程在此之前就停止的对话会以这种方式重新开始。其他加载失败会结束该轮并保留记录。只有当会话的项目文件夹仍是存入记录时的文件夹时，才会使用该记录：文件夹已改变的会话会开启新的 Casper 对话，且该轮没有说明这一点的行。释放时关闭 stdin，等待 `exitGraceMs`，然后终止进程，符合桌面端 10 秒的 Host 退出时限。恢复会像 agent-loop 一样修复中断的轮次，且不启动进程。
 
 会话在 Casper 运行时空闲满 `idleExitMs` 后，插件用 `_casper/idle`（Casper 的决策 91）询问 Casper 能否关闭进程。回复只列出工作的种类：没有提示或模型更改正在进行，也没有开发服务器、命令、调试器、助手或检查仍在工作（包括写给 AI 的说明仍在写入的命令）时，Casper 才算空闲；Casper 自己的 `acp_idle_exit: off` 总是回答不空闲。Casper 回答空闲且期间没有任何工作开始时，进程会像释放时一样被关闭。检查期间的一轮、一次模型选择、一次访问切换或一次「先计划」设置都会保留进程并重新开始计时；Casper 不空闲、10 秒内没有回答或不认识该请求（`-32601`）时也会保留，并在下一个空闲时长后再次询问。下一条提示要等旧进程退出后才启动 Casper，并用 `session/load` 重新打开对话，不会出现新对话的那一行。加载时 Casper 沿用对话自己的模型；若它不是被关闭的进程所用的模型，该轮以 `[Casper reopened on <model>; it was <model>.]` 开头，插件不发送模型设置。被关闭的进程只为本会话允许的内容随之结束：「本会话内都同意」的回答，以及 Casper 自己选的访问模式。重新打开的 Casper 在第一条提示之前会再次得到访问控制的模式和会话的「先计划」值。
 
@@ -245,8 +245,8 @@ Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打�
 - 对 `initialize` 回复中未设置 `agentCapabilities._meta.casper.steer` 的旧版 Casper，引导消息作为下一条提示送达。
 - 在本应用中还没有任何 Casper 发送过命令列表之前，Casper 的命令不会出现在 `/` 菜单中，直到会话的第一条提示启动 Casper。
 - 拒绝 fork Casper 会话。
-- Headless、SDK 服务器、ACP 与 webhook 恢复不传预设，因此由它们重新打开的 Casper 会话运行在 agent-loop 上。
-- 未保存预设的定时任务在桌面端运行于 Casper，因为它们通过会话控制器以默认预设创建会话。
+- `dsh --profile acp` 与 SDK 服务器重新打开已存储的会话时不传预设，也没有 Casper 驱动，因此在那里重新打开的 Casper 会话运行在应用自己的 agent 循环上，并使用该应用选择的模型，而不是在 Casper 中运行。桌面端下次打开它时，Casper 会重新加载自己的对话，其中没有在别处添加的轮次。一次性运行器会拒绝记录了预设的会话，webhook 只会在其规则指定的预设上创建新会话。
+- 没有保存预设的定时任务在 Casper 中运行：在自动化任务页面创建的任务会在默认预设上创建其会话，而桌面端的默认预设是 Casper，除非设置中指定了其他预设。由 Standard 会话的提醒工具创建的任务会保留该会话的预设，指向现有 Casper 会话的任务会作为其下一条提示在那里运行。Casper 会话自身没有提醒工具。
 - 只覆盖 macOS 与 Linux 上的桌面端；Windows 查找未经测试。
 - 已删除会话的 sidecar 记录要到下次启动时才会删除；已归档的会话会保留其进程，直到空闲满 `idleExitMs`。决策 91 之前的 Casper 在空闲时不会被关闭。
 - Subagent、团队与目标功能不在 Casper 会话中运行。
