@@ -85,6 +85,10 @@ describe('Casper\'s approval card', () => {
       ].join('\n'),
       options: [{ label: 'No' }, { label: 'Yes, this once', description: 'Only this write' }, { label: 'Yes for this session' }],
       multiSelect: false,
+      diffs: [
+        { path: FILE, oldText: 'one\ntwo\n', newText: 'one\n2\n' },
+        { path: '/work/project/new.txt', oldText: null, newText: 'fresh' },
+      ],
     })
     expect(options).toEqual([NO, ONCE, SESSION])
     // A diff alone is the whole detail.
@@ -101,6 +105,55 @@ describe('Casper\'s approval card', () => {
     expect(diffText([preview])).toBeUndefined()
     expect(diffText(undefined)).toBeUndefined()
     expect(MAX_CARD_OPTIONS).toBe(4)
+  })
+
+  it('only a box marked for Casper\'s card carries its diffs, and approvalDiff off leaves them as text lines', () => {
+    const diff = { type: 'diff' as const, path: FILE, oldText: 'a', newText: 'b' }
+    const marked = permissionQuestion(boxWith([diff]))
+    expect(marked.question.diffs).toEqual([{ path: FILE, oldText: 'a', newText: 'b' }])
+    expect(marked.question.detail).toBe(`${FILE}\n- a\n+ b`)
+    // Off: the same detail, no diffs.
+    const off = permissionQuestion(boxWith([diff]), { diff: false })
+    expect(off.question.header).toBe(CASPER_BOX_HEADER)
+    expect(off.question.detail).toBe(marked.question.detail)
+    expect(off.question).not.toHaveProperty('diffs')
+    // The generic card: approvalCard off, or a box without a refusal.
+    expect(permissionQuestion(boxWith([diff]), { card: false }).question).not.toHaveProperty('diffs')
+    expect(permissionQuestion(boxWith([diff], [ONCE, SESSION])).question).not.toHaveProperty('diffs')
+    // A box with no diff, such as a write's, carries none.
+    expect(permissionQuestion(request([NO, ONCE], 'text')).question).not.toHaveProperty('diffs')
+    // A plan review keeps its own shape.
+    const plan = permissionQuestion({
+      sessionId: 's',
+      toolCall: { toolCallId: 'casper-approval-2', content: [{ type: 'content', content: { type: 'text', text: '# Plan\n\nDo it.' } }, diff], _meta: { casper: { plan: { approve: 'Build', change: 'Change the plan' } } } },
+      options: [{ optionId: 'b', name: 'Build', kind: 'allow_once' }, { optionId: 'c', name: 'Change the plan', kind: 'reject_once' }],
+    })
+    expect(plan.question.intent?.kind).toBe('plan-review')
+    expect(plan.question).not.toHaveProperty('diffs')
+  })
+
+  it('a text line and a diff give the detail and diffs Casper\'s card cuts (approval-card.client.spec.tsx)', () => {
+    const { question } = permissionQuestion({
+      sessionId: 'acp',
+      toolCall: {
+        toolCallId: 'casper-approval-6',
+        title: 'Edit notes.txt?',
+        content: [
+          { type: 'content', content: { type: 'text', text: 'Change one line.' } },
+          { type: 'diff', path: '/work/notes.txt', oldText: 'old', newText: 'new' },
+        ],
+      },
+      options: [{ optionId: '1', name: 'No', kind: 'reject_once' }, { optionId: '2', name: 'Yes', kind: 'allow_once' }],
+    })
+    expect(question.detail).toBe('Change one line.\n\n/work/notes.txt\n- old\n+ new')
+    expect(question.diffs).toEqual([{ path: '/work/notes.txt', oldText: 'old', newText: 'new' }])
+    const off = permissionQuestion({
+      sessionId: 'acp',
+      toolCall: { toolCallId: 'casper-approval-5', title: 'Edit notes.txt?', content: [{ type: 'diff', path: '/work/notes.txt', oldText: 'old', newText: 'new' }] },
+      options: [{ optionId: '1', name: 'No', kind: 'reject_once' }, { optionId: '2', name: 'Yes, this once', kind: 'allow_once' }],
+    }, { diff: false }).question
+    expect(off.detail).toBe('/work/notes.txt\n- old\n+ new')
+    expect(off).not.toHaveProperty('diffs')
   })
 
   it('approvalCard off sets no header', () => {

@@ -102,3 +102,8 @@
     --dsh-button-outline-color: transparent;
   }
 }
+
+.diff {
+  flex-shrink: 0;
+  margin-bottom: 2px;
+}

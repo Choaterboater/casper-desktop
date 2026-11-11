@@ -67,6 +67,20 @@ type AskUserQuestionIntent = {
 
 `AskUserQuestionItem` is one question in a request. The caller supplies a stable `id`, which is echoed back with the answer so batched questions remain routable. Optional `detail` carries supporting text that providers render with the question but keep out of selectable option labels.
 
+Optional `diffs` lists the file changes the question is about, so a UI that can draw a diff shows them; `detail` still says them in words for every other UI. Casper's approval card draws them.
+
+```ts type-equiv
+/** One file change a question is about: the path, the text before (null for a new file or an insertion) and after. */
+interface AskUserQuestionDiff {
+  /** The changed file's path. */
+  path: string
+  /** Text before the change, or null when there was none. */
+  oldText: string | null
+  /** Text after the change. */
+  newText: string
+}
+```
+
 ```ts type-equiv
 /** One question in a user-questions request. */
 interface AskUserQuestionItem {
@@ -84,6 +98,8 @@ interface AskUserQuestionItem {
   multiSelect?: boolean
   /** Optional presentation intent for capable UIs; absent asks for the generic option list. */
   intent?: AskUserQuestionIntent
+  /** File changes the question is about, for a UI that can draw them; `detail` still says them in words. */
+  diffs?: AskUserQuestionDiff[]
 }
 ```
 

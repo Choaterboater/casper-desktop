@@ -938,6 +938,11 @@
     },
     {
       "doc": "docs/subsystems/user-questions.md",
+      "symbol": "AskUserQuestionDiff",
+      "source": "packages/interaction/user-questions/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/user-questions.md",
       "symbol": "AskUserQuestionItem",
       "source": "packages/interaction/user-questions/src/types.ts"
     },

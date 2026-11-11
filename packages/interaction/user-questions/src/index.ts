@@ -30,7 +30,7 @@ import type {
 } from './types.ts'
 
 export type {
-  AskUserQuestionAnswer, AskUserQuestionAnswerItem, AskUserQuestionIntent, AskUserQuestionItem,
+  AskUserQuestionAnswer, AskUserQuestionAnswerItem, AskUserQuestionDiff, AskUserQuestionIntent, AskUserQuestionItem,
   AskUserQuestionOption, PendingUserQuestion, SettledUserQuestion, UserQuestionProjectionView,
   UserQuestionState,
 } from './types.ts'

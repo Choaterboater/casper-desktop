@@ -43,6 +43,8 @@ export interface Config {
   accessModes: Record<string, AccessModeId>
   /** Show Casper's boxes with Casper's approval card; off shows the generic question card. */
   approvalCard: boolean
+  /** Draw the diff an edit's box carries in Casper's approval card; needs approvalCard. Off shows the diff as text lines. */
+  approvalDiff: boolean
   /**
    * Hand Casper the enabled Settings > MCP servers, credentials resolved, when Casper takes HTTP servers; Casper
    * connects to them for the session and asks before their changes. A change reaches Casper at the next turn.
@@ -76,6 +78,7 @@ export const Config: z<Config> = z.object({
   appTools: z.boolean().default(true),
   accessModes: z.dict(z.union(ACCESS_MODE_IDS as AccessModeId[])).default({ ...DEFAULT_ACCESS_MODES }),
   approvalCard: z.boolean().default(true),
+  approvalDiff: z.boolean().default(true),
   forwardMcpServers: z.boolean().default(true),
   forwardPluginMcpServers: z.boolean().default(true),
   idleExitMs: z.natural().default(900_000),
