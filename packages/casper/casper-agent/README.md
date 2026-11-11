@@ -201,6 +201,8 @@ The server speaks MCP Streamable HTTP as `dsh-desktop`, with the app's dsh runti
 | `list_mcp_resource_templates` | dsh `list_mcp_resource_templates` | read-only |
 | `read_mcp_resource` | dsh `read_mcp_resource` | read-only |
 
+A read-only tool is listed with `readOnlyHint: true`, so Casper runs it without asking. A served tool whose app tool came from an MCP server through `@deepseek-ai/dsh-mcp-client` is listed with that server's own `readOnlyHint`, `destructiveHint`, `idempotentHint` and `openWorldHint` instead, and this server adds none of its own; none of the tools above comes from an MCP server.
+
 The three resource tools are always listed, with fixed schemas, and their descriptions name the Settings and plugin-registered servers this process was handed as Casper names them (`acp-<name>`). A call maps `acp-<name>` to the app's server `<name>` and runs only on a server this process was handed. While no server in the app offers resources, the app has no such tool, and the call returns "No MCP server in the app offers resources right now."
 
 `present` comes from the Casper preset's `@deepseek-ai/dsh-tool-present` row. A call records `deliverables/presented` against the open Casper turn under the call id of the Casper step that made it, so the app shows each file as a card in that turn, as in Standard; a call after the turn ends gets the turn-over error and records nothing. Casper keeps four pinned tools, so `present` holds the pin `cordis_inspect_query` had, and Casper reaches `cordis_inspect_query` through find_capability.
