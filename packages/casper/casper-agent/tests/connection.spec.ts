@@ -31,6 +31,7 @@ async function setup(script: FakeScript = { prompts: [] }) {
   const configs: SessionConfigOption[][] = []
   const modes: string[] = []
   const plans: boolean[] = []
+  const titles: string[] = []
   const forms: { params: CreateElicitationRequest; signal: AbortSignal }[] = []
   const form = { reply: (_params: CreateElicitationRequest, _signal: AbortSignal): Promise<CreateElicitationResponse> => Promise.resolve({ action: 'cancel' }) }
   const handlers: CasperConnectionHandlers = {
@@ -39,6 +40,7 @@ async function setup(script: FakeScript = { prompts: [] }) {
     config: (options) => { configs.push([...options]) },
     mode: (modeId) => { modes.push(modeId) },
     plan: (active) => { plans.push(active) },
+    title: (text) => { titles.push(text) },
     permission: () => Promise.resolve({ outcome: { outcome: 'cancelled' } }),
     elicitation: (params, signal) => {
       forms.push({ params, signal })
@@ -56,7 +58,7 @@ async function setup(script: FakeScript = { prompts: [] }) {
     cleanups.push(() => started.connection.dispose())
     return started
   }
-  return { fake, ctx, updates, commands, configs, modes, plans, forms, form, handlers, start }
+  return { fake, ctx, updates, commands, configs, modes, plans, titles, forms, form, handlers, start }
 }
 
 /** A stand-in app tools server with a fresh token that records whether it was closed. */
@@ -207,6 +209,24 @@ describe('CasperConnection', { timeout: 30_000 }, () => {
     // The replayed chunks are dropped, but the list sent with them is not.
     expect(commands).toEqual([[status, review]])
     expect(updates).toEqual([])
+  })
+
+  it('hands Casper\'s conversation names to their handler mid-prompt and after a load\'s reply, never to update', async () => {
+    const { start, updates, titles, fake } = await setup({
+      prompts: [[{ title: 'Fix the cache miss' }, { title: null }, { text: 'done\n' }]], known: ['stored-1'], replay: ['earlier request'], title: 'Stored name',
+    })
+    const fresh = await start()
+    await fresh.connection.prompt([{ type: 'text', text: 'go' }])
+    // A null title clears nothing: the app keeps the name it has.
+    expect(titles).toEqual(['Fix the cache miss'])
+    expect(updates.map(entry => entry.update.sessionUpdate)).toEqual(['agent_message_chunk', 'agent_message_chunk'])
+    titles.length = 0
+    updates.length = 0
+    await start({}, 'stored-1')
+    await waitFor(() => titles.length === 1)
+    expect(titles).toEqual(['Stored name'])
+    expect(updates).toEqual([])
+    expect(fake.calls('session/load')).toHaveLength(1)
   })
 
   it('keeps Casper\'s options from session/new and session/load, and hands option updates to their handler during a replay too', async () => {

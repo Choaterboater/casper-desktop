@@ -86,6 +86,8 @@ export interface FakeScript {
   readonly holdIdle?: string
   /** The options of a successful `session/load` reply and from then on, as when Casper puts back the conversation's model. */
   readonly loadConfigOptions?: readonly SessionConfigOption[]
+  /** Casper's stored name, sent as a `session_info_update` right after a successful `session/load` reply. */
+  readonly title?: string
 }
 
 /** One command the stand-in offers, in ACP's `available_commands_update` shape. */
@@ -152,6 +154,7 @@ export function fakeCasper(script: FakeScript = { prompts: [] }): FakeCasper {
       appGoals: true,
       appTeams: true,
       casperChildModel: true,
+      casperTitles: true,
       accessModes: { ...DEFAULT_ACCESS_MODES },
       approvalCard: true,
       approvalDiff: true,

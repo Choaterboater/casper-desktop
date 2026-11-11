@@ -129,6 +129,14 @@ export interface CasperConnectionHandlers {
    */
   plan(active: boolean): void
   /**
+   * Receive the conversation's name from a `session_info_update`, which never
+   * reaches {@link update}: as Casper names the conversation during a prompt,
+   * after a typed `/rename`, and right after a `session/load` reply. A missing
+   * or null title is not passed on.
+   * @param title - the name Casper gives the conversation.
+   */
+  title?(title: string): void
+  /**
    * Hear that the process exited or was terminated, after the connection is
    * marked dead; called once.
    */
@@ -572,6 +580,9 @@ export class CasperConnection {
         } else if (update.sessionUpdate === 'current_mode_update') {
           if (this.modes_ !== undefined) this.modes_ = { ...this.modes_, currentModeId: update.currentModeId }
           this.casperMode(update.currentModeId)
+        } else if (update.sessionUpdate === 'session_info_update') {
+          // The name is current state too, so it counts during a replay and between prompts.
+          if (typeof update.title === 'string') options.handlers.title?.(update.title)
         } else if (!this.replaying) options.handlers.update(params)
       })
       .onRequest(methods.client.session.requestPermission, ({ params, signal }) => options.handlers.permission(params, signal))

@@ -31,7 +31,9 @@
  *   another with -32602, and fails with -32603 and `setModeError` when set. A
  *   set of the `mode` option or of the mode changes both. `replayMode` changes
  *   the mode and sends a `current_mode_update` among the replayed chunks of a
- *   successful `session/load`.
+ *   successful `session/load`. `title` is sent as a `session_info_update` right
+ *   after the reply of a successful `session/load`, as Casper sends a reopened
+ *   conversation's stored name.
  * - `FAKE_CASPER_LOG` — JSON lines appended for the start (argv, env names,
  *   PATH, cwd), every request and notification received, every permission
  *   answer, and stdin EOF. Tests poll this file.
@@ -61,7 +63,9 @@
  * `agent_thought_chunk` with that text, as Casper sends a reasoning headline
  * or a retry), `{ commandsUpdate }` (sends
  * that `available_commands_update` list), `{ configUpdate }` (replaces the
- * option list and sends it as a `config_option_update`), `{ mode }` (Casper
+ * option list and sends it as a `config_option_update`), `{ title }` (a
+ * `session_info_update` naming the conversation, as Casper sends a name it
+ * made or a typed `/rename`; null clears it, which Casper never sends), `{ mode }` (Casper
  * changes its own access mode, as "Yes to everything this session" does: a
  * `current_mode_update`, then a `config_option_update` when it has a `mode`
  * option), `{ late: Step }` (played 50 ms
@@ -214,6 +218,7 @@ interface Step {
   kind?: ToolKind
   commandsUpdate?: AvailableCommand[]
   configUpdate?: SessionConfigOption[]
+  title?: string | null
   mode?: string
   elicit?: Elicit
   steerRead?: number
@@ -306,6 +311,7 @@ interface Script {
   idle?: IdleReply[] | null
   holdIdle?: string
   loadConfigOptions?: SessionConfigOption[]
+  title?: string
 }
 
 /** The `_casper/idle` reply C17 sends. */
@@ -448,6 +454,7 @@ async function run(step: Step, params: PromptRequest, client: AgentContext, outc
       configOptions = step.configUpdate
       await update(client, { sessionUpdate: 'config_option_update', configOptions: step.configUpdate })
     }
+    if (step.title !== undefined) await update(client, { sessionUpdate: 'session_info_update', title: step.title, updatedAt: new Date().toISOString() })
     if (step.mode !== undefined) {
       setModeTo(step.mode)
       await update(client, { sessionUpdate: 'current_mode_update', currentModeId: step.mode })
@@ -766,6 +773,9 @@ createAcpAgent({ name: 'fake-casper' })
       setModeTo(script.replayMode)
       await update(client, { sessionUpdate: 'current_mode_update', currentModeId: script.replayMode })
     }
+    // Like Casper, the stored name follows the reply.
+    const { title } = script
+    if (title !== undefined) setImmediate(() => { void update(client, { sessionUpdate: 'session_info_update', title, updatedAt: new Date().toISOString() }) })
     return opened()
   })
   .onRequest(methods.agent.session.prompt, ({ params, client }) => {

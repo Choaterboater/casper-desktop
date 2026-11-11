@@ -3011,7 +3011,7 @@ describe('A Casper session\'s written title', { timeout: 60_000 }, () => {
   const DEFAULT_ROUTE = { provider: 'default-provider', model: 'default-model' }
 
   /** A Host with the title service and a first-prompt provider that writes a title on the route it is given. */
-  async function withTitles(script: FakeScript) {
+  async function withTitles(script: FakeScript, overrides: Overrides = {}) {
     const fake = fakeCasper(script)
     cleanups.push(() => { fake.remove() })
     const generate = vi.fn(async (request: SessionTitleProviderRequest) => ({
@@ -3019,7 +3019,7 @@ describe('A Casper session\'s written title', { timeout: 60_000 }, () => {
       messageSeqs: [request.messages[0]!.seq],
       ...request.route === undefined ? {} : { model: request.route },
     }))
-    const host = await boot(fake, {}, undefined, true, async (ctx) => {
+    const host = await boot(fake, overrides, undefined, true, async (ctx) => {
       await ctx.plugin(SessionTitleService, { fallbackMaxWords: 8, fallbackMaxBytes: 64, maxTitleBytes: 64 })
       ctx.sessionTitle.register({ id: SessionTitleProviderId('first-prompt'), automatic: 'first-prompt', generate })
     })
@@ -3027,12 +3027,98 @@ describe('A Casper session\'s written title', { timeout: 60_000 }, () => {
     const create = (id: string) => host.ctx.agents.create({
       sessionId: SessionId(id), meta: { cwd: fake.cwd, agentPreset: 'casper' }, agentOptions: { ...DEFAULT_ROUTE },
     })
-    return { host, generate, create }
+    const resume = (id: string) => host.ctx.agents.resume({ resumeSessionId: SessionId(id), agentPreset: 'casper', agentOptions: { ...DEFAULT_ROUTE } })
+    return { fake, host, generate, create, resume }
   }
 
-  it('the first prompt gets a model-written title on the app\'s default model', async () => {
-    const { host, generate, create } = await withTitles({ prompts: [[{ text: 'Done.\n' }]] })
+  /** The Session's `session/title` events, oldest first. */
+  function titles(agent: Agent): unknown[] {
+    return eventsOf(agent).flatMap(event => event.type === 'session/title' ? [event.data] : [])
+  }
+
+  /** The seq of the Session's first human message. */
+  function firstMessageSeq(agent: Agent): number | undefined {
+    return eventsOf(agent).find(event => event.type === 'user/message')?.seq
+  }
+
+  const CASPER = { kind: 'provider', provider: 'casper' }
+
+  it('takes the name Casper sends as the title, and asks no model for one', async () => {
+    const { host, generate, create } = await withTitles({ prompts: [[{ title: 'Fix the cache miss' }, { text: 'Done.\n' }]] })
     const { agent } = await create('casper-title')
+    await run(agent, 'please explain how the cache picks its key and fix the miss')
+    await waitFor(() => host.ctx.sessionTitle.get(agent.session)?.source.kind === 'provider')
+    expect(host.ctx.sessionTitle.get(agent.session)).toMatchObject({ title: 'Fix the cache miss', source: CASPER })
+    // No model is named, since none made it, and the title cites the opening message as the fallback did.
+    expect(host.ctx.sessionTitle.get(agent.session)?.source).toEqual(CASPER)
+    expect(titles(agent)).toEqual([
+      { title: 'please explain how the cache picks its key', messageSeqs: [firstMessageSeq(agent)], source: { kind: 'fallback' } },
+      { title: 'Fix the cache miss', messageSeqs: [firstMessageSeq(agent)], source: CASPER },
+    ])
+    expect(generate).not.toHaveBeenCalled()
+  })
+
+  it('an older Casper that sends no title keeps the title of the opening words, with no model call', async () => {
+    const { host, generate, create } = await withTitles({ prompts: [[{ text: 'Done.\n' }], [{ text: 'Again.\n' }]] })
+    const { agent } = await create('casper-title-older')
+    await run(agent, 'please explain how the cache picks its key and fix the miss')
+    await run(agent, 'and now the second part')
+    expect(host.ctx.sessionTitle.get(agent.session)).toMatchObject({ title: 'please explain how the cache picks its key', source: { kind: 'fallback' } })
+    expect(generate).not.toHaveBeenCalled()
+  })
+
+  it('a later name replaces the earlier one, and the same name is written once', async () => {
+    const { host, generate, create } = await withTitles({ prompts: [
+      [{ title: 'Fix the cache miss' }, { text: 'One.\n' }],
+      [{ title: 'Fix the cache miss' }, { title: 'Cache key rename' }, { text: 'Two.\n' }],
+    ] })
+    const { agent } = await create('casper-title-later')
+    await run(agent, 'first prompt of the session')
+    await run(agent, 'second prompt of the session')
+    expect(titles(agent).map(data => (data as { title: string }).title)).toEqual(['first prompt of the session', 'Fix the cache miss', 'Cache key rename'])
+    expect(host.ctx.sessionTitle.get(agent.session)).toMatchObject({ title: 'Cache key rename', source: CASPER })
+    expect(generate).not.toHaveBeenCalled()
+  })
+
+  it('a title the user renamed is never written over, before or after Casper names the conversation', async () => {
+    const { host, generate, create } = await withTitles({ prompts: [
+      [{ title: 'Fix the cache miss' }, { text: 'One.\n' }],
+      [{ title: 'Typed rename' }, { text: 'Two.\n' }],
+      [{ title: 'Another name' }, { text: 'Three.\n' }],
+    ] })
+    // Prompts play in order across both Sessions: the early one renamed before Casper named it.
+    const early = await create('casper-title-renamed-early')
+    early.agent.followup(prompt('first prompt of the session'))
+    host.ctx.sessionTitle.rename(early.agent.session, 'My own name')
+    await early.agent.whenIdle()
+    expect(host.ctx.sessionTitle.get(early.agent.session)).toMatchObject({ title: 'My own name', source: { kind: 'user' } })
+    const late = await create('casper-title-renamed-late')
+    await run(late.agent, 'first prompt of the session')
+    expect(host.ctx.sessionTitle.get(late.agent.session)).toMatchObject({ title: 'Typed rename', source: CASPER })
+    host.ctx.sessionTitle.rename(late.agent.session, 'My own name')
+    await run(late.agent, 'second prompt of the session')
+    expect(host.ctx.sessionTitle.get(late.agent.session)).toMatchObject({ title: 'My own name', source: { kind: 'user' } })
+    expect(titles(late.agent).at(-1)).toEqual({ title: 'My own name', messageSeqs: [], source: { kind: 'user' } })
+    expect(generate).not.toHaveBeenCalled()
+  })
+
+  it('a reopened Session takes the stored name Casper sends after the load reply', async () => {
+    const { fake, host, generate, create, resume } = await withTitles({ prompts: [[{ text: 'One.\n' }], [{ text: 'Two.\n' }]] })
+    const handle = await create('casper-title-reopened')
+    await run(handle.agent, 'first prompt of the session')
+    expect(host.ctx.sessionTitle.get(handle.agent.session)).toMatchObject({ source: { kind: 'fallback' } })
+    await handle.dispose()
+    fake.script({ prompts: [[{ text: 'One.\n' }], [{ text: 'Two.\n' }]], title: 'Stored name' })
+    const { agent } = await resume('casper-title-reopened')
+    await run(agent, 'second prompt of the session')
+    expect(fake.calls('session/load')).toHaveLength(1)
+    expect(host.ctx.sessionTitle.get(agent.session)).toMatchObject({ title: 'Stored name', source: CASPER })
+    expect(generate).not.toHaveBeenCalled()
+  })
+
+  it('with casperTitles off, Casper\'s name is ignored and the first prompt gets a model-written title on the app\'s default model', async () => {
+    const { host, generate, create } = await withTitles({ prompts: [[{ title: 'Fix the cache miss' }, { text: 'Done.\n' }]] }, { casperTitles: false })
+    const { agent } = await create('casper-title-off')
     await run(agent, 'please explain how the cache picks its key and fix the miss')
     await waitFor(() => host.ctx.sessionTitle.get(agent.session)?.source.kind === 'provider')
     expect(generate).toHaveBeenCalledOnce()
@@ -3041,17 +3127,7 @@ describe('A Casper session\'s written title', { timeout: 60_000 }, () => {
       title: 'Written title',
       source: { kind: 'provider', provider: 'first-prompt', model: DEFAULT_ROUTE },
     })
-  })
-
-  it('a title the user renamed is never written over', async () => {
-    const { host, generate, create } = await withTitles({ prompts: [[{ text: 'One.\n' }], [{ text: 'Two.\n' }]] })
-    const { agent } = await create('casper-title-renamed')
-    agent.followup(prompt('first prompt of the session'))
-    host.ctx.sessionTitle.rename(agent.session, 'My own name')
-    await agent.whenIdle()
-    await run(agent, 'second prompt of the session')
-    expect(generate).not.toHaveBeenCalled()
-    expect(host.ctx.sessionTitle.get(agent.session)).toMatchObject({ title: 'My own name', source: { kind: 'user' } })
+    expect(titles(agent).some(data => (data as { title: string }).title === 'Fix the cache miss')).toBe(false)
   })
 })
 
@@ -3099,7 +3175,8 @@ describe('The model a Casper session\'s children run on', { timeout: 60_000 }, (
   }
 
   it('follows Casper\'s model and effort when the app has the same route, while the title stays on the app\'s default', async () => {
-    const { host, generate, create } = await withRoutes({ configOptions: casperOptions(undefined, 'high'), prompts: [[{ text: 'hi\n' }]] })
+    // The written title is the one Casper's own name replaces by default.
+    const { host, generate, create } = await withRoutes({ configOptions: casperOptions(undefined, 'high'), prompts: [[{ text: 'hi\n' }]] }, { casperTitles: false })
     host.ctx.llm.registerAdapter([SOL.provider], new Routes({ [SOL.model]: ['low', 'high'] }))
     const { agent } = await create('casper-child-model')
     // Before Casper reports its model, the app's default.

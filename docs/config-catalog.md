@@ -534,6 +534,11 @@ export interface Config {
    */
   casperChildModel: boolean
   /**
+   * Name the Session with the title Casper sends, made without a model call, unless the person renamed it; an older
+   * Casper that sends none leaves the title of the opening words. false writes the title on the app's default model.
+   */
+  casperTitles: boolean
+  /**
    * The app's permission presets and the Casper access mode each sets: `read`, `ask`, or `full`. A preset the
    * table does not list, the derived `custom`, and Auto set `ask`; a read-only sandbox always sets `read`.
    */

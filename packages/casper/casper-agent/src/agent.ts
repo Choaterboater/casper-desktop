@@ -48,8 +48,8 @@ import type { Session, SessionId, TurnEndReason, UserMessage } from '@deepseek-a
 import type {} from '@deepseek-ai/dsh-session-persistence'
 // Type-only: `ctx.sessionReferenceResolver`, which reads the Sessions a message mentions.
 import type {} from '@deepseek-ai/dsh-session-reference'
-// Type-only: `ctx.sessionTitle`, which writes the Session's title.
-import type {} from '@deepseek-ai/dsh-session-title'
+// `ctx.sessionTitle`, which writes the Session's title, and the shape a title Casper sends is written in.
+import { normalizeSessionTitle, SessionTitleProviderId } from '@deepseek-ai/dsh-session-title'
 import type {} from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-tools'
@@ -87,6 +87,12 @@ export const FRESH_CONVERSATION_NOTICE = 'Casper could not reopen its earlier co
 
 /** Model name recorded on assistant messages when the config sets none. */
 const DEFAULT_MODEL_LABEL = 'casper'
+
+/** The title source of a name Casper sent; no model made it, so it names none. */
+const CASPER_TITLE_PROVIDER = SessionTitleProviderId('casper')
+
+/** The byte cap a title Casper sends is cut to: the app's `maxTitleBytes` in the base bundle. */
+const CASPER_TITLE_BYTES = 80
 
 /** The error of a turn that would start Casper after the Agent closed. */
 const CLOSING_MESSAGE = 'This session is closing, so Casper was not started.'
@@ -268,8 +274,8 @@ export class CasperAgent implements Agent {
   /**
    * @param pluginCtx - the Casper plugin context whose services the Agent uses.
    * @param id - the Session and Agent identity.
-   * @param startOptions - the options the Agent was created with: the title reads their route, and so do children while
-   *   the app has no route for Casper's current model.
+   * @param startOptions - the options the Agent was created with: the title reads their route with casperTitles off,
+   *   and so do children while the app has no route for Casper's current model.
    * @param session - the Session this Agent drives.
    * @param readers - model-selection, inbox, plan, and Casper's own access projection readers.
    * @param lastTurn - the last turn number recorded in the Session.
@@ -825,12 +831,35 @@ export class CasperAgent implements Agent {
    * Start the title the prompt queued. A Standard Session's title starts when
    * its first model request is logged; Casper's requests never are, so it
    * starts here on the app's default model, the route a new Standard Session
-   * sends its first request on. A renamed title queues nothing.
+   * sends its first request on. A renamed title queues nothing. With
+   * `casperTitles` on, the name Casper sends is the title and no model is asked.
    */
   private startTitle(): void {
+    if (this.config.casperTitles) return
     const { provider, model } = this.startOptions
     if (provider === undefined || model === undefined) return
     this.pluginCtx.get('sessionTitle')?.startQueued(this.session, { provider, model })
+  }
+
+  /**
+   * Write the name Casper sent as the Session title, the way the app writes one:
+   * a title the person renamed is never written over, the same name is not
+   * written twice, and the title cites the human messages the current one
+   * cites, so a Session with no title yet takes none.
+   * @param text - the name from Casper's `session_info_update`.
+   */
+  private casperTitle(text: string): void {
+    const titles = this.pluginCtx.get('sessionTitle')
+    if (!this.config.casperTitles || this.closed || titles === undefined) return
+    try {
+      const current = titles.get(this.session)
+      if (current === undefined || current.source.kind === 'user') return
+      const title = normalizeSessionTitle(text, CASPER_TITLE_BYTES)
+      if (title.length === 0 || title === current.title) return
+      this.session.append('session/title', { title, messageSeqs: [...current.messageSeqs], source: { kind: 'provider', provider: CASPER_TITLE_PROVIDER } })
+    } catch (error: unknown) {
+      this.pluginCtx.logger.warn(`casper agent "${this.id}": Casper's title not written: ${String(error)}`)
+    }
   }
 
   /** Send the prompt; on abort send `session/cancel` and wait the cancel grace before killing Casper. */
@@ -886,6 +915,8 @@ export class CasperAgent implements Agent {
       handlers: {
         update: (notification) => { this.receive(owner.connection, notification) },
         commands: (list) => { this.offerCommands(list) },
+        // A name is the conversation's, whichever process sends it, and the one sent after a load reply comes before the start ends.
+        title: (text) => { this.casperTitle(text) },
         config: () => { if (owner.connection !== undefined && owner.connection === this.connection) this.report(owner.connection) },
         // Casper's own mode change is kept, never copied to the chip; only Read only is restored.
         mode: () => { if (owner.connection !== undefined && owner.connection === this.connection) this.queueLiveAccess() },
