@@ -34,6 +34,7 @@ import TypertRegistry from '@deepseek-ai/dsh-typert-registry'
 import UserQuestionService from '@deepseek-ai/dsh-user-questions'
 import type { AskUserQuestionRequest } from '@deepseek-ai/dsh-user-questions'
 import type { AgentOptions } from '@deepseek-ai/dsh-agent'
+import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import { MockAdapter, textResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 // The preset's other rows, imported from their sources as the Loader would load their packages.
 import * as PluginManagerTools from '../../../boot/plugin-manager/src/tools.ts'
@@ -51,7 +52,7 @@ import { CasperAgent } from '../src/agent.ts'
 import { PLUGIN_SKILL, TURN_OVER } from '../src/app-tools.ts'
 import type { Config } from '../src/config.ts'
 import { prompt, eventsOf } from './harness.ts'
-import { fakeCasper, waitFor } from './support.ts'
+import { casperOptions, fakeCasper, waitFor } from './support.ts'
 import type { FakeCasper, FakeLogEntry, FakeScript } from './support.ts'
 
 const cleanups: (() => Promise<void> | void)[] = []
@@ -510,5 +511,34 @@ it('Casper lists, messages and stops its child through the bridged controls', { 
   const models = await client.callTool({ name: 'list_subagent_models', arguments: {} })
   expect(models.isError).toBe(false)
   writeFileSync(release, '')
+  await agent.whenIdle()
+})
+
+it('a child of a Casper Session runs on Casper\'s model when the app has the same route', { timeout: 60_000 }, async () => {
+  const args = { description: 'list files', prompt: 'List the files in the workspace.' }
+  // Casper reports openai-codex/gpt-6.1-sol at high effort, and the app has that route.
+  const fake = fakeCasper({ configOptions: casperOptions(undefined, 'high'), prompts: [
+    [{ text: 'starting\n' }],
+    [{ tool: 'subagent', target: 'list files', rawInput: args }, { mcp: 'subagent', args }, { toolEnd: 1 }],
+    [],
+  ] })
+  cleanups.push(() => { fake.remove() })
+  const { ctx, create, adapter } = await host(fake)
+  const casperRoute = new MockAdapter([textResponse('child done')], { efforts: [{ id: ReasoningEffortId('high'), name: 'High' }] })
+  ctx.llm.registerAdapter(['openai-codex'], casperRoute)
+  const children: Agent[] = []
+  ctx.on('agent/created', ({ agent }) => { if (agent.session.header.origin === 'subagent') children.push(agent) })
+  const agent = await create('casper-preset-subagent-model')
+  agent.followup(prompt('first'))
+  await agent.whenIdle()
+  await waitFor(() => agent.options.provider === 'openai-codex')
+  agent.followup(prompt('delegate the listing'))
+  const child = await waitFor(() => children[0])
+  expect(child.options).toMatchObject({ provider: 'openai-codex', model: 'gpt-6.1-sol', reasoningEffort: 'high' })
+  await waitFor(() => casperRoute.requests.length > 0)
+  expect(casperRoute.requests[0]).toMatchObject({ provider: 'openai-codex', model: 'gpt-6.1-sol', reasoningEffort: 'high' })
+  // The app's default route sent nothing.
+  expect(adapter.requests).toEqual([])
+  await waitFor(() => fake.calls('session/prompt')[2])
   await agent.whenIdle()
 })

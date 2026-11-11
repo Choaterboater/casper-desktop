@@ -58,6 +58,7 @@ import type { AccessModeId } from './access.ts'
 import { ACCESS_RECORD } from './access-record.ts'
 import type { CasperOwnAccess } from './access-record.ts'
 import { appReadRoots, isInstalled, selfAnchor } from './app-read.ts'
+import { matchChildRoute, routedOptions } from './child-route.ts'
 import { startAppTools } from './app-tools.ts'
 import type { AppToolsProfile, AppToolsServer } from './app-tools.ts'
 import { casperCommandId, casperCommands } from './commands.ts'
@@ -237,11 +238,26 @@ export class CasperAgent implements Agent {
   private reapedModel: string | undefined
   /** Set by {@link closeConnection}: no idle check runs and no process starts after it. */
   private closed = false
+  /** The app route matching Casper's current model, which {@link options} follow; undefined uses the start options. */
+  private childRoute: ModelSelection | undefined
+  /** The `provider/model/effort` {@link childRoute} was looked up for. */
+  private childRouteKey: string | undefined
+  /** Counts each lookup of {@link childRoute}; a lookup that sees another count is dropped. */
+  private childRouteSeq = 0
+  /** Stops the lookup in flight when the Agent closes. */
+  private readonly childRouteStop = new AbortController()
+  /**
+   * The app's options for this Agent. With `casperChildModel` on, provider, model and effort follow Casper's
+   * current model while the app has the same route, so a child of this Session and the app tools that read
+   * the parent's route use it; otherwise, and with the switch off, they are the options it was created with.
+   */
+  readonly options: AgentOptions
 
   /**
    * @param pluginCtx - the Casper plugin context whose services the Agent uses.
    * @param id - the Session and Agent identity.
-   * @param options - Agent options; Casper chooses its own model, so only the title reads their route.
+   * @param startOptions - the options the Agent was created with: the title reads their route, and so do children while
+   *   the app has no route for Casper's current model.
    * @param session - the Session this Agent drives.
    * @param readers - model-selection, inbox, plan, and Casper's own access projection readers.
    * @param lastTurn - the last turn number recorded in the Session.
@@ -253,7 +269,7 @@ export class CasperAgent implements Agent {
   constructor(
     private readonly pluginCtx: Context,
     readonly id: SessionId,
-    readonly options: AgentOptions,
+    private readonly startOptions: AgentOptions,
     readonly session: Session,
     readers: CasperAgentReaders,
     lastTurn: number,
@@ -270,6 +286,13 @@ export class CasperAgent implements Agent {
     this.ownAccessState = readers.casperAccess
     // Casper's own models: a pick is checked against Casper's list and applied to Casper.
     this.model = new CasperModel(readers.agentModels, session, selection => this.chooseModel(selection))
+    this.options = config.casperChildModel ? routedOptions(startOptions, () => this.childRoute) : startOptions
+    if (config.casperChildModel) {
+      // A resumed Session's recorded model counts at once; a route the app adds later is matched when it appears.
+      this.matchChildRoute()
+      this.ctx.on('llm/adapters-updated', () => { this.matchChildRoute(true) })
+      this.ctx.effect(() => () => { this.childRouteStop.abort() }, 'casperAgent.childRoute()')
+    }
     this.inbox = new ReactLoopInbox(readers.inbox, session, this.dispatch)
     this.lastTurn = lastTurn
     this.offered = commandCache.read()
@@ -726,7 +749,7 @@ export class CasperAgent implements Agent {
    * sends its first request on. A renamed title queues nothing.
    */
   private startTitle(): void {
-    const { provider, model } = this.options
+    const { provider, model } = this.startOptions
     if (provider === undefined || model === undefined) return
     this.pluginCtx.get('sessionTitle')?.startQueued(this.session, { provider, model })
   }
@@ -1154,11 +1177,35 @@ export class CasperAgent implements Agent {
       return
       /* v8 ignore stop */
     }
+    this.matchChildRoute()
     if (options === undefined) return
     // A failed save costs only the next Session's early picker.
     this.modelsCache.write({ groups: report.groups, current: report.current }).catch((error: unknown) => {
       this.pluginCtx.logger.warn(`casper agent "${this.id}": model list not saved: ${String(error)}`)
     })
+  }
+
+  /**
+   * Look up the app route for Casper's current model when it changed, or always with `again`, as when the app's
+   * routes change. Until the lookup ends, and when it finds none, {@link options} use the start options.
+   * @param again - look up even an unchanged model.
+   */
+  private matchChildRoute(again = false): void {
+    if (!this.config.casperChildModel) return
+    const current = this.models().reported?.current ?? undefined
+    const key = current === undefined ? undefined : `${current.provider}/${current.model}/${current.reasoningEffort ?? ''}`
+    if (!again && key === this.childRouteKey) return
+    const seq = ++this.childRouteSeq
+    this.childRouteKey = key
+    this.childRoute = undefined
+    const llm = this.pluginCtx.get('llm')
+    if (current === undefined || llm === undefined) return
+    matchChildRoute(llm, current, this.childRouteStop.signal).then(
+      (route) => { if (seq === this.childRouteSeq) this.childRoute = route },
+      /* v8 ignore start -- listing the app's routes does not throw; the lookup's own failures mean no route. */
+      (error: unknown) => { this.pluginCtx.logger.debug(`casper agent "${this.id}": child model not matched: ${String(error)}`) },
+      /* v8 ignore stop */
+    )
   }
 
   /** The `provider/model` Casper last reported, recorded on assistant messages. */
