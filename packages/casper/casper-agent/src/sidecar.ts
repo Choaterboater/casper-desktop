@@ -44,6 +44,15 @@ export class CasperSidecar {
   }
 
   /**
+   * Whether a Session has a conversation of its own in any folder.
+   * @param sessionId - the Session.
+   * @returns true when a record exists for it.
+   */
+  has(sessionId: SessionId): boolean {
+    return this.domain.table('sessions').get(sessionId) !== undefined
+  }
+
+  /**
    * Store the conversation a Session continues.
    * @param sessionId - the Session.
    * @param record - Casper's conversation id and folder.

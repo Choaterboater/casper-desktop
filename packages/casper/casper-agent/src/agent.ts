@@ -68,6 +68,7 @@ import type { Config } from './config.ts'
 import { CasperConnection, CasperError } from './connection.ts'
 import type { PromptReply } from './connection.ts'
 import { CONVERSATION_RECORD, conversationRecord } from './conversation.ts'
+import type { ForkPoint } from './conversation.ts'
 import { answerElicitation, elicitationQuestion, elicitationStep } from './elicitation.ts'
 import { forwardedServers } from './forward-servers.ts'
 import type { ForwardedServers } from './forward-servers.ts'
@@ -84,6 +85,12 @@ import { CASPER_PROVIDER, TurnWriter } from './turn.ts'
 
 /** Text that opens a turn whose earlier Casper conversation could not be reopened. */
 export const FRESH_CONVERSATION_NOTICE = 'Casper could not reopen its earlier conversation, so this turn starts fresh.\n'
+
+/** Text that opens a fork's first turn when Casper's conversation was not copied into it. */
+export const FORK_FRESH_NOTICE = 'This fork starts a fresh Casper conversation, so Casper does not have the messages above.\n'
+
+/** Text that opens a fork's first turn when Casper's copy ends before a stopped or failed request the fork shows. */
+export const FORK_BEHIND_NOTICE = 'Casper\'s copy of this conversation ends before the last request, which was stopped or failed, so Casper may not have that request.\n'
 
 /** Model name recorded on assistant messages when the config sets none. */
 const DEFAULT_MODEL_LABEL = 'casper'
@@ -283,6 +290,8 @@ export class CasperAgent implements Agent {
    * @param sidecar - the Session-to-conversation records.
    * @param commandCache - the last command list Casper sent, offered until this Agent's Casper sends its own.
    * @param modelsCache - where the model list Casper sends is kept for the next Session's picker.
+   * @param fork - for a fork that has not started its own conversation, the inherited conversation record to copy, or
+   *   null when it inherited none; undefined for any other Session.
    */
   constructor(
     private readonly pluginCtx: Context,
@@ -295,6 +304,7 @@ export class CasperAgent implements Agent {
     private readonly sidecar: CasperSidecar,
     private readonly commandCache: CasperCommandCache,
     private readonly modelsCache: CasperModelsCache,
+    private fork: ForkPoint | null | undefined,
   ) {
     this.dispatch = agentEvents(pluginCtx, this)
     this.scope = createScope(pluginCtx, this)
@@ -664,11 +674,12 @@ export class CasperAgent implements Agent {
       await this.refreshServers(signal)
       signal.throwIfAborted()
       const opened = await this.ensureConnection(signal)
-      signal.throwIfAborted()
       connection = opened.connection
-      // Said at once: the conversation is new even when this turn sends nothing.
+      // Said at once, also when a Stop came during the start: the conversation is new even when this turn sends nothing,
+      // and the next start reopens it with no line.
       if (opened.fresh) writer.text(FRESH_CONVERSATION_NOTICE)
       if (opened.note !== undefined) writer.text(opened.note)
+      signal.throwIfAborted()
       // Access goes first: it is the safety step.
       const accessNote = await this.applyAccess(connection)
       signal.throwIfAborted()
@@ -890,9 +901,10 @@ export class CasperAgent implements Agent {
 
   /**
    * The live connection, or a new process that reopens the stored conversation. A process closed earlier exits first.
+   * A fork with no conversation of its own copies the source's, cut at the inherited mark, or starts fresh with a note.
    * A closed Agent starts none, and a process that finishes starting after the close is closed at once.
-   * @returns the connection, whether its conversation is new, and a note when a Casper closed while idle came back on
-   *   another model.
+   * @returns the connection, whether its conversation is new, and a note when a fork's conversation was not copied or
+   *   a Casper closed while idle came back on another model.
    */
   private async ensureConnection(signal: AbortSignal): Promise<{ connection: CasperConnection; fresh: boolean; note?: string }> {
     await settledUnlessStopped(this.closing, signal)
@@ -903,6 +915,10 @@ export class CasperAgent implements Agent {
     const cwd = this.session.header.cwd
     if (cwd === undefined) throw new CasperError('CASPER_START_FAILED', 'Casper needs a project folder for this session.')
     const stored = this.sidecar.read(this.id, cwd)
+    // A fork that already has a conversation, even in another folder, never copies again.
+    const fork = stored === undefined && !this.sidecar.has(this.id) ? this.fork : undefined
+    // Only a mark proves an exact copy: the source may have gone on in the same conversation since.
+    const copy = fork?.mark !== undefined && this.config.copyOnFork ? { acpSessionId: fork.acpSessionId, at: fork.mark } : undefined
     const context = this.pluginCtx.get('profileContext')
     const profile = context === undefined ? undefined : { name: context.name, dir: context.dir }
     // Updates count only while this connection is the Agent's current one.
@@ -929,6 +945,7 @@ export class CasperAgent implements Agent {
       },
       appTools: this.config.appTools ? connection => this.startAppTools(connection, cwd, profile) : undefined,
       mcpServers: this.forwarder(),
+      fork: copy,
     }, stored?.acpSessionId, signal)
     owner.connection = started.connection
     // oxlint-disable-next-line typescript/no-unnecessary-condition -- closeConnection() can run during the start.
@@ -942,12 +959,16 @@ export class CasperAgent implements Agent {
       started.connection.terminate()
       throw new CasperError('CASPER_START_FAILED', `Casper's conversation could not be recorded: ${String(error)}`, { cause: error })
     }
+    this.fork = undefined
     this.connection = started.connection
     this.report(started.connection)
     const fresh = stored !== undefined && !started.reopened
     const before = this.reapedModel
     this.reapedModel = undefined
     const after = modelOf(started.connection)
+    // A fork starts a conversation, never reopens one, so this note is the only one.
+    if (fork !== undefined && !started.copied) return { connection: started.connection, fresh, note: FORK_FRESH_NOTICE }
+    if (fork?.behind === true) return { connection: started.connection, fresh, note: FORK_BEHIND_NOTICE }
     // The reopened conversation goes on with its own model (Casper's decision 89); a pick waiting to be sent decides instead.
     if (!started.reopened || before === undefined || after === undefined || after === before || this.models().wanted !== null) {
       return { connection: started.connection, fresh }

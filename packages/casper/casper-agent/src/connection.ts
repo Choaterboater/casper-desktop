@@ -39,6 +39,15 @@ import { findCasper, lookupDetail } from './lookup.ts'
 /** ACP error code Casper uses for an unknown or unloadable session. */
 const ACP_NOT_FOUND = -32002
 
+/** ACP error code for a method the agent does not have, as from a Casper whose runtime cannot fork. */
+const ACP_METHOD_NOT_FOUND = -32601
+
+/** ACP error code for bad parameters, as Casper's reply to a mark not in the conversation. */
+const ACP_INVALID_PARAMS = -32602
+
+/** Casper's `session/fork` refusals after which a fresh conversation starts: no fork, no such conversation, no such mark. */
+const FORK_REFUSALS: ReadonlySet<number> = new Set([ACP_METHOD_NOT_FOUND, ACP_NOT_FOUND, ACP_INVALID_PARAMS])
+
 /** Limit for Casper's answer to `_casper/idle`; a Casper that does not answer by then is not idle. */
 const IDLE_CHECK_MS = 10_000
 
@@ -183,6 +192,11 @@ export interface CasperConnectionOptions {
    * @returns the entries, their names, and their digest.
    */
   readonly mcpServers?: ((signal: AbortSignal) => Promise<ForwardedServers>) | undefined
+  /**
+   * With no stored conversation, copy this one with `session/fork`, cut at `at` (Casper's mark), when Casper offers
+   * `sessionCapabilities.fork`; Casper's refusal starts a fresh one instead. Omitted copies none.
+   */
+  readonly fork?: { readonly acpSessionId: string; readonly at: string } | undefined
 }
 
 /** A started connection and the Casper conversation it holds. */
@@ -193,6 +207,8 @@ export interface CasperStarted {
   readonly acpSessionId: string
   /** Whether the stored conversation was reopened; false when a fresh one replaced it or none was stored. */
   readonly reopened: boolean
+  /** Whether the conversation is a copy `session/fork` made of {@link CasperConnectionOptions.fork}. */
+  readonly copied: boolean
 }
 
 /**
@@ -344,7 +360,9 @@ export class CasperConnection {
   /**
    * Find (see {@link findCasper}), spawn, and open Casper. A stored conversation is reopened with
    * `session/load`; only Casper's "no saved conversation" reply falls back to
-   * `session/new`. The child is terminated when start fails or is aborted.
+   * `session/new`. With none stored, the fork option's conversation is copied with
+   * `session/fork` when Casper offers it; Casper's refusal (-32601, -32002, -32602)
+   * falls back to `session/new`. The child is terminated when start fails or is aborted.
    * @param options - subprocess service, config, folder, and receivers.
    * @param stored - the stored Casper conversation id, if any.
    * @param signal - aborts the start.
@@ -604,7 +622,7 @@ export class CasperConnection {
         const loaded = await agent.request(methods.agent.session.load, { sessionId: stored, cwd: options.cwd, mcpServers })
         this.keepOptions(loaded)
         this.sessionId = stored
-        return { acpSessionId: stored, reopened: true }
+        return { acpSessionId: stored, reopened: true, copied: false }
       } catch (error: unknown) {
         if (!(error instanceof RequestError) || error.code !== ACP_NOT_FOUND || !NO_SAVED_CONVERSATION.test(error.message)) {
           throw error
@@ -614,13 +632,27 @@ export class CasperConnection {
         this.replaying = false
       }
     }
+    const { fork } = options
+    if (stored === undefined && fork !== undefined && (this.initialized.agentCapabilities?.sessionCapabilities?.fork ?? null) !== null) {
+      try {
+        // Casper replays nothing for a copy; its commands and name follow the reply.
+        const copy = await agent.request(methods.agent.session.fork, {
+          sessionId: fork.acpSessionId, cwd: options.cwd, mcpServers, _meta: { casper: { at: fork.at } },
+        })
+        this.keepOptions(copy)
+        this.sessionId = copy.sessionId
+        return { acpSessionId: copy.sessionId, reopened: false, copied: true }
+      } catch (error: unknown) {
+        if (!(error instanceof RequestError) || !FORK_REFUSALS.has(error.code)) throw error
+      }
+    }
     const created = await agent.request(methods.agent.session.new, { cwd: options.cwd, mcpServers })
     this.keepOptions(created)
     this.sessionId = created.sessionId
-    return { acpSessionId: created.sessionId, reopened: false }
+    return { acpSessionId: created.sessionId, reopened: false, copied: false }
   }
 
-  /** Keep the options and modes of a `session/new` or `session/load` reply. */
+  /** Keep the options and modes of a `session/new`, `session/load` or `session/fork` reply. */
   private keepOptions(reply: { configOptions?: SessionConfigOption[] | null; modes?: SessionModeState | null }): void {
     this.options_ = reply.configOptions ?? undefined
     this.modes_ = reply.modes ?? undefined

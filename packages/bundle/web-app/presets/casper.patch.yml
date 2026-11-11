@@ -8,11 +8,12 @@
 # deliveries show as file cards in the Casper turn. The subagent rows serve
 # Casper the app's subagent tool and its controls: each child is a Standard
 # agent on agent-loop (agentPreset standard, since this preset has no bash or
-# file tools), not another Casper. Fork is left out: Casper Sessions cannot
-# fork. The goal rows bring /goal and the goal tools the Casper agent serves to
-# Casper; the goal service, its round driver and the goal bar are host-plane
-# and apply already. Casper runs its own checks, and plugin-market has no
-# service in this deployment.
+# file tools), not another Casper. The fork subagent is left out: a forked
+# subagent would run on the agent loop over Casper's log. The goal rows bring
+# /goal and the goal tools the Casper agent serves to Casper; the goal
+# service, its round driver and the goal bar are host-plane and apply already.
+# Casper's own checks replace casper-checks, and plugin-market has no service
+# in this deployment.
 # Desktop only, never in a Worker, exactly like the casper-agent row.
 - insert:
     - id: preset-casper

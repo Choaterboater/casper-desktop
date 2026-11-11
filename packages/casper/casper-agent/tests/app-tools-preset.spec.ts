@@ -418,7 +418,7 @@ it('the subagent rows follow present, and every child mounts the standard preset
     id: 'tool-subagent', name: '@deepseek-ai/dsh-tool-subagent',
     config: { provider: 'spawn', toolName: 'subagent', agentPreset: 'standard', modelSelection: true, modelDiscovery: true },
   })
-  // Casper Sessions cannot fork, so the fork tool is not mounted.
+  // A forked subagent would run on the agent loop over Casper's log, so the fork tool is not mounted.
   expect(rows.some(row => (row.config as { provider?: unknown } | undefined)?.provider === 'fork')).toBe(false)
 })
 

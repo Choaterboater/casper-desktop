@@ -26,7 +26,6 @@ import { CasperConnection } from '../src/connection.ts'
 import { CONVERSATION_RECORD } from '../src/conversation.ts'
 import { reportOf } from '../src/models.ts'
 import { CasperModelsCache } from '../src/models-cache.ts'
-import { FORK_UNSUPPORTED } from '../src/factory.ts'
 import type { ForwardEntry } from '../src/forward-servers.ts'
 import { MAX_EMBEDDED_REFERENCE_BYTES, TEXT_ONLY_PICTURE } from '../src/prompt.ts'
 import { MockAdapter } from '../../../core/agent-loop/tests/mock-adapter.ts'
@@ -888,12 +887,6 @@ describe('CasperAgent', { timeout: 60_000 }, () => {
     expect(Date.now() - started).toBeLessThan(5_000)
     expect(alive(pid ?? 0)).toBe(false)
     expect(turnEnds(handle.agent)).toEqual([{ kind: 'aborted', reason: { kind: 'disposed' } }])
-  })
-
-  it('refuses a fork', async () => {
-    const { host } = await setup({ prompts: [] })
-    await expect(host.ctx.agents.create({ sessionId: 'casper-fork' as never, meta: { agentPreset: 'casper', isSeeded: true } }))
-      .rejects.toThrow(FORK_UNSUPPORTED)
   })
 
   it('runs maintenance only while idle and replays input queued behind it', async () => {

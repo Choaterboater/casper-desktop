@@ -21,7 +21,7 @@ export interface Config {
   effort?: string
   /** Child environment entries merged after the subprocess scrub, so a listed key reaches Casper. */
   env: Record<string, string>
-  /** Limit for `initialize` plus `session/new` or `session/load` on a fresh process. */
+  /** Limit for `initialize` plus `session/new`, `session/load` or `session/fork` on a fresh process. */
   startTimeoutMs: number
   /** Wait for the prompt reply after `session/cancel` before the process is killed. */
   cancelGraceMs: number
@@ -65,6 +65,11 @@ export interface Config {
    * Casper that sends none leaves the title of the opening words. false writes the title on the app's default model.
    */
   casperTitles: boolean
+  /**
+   * Start a fork of a Casper Session with Casper's own conversation copied up to the fork point (`session/fork`). When
+   * Casper cannot copy it exactly, and with false, the fork starts a fresh Casper conversation and its first turn says so.
+   */
+  copyOnFork: boolean
   /**
    * The app's permission presets and the Casper access mode each sets: `read`, `ask`, or `full`. A preset the
    * table does not list, the derived `custom`, and Auto set `ask`; a read-only sandbox always sets `read`.
@@ -115,6 +120,7 @@ export const Config: z<Config> = z.object({
   appTeams: z.boolean().default(true),
   casperChildModel: z.boolean().default(true),
   casperTitles: z.boolean().default(true),
+  copyOnFork: z.boolean().default(true),
   accessModes: z.dict(z.union(ACCESS_MODE_IDS as AccessModeId[])).default({ ...DEFAULT_ACCESS_MODES }),
   approvalCard: z.boolean().default(true),
   approvalDiff: z.boolean().default(true),

@@ -17,8 +17,8 @@ import type {
   ResumeAgentOptions,
   SessionStartSource,
 } from '@deepseek-ai/dsh-agent'
-import { appendPluginRecord, interruptedTurnClosers, SessionLogOffset, SessionPreparation } from '@deepseek-ai/dsh-session'
-import type { Session } from '@deepseek-ai/dsh-session'
+import { appendPluginRecord, interruptedTurnClosers, pluginRecordOf, SessionLogOffset, SessionPreparation } from '@deepseek-ai/dsh-session'
+import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
 import type { SessionHandle } from '@deepseek-ai/dsh-session-persistence'
 import type { PlanUnitState } from '@deepseek-ai/dsh-plan-mode'
 import type { ProjectionHandle } from '@deepseek-ai/dsh-session-projection'
@@ -26,12 +26,11 @@ import type { CasperOwnAccess } from './access-record.ts'
 import { CasperAgent } from './agent.ts'
 import type { CasperCommandCache } from './commands.ts'
 import type { Config } from './config.ts'
+import { inheritedConversation } from './conversation.ts'
+import type { ForkPoint } from './conversation.ts'
 import { withCurrent } from './models.ts'
 import type { CasperModelsCache } from './models-cache.ts'
 import type { CasperSidecar } from './sidecar.ts'
-
-/** Message of the error a fork of a Casper Session rejects with. */
-export const FORK_UNSUPPORTED = 'Forking a Casper session is not supported yet.'
 
 /** Projection handles and storage the factory shares with every Agent. */
 export interface CasperFactoryDependencies {
@@ -64,6 +63,21 @@ interface Initialization {
   readonly source: SessionStartSource
   readonly setup: AgentSetup | undefined
   readonly signal: AbortSignal | undefined
+  /** For a fork that has not started its own conversation: the inherited record to copy from, or null when it has none. */
+  readonly fork: ForkPoint | null | undefined
+}
+
+/**
+ * The fork point of a forked Session, read from the events the factory already holds.
+ * @param events - the Session's events, inherited prefix first.
+ * @param inheritedEventCount - how many events the fork inherited.
+ * @returns see {@link inheritedConversation}.
+ */
+function forkPointOf(events: readonly SessionEvent[], inheritedEventCount: number): ForkPoint | null | undefined {
+  return inheritedConversation(events.flatMap((event) => {
+    const record = pluginRecordOf(event)
+    return record === undefined ? [] : [record]
+  }), inheritedEventCount, events.flatMap(event => event.type === 'turn/end' ? [{ seq: event.seq, reason: event.data.reason }] : []))
 }
 
 /** Throw one collected failure as itself, or several as one AggregateError. */
@@ -107,9 +121,14 @@ export class CasperAgentFactory implements AgentFactory {
   ) {}
 
   async createAgent(ownerCtx: Context, options: CreateAgentOptions): Promise<AgentHandle> {
-    if (options.meta?.isSeeded === true || (options.seed?.length ?? 0) > 0) throw new Error(FORK_UNSUPPORTED)
     this.assertAccepting()
-    const preparation = SessionPreparation.create(this.ctx.sessions.prepare(options.sessionId, { meta: { ...options.meta } }))
+    const preparation = SessionPreparation.create(this.ctx.sessions.prepare(options.sessionId, {
+      ...options.seed === undefined ? {} : { seed: options.seed },
+      meta: { ...options.meta },
+      ...options.inheritedEventCount === undefined ? {} : { inheritedEventCount: options.inheritedEventCount },
+    }))
+    // A fork's Casper conversation is cut where the inherited log ends.
+    const fork = options.meta?.isSeeded === true ? forkPointOf(options.seed ?? [], options.inheritedEventCount ?? 0) : undefined
     return this.track((async () => {
       using owned = preparation
       const handle = await this.ctx.sessionPersistence.create(owned.session.header, {
@@ -123,6 +142,7 @@ export class CasperAgentFactory implements AgentFactory {
         source: 'startup',
         setup: options.setup,
         signal: options.signal,
+        fork,
       })
     })())
   }
@@ -146,6 +166,8 @@ export class CasperAgentFactory implements AgentFactory {
           eventState: cold.eventState,
         }))
         const stored = { handle, storedCount: cold.events.length + closers.length }
+        // A fork reopened before its first Casper start still copies; one with a conversation record of its own does not.
+        const fork = handle.header.isSeeded ? forkPointOf(cold.events, handle.inheritedEventCount) : undefined
         handle = undefined
         return await this.initialize(ownerCtx, {
           session: preparation.session,
@@ -154,6 +176,7 @@ export class CasperAgentFactory implements AgentFactory {
           source: 'resume',
           setup: options.setup,
           signal: options.signal,
+          fork,
         })
       } finally {
         preparation?.[Symbol.dispose]()
@@ -229,6 +252,7 @@ export class CasperAgentFactory implements AgentFactory {
       this.deps.sidecar,
       this.deps.commands,
       this.deps.models,
+      init.fork,
     )
 
     let ready = false
@@ -289,8 +313,9 @@ export class CasperAgentFactory implements AgentFactory {
           abort.signal.throwIfAborted()
           detachSession = agent.ctx.sessions.enter(session)
           agent.ctx.sessions.announce(session)
-          // A new Session's picker offers the last list Casper sent, or the start value, until its own Casper reports.
-          if (init.source === 'startup') appendPluginRecord(session, AGENT_MODELS_RECORD, this.seed())
+          // A new Session's picker offers the last list Casper sent, or the start value, until its own Casper reports; a
+          // fork keeps the source's, since a copied conversation goes on with the source's model.
+          if (init.source === 'startup' && !session.header.isSeeded) appendPluginRecord(session, AGENT_MODELS_RECORD, this.seed())
           // A new Agent has no process yet, so a mode a closed process picked itself (a killed app's) is cleared.
           agent.noteOwnAccess()
           const commit = await untilAborted(init.setup?.(agent.ctx, agent), abort.signal)
