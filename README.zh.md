@@ -57,6 +57,8 @@ npx pnpm@11.28.5 run start:desktop
 
 面向 agent：请遵循 [AGENTS.md](AGENTS.md)。
 
+拉取请求和推送到 `main` 的提交会在 GitHub 自带的 runner 上运行 [Casper CI](.github/workflows/casper-ci.yml)：静态检查、类型检查、lint 与单元测试。`.github/workflows` 中的其他 workflow 来自上游，需要上游的密钥和 runner，因此在本仓库的 Actions 设置中逐个关闭，文件本身不做修改。
+
 ## 引用
 
 ```bibtex
