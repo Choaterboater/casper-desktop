@@ -61,6 +61,11 @@ export interface Config {
    */
   casperChildModel: boolean
   /**
+   * Name the Session with the title Casper sends, made without a model call, unless the person renamed it; an older
+   * Casper that sends none leaves the title of the opening words. false writes the title on the app's default model.
+   */
+  casperTitles: boolean
+  /**
    * The app's permission presets and the Casper access mode each sets: `read`, `ask`, or `full`. A preset the
    * table does not list, the derived `custom`, and Auto set `ask`; a read-only sandbox always sets `read`.
    */
@@ -109,6 +114,7 @@ export const Config: z<Config> = z.object({
   appGoals: z.boolean().default(true),
   appTeams: z.boolean().default(true),
   casperChildModel: z.boolean().default(true),
+  casperTitles: z.boolean().default(true),
   accessModes: z.dict(z.union(ACCESS_MODE_IDS as AccessModeId[])).default({ ...DEFAULT_ACCESS_MODES }),
   approvalCard: z.boolean().default(true),
   approvalDiff: z.boolean().default(true),

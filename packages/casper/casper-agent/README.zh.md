@@ -44,6 +44,7 @@ kind: "package-reference"
 | `appGoals` | `true` | 随应用工具向 Casper 提供应用的[目标工具](#goals)，并把目标的各轮作为 Casper 的轮次运行；这些工具需要 `appTools`，`false` 时不提供，到期的一轮会被丢弃，目标随之暂停 |
 | `appTeams` | `true` | 随应用工具向 Casper 提供应用的[团队工具](#team)；会话的团队开关打开时才可用，需要 `appTools`，`false` 时不提供 |
 | `casperChildModel` | `true` | 应用有相同提供方与模型时，让[子代理](#subagents)在 Casper 当前的模型上运行；`false` 时所有子代理都在应用的默认模型上运行 |
+| `casperTitles` | `true` | 用 Casper 发来的标题（不调用模型生成）为会话命名；`false` 时在应用的默认模型上生成标题 |
 | `accessModes` | `{ read-only: read, workspace-write: ask, danger-full-access: full }` | 每个权限预设设置的[访问模式](#access-control)；不能列出 `custom` 与 `auto` |
 | `approvalCard` | `true` | 用 [Casper 的审批卡片](#approvals)显示 Casper 的审批框；`false` 时显示通用问题卡片 |
 | `approvalDiff` | `true` | 在 [Casper 的审批卡片](#approvals)中绘制编辑的审批框所带的差异；需要 `approvalCard`，`false` 时以文本行显示差异 |
@@ -101,7 +102,9 @@ kind: "package-reference"
 
 每轮领取排队的输入，原样追加 `turn/start`、`step/start` 与领取的 `user/message` 事件，然后在 Casper 能改动文件之前刷写会话。领取的消息作为一条 `session/prompt` 发给 Casper，各块保持原有顺序：文本为 `text`；当 Casper 的 `initialize` 回复将 `promptCapabilities.image` 设为 true 时，图片为 `image` 块，内容是其存储的规范化字节的 base64，并带存储的媒体类型；文件为指向附件服务只读宿主副本的 `resource_link`（`file:` URI、名称与字节大小），由 Casper 用自己的文件工具读取。旧版 Casper 无法接收的图片、附件服务无法读取的图片，以及没有宿主路径的文件，各以一行占位文本发送，且该轮回复开头会有一条说明。读取图片期间中止，则该轮以中止结束且不发送提示，即使附件服务仍完成了读取。
 
-挂载了 `ctx.sessionTitle` 时，该轮在记录领取的消息后立即启动其提示排队的标题工作，所用路由取自 Agent 选项：即应用的默认模型，也就是新的标准会话发送第一个请求所用的模型。标准会话的标题在记录其第一个模型请求时启动，而 Casper 的请求从不被记录，因此若没有这一步，Casper 会话会一直保留由其开头文字生成的回退标题。标题的写入方式与标准会话相同，用户重命名过的标题永远不会被覆盖。
+挂载了 `ctx.sessionTitle` 时，会话的标题是 Casper 在 `session_info_update` 中发来的名称，它由请求本身的文字生成，不调用模型。Casper 在处理为对话命名的那个请求时、在输入 `/rename` 之后，以及在已有名称的对话的 `session/load` 回复之后立即发送它；在加载的回放期间和两次提示之间也会接收该名称。名称会像应用截断标题那样截断到 80 字节，并写为一个 `session/title` 事件，来源为 `{kind: 'provider', provider: 'casper'}`，不带模型，引用当前标题所引用的人类消息。之后的名称会替换它，相同的名称不会写两次，在会话还没有任何标题时到达的名称会被丢弃。用户重命名过的标题永远不会被覆盖。不会启动任何生成标题的模型调用，因此不发送名称的较旧 Casper 会保留由开头文字生成的回退标题。
+
+设置 `casperTitles: false` 时，Casper 的名称被忽略，该轮在记录领取的消息后立即启动其提示排队的标题工作，所用路由取自 Agent 选项：即应用的默认模型，也就是新的标准会话发送第一个请求所用的模型。标准会话的标题在记录其第一个模型请求时启动，而 Casper 的请求从不被记录，因此若没有这一步，Casper 会话会一直保留回退标题。该标题的写入方式与标准会话相同，用户重命名过的标题永远不会被覆盖。
 
 提示运行期间插入的引导消息，会以 `_casper/steer` 发给 `initialize` 回复中设置了 `agentCapabilities._meta.casper.steer` 的 Casper，带上该会话的 Casper 对话 id、该消息的块及其消息 id：在提示发出后立即发送，按队列顺序一次一条。该消息会一直留在队列中，直到 Casper 发来已读通知，即带有该 `messageId` 的 `user_message_chunk`；此时该消息按发送时的内容记录为开启下一步的 `user/message`，并在记录前一刻被本轮领取。若该步仍有未结束的调用，该消息会等待这些调用结束并留在队列中，停止也不会清除它。Casper 拒绝或始终未读的消息，以及含有会以占位文本发送的部分或含有会话提及的消息，会连同其后排队的所有消息作为下一轮运行；旧版 Casper 收到的所有消息也是如此。停止会把未读的消息与队列其余部分一起清除。
 
@@ -115,6 +118,7 @@ kind: "package-reference"
 | 仍在进行中的 `tool_call_update` | 不写入任何内容：调用保持打开，已提出的审批框仍在等待回答 |
 | 检查 `tool_call`（已完成或已失败） | 立即写入名为 `casper_check` 的 `tool/call` 及其结果 |
 | `plan` | 带完整列表的 `todo/write` |
+| 带有 `title` 的 `session_info_update` | `casperTitles` 开启时，一个为会话命名的 `session/title` 事件（见上文），无论是否有提示在运行；缺少或为 null 的标题不改变任何东西 |
 | 模型响应后的 `usage_update` | 其上下文窗口（`size`，为正整数时）记为 `request/context`，provider 为 `casper`，model 为 `_meta.casper.model` 中的 `<provider>/<model>`，仅在与会话已有的不同时追加；其 token（`_meta.casper.response`，输入与输出均为计数时）作为 `usage` 块和结算该响应的 `assistant/message` 的 `usage`：带 `toolUse` 的响应由其第一个调用提交，纯文本响应立即提交，因此之后的文本开启新步骤 |
 | 带 `_meta.casper.receipt` 的 `agent_message_chunk` | 一个立即结束的 `casper_receipt` 工具调用，结果是回执文本，meta 是回执（不含 `json` 事件），显示为该轮尾部的回执卡片，位于该轮步骤之外，无需展开步骤即可看到结论；无法解析的 meta 按文本处理 |
 | 引导消息的 `user_message_chunk` 已读通知 | 该消息的 `user/message`，在该步骤未结束的调用结束后开启下一步；若 Casper 在该步骤中尚未写入任何内容，则并入该步骤 |
@@ -245,7 +249,7 @@ Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打�
 
 `subagent` 为 Casper 会话启动一个子代理，与标准会话中相同。子代理是运行在 DeepSeek 代理循环上的标准代理：它挂载 `standard` 预设，因为 `casper` 预设没有 shell 与文件工具；Casper 路由从不接收子代理，因此不会再启动第二个 `casper acp`。它在会话的文件夹中工作，并以 Casper 会话为父会话列在其下。该调用以 Casper Agent 的身份、在其发起者边界内运行，因此子代理与标准父会话的调用一样归属于 Casper 会话，Casper 的步骤显示应用的子代理卡片。子代理在会话的路由上运行；调用中的 `provider` 与 `model` 只能在应用的模型设置允许时指定其他路由。
 
-当应用有一个提供方 id 相同的路由，且该路由的适配器认识同一个模型 id 时（例如 Casper 与应用都使用 `openrouter`），会话的路由就是 Casper 当前的模型。只有当应用为该模型列出了 Casper 的推理等级时，才会一并采用该等级，因此 Casper 的 `auto` 从不采用，而由模型自己的默认值生效。不按相近的名称匹配：提供方在应用中没有路由的 Casper 模型，例如 `claude-subscription`，或应用的模型页面没有 `openai-codex` 路由时的 `openai-codex`，会让子代理留在应用的默认模型上。每当 Casper 报告另一个模型、重新打开的会话启动以及应用的路由变化时，都会检查一次匹配；检查完成之前使用应用的默认模型。匹配只看路由而不看密钥，因此匹配到但未设置密钥的路由会让子代理的第一次请求失败，该失败作为子代理的通知返回。Casper 调用的、读取会话路由来检查图片或为图片计价的应用工具（例如 MCP 工具返回的图片结果）也会看到同一路由。标题仍使用应用的默认模型。设置 `casperChildModel: false` 时，所有子代理都在应用的默认模型上运行。
+当应用有一个提供方 id 相同的路由，且该路由的适配器认识同一个模型 id 时（例如 Casper 与应用都使用 `openrouter`），会话的路由就是 Casper 当前的模型。只有当应用为该模型列出了 Casper 的推理等级时，才会一并采用该等级，因此 Casper 的 `auto` 从不采用，而由模型自己的默认值生效。不按相近的名称匹配：提供方在应用中没有路由的 Casper 模型，例如 `claude-subscription`，或应用的模型页面没有 `openai-codex` 路由时的 `openai-codex`，会让子代理留在应用的默认模型上。每当 Casper 报告另一个模型、重新打开的会话启动以及应用的路由变化时，都会检查一次匹配；检查完成之前使用应用的默认模型。匹配只看路由而不看密钥，因此匹配到但未设置密钥的路由会让子代理的第一次请求失败，该失败作为子代理的通知返回。Casper 调用的、读取会话路由来检查图片或为图片计价的应用工具（例如 MCP 工具返回的图片结果）也会看到同一路由。设置 `casperTitles: false` 时，标题仍使用应用的默认模型。设置 `casperChildModel: false` 时，所有子代理都在应用的默认模型上运行。
 
 该调用立即返回。子代理完成时，应用的完成通知会发给 Casper：Casper 一轮正在运行时作为引导消息，Casper 空闲时作为下一条提示，这会开始新的一轮 Casper。`send_message`、`interrupt_agent`、`list_agents` 与 `list_subagent_models` 对 Casper 的子代理的作用，与对标准父会话的子代理相同。`wait_agent` 不提供：无论发送多少进度，Casper 都会在 10 分钟后结束任何 MCP 调用，这会使更长的等待失败，并在本次任务剩余时间内失去应用工具；而且通知本来就会自行到达。
 
@@ -321,7 +325,8 @@ Casper 会话的模型菜单与标准会话一样显示应用的**启用智能�
 - 只有 macOS 与 Linux 上的桌面端运行过 Casper 会话。在 Windows 上，可执行文件查找只由单元测试检查，且应用不会读取安装程序保存的 Path，因此不在应用自身环境中的自定义安装文件夹要在应用重启后才能找到。
 - 已删除会话的 sidecar 记录要到下次启动时才会删除；已归档的会话会保留其进程，直到空闲满 `idleExitMs`。决策 91 之前的 Casper 在空闲时不会被关闭。
 - `appTeams` 关闭时，Casper 会话中仍显示团队开关，并且它仍控制其标准子代理。Casper 的子代理是标准代理，只有应用有相同路由时才使用 Casper 的模型，否则使用应用的默认模型；它们遵循应用的规则而不是 Casper 的私密位置，并且不能用 `wait_agent` 等待。
-- Casper 会话的标题由应用的默认模型（可能是 DeepSeek 模型）生成，而不是由 Casper 所运行的模型生成。
+- `casperTitles` 关闭时，Casper 会话的标题由应用的默认模型（可能是 DeepSeek 模型）生成，而不是由 Casper 所运行的模型生成。
+- 用户在应用中给 Casper 会话起的名称会保留，因此之后向 Casper 输入的 `/rename` 只会重命名 Casper 自己的对话。在 Casper 发送名称之前就已有标题的会话，可能会在 Casper 下次重新打开它时采用 Casper 保存的名称。
 
 <a id="dev-note"></a>
 ### 开发备注
