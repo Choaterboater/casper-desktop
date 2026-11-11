@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/deepseek-llm-api-wire-extensions.md
 /official-deepseek-llm-api-wire-extensions:
-  en: 39729b071744e94b
-  zh: f3a1913295e78b5f
+  en: 68a3441fb9f674ee
+  zh: 183a8b15dc4d6e45
 /official-deepseek-llm-api-wire-extensions/wire-namespaces-and-versioning:
   en: 1da81051addc4b47
   zh: 3e8d7cd3f8c1cdba
