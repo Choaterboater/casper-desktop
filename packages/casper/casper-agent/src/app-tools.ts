@@ -20,12 +20,12 @@ import {
   type JsonSchemaType,
   type ServerContext,
 } from '@modelcontextprotocol/server'
-import type { Agent } from '@deepseek-ai/dsh-agent'
+import type { Agent, ModelSelection } from '@deepseek-ai/dsh-agent'
 import { mcpToolOrigin, type McpToolHints, type McpToolOrigin } from '@deepseek-ai/dsh-mcp-client'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { SkillRegistry } from '@deepseek-ai/dsh-skill'
-import type { ToolResult, ToolsService } from '@deepseek-ai/dsh-tools'
+import type { ResolvedToolSet, ToolResult, ToolsService } from '@deepseek-ai/dsh-tools'
 import { readAppFile, READ_MAX_LINES } from './app-read.ts'
 
 /** Name Casper gets the app's server under; Casper prefixes it with `acp-`. */
@@ -44,6 +44,8 @@ export const PROGRESS_INTERVAL_MS = 10_000
 export const PLUGIN_SKILL = 'cordis-plugin-development'
 /** Result of a call that arrives while no Casper turn is open. */
 export const TURN_OVER = "Casper's turn is over; ask again in a prompt."
+/** Result of a Team tool call while Team is off for the Session. */
+export const TEAM_OFF = 'Team is off for this Session; the person can turn on Enable agent teamwork in the model menu.'
 
 const GUIDE_FIRST = `For app plugins, first load ${PLUGIN_SKILL} with app_skill.`
 
@@ -63,6 +65,11 @@ interface BridgedTool {
   readonly subagents: boolean
   /** Whether it is one of the app's goal tools, served only while {@link AppToolsOptions.goals} is on. */
   readonly goals: boolean
+  /**
+   * Whether it is one of the app's Team task-board tools, served only while {@link AppToolsOptions.teams} is on;
+   * the app admits a call only while Team is on for the Session.
+   */
+  readonly teams: boolean
 }
 
 /**
@@ -80,28 +87,42 @@ interface BridgedTool {
  * The app's goal tools follow, also never pinned. The app gives a Standard
  * agent their rules in its system prompt, which Casper never reads, so the two
  * that change a goal carry them in {@link GOAL_RULES}.
+ *
+ * The app's Team task-board tools come last, also never pinned. Casper lists
+ * the tools once per connection, so they are listed whether or not Team is on;
+ * the app's own check refuses a call while it is off, and the task-creating one
+ * carries the Team rules in {@link TEAM_RULES}.
  */
 const BRIDGED: readonly BridgedTool[] = [
-  { mcp: 'app_skill', dsh: 'skill', readOnly: true, pin: true, guide: false, subagents: false, goals: false },
-  { mcp: 'plugin_manager', dsh: 'plugin_manager', readOnly: false, pin: true, guide: true, subagents: false, goals: false },
-  { mcp: 'app_read_file', dsh: undefined, readOnly: true, pin: true, guide: false, subagents: false, goals: false },
-  { mcp: 'present', dsh: 'present', readOnly: true, pin: true, guide: false, subagents: false, goals: false },
-  { mcp: 'cordis_inspect_query', dsh: 'cordis_inspect_query', readOnly: true, pin: false, guide: false, subagents: false, goals: false },
-  { mcp: 'cordis_inspect_list', dsh: 'cordis_inspect_list', readOnly: true, pin: false, guide: true, subagents: false, goals: false },
-  { mcp: 'subagent', dsh: 'subagent', readOnly: false, pin: false, guide: false, subagents: true, goals: false },
-  { mcp: 'send_message', dsh: 'send_message', readOnly: false, pin: false, guide: false, subagents: true, goals: false },
-  { mcp: 'interrupt_agent', dsh: 'interrupt_agent', readOnly: false, pin: false, guide: false, subagents: true, goals: false },
-  { mcp: 'list_agents', dsh: 'list_agents', readOnly: true, pin: false, guide: false, subagents: true, goals: false },
-  { mcp: 'list_subagent_models', dsh: 'list_subagent_models', readOnly: true, pin: false, guide: false, subagents: true, goals: false },
-  { mcp: 'get_goal', dsh: 'get_goal', readOnly: true, pin: false, guide: false, subagents: false, goals: true },
-  { mcp: 'create_goal', dsh: 'create_goal', readOnly: false, pin: false, guide: false, subagents: false, goals: true },
-  { mcp: 'update_goal', dsh: 'update_goal', readOnly: false, pin: false, guide: false, subagents: false, goals: true },
+  { mcp: 'app_skill', dsh: 'skill', readOnly: true, pin: true, guide: false, subagents: false, goals: false, teams: false },
+  { mcp: 'plugin_manager', dsh: 'plugin_manager', readOnly: false, pin: true, guide: true, subagents: false, goals: false, teams: false },
+  { mcp: 'app_read_file', dsh: undefined, readOnly: true, pin: true, guide: false, subagents: false, goals: false, teams: false },
+  { mcp: 'present', dsh: 'present', readOnly: true, pin: true, guide: false, subagents: false, goals: false, teams: false },
+  { mcp: 'cordis_inspect_query', dsh: 'cordis_inspect_query', readOnly: true, pin: false, guide: false, subagents: false, goals: false, teams: false },
+  { mcp: 'cordis_inspect_list', dsh: 'cordis_inspect_list', readOnly: true, pin: false, guide: true, subagents: false, goals: false, teams: false },
+  { mcp: 'subagent', dsh: 'subagent', readOnly: false, pin: false, guide: false, subagents: true, goals: false, teams: false },
+  { mcp: 'send_message', dsh: 'send_message', readOnly: false, pin: false, guide: false, subagents: true, goals: false, teams: false },
+  { mcp: 'interrupt_agent', dsh: 'interrupt_agent', readOnly: false, pin: false, guide: false, subagents: true, goals: false, teams: false },
+  { mcp: 'list_agents', dsh: 'list_agents', readOnly: true, pin: false, guide: false, subagents: true, goals: false, teams: false },
+  { mcp: 'list_subagent_models', dsh: 'list_subagent_models', readOnly: true, pin: false, guide: false, subagents: true, goals: false, teams: false },
+  { mcp: 'get_goal', dsh: 'get_goal', readOnly: true, pin: false, guide: false, subagents: false, goals: true, teams: false },
+  { mcp: 'create_goal', dsh: 'create_goal', readOnly: false, pin: false, guide: false, subagents: false, goals: true, teams: false },
+  { mcp: 'update_goal', dsh: 'update_goal', readOnly: false, pin: false, guide: false, subagents: false, goals: true, teams: false },
+  { mcp: 'team_task_create', dsh: 'team_task_create', readOnly: false, pin: false, guide: false, subagents: false, goals: false, teams: true },
+  { mcp: 'team_task_list', dsh: 'team_task_list', readOnly: true, pin: false, guide: false, subagents: false, goals: false, teams: true },
+  { mcp: 'team_task_get', dsh: 'team_task_get', readOnly: true, pin: false, guide: false, subagents: false, goals: false, teams: true },
+  { mcp: 'team_task_update', dsh: 'team_task_update', readOnly: false, pin: false, guide: false, subagents: false, goals: false, teams: true },
 ]
 
 /** The goal rules a Standard agent reads in its system prompt, added to the goal tools that change a goal. */
 export const GOAL_RULES = 'Rules: when the Session was reopened, an active goal waits until the person asks to go on; then call update_goal '
   + 'with action resume. Mark a goal complete only when its objective is achieved, and blocked only when the same condition '
   + 'has stopped progress for several goal rounds; difficulty or work left to do is not blocked.'
+
+/** The Team rules a Standard agent reads in its system prompt while Team is on, added to `team_task_create`. */
+export const TEAM_RULES = 'Rules: split write work into separate scopes and record them on the task; use blocked_by when work must be ordered. '
+  + 'An owner claims a task with its current revision, does the work, then completes it. Task changes wake no one: use send_message '
+  + 'when another agent must act. A teammate\'s finish notice reaches you on its own; answer after the teammates you need have finished.'
 
 /** Result of a resource tool while no MCP server in the app offers resources. */
 export const NO_RESOURCES = 'No MCP server in the app offers resources right now.'
@@ -207,8 +228,8 @@ export interface AppToolsProfile {
 
 /** What {@link startAppTools} serves and whom it runs calls as. */
 export interface AppToolsOptions {
-  /** The app's tool registry; calls resolve in `agent`'s scope. */
-  readonly tools: Pick<ToolsService, 'schemas' | 'execute' | 'get'>
+  /** The app's tool registry; calls resolve in `agent`'s scope, and a Team call's admission is resolved for it. */
+  readonly tools: Pick<ToolsService, 'schemas' | 'execute' | 'get' | 'resolve'>
   /** The app's skill registry, when composed. */
   readonly skills: Pick<SkillRegistry, 'list'> | undefined
   /** The Casper Agent every call runs as. */
@@ -230,6 +251,16 @@ export interface AppToolsOptions {
   readonly subagents?: boolean | undefined
   /** Serve the app's goal tools: `get_goal`, `create_goal` and `update_goal`; true when omitted. */
   readonly goals?: boolean | undefined
+  /**
+   * Serve the app's Team task-board tools: `team_task_create`, `team_task_list`, `team_task_get` and
+   * `team_task_update`; true when omitted.
+   */
+  readonly teams?: boolean | undefined
+  /**
+   * The route the app's checks read when they admit a Team call.
+   * @returns the Agent's current model, or a stand-in before it has one.
+   */
+  readonly route: () => Readonly<ModelSelection>
   /**
    * Run a call inside the caller's initiator boundary, so the app tool sees the Casper Agent as the initiator of
    * what it starts, as a Standard parent's tool call does; the call runs as it is when omitted.
@@ -420,11 +451,20 @@ async function mcpServer(options: AppToolsOptions, version: string): Promise<Mcp
     const id = acpId === undefined ? ToolCallId(`casper-app:${randomUUID()}`) : options.callId(acpId)
     const stop = heartbeat(ctx, options.onError)
     const initiate = options.initiate ?? (<T>(operation: () => T): T => operation())
+    const signal = AbortSignal.any([ctx.mcpReq.signal, turn])
+    let toolSet: ResolvedToolSet | undefined
     try {
+      if (tool.teams) {
+        // The app registers the Team tools with a check that admits them only while Team is on; it runs here as at a step.
+        toolSet = await options.tools.resolve({ agent: options.agent, modelSelection: options.route(), signal })
+        if (!toolSet.view(options.agent).has(dsh)) return errorResult(TEAM_OFF)
+      }
+      const admitted = toolSet
       const batch = await initiate(() => options.tools.execute({
         calls: [{ type: 'tool-call', id, name: dsh, arguments: JSON.stringify(args) }],
-        signal: AbortSignal.any([ctx.mcpReq.signal, turn]),
+        signal,
         agent: options.agent,
+        ...admitted === undefined ? {} : { toolSet: admitted },
       }))
       const result = batch.results[0]?.result
       /* v8 ignore next -- an executor returns one result per call. */
@@ -439,6 +479,7 @@ async function mcpServer(options: AppToolsOptions, version: string): Promise<Mcp
       return errorResult(`${tool.mcp} failed in the app: ${String(error)}`)
     } finally {
       stop()
+      toolSet?.dispose()
     }
   }
   const readFile = async (args: { path: string; offset?: number; limit?: number }): Promise<CallToolResult> => {
@@ -461,13 +502,16 @@ async function mcpServer(options: AppToolsOptions, version: string): Promise<Mcp
       return skillDescription(listed.filter(skill => skill.invocation.modelInvocable).map(skill => skill.name))
     }
     if (tool.goals && !tool.readOnly) return `${own} ${GOAL_RULES}`
+    if (tool.mcp === 'team_task_create') return `${own} ${TEAM_RULES}`
     return tool.guide ? `${GUIDE_FIRST} ${own}` : own
   }
   const subagents = options.subagents ?? true
   const goals = options.goals ?? true
+  const teams = options.teams ?? true
   for (const tool of BRIDGED) {
     if (tool.subagents && !subagents) continue
     if (tool.goals && !goals) continue
+    if (tool.teams && !teams) continue
     const dsh = tool.dsh
     if (dsh === undefined) {
       server.registerTool(tool.mcp, {
@@ -487,7 +531,9 @@ async function mcpServer(options: AppToolsOptions, version: string): Promise<Mcp
   }
   const forwarded = options.resourceServers?.() ?? []
   for (const tool of RESOURCE_TOOLS) {
-    const bridged: BridgedTool = { mcp: tool.mcp, dsh: tool.mcp, readOnly: true, pin: false, guide: false, subagents: false, goals: false }
+    const bridged: BridgedTool = {
+      mcp: tool.mcp, dsh: tool.mcp, readOnly: true, pin: false, guide: false, subagents: false, goals: false, teams: false,
+    }
     server.registerTool(tool.mcp, {
       description: resourceDescription(tool.does, forwarded),
       inputSchema: fromJsonSchema<Record<string, unknown>>(tool.schema),

@@ -130,12 +130,13 @@ it.each(['addressed', 'listed'] as const)('hides the switch on a child Session (
   expect(input.selectTeamMode).not.toHaveBeenCalled()
 })
 
-it('hides the switch when the Session\'s Agent picks its own models, and shows it while that view loads', () => {
-  const own = { groups: [], current: null, started: false }
-  const view = render(<TeamModeToggle {...props(false, undefined, undefined, false, own)} />)
-  expect(screen.queryByRole('switch')).toBeNull()
-  view.rerender(<TeamModeToggle {...props(true, undefined, undefined, false, { ...own, started: true })} />)
-  expect(screen.queryByRole('switch')).toBeNull()
-  view.rerender(<TeamModeToggle {...props(false, undefined, undefined, false, undefined)} />)
+it('shows the switch in a Session whose Agent picks its own models, such as Casper', () => {
+  const own = { groups: [], current: null, started: true }
+  const input = props(false, undefined, undefined, false, own)
+  const view = render(<TeamModeToggle {...input} />)
   expect(screen.getByRole('switch').getAttribute('aria-checked')).toBe('false')
+  fireEvent.click(screen.getByRole('switch'))
+  expect(input.selectTeamMode).toHaveBeenCalledWith(true)
+  view.rerender(<TeamModeToggle {...props(true, undefined, undefined, false, own)} />)
+  expect(screen.getByRole('switch').getAttribute('aria-checked')).toBe('true')
 })

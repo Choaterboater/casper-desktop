@@ -24,7 +24,7 @@ This plugin makes the Casper agent the main AI for Sessions on the `casper` pres
 <a id="use-this-package"></a>
 ## Use this package
 
-The Desktop profile mounts the plugin from `packages/bundle/web-app/cordis.patch.yml` (row `casper-agent`, disabled outside Desktop and in the in-browser preview) and declares the `casper` preset in `packages/bundle/web-app/presets/casper.patch.yml`. The preset mounts `tool-todo`, which shows Casper's plan as the todo list, and the rows the app tools run: `tool-cordis`, `skill-filesystem` (with the Cordis preset's skill folders), `tool-skill`, and `tool-plugin-manager`, which binds the app's existing plugin manager and is off when the app runs without a profile. It also mounts `present`, and `tool-subagent-control` with `tool-subagent` (the `spawn` backend, `agentPreset: standard`, model choice and `list_subagent_models` on), which give Casper the app's [subagents](#subagents), and `command-goal` with `tool-goal`, which give a Casper Session the app's [goals](#goals). The plugin market is not mounted. On Desktop the preset registry's default is `casper`; a default saved in Settings still wins. The plugin injects `agents`, `sessions`, `sessionProjections`, `sessionPersistence`, `subprocess`, `storageDomain`, and `tools`, and uses `userQuestions`, `skills`, `profileContext`, `attachments`, `commands`, `permissionPresets`, `sandboxPolicy`, `mcpManager`, `credentials`, and `sessionReferenceResolver` when they are mounted.
+The Desktop profile mounts the plugin from `packages/bundle/web-app/cordis.patch.yml` (row `casper-agent`, disabled outside Desktop and in the in-browser preview) and declares the `casper` preset in `packages/bundle/web-app/presets/casper.patch.yml`. The preset mounts `tool-todo`, which shows Casper's plan as the todo list, and the rows the app tools run: `tool-cordis`, `skill-filesystem` (with the Cordis preset's skill folders), `tool-skill`, and `tool-plugin-manager`, which binds the app's existing plugin manager and is off when the app runs without a profile. It also mounts `present`, and `tool-subagent-control` with `tool-subagent` (the `spawn` backend, `agentPreset: standard`, model choice and `list_subagent_models` on), which give Casper the app's [subagents](#subagents), and `command-goal` with `tool-goal`, which give a Casper Session the app's [goals](#goals). The app's [Team](#team) service and task-board tools need no preset row: the base patch mounts them for every Session. The plugin market is not mounted. On Desktop the preset registry's default is `casper`; a default saved in Settings still wins. The plugin injects `agents`, `sessions`, `sessionProjections`, `sessionPersistence`, `subprocess`, `storageDomain`, and `tools`, and uses `userQuestions`, `skills`, `profileContext`, `attachments`, `commands`, `permissionPresets`, `sandboxPolicy`, `mcpManager`, `credentials`, and `sessionReferenceResolver` when they are mounted.
 
 | Field | Default | Meaning |
 |---|---|---|
@@ -42,6 +42,7 @@ The Desktop profile mounts the plugin from `packages/bundle/web-app/cordis.patch
 | `appTools` | `true` | Offer the app tools to Casper; `false` sends an empty `mcpServers` list |
 | `appSubagents` | `true` | Serve Casper the app's [subagent tools](#subagents) with the app tools; it needs `appTools`, and `false` leaves them out |
 | `appGoals` | `true` | Serve Casper the app's [goal tools](#goals) with the app tools and run a goal's rounds as Casper turns; the tools need `appTools`, and `false` leaves them out and drops a round that comes due, which pauses the goal |
+| `appTeams` | `true` | Serve Casper the app's [Team tools](#team) with the app tools; they work while the Session's Team switch is on, need `appTools`, and `false` leaves them out |
 | `casperChildModel` | `true` | Run a [child](#subagents) on Casper's current model when the app has the same provider and model; `false` runs every child on the app's default model |
 | `accessModes` | `{ read-only: read, workspace-write: ask, danger-full-access: full }` | The [access mode](#access-control) each permission preset sets; `custom` and `auto` cannot be listed |
 | `approvalCard` | `true` | Show Casper's boxes with [Casper's approval card](#approvals); `false` shows the generic question card |
@@ -217,6 +218,10 @@ The server speaks MCP Streamable HTTP as `dsh-desktop`, with the app's dsh runti
 | `get_goal` | dsh `get_goal` | read-only |
 | `create_goal` | dsh `create_goal` | |
 | `update_goal` | dsh `update_goal` | |
+| `team_task_create` | dsh `team_task_create` | |
+| `team_task_list` | dsh `team_task_list` | read-only |
+| `team_task_get` | dsh `team_task_get` | read-only |
+| `team_task_update` | dsh `team_task_update` | |
 | `list_mcp_resources` | dsh `list_mcp_resources` | read-only |
 | `list_mcp_resource_templates` | dsh `list_mcp_resource_templates` | read-only |
 | `read_mcp_resource` | dsh `read_mcp_resource` | read-only |
@@ -258,6 +263,15 @@ Each round the driver queues runs as a Casper turn whose prompt is the round's t
 With `appGoals` off the rows still mount, so `/goal` still sets a goal, but the tools are not served, and a round that comes due is dropped with no check and no prompt. A turn that held only the round ends `blocked`; lines claimed with it still run. The driver then pauses the goal.
 
 Casper's access mode applies to the calls as to the subagent tools: under Read Only Casper refuses `create_goal` and `update_goal`; under Full access Casper asks in its own box; Workspace Write adds no box.
+
+<a id="team"></a>
+### Team
+
+A Casper Session's model menu shows the app's **Enable agent teamwork** switch, as a Standard Session's does. The switch is saved on the Casper Session, which is the root of its tree, so it also turns Team on for the Standard children Casper starts with `subagent`: they get the task-board tools and the Team rules, and read the same board. New Sessions start with Team off.
+
+While `appTeams` is on, the app tools also serve `team_task_create`, `team_task_list`, `team_task_get` and `team_task_update`, after the goal tools and not pinned. Casper reads the tool list once for each connection, so they are listed whether Team is on or off. Each call runs the app's own Team check for the Session, as a Standard step does before it offers the tools, with Casper's current model as the route; while Team is off the call returns "Team is off for this Session; the person can turn on Enable agent teamwork in the model menu." and nothing runs. A Standard agent reads the Team rules in its system prompt, so `team_task_create` carries them at the end of its description. The calls run as the Casper Agent inside its initiator boundary, and Casper's access mode applies to them as to the goal tools.
+
+With `appTeams` off Casper gets none of the four tools. The switch still shows, because the model menu cannot read this plugin's settings, and it still turns Team on for Casper's Standard children.
 
 <a id="settings-mcp-servers"></a>
 ### Settings MCP servers
@@ -306,7 +320,7 @@ The plugin sends no model request, so it has no cache effect; Casper's own reque
 - Scheduled tasks run in Casper when they have no saved preset: a task made on the Schedule page creates its Session on the default preset, which is Casper on Desktop unless Settings names another. A task made by a Standard Session's reminder tools keeps that Session's preset, and a task aimed at an existing Casper Session runs there as its next prompt. Casper Sessions have no reminder tools of their own.
 - Only Desktop on macOS and Linux has run Casper Sessions. On Windows the executable lookup is checked by unit tests only, and the app does not read the Path the installer saved, so a custom install folder outside the app's own environment is found only after the app restarts.
 - A deleted Session's sidecar record goes only at the next start, and an archived Session keeps its process until it is idle for `idleExitMs`. A Casper from before decision 91 is never closed while idle.
-- Team features do not run inside Casper Sessions. Casper's children are Standard agents on Casper's model only when the app has the same route, else on the app's default model; they follow the app's rules rather than Casper's private places, and cannot be waited on with `wait_agent`.
+- With `appTeams` off the Team switch still shows in a Casper Session and still governs its Standard children. Casper's children are Standard agents on Casper's model only when the app has the same route, else on the app's default model; they follow the app's rules rather than Casper's private places, and cannot be waited on with `wait_agent`.
 - A Casper Session's written title is made on the app's default model, which may be a DeepSeek model, not on the model Casper runs.
 
 <a id="dev-note"></a>

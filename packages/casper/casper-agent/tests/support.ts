@@ -150,6 +150,7 @@ export function fakeCasper(script: FakeScript = { prompts: [] }): FakeCasper {
       appTools: false,
       appSubagents: true,
       appGoals: true,
+      appTeams: true,
       casperChildModel: true,
       accessModes: { ...DEFAULT_ACCESS_MODES },
       approvalCard: true,

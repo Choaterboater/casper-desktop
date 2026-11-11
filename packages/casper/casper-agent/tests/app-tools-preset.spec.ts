@@ -3,8 +3,8 @@
  * Cordis inspection, skill, present and plugin_manager tools those rows bind in the Casper Agent's scope, a
  * bridged install asks once, through the app's own approval, on the app's existing plugin manager, a bridged
  * present records the delivery the app's file card reads in the Casper turn, a bridged subagent call starts
- * a Standard child of the Casper Session whose completion notice reaches Casper, and a goal set with `/goal` or
- * the bridged goal tools runs its rounds as Casper turns.
+ * a Standard child of the Casper Session whose completion notice reaches Casper, a goal set with `/goal` or
+ * the bridged goal tools runs its rounds as Casper turns, and the Team switch works for a Casper Session.
  */
 
 import { writeFileSync } from 'node:fs'
@@ -51,11 +51,13 @@ import * as SkillFilesystem from '../../../skill/skill-filesystem/src/index.ts'
 import * as ToolSkill from '../../../skill/tool-skill/src/index.ts'
 import SubagentRuntime from '../../../subagent/subagent/src/index.ts'
 import * as SubagentSpawn from '../../../subagent/subagent-spawn-in-process/src/index.ts'
+import TeamService from '../../../team/agent-team/src/index.ts'
+import * as ToolAgentTeam from '../../../team/tool-agent-team/src/index.ts'
 import * as ToolSubagent from '../../../subagent/tool-subagent/src/index.ts'
 import * as ToolSubagentControl from '../../../subagent/tool-subagent-control/src/index.ts'
 import * as CasperAgentPlugin from '../src/index.ts'
 import { CasperAgent } from '../src/agent.ts'
-import { PLUGIN_SKILL, TURN_OVER } from '../src/app-tools.ts'
+import { PLUGIN_SKILL, TEAM_OFF, TURN_OVER } from '../src/app-tools.ts'
 import type { Config } from '../src/config.ts'
 import { prompt, eventsOf, turnEnds } from './harness.ts'
 import { casperOptions, fakeCasper, waitFor } from './support.ts'
@@ -151,6 +153,9 @@ async function host(fake: FakeCasper, childReplies: string[] = [], config: Parti
   await ctx.plugin(CommandRuntime)
   await ctx.plugin(GoalService)
   await ctx.plugin(GoalRoundDriver)
+  // The Host composition's Team service and task-board tools, which the base patch mounts for every Session.
+  await ctx.plugin(TeamService, { maxTasks: 256 })
+  await ctx.plugin(ToolAgentTeam)
   const adapter = new MockAdapter(childReplies.map(reply => reply === 'hang' ? 'hang' as const : textResponse(reply)))
   ctx.llm.registerAdapter(['mock'], adapter)
   const dir = join(fake.root, 'profiles', 'desktop')
@@ -321,7 +326,7 @@ function findCapability(query: string, server: string, tools: readonly { name: s
   return scored.filter(entry => entry.score > 0).sort((a, b) => b.score - a.score || a.id.localeCompare(b.id)).map(entry => entry.id)
 }
 
-it('lists all six app tools, the five subagent tools and the three goal tools, then the resource tools, to Casper from the preset rows', { timeout: 60_000 }, async () => {
+it('lists all six app tools, the five subagent tools, the three goal tools and the four Team tools, then the resource tools, to Casper', { timeout: 60_000 }, async () => {
   const fake = fakeCasper({ prompts: [[]] })
   cleanups.push(() => { fake.remove() })
   const { create } = await host(fake)
@@ -334,6 +339,7 @@ it('lists all six app tools, the five subagent tools and the three goal tools, t
     'app_skill', 'plugin_manager', 'app_read_file', 'present', 'cordis_inspect_query', 'cordis_inspect_list',
     'subagent', 'send_message', 'interrupt_agent', 'list_agents', 'list_subagent_models',
     'get_goal', 'create_goal', 'update_goal',
+    'team_task_create', 'team_task_list', 'team_task_get', 'team_task_update',
     'list_mcp_resources', 'list_mcp_resource_templates', 'read_mcp_resource',
   ])
 })
@@ -688,4 +694,71 @@ it('a round queued before /goal edit is refused by the round driver\'s check, an
   expect(texts[0]).toContain('Objective: "second objective"')
   const logged = eventsOf(agent).flatMap(event => event.type === 'user/message' ? [JSON.stringify(event.data.content)] : [])
   expect(logged.some(text => text.includes('first objective'))).toBe(false)
+})
+
+/** The Team tools the bridge serves, in list order. */
+const TEAM_TOOLS = ['team_task_create', 'team_task_list', 'team_task_get', 'team_task_update']
+
+it('the Team switch works for a Casper Session: Casper\'s bridged task goes on the board its Standard child reads', { timeout: 60_000 }, async () => {
+  const task = { subject: 'write the docs', description: 'Write the docs for the new page.' }
+  const child = { description: 'docs helper', prompt: 'Help with the docs.' }
+  const fake = fakeCasper({ prompts: [
+    [{ mcp: 'team_task_list', args: {} }],
+    [{ mcp: 'team_task_create', args: task }, { mcp: 'subagent', args: child }],
+  ] })
+  cleanups.push(() => { fake.remove() })
+  const { ctx, create } = await host(fake, ['hang'])
+  const children: Agent[] = []
+  ctx.on('agent/created', ({ agent }) => { if (agent.session.header.origin === 'subagent') children.push(agent) })
+  const agent = await create('casper-preset-team')
+  // New Sessions start with Team off: the tools are listed, and the app's own check refuses them.
+  expect(ctx.agentTeams.isEnabled(agent)).toBe(false)
+  agent.followup(prompt('list the team tasks'))
+  await agent.whenIdle()
+  expect(results(fake.log())[0]?.result).toEqual({ isError: true, content: [{ type: 'text', text: TEAM_OFF }] })
+  // The model menu's switch calls setEnabled on the Session, which is the root of its tree.
+  await ctx.agentTeams.setEnabled(agent, true)
+  expect(ctx.agentTeams.isEnabled(agent)).toBe(true)
+  agent.followup(prompt('plan the docs with a helper'))
+  const teammate = await waitFor(() => children[0])
+  const [, created] = results(fake.log())
+  expect(created?.result).toMatchObject({ isError: false })
+  const board = ctx.agentTeams.listTasks(agent)
+  expect(board).toMatchObject([{ subject: task.subject, description: task.description, status: 'pending' }])
+  // The Standard child is a teammate: it reads the same board, and Team is on for it too.
+  expect(ctx.agentTeams.isEnabled(teammate)).toBe(true)
+  expect(ctx.agentTeams.listTasks(teammate).map(entry => entry.id)).toEqual(board.map(entry => entry.id))
+  expect(ctx.tools.schemas(teammate).map(schema => schema.name)).toEqual(expect.arrayContaining(TEAM_TOOLS))
+  teammate.cancel({ kind: 'user' })
+  await waitFor(() => teammate.status === 'idle')
+  await agent.whenIdle()
+})
+
+it('serves the Team tools unpinned, with the four pins unchanged, and none of them with appTeams off', { timeout: 60_000 }, async () => {
+  const fake = fakeCasper({ prompts: [[]] })
+  cleanups.push(() => { fake.remove() })
+  const { create } = await host(fake)
+  const agent = await create('casper-preset-team-list')
+  agent.followup(prompt('hi'))
+  await agent.whenIdle()
+  const { tools } = await (await appClient(fake)).listTools()
+  const byName = new Map(tools.map(tool => [tool.name, tool]))
+  expect(tools.filter(tool => tool._meta?.['casper/pin'] === true).map(tool => tool.name)).toEqual(['app_skill', 'plugin_manager', 'app_read_file', 'present'])
+  for (const name of TEAM_TOOLS) expect(byName.get(name)?._meta).toBeUndefined()
+  const readOnly = { readOnlyHint: true }
+  expect(TEAM_TOOLS.map(name => byName.get(name)?.annotations)).toEqual([undefined, readOnly, readOnly, undefined])
+  expect(findCapability('create a team task for the docs', 'acp-app', tools)[0]).toBe('mcp:acp-app:team_task_create')
+
+  const offFake = fakeCasper({ prompts: [[]] })
+  cleanups.push(() => { offFake.remove() })
+  const off = await host(offFake, [], { appTeams: false })
+  const offAgent = await off.create('casper-preset-team-off')
+  offAgent.followup(prompt('hi'))
+  await offAgent.whenIdle()
+  const listed = (await (await appClient(offFake)).listTools()).tools.map(tool => tool.name)
+  for (const name of TEAM_TOOLS) expect(listed).not.toContain(name)
+  expect(listed).toContain('present')
+  // The switch still governs the Session's tree; only Casper's own Team tools are left out.
+  await off.ctx.agentTeams.setEnabled(offAgent, true)
+  expect(off.ctx.agentTeams.isEnabled(offAgent)).toBe(true)
 })

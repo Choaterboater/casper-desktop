@@ -26,6 +26,8 @@ import {
   servedAnnotations,
   skillDescription,
   startAppTools,
+  TEAM_OFF,
+  TEAM_RULES,
   TURN_OVER,
 } from '../src/app-tools.ts'
 import type { AppToolsOptions, AppToolsServer, BridgedCall } from '../src/app-tools.ts'
@@ -38,6 +40,8 @@ const APP_TOOLS = ['app_skill', 'plugin_manager', 'app_read_file', 'present', 'c
 const SUBAGENT_TOOLS = ['subagent', 'send_message', 'interrupt_agent', 'list_agents', 'list_subagent_models']
 /** The app's goal tools, listed after the subagent tools and never pinned. */
 const GOAL_TOOLS = ['get_goal', 'create_goal', 'update_goal']
+/** The app's Team task-board tools, listed after the goal tools and never pinned. */
+const TEAM_TOOLS = ['team_task_create', 'team_task_list', 'team_task_get', 'team_task_update']
 /** The resource tools, listed after the app tools. */
 const RESOURCE_TOOLS = ['list_mcp_resources', 'list_mcp_resource_templates', 'read_mcp_resource']
 
@@ -127,6 +131,7 @@ async function serve(agent: Agent, ctx: Awaited<ReturnType<typeof host>>['ctx'],
     callId: acpId => ToolCallId(`casper:test:${acpId}`),
     record: () => {},
     onError: () => {},
+    route: () => ({ provider: 'casper', model: 'casper' }),
     ...overrides,
   })
   cleanups.push(() => server.close())
@@ -236,6 +241,7 @@ describe('app tools over MCP', { timeout: 60_000 }, () => {
     const withOrigins: AppToolsOptions['tools'] = {
       schemas: scope => ctx.tools.schemas(scope),
       execute: input => ctx.tools.execute(input),
+      resolve: input => ctx.tools.resolve(input),
       get: (name, scope) => {
         if (name === 'plugin_manager') return listed
         const definition = ctx.tools.get(name, scope)
@@ -331,6 +337,7 @@ describe('app tools over MCP', { timeout: 60_000 }, () => {
     const hidden: AppToolsOptions['tools'] = {
       schemas: scope => ctx.tools.schemas(scope).filter(schema => schema.name !== 'plugin_manager'),
       execute: input => ctx.tools.execute(input),
+      resolve: input => ctx.tools.resolve(input),
       get: (name, scope) => ctx.tools.get(name, scope),
     }
     const mcp = await client(await serve(agent, ctx, { tools: hidden }))
@@ -364,8 +371,10 @@ describe('app tools over MCP', { timeout: 60_000 }, () => {
   })
 
   it('names each served tool after the app tool it runs', () => {
-    expect([...APP_TOOLS, ...SUBAGENT_TOOLS, ...GOAL_TOOLS, ...RESOURCE_TOOLS, 'wait_agent', 'other'].map(dshNameOf))
-      .toEqual(['skill', 'plugin_manager', 'app_read_file', 'present', 'cordis_inspect_query', 'cordis_inspect_list', ...SUBAGENT_TOOLS, ...GOAL_TOOLS, ...RESOURCE_TOOLS, undefined, undefined])
+    expect([...APP_TOOLS, ...SUBAGENT_TOOLS, ...GOAL_TOOLS, ...TEAM_TOOLS, ...RESOURCE_TOOLS, 'wait_agent', 'other'].map(dshNameOf)).toEqual([
+      'skill', 'plugin_manager', 'app_read_file', 'present', 'cordis_inspect_query', 'cordis_inspect_list',
+      ...SUBAGENT_TOOLS, ...GOAL_TOOLS, ...TEAM_TOOLS, ...RESOURCE_TOOLS, undefined, undefined,
+    ])
   })
 
   it('gives a call without a Casper call id a fresh id of its own, and records no step result for it', async () => {
@@ -445,6 +454,7 @@ describe('app tools over MCP', { timeout: 60_000 }, () => {
     const failing: AppToolsOptions['tools'] = {
       schemas: scope => ctx.tools.schemas(scope),
       execute: () => Promise.reject(new Error('executor unloaded')),
+      resolve: input => ctx.tools.resolve(input),
       get: (name, scope) => ctx.tools.get(name, scope),
     }
     const mcp = await client(await serve(agent, ctx, { tools: failing }))
@@ -652,5 +662,68 @@ describe('the app\'s goal tools over MCP', { timeout: 60_000 }, () => {
       isError: false,
     })
     expect(ran).toEqual([{ name: 'get_goal', agent }, { name: 'update_goal', agent }])
+  })
+})
+
+describe('the app\'s Team tools over MCP', { timeout: 60_000 }, () => {
+  /** A Host whose Agent scope has stand-ins for the Team tools, each admitted only while `team.on` is set, as the app's are. */
+  async function withTeamTools() {
+    const booted = await host()
+    const team = { on: false, routes: [] as unknown[] }
+    const ran: { name: string; agent: unknown }[] = []
+    for (const name of TEAM_TOOLS) {
+      booted.ctx.tools.register(defineTool({
+        name, description: `Stand-in ${name}.`, parameters: { task_id: { type: 'string' } },
+        output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
+        execute: (_args, exec) => {
+          ran.push({ name, agent: exec.agent })
+          return Promise.resolve(`${name} ran`)
+        },
+      }), {
+        when: ({ agent, modelSelection }) => {
+          team.routes.push({ agent, modelSelection })
+          return team.on
+        },
+      })
+    }
+    return { ...booted, ran, team }
+  }
+
+  it('lists them after the goal tools whatever the Team mode, unpinned, read-only on the two reads, with the rules on team_task_create', async () => {
+    const { ctx, agent } = await withTeamTools()
+    const { tools } = await (await client(await serve(agent, ctx))).listTools()
+    expect(tools.map(tool => tool.name)).toEqual([...APP_TOOLS, ...TEAM_TOOLS, ...RESOURCE_TOOLS])
+    const byName = new Map(tools.map(tool => [tool.name, tool]))
+    for (const name of TEAM_TOOLS) expect(byName.get(name)?._meta).toBeUndefined()
+    const readOnly = { readOnlyHint: true }
+    expect(TEAM_TOOLS.map(name => byName.get(name)?.annotations)).toEqual([undefined, readOnly, readOnly, undefined])
+    expect(tools.filter(tool => tool._meta?.['casper/pin'] === true).map(tool => tool.name)).toEqual(['app_skill', 'plugin_manager', 'app_read_file', 'present'])
+    expect(byName.get('team_task_create')?.description).toBe(`Stand-in team_task_create. ${TEAM_RULES}`)
+    expect(byName.get('team_task_update')?.description).toBe('Stand-in team_task_update.')
+    expect(TEAM_RULES.length).toBeLessThan(DESCRIPTION_MAX / 2)
+  })
+
+  it('leaves them all out with teams off, and serves the other tools as before', async () => {
+    const { ctx, agent, ran } = await withTeamTools()
+    const mcp = await client(await serve(agent, ctx, { teams: false }))
+    expect((await mcp.listTools()).tools.map(tool => tool.name)).toEqual([...APP_TOOLS, ...RESOURCE_TOOLS])
+    await expect(mcp.callTool({ name: 'team_task_list', arguments: {} })).rejects.toThrow(/Tool team_task_list not found/)
+    expect(ran).toEqual([])
+  })
+
+  it('runs a call only while the app\'s check admits it, with the route it is given, and says Team is off otherwise', async () => {
+    const { ctx, agent, ran, team } = await withTeamTools()
+    const route = { provider: 'openai-codex', model: 'gpt-6.1-sol' }
+    const mcp = await client(await serve(agent, ctx, { route: () => route }))
+    expect(await mcp.callTool({ name: 'team_task_list', arguments: {} })).toEqual({ content: [{ type: 'text', text: TEAM_OFF }], isError: true })
+    expect(ran).toEqual([])
+    team.on = true
+    expect(await mcp.callTool({ name: 'team_task_get', arguments: { task_id: 'task-1' } })).toEqual({ content: [{ type: 'text', text: 'team_task_get ran' }], isError: false })
+    expect(ran).toEqual([{ name: 'team_task_get', agent }])
+    expect(team.routes).toContainEqual({ agent, modelSelection: route })
+    // Other tools need no admission and run as before.
+    team.routes.length = 0
+    expect(await mcp.callTool({ name: 'present', arguments: { files: [] } })).toMatchObject({ isError: false })
+    expect(team.routes).toEqual([])
   })
 })
