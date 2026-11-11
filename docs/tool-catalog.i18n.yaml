@@ -9,8 +9,8 @@
   en: 6cc2cd9ced70bb09
   zh: 1c0e6cb4ba2ed637
 /tool-schema-catalog/tool-package-map:
-  en: 17d0b1d1a3c15c7f
-  zh: 1a9d90fc99e0e848
+  en: e680bf2f4cc2f897
+  zh: ae09f555b6ee46ee
 /tool-schema-catalog/deepseek-ai-dsh-plugin-manager:
   en: e0143916bb634762
   zh: e0143916bb634762
@@ -291,8 +291,50 @@
   en: 8001eda7e9ff6a25
   zh: 2414761029f21404
 /tool-schema-catalog/deepseek-ai-dsh-tool-agent-team/team-task-update:
-  en: 9acd1c5b2fac9853
-  zh: 3bd81e9cd1f1c28d
+  en: e7d945ddf7dfcc5f
+  zh: 03e7175436f1c4fd
+/tool-schema-catalog/deepseek-ai-dsh-casper-checks:
+  en: 085796c5d94fdad8
+  zh: 085796c5d94fdad8
+/tool-schema-catalog/deepseek-ai-dsh-casper-checks/check-list:
+  en: 6191cd9d0ccd43cc
+  zh: bdef21c6a5d672bf
+/tool-schema-catalog/deepseek-ai-dsh-casper-checks/check-record:
+  en: 33f12b67a5b68268
+  zh: 14e8a16f552dc941
+/tool-schema-catalog/deepseek-ai-dsh-casper-checks/check-replay:
+  en: 3a9015595d54bdf3
+  zh: 0a0ca4619a9a5b74
+/tool-schema-catalog/deepseek-ai-dsh-casper-sidebar-browser:
+  en: 5470377d0812eca2
+  zh: 5470377d0812eca2
+/tool-schema-catalog/deepseek-ai-dsh-casper-sidebar-browser/browser-click:
+  en: 0363137957c4dff3
+  zh: 6d2070be68cded6c
+/tool-schema-catalog/deepseek-ai-dsh-casper-sidebar-browser/browser-key:
+  en: 417904947125f5c2
+  zh: aebfccfee1fcfc1b
+/tool-schema-catalog/deepseek-ai-dsh-casper-sidebar-browser/browser-navigate:
+  en: c91734f0a286d249
+  zh: 6afbf09b383baef6
+/tool-schema-catalog/deepseek-ai-dsh-casper-sidebar-browser/browser-open:
+  en: b7d825065a6fa812
+  zh: 8e742d85e3ef75f8
+/tool-schema-catalog/deepseek-ai-dsh-casper-sidebar-browser/browser-read:
+  en: 903a9e44412a0846
+  zh: 8e4085e06414cec6
+/tool-schema-catalog/deepseek-ai-dsh-casper-sidebar-browser/browser-screenshot:
+  en: 03228f13c480a47b
+  zh: c4c7ab6eac7fc169
+/tool-schema-catalog/deepseek-ai-dsh-casper-sidebar-browser/browser-scroll:
+  en: 35529cf282fc322c
+  zh: c88e52ede222d28a
+/tool-schema-catalog/deepseek-ai-dsh-casper-sidebar-browser/browser-tabs:
+  en: 93c53eb38838d02f
+  zh: a336c02e14864099
+/tool-schema-catalog/deepseek-ai-dsh-casper-sidebar-browser/browser-type:
+  en: bb4838b3047b0fd2
+  zh: 4483e923a1fbbbd0
 /tool-schema-catalog/deepseek-ai-dsh-tool-todo:
   en: dea62d26fb18ff68
   zh: dea62d26fb18ff68
