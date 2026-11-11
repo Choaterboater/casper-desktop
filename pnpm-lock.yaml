@@ -18511,6 +18511,9 @@ importers:
       '@deepseek-ai/dsh-brand':
         specifier: workspace:*
         version: link:../../packages/util/brand
+      '@deepseek-ai/dsh-casper-sidebar-browser':
+        specifier: workspace:*
+        version: link:../../packages/casper/tool-sidebar-browser
       '@deepseek-ai/dsh-client-connection':
         specifier: workspace:*
         version: link:../../packages/client/connection
