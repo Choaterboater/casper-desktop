@@ -29,7 +29,7 @@ kind: "package-reference"
 | 字段 | 默认值 | 含义 |
 |---|---|---|
 | `presets` | `['casper']` | 由 Casper 驱动其会话的预设 |
-| `command` | `casper` | Casper 可执行文件；桌面端条目在 PATH、`~/.local/bin`、`~/.bun/bin`、`/opt/homebrew/bin` 与 `/usr/local/bin` 中查找 |
+| `command` | `casper` | Casper 可执行文件；桌面端条目在 PATH、`~/.local/bin`、`~/.bun/bin`、`/opt/homebrew/bin` 与 `/usr/local/bin` 中查找。在 Windows 上，若这样找不到，插件还会在 PATH 上按每个 PATHEXT 后缀尝试 `casper`，然后在 `CASPER_INSTALL_DIR`、`%LOCALAPPDATA%\Programs\casper`（Casper 安装程序的文件夹）与 `%BUN_INSTALL%\bin` 中尝试 `casper.exe`；找到的 `.cmd`、`.bat` 或其他脚本只在错误中列出，不会启动。`command` 设为 `casper` 或 `casper.exe` 以外的值即可关闭此行为 |
 | `args` | `['acp']` | 启动 Casper ACP 服务器的参数 |
 | `model` | 未设置 | 起始模型，以 `--model` 传入；未设置时沿用 Casper 自身的默认值。[模型选择器](#model-picker)可按会话更改 |
 | `effort` | 未设置 | 起始推理等级，以 `--effort` 传入；未设置时沿用 Casper 自身的默认值。模型选择器可按会话更改 |
@@ -57,6 +57,7 @@ kind: "package-reference"
 | 文件 | 作用 |
 |---|---|
 | [`src/index.ts`](src/index.ts) | 插件入口：注册投影、打开 sidecar，并注册工厂路由 |
+| [`src/lookup.ts`](src/lookup.ts) | 查找 Casper 可执行文件，并在 Windows 上回退到安装程序与 bun 的文件夹 |
 | [`src/route.ts`](src/route.ts) | 选择配置预设上的根会话；委派的子会话仍使用 agent-loop |
 | [`src/factory.ts`](src/factory.ts) | 按 agent-loop 的发布顺序创建与恢复 Agent，拒绝 fork，并在卸载时并行销毁所有 Agent |
 | [`src/agent.ts`](src/agent.ts) | `CasperAgent`：收件箱、阶段、每轮一条提示、把引导消息发给正在运行的提示、取消与进程重启 |
@@ -247,7 +248,7 @@ Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打�
 - 拒绝 fork Casper 会话。
 - `dsh --profile acp` 与 SDK 服务器重新打开已存储的会话时不传预设，也没有 Casper 驱动，因此在那里重新打开的 Casper 会话运行在应用自己的 agent 循环上，并使用该应用选择的模型，而不是在 Casper 中运行。桌面端下次打开它时，Casper 会重新加载自己的对话，其中没有在别处添加的轮次。一次性运行器会拒绝记录了预设的会话，webhook 只会在其规则指定的预设上创建新会话。
 - 没有保存预设的定时任务在 Casper 中运行：在自动化任务页面创建的任务会在默认预设上创建其会话，而桌面端的默认预设是 Casper，除非设置中指定了其他预设。由 Standard 会话的提醒工具创建的任务会保留该会话的预设，指向现有 Casper 会话的任务会作为其下一条提示在那里运行。Casper 会话自身没有提醒工具。
-- 只覆盖 macOS 与 Linux 上的桌面端；Windows 查找未经测试。
+- 只有 macOS 与 Linux 上的桌面端运行过 Casper 会话。在 Windows 上，可执行文件查找只由单元测试检查，且应用不会读取安装程序保存的 Path，因此不在应用自身环境中的自定义安装文件夹要在应用重启后才能找到。
 - 已删除会话的 sidecar 记录要到下次启动时才会删除；已归档的会话会保留其进程，直到空闲满 `idleExitMs`。决策 91 之前的 Casper 在空闲时不会被关闭。
 - Subagent、团队与目标功能不在 Casper 会话中运行。
 - Casper 会话的标题由应用的默认模型（可能是 DeepSeek 模型）生成，而不是由 Casper 所运行的模型生成。

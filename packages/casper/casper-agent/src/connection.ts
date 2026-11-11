@@ -33,6 +33,7 @@ import { appToolsEntry } from './app-tools.ts'
 import type { AppToolsServer } from './app-tools.ts'
 import type { Config } from './config.ts'
 import type { ForwardedServers } from './forward-servers.ts'
+import { findCasper, lookupDetail } from './lookup.ts'
 
 /** ACP error code Casper uses for an unknown or unloadable session. */
 const ACP_NOT_FOUND = -32002
@@ -317,7 +318,7 @@ export class CasperConnection {
   }
 
   /**
-   * Resolve, spawn, and open Casper. A stored conversation is reopened with
+   * Find (see {@link findCasper}), spawn, and open Casper. A stored conversation is reopened with
    * `session/load`; only Casper's "no saved conversation" reply falls back to
    * `session/new`. The child is terminated when start fails or is aborted.
    * @param options - subprocess service, config, folder, and receivers.
@@ -331,12 +332,12 @@ export class CasperConnection {
     const { config } = options
     let executable: string
     try {
-      executable = await options.subprocess.resolveExecutable(config.command, config.env, signal)
+      executable = await findCasper(options.subprocess, config, signal)
     } catch (error: unknown) {
       signal.throwIfAborted()
       if (error instanceof SubprocessExecutableNotFoundError) {
         throw new CasperError('CASPER_NOT_FOUND',
-          `Casper was not found at "${config.command}". Install Casper, or pick another mode for this session.`, { cause: error })
+          `Casper was not found at "${config.command}". Install Casper, or pick another mode for this session.${lookupDetail(error)}`, { cause: error })
       }
       throw new CasperError('CASPER_START_FAILED', `Casper could not start: ${errorText(error)}`, { cause: error })
     }
