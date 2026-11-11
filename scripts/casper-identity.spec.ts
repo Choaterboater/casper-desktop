@@ -1,6 +1,5 @@
 /** Casper identity: publisher, upstream credit, website ghost, installer names, and the copied checks staying off. */
 
-import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -16,8 +15,15 @@ const GHOST = 'M12 30a20 20 0 0 1 40 0v24'
 const GHOST_MARK = 'M3 11.1a9 9 0 0 1 18 0v10.8'
 /** The lopsided first Casper ghost, replaced by the website ghost. */
 const OLD_GHOST = 'M12 2C7.9 2 5 5.1 5 9.2V21'
-/** This repository's first commit: DeepSeek Harness's tree, whose bitmaps still drew the whale. */
-const UPSTREAM = 'adf962ec'
+/** sha256 of the upstream installer and running-status bitmaps, which still drew the old logo. */
+const UPSTREAM_WHALE_SHA256: Readonly<Record<string, string>> = {
+  'apps/desktop/installer/assets/brand.png': '3276df8a1d3491160e9436a4b5690444c96c1351661901a84581ff216d10fd2f',
+  'apps/desktop/installer/assets/brand-2x.png': '2d3538a84ecf40619053218f9f32ee853d26614377cbcd8d3c96a9a0192ac529',
+  'apps/desktop/installer/assets/brand-dark.png': '59901811702183ee8047b61ca7d0be9adc6c1bbd8f6d630f859b60b0e583cd9a',
+  'apps/desktop/installer/assets/brand-dark-2x.png': 'd9ac067d453cceace270fdf17158a2dccd8df5577f35639699030d6a80c39e40',
+  'apps/desktop/installer/assets/uninstaller-sidebar.png': 'f853ea4d1d54fc9aa55565ce05ae51c1f577db835636dadb74db54cd8b00e3ea',
+  'packages/client/ui-chat/src/client/assets/running-whale@2x.png': '0fd990d118113d19af7af4480f2b55d610b103451a08be6f7bf5a146823f8bd3',
+}
 /** The opening of DeepSeek's whale path, which must not ship as Casper's mark. */
 const WHALE = /M48\.8354 10\.0479|M22\.9168 1\.43018|M968\.002 326\.025/u
 
@@ -67,10 +73,9 @@ describe('Casper identity', () => {
 
   it('ships no installer or running-status bitmap left over from the upstream whale artwork', () => {
     const digest = (bytes: Buffer): string => createHash('sha256').update(bytes).digest('hex')
-    const installer = ['brand.png', 'brand-2x.png', 'brand-dark.png', 'brand-dark-2x.png', 'uninstaller-sidebar.png']
-    for (const path of [...installer.map(name => `apps/desktop/installer/assets/${name}`), 'packages/client/ui-chat/src/client/assets/running-whale@2x.png']) {
-      const upstream = execFileSync('git', ['show', `${UPSTREAM}:${path}`], { cwd: root, maxBuffer: 16 * 1024 * 1024 })
-      expect(digest(readFileSync(resolve(root, path))), path).not.toBe(digest(upstream))
+    expect(Object.keys(UPSTREAM_WHALE_SHA256)).toHaveLength(6)
+    for (const [path, upstream] of Object.entries(UPSTREAM_WHALE_SHA256)) {
+      expect(digest(readFileSync(resolve(root, path))), path).not.toBe(upstream)
     }
   })
 
