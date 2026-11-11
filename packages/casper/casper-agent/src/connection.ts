@@ -129,6 +129,11 @@ export interface CasperConnectionHandlers {
    */
   plan(active: boolean): void
   /**
+   * Hear that the process exited or was terminated, after the connection is
+   * marked dead; called once.
+   */
+  exit?(): void
+  /**
    * Answer one `session/request_permission`.
    * @param params - Casper's request.
    * @param signal - aborted when Casper withdraws the request or the connection closes.
@@ -652,10 +657,11 @@ export class CasperConnection {
     await this.appTools?.close()
   }
 
-  /** Mark the process gone and revoke the app tools. */
+  /** Mark the process gone, revoke the app tools, and tell the exit handler. */
   private exited(): void {
     this.exitedState = true
     this.revokeAppTools()
+    this.options.handlers.exit?.()
   }
 
   /** Close the app tools server without waiting. */

@@ -45,6 +45,7 @@ The Desktop profile mounts the plugin from `packages/bundle/web-app/cordis.patch
 | `approvalDiff` | `true` | Draw the diff an edit's box carries in [Casper's approval card](#approvals); it needs `approvalCard`, and `false` shows the diff as text lines |
 | `forwardMcpServers` | `true` | Hand Casper the enabled [Settings > MCP servers](#settings-mcp-servers); `false` sends only the app tools server |
 | `forwardPluginMcpServers` | `true` | Also hand Casper the servers [plugins register with the MCP manager](#settings-mcp-servers), after the Settings servers and within the same 7; it needs `forwardMcpServers`, and `false` leaves them out |
+| `modePill` | `true` | Show an [access mode Casper picks itself](#access-control) as a pill next to the access control; `false` records none and clears one already shown |
 | `idleExitMs` | `900000` | Idle time after which Casper is asked whether its process may be [closed](#process-lifetime-and-resume) (15 minutes); `0` keeps it until the Session closes |
 
 The child never receives `DEEPSEEK_*` or `DSH_*` names, or credential-shaped names that `env` does not list. The one exception is the app profile: when the app runs with a profile, Casper gets `DSH_PROFILE` and `DSH_PROFILE_DIR`, so a bundle it builds can name the profile it installs into.
@@ -58,7 +59,7 @@ A turn that cannot run ends with an error on `turn/end`: `CASPER_NOT_FOUND` when
 
 | File | Role |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: registers the projections, opens the sidecar, and registers the factory route |
+| [`src/index.ts`](src/index.ts) | Plugin entry: registers the projections, `casperAccess` among them, opens the sidecar, and registers the factory route |
 | [`src/lookup.ts`](src/lookup.ts) | Finds the Casper executable, with the Windows fallback to the installer's and bun's folders |
 | [`src/route.ts`](src/route.ts) | Selects root Sessions on the configured presets; delegated children stay on agent-loop |
 | [`src/factory.ts`](src/factory.ts) | Creates and resumes Agents with agent-loop's publication order, refuses forks, and tears every Agent down in parallel on unload |
@@ -70,7 +71,7 @@ A turn that cannot run ends with an error on `turn/end`: `CASPER_NOT_FOUND` when
 | [`src/box.ts`](src/box.ts) | The box's question id, header, and card limit, shared by both halves |
 | [`src/receipt.ts`](src/receipt.ts) | Reads Casper's receipt and a response's tokens from ACP `_meta`, shared by both halves |
 | [`src/conversation.ts`](src/conversation.ts) | The `plugin:casper-agent/conversation` record, and the check of Casper's mark in a prompt reply's `_meta` |
-| [`src/client/index.ts`](src/client/index.ts) | Client half: registers Casper's approval card first in the conversation composer chain, the receipt card in a completed turn's tail, and the receipt card as the `casper_receipt` tool view |
+| [`src/client/index.ts`](src/client/index.ts) | Client half: registers Casper's approval card first in the conversation composer chain, the receipt card in a completed turn's tail, the receipt card as the `casper_receipt` tool view, and the mode pill after the composer's mode controls |
 | [`src/client/receipt-turn.ts`](src/client/receipt-turn.ts) | Claims the `casper_receipt` call and its result on the Chat target, so no step holds them, and publishes the receipt on its turn |
 | [`src/client/CasperBoxCard.tsx`](src/client/CasperBoxCard.tsx) | Casper's approval card: which questions it takes, its rows, keys, and answer |
 | [`src/client/ReceiptRow.tsx`](src/client/ReceiptRow.tsx) | Casper's receipt card: the verdict, changed files, checks, and model use, with its words in [`src/client/locales.ts`](src/client/locales.ts) |
@@ -85,6 +86,10 @@ A turn that cannot run ends with an error on `turn/end`: `CASPER_NOT_FOUND` when
 | [`src/model.ts`](src/model.ts) | `CasperModel`: the Agent's model handle, which hands picks to Casper instead of the Host catalog |
 | [`src/models-cache.ts`](src/models-cache.ts) | Host storage domain `casper_agent_models` keeping the last model list |
 | [`src/access.ts`](src/access.ts) | Maps the permission preset to Casper's access mode |
+| [`src/access-record.ts`](src/access-record.ts) | The `plugin:casper-agent/access` record of the access mode Casper picked itself |
+| [`src/access-projection.ts`](src/access-projection.ts) | The `casperAccess` projection the mode pill reads, folded from those records |
+| [`src/access-view.ts`](src/access-view.ts) | The `casperAccess` view's type, shared by both halves |
+| [`src/client/ModePill.tsx`](src/client/ModePill.tsx) | Casper's mode pill beside the composer's access control |
 
 <a id="turns-and-events"></a>
 ### Turns and events
@@ -153,6 +158,8 @@ The composer's access control (the permission preset) sets Casper's access mode.
 
 The mode goes in Casper's `mode` config option, or in `session/set_mode` when Casper offers only `modes`. It is sent before each prompt, after a Casper restart, and as soon as the preset changes, during a prompt too; one switch sends one request. A mode Casper picks itself, such as "Yes to everything this session" or `/permissions all`, is kept until the preset changes and never moves the control: only the person's own pick sets the preset. The exception is Read Only, which the app sets again whenever Casper leaves it.
 
+The composer shows such a mode as a pill of its own after the access and plan controls, such as `Casper set Don't ask`, while the process that picked it runs. The pill is display only: it has no action, sends nothing to Casper, and the access control and the preset stay as they were. Each change is recorded as the plugin record `plugin:casper-agent/access` `{mode}`, the mode Casper is in when it differs from the mode the app last set on that process, else `null`; an app build without this package keeps and skips it. The `casperAccess` projection folds the records, skips a malformed one, and is left out of Session summaries. The pill clears when Casper goes back to the app's mode, when the person picks another mode on the control (the one Casper picked included), and when the process ends: closed while idle, for changed MCP servers, or with the Session, or exited. A reopened Session whose log still names a mode, as a closed app can leave it, writes `null` as it opens, so that mode is not shown. With `modePill: false` no mode is recorded, and a pill already shown clears at the next access sync.
+
 When Read Only or Workspace Write cannot be set before a prompt, the turn ends `CASPER_ACCESS_NOT_APPLIED` and no prompt is sent; a Casper without modes runs Workspace Write as usual. When it cannot be set during a prompt, the prompt stops and the turn ends the same way; a switch that fails while the turn is still preparing its prompt, such as during a picture read or a model set, ends the turn the same way with no prompt sent. Full access that cannot be set leaves a note in the reply, and Casper asks as usual.
 
 ### Casper's commands
@@ -179,7 +186,7 @@ Casper starts at a Session's first prompt, so a missing command never blocks ope
 
 Each prompt reply also leaves a `plugin:casper-agent/conversation` record in the Session log (see [Turns and events](#turns-and-events)): which Casper conversation the turn went to, and Casper's mark for where its reply left that conversation. It is there so a later fork can cut the Casper conversation at that turn; nothing reads it yet, and the sidecar stays what reopening uses. It is a plugin record, so an app build without this package keeps it, skips it, and still opens the Session. A record that cannot be written is logged as a warning and the turn ends as it would have.
 
-Once a Session has sat idle for `idleExitMs` with Casper running, the plugin asks Casper with `_casper/idle` (Casper's decision 91) whether the process may be closed. The reply names only kinds of work: Casper is idle when no prompt or model change is under way and no dev server, command, debugger, helper, or checks are still at work, a command whose note for the AI is still being written included; Casper's own `acp_idle_exit: off` always answers not idle. When Casper says idle and nothing started meanwhile, the process is closed as on disposal. A turn, a model pick, an access switch, or a Plan first set during the check keeps it and starts the idle time again; so does a Casper that is not idle, that gives no answer within 10 seconds, or that does not know the request (`-32601`), and it is asked again after another idle time. The next prompt starts Casper only after the old process has exited and reopens the conversation with `session/load`, with no fresh-conversation line. On that load Casper goes on with the conversation's own model; when that is not the model the closed process was on, the turn opens with `[Casper reopened on <model>; it was <model>.]` and the plugin sends no model set. What the closed process allowed for its session alone ends with it: "Yes, for this session" answers and an access mode Casper picked itself. The reopened Casper gets the access control's mode and the Session's Plan first value again before its first prompt.
+Once a Session has sat idle for `idleExitMs` with Casper running, the plugin asks Casper with `_casper/idle` (Casper's decision 91) whether the process may be closed. The reply names only kinds of work: Casper is idle when no prompt or model change is under way and no dev server, command, debugger, helper, or checks are still at work, a command whose note for the AI is still being written included; Casper's own `acp_idle_exit: off` always answers not idle. When Casper says idle and nothing started meanwhile, the process is closed as on disposal. A turn, a model pick, an access switch, or a Plan first set during the check keeps it and starts the idle time again; so does a Casper that is not idle, that gives no answer within 10 seconds, or that does not know the request (`-32601`), and it is asked again after another idle time. The next prompt starts Casper only after the old process has exited and reopens the conversation with `session/load`, with no fresh-conversation line. On that load Casper goes on with the conversation's own model; when that is not the model the closed process was on, the turn opens with `[Casper reopened on <model>; it was <model>.]` and the plugin sends no model set. What the closed process allowed for its session alone ends with it: "Yes, for this session" answers and an access mode Casper picked itself, whose [pill](#access-control) clears. The reopened Casper gets the access control's mode and the Session's Plan first value again before its first prompt.
 
 At each start the plugin drops, in the background, the sidecar records of Sessions that `sessionPersistence.stat` no longer finds; the app has no Session delete of its own. An archived Session is still stored and keeps its record, and so does one whose check fails.
 
@@ -253,7 +260,7 @@ The plugin sends no model request, so it has no cache effect; Casper's own reque
 - App tool results reach Casper as text only: an image or other non-text block becomes a note. None of the served tools returns an image today.
 - In a packaged app `app_read_file` reaches each installed package's `README.md`, `package.json` and built `lib/*.js`, the skill files, and `ui-theme`'s `lib/styles`. The Desktop runtime copy drops every `.d.ts`, packages publish no `src/`, and the repository's `docs/` ship in no package, so `lib/types`, `ui-sidebar`'s `slots.ts`, `docs/cordis-tutorial` and `docs/web-styling.md` cannot be read there; slot props and theme tokens come from `cordis_inspect_query` instead. Shipping those guides with the app is not done.
 - Casper's approval card draws a diff only for an edit's box. Casper sends no diff in a write's box, nor for an edit that holds a secret, has a side larger than 256 KB, or touches a path it did not check, so those boxes show their text only.
-- A mode Casper picks itself is not shown: the access control keeps showing the preset.
+- After the app was closed without its usual shutdown, the Session log still names an access mode Casper picked itself until the Session is next opened; only the opened Session clears it.
 - Steering reaches an older Casper, whose `initialize` reply does not set `agentCapabilities._meta.casper.steer`, as the next prompt.
 - Before any Casper has sent its command list in this app, Casper's commands are missing from the `/` menu until the Session's first prompt starts Casper.
 - Forking a Casper Session is refused.

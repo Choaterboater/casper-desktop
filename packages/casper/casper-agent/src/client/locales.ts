@@ -1,6 +1,6 @@
-/** `casper-receipt` namespace dictionaries for Casper's receipt card and approval card. */
+/** `casper-receipt` namespace dictionaries for Casper's receipt card, approval card and mode pill. */
 
-/** Dictionary namespace owned by the receipt card and the approval card. */
+/** Dictionary namespace owned by the receipt card, the approval card and the mode pill. */
 export const NS = 'casper-receipt'
 
 /** English dictionary (the key-set source of truth). */
@@ -15,6 +15,11 @@ export const en = {
   'box.diff.collapseAria': 'Collapse diff',
   'box.diff.expand': '… {count} more lines',
   'box.diff.expandAria': 'Expand {count} more diff lines',
+  'pill.label': 'Casper set {mode}',
+  'pill.read': 'Read only',
+  'pill.ask': 'Ask first',
+  'pill.full': "Don't ask",
+  'pill.title': "Casper changed its own access for now. The access control keeps your pick; this ends when Casper's process closes.",
   'row.title': 'Receipt',
   'row.running': 'Writing the receipt',
   'row.changed': 'Changed files',
@@ -41,7 +46,7 @@ export type CasperReceiptKey = keyof typeof en
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
-    /** Casper's receipt card and approval card copy. */
+    /** Casper's receipt card, approval card and mode pill copy. */
     'casper-receipt': CasperReceiptKey
   }
 }
@@ -58,6 +63,11 @@ export const zh = {
   'box.diff.collapseAria': '收起差异',
   'box.diff.expand': '… 其余 {count} 行',
   'box.diff.expandAria': '展开其余 {count} 行差异',
+  'pill.label': 'Casper 已设为{mode}',
+  'pill.read': '只读',
+  'pill.ask': '先询问',
+  'pill.full': '不询问',
+  'pill.title': 'Casper 暂时更改了自己的权限。权限控件保留你的选择；Casper 的进程关闭时此设置结束。',
   'row.title': '回执',
   'row.running': '正在生成回执',
   'row.changed': '已更改的文件',
@@ -91,6 +101,11 @@ export const ja = {
   'box.diff.collapseAria': '差分を折りたたむ',
   'box.diff.expand': '… 残り{count}行',
   'box.diff.expandAria': '差分の残り{count}行を表示',
+  'pill.label': 'Casper が{mode}に設定',
+  'pill.read': '読み取り専用',
+  'pill.ask': '先に確認',
+  'pill.full': '確認しない',
+  'pill.title': 'Casper が一時的に自分のアクセスを変更しました。アクセス設定はあなたの選択のままです。Casper のプロセスが終了すると元に戻ります。',
   'row.title': 'レシート',
   'row.running': 'レシートを作成中',
   'row.changed': '変更されたファイル',
@@ -124,6 +139,11 @@ export const es = {
   'box.diff.collapseAria': 'Contraer diferencia',
   'box.diff.expand': '… {count} líneas más',
   'box.diff.expandAria': 'Mostrar {count} líneas más de la diferencia',
+  'pill.label': 'Casper puso {mode}',
+  'pill.read': 'Solo lectura',
+  'pill.ask': 'Preguntar antes',
+  'pill.full': 'No preguntar',
+  'pill.title': 'Casper cambió su propio acceso por ahora. El control de acceso conserva tu elección; esto termina cuando se cierra el proceso de Casper.',
   'row.title': 'Recibo',
   'row.running': 'Escribiendo el recibo',
   'row.changed': 'Archivos modificados',
@@ -157,6 +177,11 @@ export const fr = {
   'box.diff.collapseAria': 'Réduire la différence',
   'box.diff.expand': '… {count} lignes de plus',
   'box.diff.expandAria': 'Afficher {count} lignes de plus de la différence',
+  'pill.label': 'Casper a choisi {mode}',
+  'pill.read': 'Lecture seule',
+  'pill.ask': 'Demander d’abord',
+  'pill.full': 'Ne pas demander',
+  'pill.title': 'Casper a changé son propre accès pour l’instant. Le contrôle d’accès garde votre choix ; cela prend fin à la fermeture du processus de Casper.',
   'row.title': 'Reçu',
   'row.running': 'Rédaction du reçu',
   'row.changed': 'Fichiers modifiés',
@@ -190,6 +215,11 @@ export const de = {
   'box.diff.collapseAria': 'Differenz ausblenden',
   'box.diff.expand': '… {count} weitere Zeilen',
   'box.diff.expandAria': '{count} weitere Zeilen der Differenz anzeigen',
+  'pill.label': 'Casper hat {mode} gesetzt',
+  'pill.read': 'Nur lesen',
+  'pill.ask': 'Erst fragen',
+  'pill.full': 'Nicht fragen',
+  'pill.title': 'Casper hat seinen eigenen Zugriff vorerst geändert. Die Zugriffssteuerung behält deine Wahl; das endet, wenn Caspers Prozess schließt.',
   'row.title': 'Beleg',
   'row.running': 'Beleg wird erstellt',
   'row.changed': 'Geänderte Dateien',
@@ -223,6 +253,11 @@ export const ru = {
   'box.diff.collapseAria': 'Свернуть различия',
   'box.diff.expand': '… ещё строк: {count}',
   'box.diff.expandAria': 'Показать ещё строк различий: {count}',
+  'pill.label': 'Casper выбрал режим «{mode}»',
+  'pill.read': 'Только чтение',
+  'pill.ask': 'Сначала спрашивать',
+  'pill.full': 'Не спрашивать',
+  'pill.title': 'Casper временно изменил свой доступ. Переключатель доступа сохраняет ваш выбор; это закончится, когда процесс Casper закроется.',
   'row.title': 'Отчёт',
   'row.running': 'Составляется отчёт',
   'row.changed': 'Изменённые файлы',
@@ -256,6 +291,11 @@ export const pt = {
   'box.diff.collapseAria': 'Recolher diferença',
   'box.diff.expand': '… mais {count} linhas',
   'box.diff.expandAria': 'Mostrar mais {count} linhas da diferença',
+  'pill.label': 'Casper definiu {mode}',
+  'pill.read': 'Somente leitura',
+  'pill.ask': 'Perguntar antes',
+  'pill.full': 'Não perguntar',
+  'pill.title': 'O Casper mudou o próprio acesso por enquanto. O controle de acesso mantém sua escolha; isso termina quando o processo do Casper fecha.',
   'row.title': 'Recibo',
   'row.running': 'Escrevendo o recibo',
   'row.changed': 'Arquivos alterados',

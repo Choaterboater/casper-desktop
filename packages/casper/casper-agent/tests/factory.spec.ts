@@ -9,6 +9,7 @@ import { KNOWN_SESSION_EVENT_TYPES, pluginRecordOf, Session, SessionId } from '@
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
+import { casperAccessProjectionDefinition } from '../src/access-projection.ts'
 import { CasperAgent } from '../src/agent.ts'
 import { CasperCommandCache } from '../src/commands.ts'
 import { CasperAgentFactory } from '../src/factory.ts'
@@ -257,6 +258,7 @@ describe('CasperAgentFactory', { timeout: 60_000 }, () => {
       agentModels: await host.ctx.sessionProjections.register(agentModelsProjectionDefinition),
       inbox: await host.ctx.sessionProjections.register(inboxProjectionDefinition),
       plan: await host.ctx.sessionProjections.register(planProjectionDefinition),
+      casperAccess: await host.ctx.sessionProjections.register(casperAccessProjectionDefinition),
       sidecar: new CasperSidecar(domain as never),
       commands: new CasperCommandCache(host.ctx.storageDomain.get('casper_agent_commands') as never),
       models: new CasperModelsCache(host.ctx.storageDomain.get('casper_agent_models') as never),

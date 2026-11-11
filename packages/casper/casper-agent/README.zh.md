@@ -45,6 +45,7 @@ kind: "package-reference"
 | `approvalDiff` | `true` | 在 [Casper 的审批卡片](#approvals)中绘制编辑的审批框所带的差异；需要 `approvalCard`，`false` 时以文本行显示差异 |
 | `forwardMcpServers` | `true` | 把已启用的[「设置 > MCP 服务器」](#settings-mcp-servers)交给 Casper；`false` 时只发送应用工具服务器 |
 | `forwardPluginMcpServers` | `true` | 同时把[插件向 MCP 管理器注册的服务器](#settings-mcp-servers)交给 Casper，排在设置中的服务器之后，并共用同样的 7 个名额；需要 `forwardMcpServers`，`false` 时不交给 Casper |
+| `modePill` | `true` | 把 [Casper 自己选择的访问模式](#access-control)作为一个标签显示在权限控件旁边；`false` 时不记录，并清除已显示的标签 |
 | `idleExitMs` | `900000` | 空闲多久后询问 Casper 能否[关闭](#process-lifetime-and-resume)其进程（15 分钟）；`0` 时保留进程直到会话关闭 |
 
 子进程不会收到 `DEEPSEEK_*` 或 `DSH_*` 名称，也不会收到 `env` 未列出的凭据类名称。唯一的例外是应用 profile：应用带 profile 运行时，Casper 会收到 `DSH_PROFILE` 与 `DSH_PROFILE_DIR`，使它构建的 bundle 能指明要安装到的 profile。
@@ -58,7 +59,7 @@ kind: "package-reference"
 
 | 文件 | 作用 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | 插件入口：注册投影、打开 sidecar，并注册工厂路由 |
+| [`src/index.ts`](src/index.ts) | 插件入口：注册投影（其中包括 `casperAccess`）、打开 sidecar，并注册工厂路由 |
 | [`src/lookup.ts`](src/lookup.ts) | 查找 Casper 可执行文件，并在 Windows 上回退到安装程序与 bun 的文件夹 |
 | [`src/route.ts`](src/route.ts) | 选择配置预设上的根会话；委派的子会话仍使用 agent-loop |
 | [`src/factory.ts`](src/factory.ts) | 按 agent-loop 的发布顺序创建与恢复 Agent，拒绝 fork，并在卸载时并行销毁所有 Agent |
@@ -70,7 +71,7 @@ kind: "package-reference"
 | [`src/box.ts`](src/box.ts) | 审批框的问题 id、标题与卡片上限，由两半共用 |
 | [`src/receipt.ts`](src/receipt.ts) | 从 ACP `_meta` 读取 Casper 的回执与一次响应的 token，由两半共用 |
 | [`src/conversation.ts`](src/conversation.ts) | `plugin:casper-agent/conversation` 记录，以及对提示回复 `_meta` 中 Casper 标记的检查 |
-| [`src/client/index.ts`](src/client/index.ts) | 客户端一半：把 Casper 的审批卡片注册为对话输入框链的第一项，把回执卡片注册到已完成一轮的尾部，并把回执卡片注册为 `casper_receipt` 的工具视图 |
+| [`src/client/index.ts`](src/client/index.ts) | 客户端一半：把 Casper 的审批卡片注册为对话输入框链的第一项，把回执卡片注册到已完成一轮的尾部，把回执卡片注册为 `casper_receipt` 的工具视图，并把模式标签注册在输入框的模式控件之后 |
 | [`src/client/receipt-turn.ts`](src/client/receipt-turn.ts) | 在 Chat 目标上认领 `casper_receipt` 调用及其结果，使其不属于任何步骤，并把回执发布到它所在的一轮 |
 | [`src/client/CasperBoxCard.tsx`](src/client/CasperBoxCard.tsx) | Casper 的审批卡片：它接管哪些问题、它的行、按键与回答 |
 | [`src/client/ReceiptRow.tsx`](src/client/ReceiptRow.tsx) | Casper 的回执卡片：结论、已更改的文件、检查与模型用量，文案在 [`src/client/locales.ts`](src/client/locales.ts) |
@@ -85,6 +86,10 @@ kind: "package-reference"
 | [`src/model.ts`](src/model.ts) | `CasperModel`：Agent 的模型句柄，把选择交给 Casper 而不是 Host 目录 |
 | [`src/models-cache.ts`](src/models-cache.ts) | 保存最后一份模型列表的 Host 存储域 `casper_agent_models` |
 | [`src/access.ts`](src/access.ts) | 把权限预设映射为 Casper 的访问模式 |
+| [`src/access-record.ts`](src/access-record.ts) | 记录 Casper 自己选择的访问模式的 `plugin:casper-agent/access` 记录 |
+| [`src/access-projection.ts`](src/access-projection.ts) | 由这些记录折叠出的、模式标签读取的 `casperAccess` 投影 |
+| [`src/access-view.ts`](src/access-view.ts) | `casperAccess` 视图的类型，两半共用 |
+| [`src/client/ModePill.tsx`](src/client/ModePill.tsx) | 输入框权限控件旁的 Casper 模式标签 |
 
 <a id="turns-and-events"></a>
 ### 轮次与事件
@@ -153,6 +158,8 @@ Casper 的计划 Build 框带有 `_meta.casper.plan`，其中是 Build 与 Chang
 
 模式通过 Casper 的 `mode` 配置项发送；Casper 只提供 `modes` 时改用 `session/set_mode`。它在每条提示之前、Casper 重启之后以及预设一变化时发送，提示运行期间也是如此；一次切换只发送一个请求。Casper 自己选择的模式，例如“本会话全部同意”或 `/permissions all`，会保留到预设再次变化，且从不改动该控件：只有用户本人的选择会设置预设。例外是「仅可查看」：Casper 一旦离开它，应用会再次设置。
 
+在选择该模式的进程运行期间，输入框会在权限与计划控件之后用一个单独的标签显示这种模式，例如 `Casper set Don't ask`（中文界面为“Casper 已设为不询问”）。该标签只用于显示：它没有操作，不向 Casper 发送任何内容，权限控件与预设保持不变。每次变化都记录为插件记录 `plugin:casper-agent/access` `{mode}`：当 Casper 所处的模式与应用上次为该进程设置的模式不同时为该模式，否则为 `null`；不含本包的应用构建会保留并跳过它。`casperAccess` 投影折叠这些记录，跳过格式错误的记录，并且不计入会话摘要。Casper 回到应用设置的模式、用户在控件上选择另一个模式（包括 Casper 选的那个），以及进程结束时（空闲时关闭、因 MCP 服务器变化而关闭、随会话关闭，或退出），标签都会清除。重新打开的会话若其日志仍记着某个模式（已关闭的应用可能留下这种记录），会在打开时写入 `null`，因此该模式不会显示。`modePill: false` 时不记录任何模式，已显示的标签会在下一次访问同步时清除。
+
 提示之前无法设置「仅可查看」或「工作区内修改」时，该轮以 `CASPER_ACCESS_NOT_APPLIED` 结束，不发送提示；没有模式的 Casper 照常以「工作区内修改」运行。提示运行期间无法设置时，提示停止，该轮同样以此结束；该轮仍在准备提示时（例如读取图片或设置模型期间）切换失败，该轮同样以此结束且不发送提示。无法设置「完全权限」时，回复中留下一条说明，Casper 照常询问。
 
 ### Casper 的命令
@@ -179,7 +186,7 @@ Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打�
 
 每次提示回复还会在会话日志中留下一条 `plugin:casper-agent/conversation` 记录（见[轮次与事件](#turns-and-events)）：该轮发往哪个 Casper 对话，以及 Casper 为其回复在该对话中停下的位置给出的标记。它的用途是让之后的分叉能在该轮处截断 Casper 对话；目前没有任何地方读取它，重新打开仍使用 sidecar。它是插件记录，因此没有此包的应用构建会保留并跳过它，仍能打开会话。无法写入的记录会记为一条警告，该轮照常结束。
 
-会话在 Casper 运行时空闲满 `idleExitMs` 后，插件用 `_casper/idle`（Casper 的决策 91）询问 Casper 能否关闭进程。回复只列出工作的种类：没有提示或模型更改正在进行，也没有开发服务器、命令、调试器、助手或检查仍在工作（包括写给 AI 的说明仍在写入的命令）时，Casper 才算空闲；Casper 自己的 `acp_idle_exit: off` 总是回答不空闲。Casper 回答空闲且期间没有任何工作开始时，进程会像释放时一样被关闭。检查期间的一轮、一次模型选择、一次访问切换或一次「先计划」设置都会保留进程并重新开始计时；Casper 不空闲、10 秒内没有回答或不认识该请求（`-32601`）时也会保留，并在下一个空闲时长后再次询问。下一条提示要等旧进程退出后才启动 Casper，并用 `session/load` 重新打开对话，不会出现新对话的那一行。加载时 Casper 沿用对话自己的模型；若它不是被关闭的进程所用的模型，该轮以 `[Casper reopened on <model>; it was <model>.]` 开头，插件不发送模型设置。被关闭的进程只为本会话允许的内容随之结束：「本会话内都同意」的回答，以及 Casper 自己选的访问模式。重新打开的 Casper 在第一条提示之前会再次得到访问控制的模式和会话的「先计划」值。
+会话在 Casper 运行时空闲满 `idleExitMs` 后，插件用 `_casper/idle`（Casper 的决策 91）询问 Casper 能否关闭进程。回复只列出工作的种类：没有提示或模型更改正在进行，也没有开发服务器、命令、调试器、助手或检查仍在工作（包括写给 AI 的说明仍在写入的命令）时，Casper 才算空闲；Casper 自己的 `acp_idle_exit: off` 总是回答不空闲。Casper 回答空闲且期间没有任何工作开始时，进程会像释放时一样被关闭。检查期间的一轮、一次模型选择、一次访问切换或一次「先计划」设置都会保留进程并重新开始计时；Casper 不空闲、10 秒内没有回答或不认识该请求（`-32601`）时也会保留，并在下一个空闲时长后再次询问。下一条提示要等旧进程退出后才启动 Casper，并用 `session/load` 重新打开对话，不会出现新对话的那一行。加载时 Casper 沿用对话自己的模型；若它不是被关闭的进程所用的模型，该轮以 `[Casper reopened on <model>; it was <model>.]` 开头，插件不发送模型设置。被关闭的进程只为本会话允许的内容随之结束：「本会话内都同意」的回答，以及 Casper 自己选的访问模式，其[标签](#access-control)随之清除。重新打开的 Casper 在第一条提示之前会再次得到访问控制的模式和会话的「先计划」值。
 
 每次启动时，插件会在后台删除 `sessionPersistence.stat` 已找不到的会话的 sidecar 记录；应用本身没有删除会话的功能。已归档的会话仍然保存着，会保留其记录；检查失败的会话也会保留。
 
@@ -253,7 +260,7 @@ Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打�
 - 应用工具的结果只以文本形式到达 Casper：图片或其他非文本块会变成一行说明。目前提供的工具都不返回图片。
 - 在打包的应用中，`app_read_file` 能读到每个已安装包的 `README.md`、`package.json` 与构建出的 `lib/*.js`、技能文件，以及 `ui-theme` 的 `lib/styles`。Desktop 运行时副本会去掉所有 `.d.ts`，各包不发布 `src/`，仓库的 `docs/` 也不在任何包中，因此那里无法读取 `lib/types`、`ui-sidebar` 的 `slots.ts`、`docs/cordis-tutorial` 与 `docs/web-styling.md`；插槽属性与主题令牌改由 `cordis_inspect_query` 获得。尚未随应用提供这些指南。
 - Casper 的审批卡片只为编辑的审批框绘制差异。Casper 在写入的审批框中不发送差异，含有密钥、某一侧大于 256 KB 或涉及其未检查路径的编辑也不发送，因此这些审批框只显示文本。
-- Casper 自己选择的模式不会显示：权限控件仍显示预设。
+- 应用未经正常关闭就退出后，在会话下次打开之前，会话日志仍记着 Casper 自己选择的访问模式；只有打开的会话会清除它。
 - 对 `initialize` 回复中未设置 `agentCapabilities._meta.casper.steer` 的旧版 Casper，引导消息作为下一条提示送达。
 - 在本应用中还没有任何 Casper 发送过命令列表之前，Casper 的命令不会出现在 `/` 菜单中，直到会话的第一条提示启动 Casper。
 - 拒绝 fork Casper 会话。

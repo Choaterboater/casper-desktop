@@ -53,8 +53,10 @@ import type {} from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-tools'
 import type { AskUserQuestionAnswer } from '@deepseek-ai/dsh-user-questions'
-import { ACCESS_MODE_LABELS, accessModeFor } from './access.ts'
+import { ACCESS_MODE_IDS, ACCESS_MODE_LABELS, accessModeFor } from './access.ts'
 import type { AccessModeId } from './access.ts'
+import { ACCESS_RECORD } from './access-record.ts'
+import type { CasperOwnAccess } from './access-record.ts'
 import { appReadRoots, isInstalled, selfAnchor } from './app-read.ts'
 import { startAppTools } from './app-tools.ts'
 import type { AppToolsProfile, AppToolsServer } from './app-tools.ts'
@@ -95,6 +97,8 @@ export interface CasperAgentReaders {
   readonly inbox: () => InboxState
   /** The Session's logged Plan first state, which the composer's plan chip shows. */
   readonly plan: () => PlanUnitState
+  /** The access mode Casper picked itself, as last recorded; the composer's mode pill shows it. */
+  readonly casperAccess: () => CasperOwnAccess
 }
 
 /** The steering one prompt has sent to Casper. */
@@ -206,6 +210,8 @@ export class CasperAgent implements Agent {
   private lateAccess: AccessSync | undefined
   /** Reader of the Session's logged Plan first state. */
   private readonly planState: () => PlanUnitState
+  /** Reader of the recorded access mode Casper picked itself. */
+  private readonly ownAccessState: () => CasperOwnAccess
   /**
    * Connections whose Plan first value is the Session's: the restore ran or was not needed, or the user set it.
    * Until then a restarted Casper's own default is never recorded.
@@ -237,7 +243,7 @@ export class CasperAgent implements Agent {
    * @param id - the Session and Agent identity.
    * @param options - Agent options; Casper chooses its own model, so only the title reads their route.
    * @param session - the Session this Agent drives.
-   * @param readers - model-selection and inbox projection readers.
+   * @param readers - model-selection, inbox, plan, and Casper's own access projection readers.
    * @param lastTurn - the last turn number recorded in the Session.
    * @param config - the plugin config.
    * @param sidecar - the Session-to-conversation records.
@@ -261,6 +267,7 @@ export class CasperAgent implements Agent {
     this.ctx = this.scope.ctx
     this.models = readers.agentModels
     this.planState = readers.plan
+    this.ownAccessState = readers.casperAccess
     // Casper's own models: a pick is checked against Casper's list and applied to Casper.
     this.model = new CasperModel(readers.agentModels, session, selection => this.chooseModel(selection))
     this.inbox = new ReactLoopInbox(readers.inbox, session, this.dispatch)
@@ -358,6 +365,8 @@ export class CasperAgent implements Agent {
 
   /** Close a process the Agent no longer uses; the next process and {@link closeConnection} wait for it. */
   private closeLater(connection: CasperConnection): void {
+    // A mode Casper picked itself ends with its process.
+    this.noteOwnAccess()
     const closed = connection.dispose().catch(
       /* v8 ignore next -- dispose fails only when the app tools listener cannot close. */
       (error: unknown) => { this.pluginCtx.logger.warn(`casper agent "${this.id}": Casper did not close cleanly: ${String(error)}`) },
@@ -468,6 +477,8 @@ export class CasperAgent implements Agent {
     this.idleCheck?.abort()
     const connection = this.connection
     this.connection = undefined
+    // A mode Casper picked itself ends with its process; recorded while the Session is still open.
+    this.noteOwnAccess()
     // A process closed earlier, while idle or for changed servers, is part of the range too.
     await Promise.all([this.closing, connection?.dispose()])
   }
@@ -778,6 +789,8 @@ export class CasperAgent implements Agent {
         mode: () => { if (owner.connection !== undefined && owner.connection === this.connection) this.queueLiveAccess() },
         // Casper's Plan first value is the chip's, whoever changed it.
         plan: () => { if (owner.connection !== undefined && owner.connection === this.connection) this.syncPlan() },
+        // A crash ends a mode Casper picked itself; the record follows the live connection, so a late exit clears nothing new.
+        exit: () => { this.noteOwnAccess() },
         permission: (params, signal) => this.permission(owner.connection, params, signal),
         elicitation: (params, signal) => this.elicitation(owner.connection, params, signal),
       },
@@ -1186,6 +1199,16 @@ export class CasperAgent implements Agent {
    * @returns the wanted mode and any failure, or undefined when the app mounts no permission presets.
    */
   private async syncAccess(connection: CasperConnection): Promise<AccessSync | undefined> {
+    try {
+      return await this.syncAccessMode(connection)
+    } finally {
+      // Casper's own change reaches here through its mode handler, and every chip switch does too.
+      this.noteOwnAccess()
+    }
+  }
+
+  /** The body of {@link syncAccess}. */
+  private async syncAccessMode(connection: CasperConnection): Promise<AccessSync | undefined> {
     const wanted = this.wantedAccess()
     if (wanted === undefined) return undefined
     const set = this.accessSet.get(connection) ?? connection.accessMode ?? 'ask'
@@ -1375,7 +1398,37 @@ export class CasperAgent implements Agent {
   /** Forget the current connection and start killing it. */
   private dropConnection(connection: CasperConnection): void {
     this.connection = undefined
+    this.noteOwnAccess()
     connection.terminate()
+  }
+
+  /**
+   * Record the access mode Casper picked itself when it changed, for the
+   * composer's mode pill: the live process's mode when it differs from the
+   * mode this app last set on it, else null (no pick, the app set a mode,
+   * Casper went back to it, or the process ended). With `modePill` off it is
+   * always null. Display only: it sets nothing on Casper and never moves the
+   * access control. A failed record costs only the pill.
+   */
+  noteOwnAccess(): void {
+    const mode = this.ownAccess()
+    if (mode === this.ownAccessState().mode) return
+    try {
+      appendPluginRecord(this.session, ACCESS_RECORD, { mode })
+    } catch (error: unknown) {
+      /* v8 ignore start -- an append fails only when the Session is closed under the Agent. */
+      this.pluginCtx.logger.warn(`casper agent "${this.id}": Casper's own access mode not recorded: ${String(error)}`)
+      /* v8 ignore stop */
+    }
+  }
+
+  /** The access mode the live Casper picked itself, or null. */
+  private ownAccess(): AccessModeId | null {
+    const connection = this.connection
+    if (!this.config.modePill || connection === undefined || connection.dead) return null
+    const set = this.accessSet.get(connection)
+    const mode = ACCESS_MODE_IDS.find(id => id === connection.accessMode)
+    return set === undefined || mode === undefined || mode === set ? null : mode
   }
 
   /** The current prompt's sink when `connection` is the one prompting; updates outside a prompt are dropped. */

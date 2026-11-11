@@ -15,6 +15,7 @@ import type {} from '@deepseek-ai/dsh-storage-domain'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-tools'
 import { checkAccessModes } from './access.ts'
+import { casperAccessProjectionDefinition } from './access-projection.ts'
 import { openCommandCache } from './commands.ts'
 import { Config } from './config.ts'
 import { CasperAgentFactory } from './factory.ts'
@@ -65,6 +66,8 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   const inbox = await ctx.sessionProjections.register(inboxProjectionDefinition)
   // Only plan-mode's projection: the composer's plan chip shows Casper's Plan first option. Its controller is never applied.
   const plan = await ctx.sessionProjections.register(planProjectionDefinition)
+  // The access mode Casper picked itself, which the composer's mode pill shows.
+  const casperAccess = await ctx.sessionProjections.register(casperAccessProjectionDefinition)
   const sidecar = await openSidecar(ctx.storageDomain)
   // Records of Sessions that are gone are dropped in the background; disposal waits for it before closing the sidecar.
   const pruned = sidecar.prune(async sessionId => await ctx.sessionPersistence.stat(sessionId) !== undefined).then(
@@ -73,7 +76,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   )
   const commands = await openCommandCache(ctx.storageDomain)
   const models = await openModelsCache(ctx.storageDomain)
-  const factory = new CasperAgentFactory(ctx, config, { agentModels, inbox, plan, sidecar, commands, models })
+  const factory = new CasperAgentFactory(ctx, config, { agentModels, inbox, plan, casperAccess, sidecar, commands, models })
   ctx.effect(() => async () => {
     await factory.dispose()
     await pruned

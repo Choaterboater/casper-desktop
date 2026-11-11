@@ -22,6 +22,7 @@ import type { Session } from '@deepseek-ai/dsh-session'
 import type { SessionHandle } from '@deepseek-ai/dsh-session-persistence'
 import type { PlanUnitState } from '@deepseek-ai/dsh-plan-mode'
 import type { ProjectionHandle } from '@deepseek-ai/dsh-session-projection'
+import type { CasperOwnAccess } from './access-record.ts'
 import { CasperAgent } from './agent.ts'
 import type { CasperCommandCache } from './commands.ts'
 import type { Config } from './config.ts'
@@ -40,6 +41,8 @@ export interface CasperFactoryDependencies {
   readonly inbox: ProjectionHandle<InboxState>
   /** The registered `plan` projection, shared with plan-mode; the composer's plan chip reads it. */
   readonly plan: ProjectionHandle<PlanUnitState>
+  /** The registered `casperAccess` projection; the composer's mode pill reads it. */
+  readonly casperAccess: ProjectionHandle<CasperOwnAccess>
   /** The Session-to-conversation records. */
   readonly sidecar: CasperSidecar
   /** The last command list Casper sent. */
@@ -219,6 +222,7 @@ export class CasperAgentFactory implements AgentFactory {
         agentModels: this.deps.agentModels.readerFor(session),
         inbox: this.deps.inbox.readerFor(session),
         plan: this.deps.plan.readerFor(session),
+        casperAccess: this.deps.casperAccess.readerFor(session),
       },
       this.ctx.agents.turnBoundaryOf(session).lastTurn,
       this.config,
@@ -287,6 +291,8 @@ export class CasperAgentFactory implements AgentFactory {
           agent.ctx.sessions.announce(session)
           // A new Session's picker offers the last list Casper sent, or the start value, until its own Casper reports.
           if (init.source === 'startup') appendPluginRecord(session, AGENT_MODELS_RECORD, this.seed())
+          // A new Agent has no process yet, so a mode a closed process picked itself (a killed app's) is cleared.
+          agent.noteOwnAccess()
           const commit = await untilAborted(init.setup?.(agent.ctx, agent), abort.signal)
           abort.signal.throwIfAborted()
           commit?.commit()
