@@ -379,6 +379,8 @@
       "@deepseek-ai/dsh-casper-sidebar-browser/types": ["./packages/casper/tool-sidebar-browser/src/types.ts"],
       "@deepseek-ai/dsh-casper-sidebar-browser-client": ["./packages/casper/sidebar-browser-client/src"],
       "@deepseek-ai/dsh-casper-sidebar-browser-client/client": ["./packages/casper/sidebar-browser-client/src/client/index.ts"],
+      // Casper Agent's Client half (its approval and receipt card) is a subpath, so its alias stays hand-written too.
+      "@deepseek-ai/dsh-casper-agent/client": ["./packages/casper/casper-agent/src/client/index.ts"],
       "@deepseek-ai/dsh-agent-team/types": ["./packages/team/agent-team/src/types.ts"],
       "@deepseek-ai/dsh-experimental-auto-review": ["./packages/experimental/auto-review/src"],
       "@deepseek-ai/dsh-experimental-claude-code-mods": ["./packages/experimental/claude-code-mods/src"],
