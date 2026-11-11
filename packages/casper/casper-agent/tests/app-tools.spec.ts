@@ -9,6 +9,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
+import { createMcpToolDefinition, type McpToolOrigin } from '@deepseek-ai/dsh-mcp-client'
 import type { SkillSummary } from '@deepseek-ai/dsh-skill'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { ToolBatchInput, ToolExecution } from '@deepseek-ai/dsh-tools'
@@ -21,6 +22,7 @@ import {
   NO_RESOURCES,
   PLUGIN_SKILL,
   PROGRESS_INTERVAL_MS,
+  servedAnnotations,
   skillDescription,
   startAppTools,
   TURN_OVER,
@@ -214,6 +216,47 @@ describe('app tools over MCP', { timeout: 60_000 }, () => {
     for (const tool of tools.filter(listed => listed.name !== 'plugin_manager')) expect(tool.annotations).toEqual({ readOnlyHint: true })
   })
 
+  it("sends a served MCP tool's own four hints, and adds no readOnlyHint of its own", async () => {
+    const { ctx, agent } = await host()
+    // plugin_manager stands for a tool mcp-client built from a listed MCP tool; title is not a hint and is dropped.
+    const listed = createMcpToolDefinition(ctx, {
+      name: 'plugin_manager', rawName: 'manage', description: 'Manage profile plugins.', inputSchema: { type: 'object' },
+      server: 'srv', annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, title: 'Manage' },
+      call: () => Promise.resolve({ content: [] }),
+    })
+    const origins: Record<string, McpToolOrigin> = {
+      cordis_inspect_query: { server: 'srv', rawName: 'query', annotations: { readOnlyHint: false, destructiveHint: true } },
+      present: { server: 'srv', rawName: 'present', annotations: {} },
+    }
+    const withOrigins: AppToolsOptions['tools'] = {
+      schemas: scope => ctx.tools.schemas(scope),
+      execute: input => ctx.tools.execute(input),
+      get: (name, scope) => {
+        if (name === 'plugin_manager') return listed
+        const definition = ctx.tools.get(name, scope)
+        const origin = origins[name]
+        return definition === undefined || origin === undefined ? definition : { ...definition, mcpOrigin: origin }
+      },
+    }
+    const { tools } = await (await client(await serve(agent, ctx, { tools: withOrigins }))).listTools()
+    const byName = new Map(tools.map(tool => [tool.name, tool.annotations]))
+    expect(byName.get('plugin_manager')).toEqual({ readOnlyHint: true, idempotentHint: true, openWorldHint: false })
+    expect(byName.get('cordis_inspect_query')).toEqual({ readOnlyHint: false, destructiveHint: true })
+    expect(byName.get('present')).toBeUndefined()
+    // Rows with no MCP origin keep today's annotations.
+    expect(byName.get('cordis_inspect_list')).toEqual({ readOnlyHint: true })
+    expect(byName.get('app_read_file')).toEqual({ readOnlyHint: true })
+  })
+
+  it('servedAnnotations keeps the bridge flag for its own rows and the server hints for an MCP row', () => {
+    const origin: McpToolOrigin = { server: 'srv', rawName: 'x', annotations: { readOnlyHint: true, openWorldHint: true } }
+    expect(servedAnnotations(true, undefined)).toEqual({ readOnlyHint: true })
+    expect(servedAnnotations(false, undefined)).toBeUndefined()
+    expect(servedAnnotations(false, origin)).toEqual({ readOnlyHint: true, openWorldHint: true })
+    expect(servedAnnotations(true, { ...origin, annotations: {} })).toBeUndefined()
+    expect(servedAnnotations(true, { ...origin, annotations: { destructiveHint: true } })).toEqual({ destructiveHint: true })
+  })
+
   it('the pins are app_skill, plugin_manager, app_read_file and present', async () => {
     const { ctx, agent } = await host()
     const { tools } = await (await client(await serve(agent, ctx))).listTools()
@@ -283,6 +326,7 @@ describe('app tools over MCP', { timeout: 60_000 }, () => {
     const hidden: AppToolsOptions['tools'] = {
       schemas: scope => ctx.tools.schemas(scope).filter(schema => schema.name !== 'plugin_manager'),
       execute: input => ctx.tools.execute(input),
+      get: (name, scope) => ctx.tools.get(name, scope),
     }
     const mcp = await client(await serve(agent, ctx, { tools: hidden }))
     expect((await mcp.listTools()).tools.map(tool => tool.name)).toEqual(['app_skill', 'app_read_file', 'present', 'cordis_inspect_query', 'cordis_inspect_list', ...RESOURCE_TOOLS])
@@ -393,7 +437,11 @@ describe('app tools over MCP', { timeout: 60_000 }, () => {
 
   it('reports an executor failure as an error result', async () => {
     const { ctx, agent } = await host()
-    const failing: AppToolsOptions['tools'] = { schemas: scope => ctx.tools.schemas(scope), execute: () => Promise.reject(new Error('executor unloaded')) }
+    const failing: AppToolsOptions['tools'] = {
+      schemas: scope => ctx.tools.schemas(scope),
+      execute: () => Promise.reject(new Error('executor unloaded')),
+      get: (name, scope) => ctx.tools.get(name, scope),
+    }
     const mcp = await client(await serve(agent, ctx, { tools: failing }))
     expect(await mcp.callTool({ name: 'cordis_inspect_list', arguments: {} })).toEqual({
       content: [{ type: 'text', text: 'cordis_inspect_list failed in the app: Error: executor unloaded' }], isError: true,

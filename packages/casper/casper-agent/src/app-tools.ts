@@ -21,6 +21,7 @@ import {
   type ServerContext,
 } from '@modelcontextprotocol/server'
 import type { Agent } from '@deepseek-ai/dsh-agent'
+import { mcpToolOrigin, type McpToolHints, type McpToolOrigin } from '@deepseek-ai/dsh-mcp-client'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { SkillRegistry } from '@deepseek-ai/dsh-skill'
@@ -181,7 +182,7 @@ export interface AppToolsProfile {
 /** What {@link startAppTools} serves and whom it runs calls as. */
 export interface AppToolsOptions {
   /** The app's tool registry; calls resolve in `agent`'s scope. */
-  readonly tools: Pick<ToolsService, 'schemas' | 'execute'>
+  readonly tools: Pick<ToolsService, 'schemas' | 'execute' | 'get'>
   /** The app's skill registry, when composed. */
   readonly skills: Pick<SkillRegistry, 'list'> | undefined
   /** The Casper Agent every call runs as. */
@@ -237,6 +238,18 @@ export interface AppToolsServer {
    * @returns resolution once the listener is closed.
    */
   close(): Promise<void>
+}
+
+/**
+ * The MCP annotations a served tool is listed with.
+ * @param readOnly - the bridge's own read-only flag for the row.
+ * @param origin - the MCP origin of the app tool the row runs, when it came from an MCP server.
+ * @returns that server's own hints verbatim for an MCP tool, never one the bridge adds;
+ *   otherwise `{ readOnlyHint: true }` for a read-only row, or undefined.
+ */
+export function servedAnnotations(readOnly: boolean, origin: McpToolOrigin | undefined): McpToolHints | undefined {
+  if (origin !== undefined) return Object.keys(origin.annotations).length === 0 ? undefined : { ...origin.annotations }
+  return readOnly ? { readOnlyHint: true } : undefined
 }
 
 /**
@@ -391,10 +404,14 @@ async function mcpServer(options: AppToolsOptions, version: string): Promise<Mcp
     const read = await readAppFile(options.roots, args)
     return { content: [{ type: 'text', text: read.text }], isError: read.isError }
   }
-  const hints = (tool: BridgedTool) => ({
-    ...tool.readOnly ? { annotations: { readOnlyHint: true } } : {},
-    ...tool.pin ? { _meta: { [PIN_META]: true } } : {},
-  })
+  const hints = (tool: BridgedTool) => {
+    const origin = tool.dsh === undefined ? undefined : mcpToolOrigin(options.tools.get(tool.dsh, options.agent))
+    const annotations = servedAnnotations(tool.readOnly, origin)
+    return {
+      ...annotations === undefined ? {} : { annotations },
+      ...tool.pin ? { _meta: { [PIN_META]: true } } : {},
+    }
+  }
   const description = async (tool: BridgedTool, own: string): Promise<string> => {
     if (tool.mcp === 'app_skill') {
       const listed = options.skills === undefined ? [] : await options.skills.list({ cwd: options.cwd, scope: options.agent })

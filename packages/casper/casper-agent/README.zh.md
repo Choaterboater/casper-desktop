@@ -201,6 +201,8 @@ Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打�
 | `list_mcp_resource_templates` | dsh `list_mcp_resource_templates` | 只读 |
 | `read_mcp_resource` | dsh `read_mcp_resource` | 只读 |
 
+只读工具列出时带有 `readOnlyHint: true`，因此 Casper 运行它时不询问。若某个提供的工具所对应的应用工具是通过 `@deepseek-ai/dsh-mcp-client` 来自某个 MCP 服务器，则改为带上该服务器自己的 `readOnlyHint`、`destructiveHint`、`idempotentHint` 与 `openWorldHint` 列出，本服务器不会自行添加任何提示；上表中没有工具来自 MCP 服务器。
+
 三个资源工具总会列出，使用固定的 schema，其描述按 Casper 的命名（`acp-<name>`）列出此进程获得的设置服务器与插件注册的服务器。调用会把 `acp-<name>` 映射为应用的服务器 `<name>`，并且只在此进程获得的服务器上运行。应用中没有服务器提供资源时，应用没有这些工具，调用返回 "No MCP server in the app offers resources right now."
 
 `present` 来自 Casper 预设的 `@deepseek-ai/dsh-tool-present` 行。调用会针对当前的 Casper 轮次、以发起调用的 Casper 步骤的调用 id 记录 `deliverables/presented`，因此应用会像在 Standard 中一样，在该轮次中把每个文件显示为卡片；轮次结束后到达的调用会得到轮次已结束的错误，并且不记录任何内容。Casper 只保留四个置顶工具，因此 `present` 占用了 `cordis_inspect_query` 原先的置顶位置，Casper 通过 find_capability 找到 `cordis_inspect_query`。
