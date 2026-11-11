@@ -3599,16 +3599,6 @@ importers:
         specifier: ^18.2.0
         version: 18.3.1
 
-  packages/casper/casper-bundle:
-    dependencies:
-      '@deepseek-ai/dsh-mcp-client':
-        specifier: workspace:*
-        version: link:../../mcp/mcp-client
-    devDependencies:
-      '@deepseek-ai/cordis':
-        specifier: workspace:~
-        version: link:../../../vendor/cordis
-
   packages/casper/sidebar-browser-client:
     devDependencies:
       '@deepseek-ai/cordis':
