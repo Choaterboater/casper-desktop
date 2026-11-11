@@ -29,7 +29,7 @@ describe('gen-tool-catalog collectToolCatalog', () => {
     expect(names).toEqual([
       'apply_patch', 'ask_user_question', 'bash', 'bash',
       'browser_click', 'browser_key', 'browser_navigate', 'browser_open', 'browser_read', 'browser_screenshot',
-      'browser_scroll', 'browser_tabs', 'browser_type', 'check_list', 'check_record', 'check_replay', 'cordis_inspect_list',
+      'browser_scroll', 'browser_tabs', 'browser_type', 'cordis_inspect_list',
       'cordis_inspect_query',
       'create_goal', 'create_worktree', 'edit', 'exit_plan_mode', 'get_goal', 'glob', 'grep',
       'interrupt_agent', 'job_kill', 'job_list', 'job_output',

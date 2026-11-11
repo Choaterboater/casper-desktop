@@ -525,7 +525,6 @@
     { "path": "./packages/bundle/sdk-minimal" },
     { "path": "./packages/bundle/web-app" },
     { "path": "./packages/casper/casper-agent/tsconfig.host.json" },
-    { "path": "./packages/casper/tool-checks" },
     { "path": "./packages/casper/tool-sidebar-browser" },
     { "path": "./packages/util/official-bundles" },
     { "path": "./packages/boot/app-boot" },

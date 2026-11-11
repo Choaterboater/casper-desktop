@@ -48,7 +48,6 @@
 | `@deepseek-ai/dsh-tool-subagent-control` | `interrupt_agent`、`list_agents`、`send_message`、`wait_agent` | `ctx.tools`、`ctx.subagents`、`ctx.agents` | `tool/call`、`tool/result`、`child session events through ctx.subagents` | - | 共享控制工具发现并联系 subagent 树中的 Agent，中断有权控制的后代，并等待调用者收件箱中的输入。绑定提供方的 `tool-subagent` 实例提供委派工具。 |
 | `@deepseek-ai/dsh-tool-jobs` | `job_kill`、`job_list`、`job_output` | `ctx.tools`、`ctx.jobs`、`ctx.systemPrompt` | `tool/call`、`tool/result`、`user/message via agent.inject() for background completion notices` | - | 与任务种类无关的后台任务控制器：后台 bash 命令与 PTY 发送 都通过相同的 3 个工具读取、列出和终止。加载该插件会挂接控制器，从而启用生产方的 `ctx.jobs.start()`。 |
 | `@deepseek-ai/dsh-tool-agent-team` | `team_task_create`, `team_task_get`, `team_task_list`, `team_task_update` | `ctx.tools`, `ctx.systemPrompt`, `ctx.agentTeams`, `ctx.subagents`, `an exact live Team member Agent` | `tool/call`, `team/task`, `tool/result` | - | 四个任务板工具共享 subagent 树的根 Session。在根 Session 开启 Team 模式，会在标准 subagent 委派和控制工具之外增加任务板指导。标准 subagent 控制工具提供必需身份，不受 Team 模式影响。 |
-| `@deepseek-ai/dsh-casper-checks` | `check_list`, `check_record`, `check_replay` | `ctx.workingDirectory`, `ctx.tools`, `ctx.shell`, `ctx.systemPrompt`, `an owning Agent at execution time` | `tool/call`, `tool/result` | - | Casper 检查在内存中按 agent 保存状态：check_record 运行命令作为基线，重叠工作目录中的任何修改类工具结果都会把检查标记为过期，agent/turn-stopping 检查点会重放过期的检查。没有干净退出码的运行记为 `not_run`，绝不记为 `passed`。 |
 | `@deepseek-ai/dsh-casper-sidebar-browser` | `browser_click`, `browser_key`, `browser_navigate`, `browser_open`, `browser_read`, `browser_screenshot`, `browser_scroll`, `browser_tabs`, `browser_type` | `ctx.tools`, `ctx.sessionProjections`, `a calling Agent`, `the Casper desktop app showing the Session` | `tool/call`, `tool/result`, `Sidebar browser tabs and pages` | - | Desktop preset 挂载这些工具；每次调用都在显示调用方 Session 的 Desktop Client 的侧栏浏览器中运行，没有这样的 Client 时回答 `unavailable`。browser_click、browser_type、browser_key 与 browser_scroll 会先请求用户允许该标签页的源（origin），每个 Session 一次；成功的输入结果会在 `tool/result` 元数据中记录其源，使授权在重启后仍然保留。browser_screenshot 只向声明图片输入的模型返回图片。 |
 | `@deepseek-ai/dsh-tool-todo` | `todo_write` | `ctx.tools`、`owning Agent session` | `tool/call`、`todo/write`、`tool/result` | - | todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为检查清单。`allowParallelInProgress` 是没有默认值的必填项，因此本目录明确选择 `true`，对应描述允许同时存在多个 `in_progress` 项。选择 `false` 的部署会获得同一工具，但描述会要求只能有 1 个活动任务。 |
 | `@deepseek-ai/dsh-tool-working-directory` | `working_directory` | `ctx.tools`, `ctx.workingDirectory` | `tool/call`, `working-directory/change`, `user context for directory changes`, `tool/result` | - | 读取或改变调用方 Session 的目录。已有 shell 和进程保留自己的目录；原始元数据和权限根目录保持不变。 |
@@ -2428,73 +2427,6 @@ subagent_oar 工具在为外部提供方配置的别名之间选择。本目录�
 来源：[`packages/team/tool-agent-team/src/index.ts`](../packages/team/tool-agent-team/src/index.ts)
 
 四个任务板工具共享 subagent 树的根 Session。在根 Session 开启 Team 模式，会在标准子代理委派和控制工具之外增加任务板指导。标准子代理控制工具提供必需身份，不受 Team 模式影响。
-
-<a id="deepseek-aidsh-casper-checks"></a>
-
-## `@deepseek-ai/dsh-casper-checks`
-
-### `check_list`
-
-列出已记录的检查，以及每项检查的最新结论和此后代码是否有改动。
-
-```json
-{
-  "type": "object",
-  "properties": {}
-}
-```
-
-来源：[`packages/casper/tool-checks/src/index.ts`](../packages/casper/tool-checks/src/index.ts)
-
-### `check_record`
-
-记录一项项目检查（一个以退出码 0 表示通过的 shell 命令），立即运行它作为基线，并保留它以供重放。再次记录同一名称会替换原有检查。
-
-```json
-{
-  "type": "object",
-  "properties": {
-    "name": {
-      "type": "string",
-      "description": "Short id, e.g. test, lint, build."
-    },
-    "command": {
-      "type": "string",
-      "description": "Shell command run in the working directory."
-    },
-    "timeoutMs": {
-      "type": "integer",
-      "description": "Optional deadline; a timeout is reported as not run."
-    }
-  },
-  "required": [
-    "name",
-    "command"
-  ]
-}
-```
-
-来源：[`packages/casper/tool-checks/src/index.ts`](../packages/casper/tool-checks/src/index.ts)
-
-### `check_replay`
-
-针对当前代码重放已记录的检查。省略 `name` 即重放所有检查。
-
-```json
-{
-  "type": "object",
-  "properties": {
-    "name": {
-      "type": "string",
-      "description": "One recorded check; omit for all."
-    }
-  }
-}
-```
-
-来源：[`packages/casper/tool-checks/src/index.ts`](../packages/casper/tool-checks/src/index.ts)
-
-Casper 检查在内存中按 agent 保存状态：check_record 运行命令作为基线，重叠工作目录中的任何修改类工具结果都会把检查标记为过期，agent/turn-stopping 检查点会重放过期的检查。没有干净退出码的运行记为 `not_run`，绝不记为 `passed`。
 
 <a id="deepseek-aidsh-casper-sidebar-browser"></a>
 

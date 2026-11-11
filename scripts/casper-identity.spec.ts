@@ -79,16 +79,6 @@ describe('Casper identity', () => {
     }
   })
 
-  // The copied checks re-run the project's tests after every edit: they cost tokens without catching more bugs,
-  // broke recorded web replays, and called passing checks "blocked by the sandbox".
-  it('keeps the copied Casper checks switched off in the Standard, Cordis and PTC modes', () => {
-    const row = /- id: casper-checks\n\s+name: '@deepseek-ai\/dsh-casper-checks'\n(?:\s+#[^\n]*\n)*\s+disabled: true\n/u
-    for (const mode of ['standard', 'cordis', 'ptc']) {
-      const path = `packages/bundle/web-app/presets/${mode}.patch.yml`
-      expect(read(path), path).toMatch(row)
-    }
-  })
-
   it('names installers casper-<version>-<os>-<arch>', () => {
     expect(read('apps/desktop/scripts/electron-builder-config.mjs')).toContain('artifactName: `casper-\\${version}-\\${os}-\\${arch}')
     expect(read('apps/desktop/scripts/desktop-build-version-discovery.ts')).toContain('casper-(?<version>')

@@ -547,39 +547,6 @@ export type AccessModeId = 'read' | 'ask' | 'full'
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-casper-agent -->
 
-<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-casper-checks -->
-<a id="deepseek-aidsh-casper-checks"></a>
-
-## `@deepseek-ai/dsh-casper-checks`
-
-- `inject`: `tools` · `shell` · `systemPrompt` · `workingDirectory` · `fs`
-- `source`: [`packages/casper/tool-checks/src/index.ts:60`](../packages/casper/tool-checks/src/index.ts)
-
-```ts config-catalog
-/** Deployment configuration. */
-export interface Config {
-  /** Tool names whose results invalidate checks and count as a turn's changes. */
-  mutatingTools: string[]
-  /** Replay stale checks and run project checks at the turn-stopping checkpoint. */
-  replayOnStop: boolean
-  /** Repair rounds the checkpoint may force in one turn; `repair.maxAttempts` in the project file overrides it. */
-  maxRepairRounds: number
-  /** Characters of command output retained per run, shared between stdout and stderr. */
-  outputChars: number
-  /** Recorded checks one agent may hold. */
-  maxChecks: number
-  /** Run the project's checks after a top-level turn changes files; `verification.mode` in the project file overrides it. */
-  projectChecks: boolean
-  /** Deadline of one project check; `verification.timeoutMs` in the project file overrides it. */
-  projectTimeoutMs: number
-  /** Run project checks even when the shell sandbox does not confine them. */
-  runUnconfined: boolean
-  /** Steer the closing receipt to the agent so its final reply carries it. */
-  receipt: boolean
-}
-```
-<!-- END GENERATED config-catalog:@deepseek-ai/dsh-casper-checks -->
-
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-client-connection -->
 <a id="deepseek-aidsh-client-connection"></a>
 

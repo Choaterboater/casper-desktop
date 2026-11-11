@@ -2993,9 +2993,6 @@ importers:
       '@deepseek-ai/dsh-casper-agent':
         specifier: workspace:*
         version: link:../../casper/casper-agent
-      '@deepseek-ai/dsh-casper-checks':
-        specifier: workspace:*
-        version: link:../../casper/tool-checks
       '@deepseek-ai/dsh-casper-sidebar-browser':
         specifier: workspace:*
         version: link:../../casper/tool-sidebar-browser
@@ -3616,49 +3613,6 @@ importers:
       '@deepseek-ai/dsh-client-ui-sidebar-browser':
         specifier: workspace:*
         version: link:../../client/ui-sidebar-browser
-
-  packages/casper/tool-checks:
-    dependencies:
-      '@deepseek-ai/schemastery':
-        specifier: link:../../../vendor/schemastery
-        version: link:../../../vendor/schemastery
-      yaml:
-        specifier: ^2.8.1
-        version: 2.9.0
-    devDependencies:
-      '@deepseek-ai/cordis':
-        specifier: workspace:~
-        version: link:../../../vendor/cordis
-      '@deepseek-ai/dsh-agent':
-        specifier: workspace:*
-        version: link:../../core/agent
-      '@deepseek-ai/dsh-fs':
-        specifier: workspace:*
-        version: link:../../fs/fs
-      '@deepseek-ai/dsh-llm':
-        specifier: workspace:*
-        version: link:../../llm/llm
-      '@deepseek-ai/dsh-session':
-        specifier: workspace:*
-        version: link:../../core/session
-      '@deepseek-ai/dsh-shell':
-        specifier: workspace:*
-        version: link:../../shell/shell
-      '@deepseek-ai/dsh-system-prompt':
-        specifier: workspace:*
-        version: link:../../core/system-prompt
-      '@deepseek-ai/dsh-tool-executor-native':
-        specifier: workspace:*
-        version: link:../../core/tool-executor-native
-      '@deepseek-ai/dsh-tool-testkit':
-        specifier: workspace:*
-        version: link:../../test-support/tool-testkit
-      '@deepseek-ai/dsh-tools':
-        specifier: workspace:*
-        version: link:../../core/tools
-      '@deepseek-ai/dsh-working-directory':
-        specifier: workspace:*
-        version: link:../../session/working-directory
 
   packages/casper/tool-sidebar-browser:
     dependencies:
