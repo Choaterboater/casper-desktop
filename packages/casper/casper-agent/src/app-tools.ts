@@ -6,6 +6,7 @@
  * @module @deepseek-ai/dsh-casper-agent/app-tools
  */
 
+import { Buffer } from 'node:buffer'
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
@@ -21,6 +22,7 @@ import {
   type ServerContext,
 } from '@modelcontextprotocol/server'
 import type { Agent, ModelSelection } from '@deepseek-ai/dsh-agent'
+import type { AttachmentStore, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import { mcpToolOrigin, type McpToolHints, type McpToolOrigin } from '@deepseek-ai/dsh-mcp-client'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
@@ -257,6 +259,13 @@ export interface AppToolsOptions {
    */
   readonly teams?: boolean | undefined
   /**
+   * Send the pictures in an app tool's result to Casper as MCP image content, within {@link MAX_REPLY_BYTES}; true
+   * when omitted. False sends a one-line note in place of each.
+   */
+  readonly images?: boolean | undefined
+  /** The app's attachment store, which holds the bytes of a picture in a result; a picture is unreadable when omitted. */
+  readonly attachments?: Pick<AttachmentStore, 'readImage'> | undefined
+  /**
    * The route the app's checks read when they admit a Team call.
    * @returns the Agent's current model, or a stand-in before it has one.
    */
@@ -384,20 +393,73 @@ export function skillPreface(profile: AppToolsProfile | undefined, installed: bo
 }
 
 /**
- * Map the app's result blocks to MCP content; blocks MCP has no form for become a short note.
- * @param blocks - the app tool's result content.
- * @returns MCP text content in the same order.
+ * Most bytes of text and pictures one reply carries. Casper fails an MCP call whose reply passes 8 MiB; the rest is
+ * room for the JSON framing and progress notices.
  */
-export function mcpContent(blocks: readonly ContentBlock[]): CallToolResult['content'] {
-  return blocks.map((block) => {
-    switch (block.type) {
-      case 'text':
-        return { type: 'text' as const, text: block.text }
-      default:
-        // Images are attachment references in the app; none of the served tools returns one.
-        return { type: 'text' as const, text: `[${block.type} result not sent]` }
+export const MAX_REPLY_BYTES = 7 * 1024 * 1024
+/** Sent in place of a picture that would take the reply past {@link MAX_REPLY_BYTES}. */
+export const PICTURE_OVER_BUDGET = '[A picture in this result was not sent: with it the reply would pass the 8 MB Casper takes.]'
+/** Sent in place of a picture the app could not read. */
+export const PICTURE_UNREADABLE = '[A picture in this result could not be read, so it was not sent.]'
+
+/** Where {@link mcpContent} reads the pictures of a result from. */
+export interface McpPictures {
+  /** The app's attachment store; every picture is unreadable when undefined. */
+  readonly attachments: Pick<AttachmentStore, 'readImage'> | undefined
+  /** The call's signal; a read it aborts fails the whole conversion. */
+  readonly signal: AbortSignal
+}
+
+/** Length of the base64 form of `bytes` bytes. */
+function base64Length(bytes: number): number {
+  return Math.ceil(bytes / 3) * 4
+}
+
+/** One picture as MCP image content, or the note sent in its place when it is unreadable or does not fit in `room`. */
+async function mcpPicture(ref: ImageAttachmentRef, pictures: McpPictures, room: number): Promise<CallToolResult['content'][number]> {
+  // The stored size is exact, so a picture that cannot fit is never read.
+  if (base64Length(ref.bytes) > room) return { type: 'text', text: PICTURE_OVER_BUDGET }
+  if (pictures.attachments === undefined) return { type: 'text', text: PICTURE_UNREADABLE }
+  let data: Uint8Array
+  try {
+    data = (await pictures.attachments.readImage(ref, pictures.signal)).data
+  } catch (error: unknown) {
+    // An abort ends the call; any other read failure sends the note.
+    if (pictures.signal.aborted) throw error
+    return { type: 'text', text: PICTURE_UNREADABLE }
+  }
+  const base64 = Buffer.from(data).toString('base64')
+  if (base64.length > room) return { type: 'text', text: PICTURE_OVER_BUDGET }
+  return { type: 'image', data: base64, mimeType: ref.mediaType }
+}
+
+/**
+ * Map the app's result blocks to MCP content, in the same order. Text passes through. With `pictures`, each picture
+ * goes as MCP image content (its stored normalized bytes, base64, with the stored media type) while the text and the
+ * pictures before it leave room within {@link MAX_REPLY_BYTES}; otherwise a picture, like every block MCP has no form
+ * for, becomes a short note.
+ * @param blocks - the app tool's result content.
+ * @param pictures - where to read pictures from; undefined sends each as a note.
+ * @returns MCP content in the same order.
+ */
+export async function mcpContent(blocks: readonly ContentBlock[], pictures?: McpPictures): Promise<CallToolResult['content']> {
+  // Text counts as it goes on the wire: JSON-escaped, so quotes, newlines and control characters count in full.
+  let used = 0
+  for (const block of blocks) if (block.type === 'text') used += Buffer.byteLength(JSON.stringify(block.text), 'utf8')
+  const content: CallToolResult['content'] = []
+  for (const block of blocks) {
+    if (block.type === 'text') {
+      content.push({ type: 'text', text: block.text })
+    } else if (block.type === 'image' && block.offloaded !== true && pictures !== undefined) {
+      // An offloaded picture keeps its note: the app chose to send no bytes for it.
+      const picture = await mcpPicture(block.attachment, pictures, MAX_REPLY_BYTES - used)
+      if (picture.type === 'image') used += picture.data.length
+      content.push(picture)
+    } else {
+      content.push({ type: 'text', text: `[${block.type} result not sent]` })
     }
-  })
+  }
+  return content
 }
 
 function errorResult(text: string): CallToolResult {
@@ -470,10 +532,11 @@ async function mcpServer(options: AppToolsOptions, version: string): Promise<Mcp
       /* v8 ignore next -- an executor returns one result per call. */
       if (result === undefined) return errorResult(`${tool.mcp} returned no result.`)
       if (acpId !== undefined) options.record(acpId, { name: dsh, arguments: JSON.stringify(args), result })
-      const content = mcpContent(result.content)
+      // Context a tool defers to the next step, such as the wrap-up after a goal round's update_goal, goes with the
+      // result and shares its reply budget. Casper sends no pictures from a failed result, so none are read for one.
+      const pictures = (options.images ?? true) && !result.isError ? { attachments: options.attachments, signal } : undefined
+      const content = await mcpContent([...result.content, ...batch.additionalContexts.flatMap(context => context.content)], pictures)
       if (tool.mcp === 'app_skill' && !result.isError) content.unshift({ type: 'text', text: skillPreface(options.profile, options.installed) })
-      // Context a tool defers to the next step, such as the wrap-up after a goal round's update_goal, goes with the result.
-      for (const context of batch.additionalContexts) content.push(...mcpContent(context.content))
       return { content, isError: result.isError }
     } catch (error: unknown) {
       return errorResult(`${tool.mcp} failed in the app: ${String(error)}`)

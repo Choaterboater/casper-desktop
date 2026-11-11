@@ -159,6 +159,7 @@ export function fakeCasper(script: FakeScript = { prompts: [] }): FakeCasper {
       appSubagents: true,
       appGoals: true,
       appTeams: true,
+      appToolImages: true,
       casperChildModel: true,
       casperTitles: true,
       copyOnFork: true,

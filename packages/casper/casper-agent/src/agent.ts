@@ -1017,6 +1017,8 @@ export class CasperAgent implements Agent {
       subagents: this.config.appSubagents,
       goals: this.config.appGoals,
       teams: this.config.appTeams,
+      images: this.config.appToolImages,
+      attachments: this.pluginCtx.get('attachments'),
       route: () => this.routeSelection(),
       // A child the app's subagent tool starts is attributed to this Agent, as a Standard parent's tool call is.
       initiate: operation => this.pluginCtx.agents.withInitiator(this, operation),

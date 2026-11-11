@@ -43,6 +43,7 @@ kind: "package-reference"
 | `appSubagents` | `true` | 随应用工具向 Casper 提供应用的[子代理工具](#subagents)；需要 `appTools`，`false` 时不提供 |
 | `appGoals` | `true` | 随应用工具向 Casper 提供应用的[目标工具](#goals)，并把目标的各轮作为 Casper 的轮次运行；这些工具需要 `appTools`，`false` 时不提供，到期的一轮会被丢弃，目标随之暂停 |
 | `appTeams` | `true` | 随应用工具向 Casper 提供应用的[团队工具](#team)；会话的团队开关打开时才可用，需要 `appTools`，`false` 时不提供 |
+| `appToolImages` | `true` | 把应用工具结果中的图片作为 MCP 图片内容发给 Casper，每次回复不超过 7 MiB；`false` 时每张图片换成一行说明，与以前相同 |
 | `casperChildModel` | `true` | 应用有相同提供方与模型时，让[子代理](#subagents)在 Casper 当前的模型上运行；`false` 时所有子代理都在应用的默认模型上运行 |
 | `casperTitles` | `true` | 用 Casper 发来的标题（不调用模型生成）为会话命名；`false` 时在应用的默认模型上生成标题 |
 | `copyOnFork` | `true` | [分叉](#forks)启动时复制 Casper 截至分叉点的对话；`false` 时每个分叉都从新的 Casper 对话开始，其第一轮会说明这一点 |
@@ -254,7 +255,7 @@ Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打�
 
 `present` 来自 Casper 预设的 `@deepseek-ai/dsh-tool-present` 行。调用会针对当前的 Casper 轮次、以发起调用的 Casper 步骤的调用 id 记录 `deliverables/presented`，因此应用会像在 Standard 中一样，在该轮次中把每个文件显示为卡片；轮次结束后到达的调用会得到轮次已结束的错误，并且不记录任何内容。Casper 只保留四个置顶工具，因此 `present` 占用了 `cordis_inspect_query` 原先的置顶位置，Casper 通过 find_capability 找到 `cordis_inspect_query`。
 
-每次调用都通过 `ctx.tools.execute` 运行，并以 Casper Agent 作为 `agent`，因此工具看到的会话、profile 与审批与在 DeepSeek 循环中相同。调用 id 是发起该调用的 Casper 步骤的会话调用 id，取自 `_meta["casper/acpToolCallId"]`；没有该字段的调用会得到新的 id。只有在 Casper 轮次运行期间才接受调用，并随轮次一起中止；轮次结束后到达的调用会得到说明这一点的错误。未完成的调用每 10 秒发送一次进度通知，使 Casper 的空闲计时器不会到期。结果中的文本块作为 MCP 文本传递；其他任何块（例如图片）会变成一行说明，如 `[image result not sent]`。
+每次调用都通过 `ctx.tools.execute` 运行，并以 Casper Agent 作为 `agent`，因此工具看到的会话、profile 与审批与在 DeepSeek 循环中相同。调用 id 是发起该调用的 Casper 步骤的会话调用 id，取自 `_meta["casper/acpToolCallId"]`；没有该字段的调用会得到新的 id。只有在 Casper 轮次运行期间才接受调用，并随轮次一起中止；轮次结束后到达的调用会得到说明这一点的错误。未完成的调用每 10 秒发送一次进度通知，使 Casper 的空闲计时器不会到期。结果中的文本块作为 MCP 文本传递。`appToolImages` 开启时，每张图片在原位置作为 MCP 图片内容发送：内容是其存储的规范化字节的 base64，并带存储的媒体类型（PNG、JPEG、WebP 或 GIF）。回复超过 8 MiB 时 Casper 会让该次调用失败，因此文本和前面的图片必须在 7 MiB 内留出空间：放不下的图片变成 "[A picture in this result was not sent: with it the reply would pass the 8 MB Casper takes.]"，应用读不出的图片变成 "[A picture in this result could not be read, so it was not sent.]"。工具推迟到下一步的上下文跟在结果之后，共用这一额度。失败的结果（Casper 本来就会丢弃其中的图片）以及 `appToolImages` 关闭时的所有结果中，每张图片都变成 `[image result not sent]`，且不会被读取。Casper 每个结果最多保留 8 张图片，并把每张缩小到符合其自身限制；不支持 MCP 图片的旧版 Casper、无法看图的模型，或 Casper 设置了 `mcp_pictures: off` 时，模型看到的是 Casper 自己的说明。其他任何块（例如推理）会变成一行说明，如 `[reasoning result not sent]`。
 
 `plugin_manager` 保留自己的规则：应用隐藏的 bundle 以 `not-offered` 拒绝，每个操作（包括 `install_bundle`）都像在 DeepSeek 循环中一样通过应用自己的审批卡片询问。`clientAsks` 告诉 Casper 该卡片就是关口，因此 Casper 不会为此服务器显示自己的变更框，它的自动回答也永远不会批准安装。在「完全权限」下应用的卡片不再询问，因此处于 `full` 模式的 Casper 会忽略 `clientAsks`，改用自己的框询问：无论哪种情况都只有一个框。
 
@@ -331,7 +332,7 @@ Casper 会话的模型菜单与标准会话一样显示应用的**启用智能�
 - 自身既无文本也无调用的响应，其用量计入下一个调用的步骤；若接着出现的是文本，则不计入；不发送 `usage_update` 的 Casper 不显示上下文环与 token 数。提示看起来与模型文本相同。推理只显示 Casper 作为思考发送的标题与重试，不显示模型自身的推理。`session/load` 的回放也不显示。
 - 正在运行的 shell 步骤在结束前不显示输出。
 - 自成一行的 MCP 客户端条目（例如内置的 network 服务器）尚不会交给 Casper；只有「设置 > MCP 服务器」和插件向 MCP 管理器注册的服务器会。每个对话都会启动各 stdio 服务器自己的副本。
-- 应用工具的结果只以文本形式到达 Casper：图片或其他非文本块会变成一行说明。目前提供的工具都不返回图片。
+- 目前提供的工具都不返回图片；会返回图片的应用文件读取与浏览器截图并未提供。不向模型展示 MCP 图片的 Casper 仍会收到图片字节，每次回复最多 7 MiB。
 - 在打包的应用中，`app_read_file` 能读到每个已安装包的 `README.md`、`package.json` 与构建出的 `lib/*.js`、技能文件，以及 `ui-theme` 的 `lib/styles`。Desktop 运行时副本会去掉所有 `.d.ts`，各包不发布 `src/`，仓库的 `docs/` 也不在任何包中，因此那里无法读取 `lib/types`、`ui-sidebar` 的 `slots.ts`、`docs/cordis-tutorial` 与 `docs/web-styling.md`；插槽属性与主题令牌改由 `cordis_inspect_query` 获得。尚未随应用提供这些指南。
 - Casper 的审批卡片只为编辑的审批框绘制差异。Casper 在写入的审批框中不发送差异，含有密钥、某一侧大于 256 KB 或涉及其未检查路径的编辑也不发送，因此这些审批框只显示文本。
 - 应用未经正常关闭就退出后，在会话下次打开之前，会话日志仍记着 Casper 自己选择的访问模式；只有打开的会话会清除它。
