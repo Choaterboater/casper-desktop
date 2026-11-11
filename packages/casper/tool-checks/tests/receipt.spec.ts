@@ -39,7 +39,7 @@ describe('turn changes', () => {
   })
 
   it('treats prose as documentation but not the text files builds read', () => {
-    expect(['README.md', 'docs/guide.mdx', 'NOTES.txt', 'a.rst', 'b.adoc'].every(isDocumentation)).toBe(true)
+    expect(['README.md', 'guide/intro.mdx', 'NOTES.txt', 'a.rst', 'b.adoc'].every(isDocumentation)).toBe(true)
     expect(['requirements-dev.txt', 'constraints.txt', 'CMakeLists.txt', 'runtime.txt', 'requirements/base.txt', 'a.yaml', 'a.json', 'a.ts'].some(isDocumentation)).toBe(false)
   })
 
@@ -107,7 +107,7 @@ describe('receipt', () => {
   it('says why nothing was checked', () => {
     expect(formatReceipt(receipt({ notChecked: 'no checks found', changes: changed([], true) })))
       .toBe('– Not checked — no checks found\nChanged: files through shell commands (not listed)')
-    expect(formatReceipt(receipt({ documentationOnly: true, changes: changed(['README.md', 'docs/a.md']) })))
-      .toBe('– Checks skipped — only documentation changed (README.md, docs/a.md)')
+    expect(formatReceipt(receipt({ documentationOnly: true, changes: changed(['README.md', 'guide/a.md']) })))
+      .toBe('– Checks skipped — only documentation changed (README.md, guide/a.md)')
   })
 })
