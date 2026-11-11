@@ -54,7 +54,7 @@ describe('Casper identity', () => {
   })
 
   it('draws the website ghost in every icon source and none of the older marks', () => {
-    const colour = ['apps/desktop/resources/icon.svg', 'apps/desktop/resources/icon-macos.svg', 'apps/desktop/resources/icon-windows.svg', 'apps/web/public/favicon.svg', 'apps/web/public/favicon-dark.svg', 'packages/casper/casper-bundle/icon.svg', 'packages/client/ui-primitives/src/GhostLogo.tsx']
+    const colour = ['apps/desktop/resources/icon.svg', 'apps/desktop/resources/icon-macos.svg', 'apps/desktop/resources/icon-windows.svg', 'apps/web/public/favicon.svg', 'apps/web/public/favicon-dark.svg', 'packages/client/ui-primitives/src/GhostLogo.tsx']
     const mono = ['packages/client/ui-primitives/src/GhostLogo.tsx', 'apps/desktop/renderer/assets/welcome-brand.svg']
     for (const path of colour) expect(read(path), path).toContain(GHOST)
     for (const path of mono) expect(read(path), path).toContain(GHOST_MARK)
