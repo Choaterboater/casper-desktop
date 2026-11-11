@@ -44,7 +44,6 @@ This table connects model-visible tool names to the plugin package and service s
 | `@deepseek-ai/dsh-tool-subagent-control` | `interrupt_agent`, `list_agents`, `send_message`, `wait_agent` | `ctx.tools`, `ctx.subagents`, `ctx.agents` | `tool/call`, `tool/result`, `child session events through ctx.subagents` | - | The shared control tools discover and contact agents in the subagent tree, interrupt owned descendants, and wait for input in the caller’s inbox. Provider-bound `tool-subagent` instances supply delegation tools. |
 | `@deepseek-ai/dsh-tool-jobs` | `job_kill`, `job_list`, `job_output` | `ctx.tools`, `ctx.jobs`, `ctx.systemPrompt` | `tool/call`, `tool/result`, `user/message via agent.inject() for background completion notices` | - | The kind-agnostic background-job controller: background bash commands and PTY sends are read, listed, and killed through the same three tools. Loading the plugin attaches the controller that arms producers' `ctx.jobs.start()`. |
 | `@deepseek-ai/dsh-tool-agent-team` | `team_task_create`, `team_task_get`, `team_task_list`, `team_task_update` | `ctx.tools`, `ctx.systemPrompt`, `ctx.agentTeams`, `ctx.subagents`, `an exact live Team member Agent` | `tool/call`, `team/task`, `tool/result` | - | Four task-board tools share the subagent tree’s root Session. Enabling Team mode on the root Session adds task-board guidance alongside standard subagent delegation and control tools. Standard subagent controls provide required identity independently of Team mode. |
-| `@deepseek-ai/dsh-casper-checks` | `check_list`, `check_record`, `check_replay` | `ctx.workingDirectory`, `ctx.tools`, `ctx.shell`, `ctx.systemPrompt`, `an owning Agent at execution time` | `tool/call`, `tool/result` | - | Casper checks keep per-agent state in memory: check_record runs the command as a baseline, any mutating tool result in an overlapping working directory marks checks stale, and the agent/turn-stopping checkpoint replays stale checks. A run without a clean exit code is `not_run`, never `passed`. |
 | `@deepseek-ai/dsh-casper-sidebar-browser` | `browser_click`, `browser_key`, `browser_navigate`, `browser_open`, `browser_read`, `browser_screenshot`, `browser_scroll`, `browser_tabs`, `browser_type` | `ctx.tools`, `ctx.sessionProjections`, `a calling Agent`, `the Casper desktop app showing the Session` | `tool/call`, `tool/result`, `Sidebar browser tabs and pages` | - | The Desktop presets mount these tools; each call runs in the Sidebar browser of the Desktop Client showing the calling Session, and answers `unavailable` without one. browser_click, browser_type, browser_key, and browser_scroll first ask the user to allow the tab's origin once per Session; a successful input result records its origin in `tool/result` metadata so the grant survives a restart. browser_screenshot returns an image only to a model that declares image input. |
 | `@deepseek-ai/dsh-tool-todo` | `todo_write` | `ctx.tools`, `owning Agent session` | `tool/call`, `todo/write`, `tool/result` | - | todo_write is session-owned state; UIs render the latest todo/write event as a checklist. `allowParallelInProgress` is required with no default, so the catalog states its choice: `true`, whose description invites several `in_progress` items. A deployment choosing `false` receives the same tool with a description asking for exactly one active task. |
 | `@deepseek-ai/dsh-tool-working-directory` | `working_directory` | `ctx.tools`, `ctx.workingDirectory` | `tool/call`, `working-directory/change`, `user context for directory changes`, `tool/result` | - | Reads or changes the calling Session directory. Existing shells and processes retain their own directories; origin metadata and permission roots stay fixed. |
@@ -2422,73 +2421,6 @@ Compare-and-set a shared task action using the latest revision from team_task_ge
 Source: [`packages/team/tool-agent-team/src/index.ts`](../packages/team/tool-agent-team/src/index.ts)
 
 Four task-board tools share the subagent tree’s root Session. Enabling Team mode on the root Session adds task-board guidance alongside standard subagent delegation and control tools. Standard subagent controls provide required identity independently of Team mode.
-
-<a id="deepseek-aidsh-casper-checks"></a>
-
-## `@deepseek-ai/dsh-casper-checks`
-
-### `check_list`
-
-List recorded checks with their latest verdict and whether code changed since.
-
-```json
-{
-  "type": "object",
-  "properties": {}
-}
-```
-
-Source: [`packages/casper/tool-checks/src/index.ts`](../packages/casper/tool-checks/src/index.ts)
-
-### `check_record`
-
-Record a project check (a shell command whose exit code 0 means pass), run it now as the baseline, and keep it for replay. Recording a name again replaces it.
-
-```json
-{
-  "type": "object",
-  "properties": {
-    "name": {
-      "type": "string",
-      "description": "Short id, e.g. test, lint, build."
-    },
-    "command": {
-      "type": "string",
-      "description": "Shell command run in the working directory."
-    },
-    "timeoutMs": {
-      "type": "integer",
-      "description": "Optional deadline; a timeout is reported as not run."
-    }
-  },
-  "required": [
-    "name",
-    "command"
-  ]
-}
-```
-
-Source: [`packages/casper/tool-checks/src/index.ts`](../packages/casper/tool-checks/src/index.ts)
-
-### `check_replay`
-
-Replay recorded checks against the current code. Omit `name` to replay every check.
-
-```json
-{
-  "type": "object",
-  "properties": {
-    "name": {
-      "type": "string",
-      "description": "One recorded check; omit for all."
-    }
-  }
-}
-```
-
-Source: [`packages/casper/tool-checks/src/index.ts`](../packages/casper/tool-checks/src/index.ts)
-
-Casper checks keep per-agent state in memory: check_record runs the command as a baseline, any mutating tool result in an overlapping working directory marks checks stale, and the agent/turn-stopping checkpoint replays stale checks. A run without a clean exit code is `not_run`, never `passed`.
 
 <a id="deepseek-aidsh-casper-sidebar-browser"></a>
 

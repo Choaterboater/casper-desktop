@@ -152,7 +152,6 @@ flowchart TD
   end
   subgraph group_casper["packages/casper"]
     pkg_casper_agent["casper-agent"]
-    pkg_casper_checks["casper-checks"]
     pkg_casper_sidebar_browser["casper-sidebar-browser"]
     pkg_casper_sidebar_browser_client["casper-sidebar-browser-client"]
   end
@@ -925,13 +924,6 @@ flowchart TD
   pkg_plan_mode --> pkg_system_prompt
   pkg_plan_mode --> pkg_tools
   pkg_plan_mode --> pkg_user_questions
-  pkg_casper_checks --> pkg_agent
-  pkg_casper_checks --> pkg_fs
-  pkg_casper_checks --> pkg_llm
-  pkg_casper_checks --> pkg_shell
-  pkg_casper_checks --> pkg_system_prompt
-  pkg_casper_checks --> pkg_tools
-  pkg_casper_checks --> pkg_working_directory
   pkg_casper_sidebar_browser --> pkg_attachment
   pkg_casper_sidebar_browser --> pkg_scope
   pkg_casper_sidebar_browser --> pkg_session_projection
@@ -1839,7 +1831,6 @@ flowchart TD
 | [`web-deepseek-api`](../packages/web/web-deepseek-api) | `web` | [`agent`](../packages/core/agent), [`credentials`](../packages/credentials/credentials), [`deepseek-account`](../packages/credentials/deepseek-account), [`launch-environment`](../packages/util/launch-environment), [`llm`](../packages/llm/llm), [`llm-deepseek`](../packages/llm/llm-deepseek), [`llm-deepseek-account`](../packages/llm/llm-deepseek-account), [`llm-deepseek-api-key`](../packages/llm/llm-deepseek-api-key), [`session`](../packages/core/session), [`web`](../packages/web/web) |
 | [`tool-todo`](../packages/todo/tool-todo) | `todo` | [`agent`](../packages/core/agent), [`session`](../packages/core/session), [`session-projection`](../packages/session/session-projection), [`tools`](../packages/core/tools) |
 | [`plan-mode`](../packages/plan/plan-mode) | `plan` | [`agent`](../packages/core/agent), [`commands`](../packages/interaction/commands), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`session-projection`](../packages/session/session-projection), [`system-prompt`](../packages/core/system-prompt), [`tools`](../packages/core/tools), [`user-questions`](../packages/interaction/user-questions) |
-| [`casper-checks`](../packages/casper/tool-checks) | `casper` | [`agent`](../packages/core/agent), [`fs`](../packages/fs/fs), [`llm`](../packages/llm/llm), [`shell`](../packages/shell/shell), [`system-prompt`](../packages/core/system-prompt), [`tools`](../packages/core/tools), [`working-directory`](../packages/session/working-directory) |
 | [`casper-sidebar-browser`](../packages/casper/tool-sidebar-browser) | `casper` | [`attachment`](../packages/attachment/attachment), [`scope`](../packages/core/scope), [`session-projection`](../packages/session/session-projection), [`tools`](../packages/core/tools), [`user-questions`](../packages/interaction/user-questions) |
 | [`command-compact`](../packages/compaction/command-compact) | `compaction` | [`commands`](../packages/interaction/commands), [`compaction`](../packages/compaction/compaction) |
 | [`compaction-image-offload`](../packages/compaction/compaction-image-offload) | `compaction` | [`agent`](../packages/core/agent), [`compaction`](../packages/compaction/compaction), [`llm`](../packages/llm/llm), [`session`](../packages/core/session) |

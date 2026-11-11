@@ -123,7 +123,7 @@ it('declares the Casper preset with the todo list, the plugin kit and present, o
   expect(evaluate(disabled ?? '', profileCtx('web'))).toBe(true)
 })
 
-it('gives the Casper preset the agent-preset skills and the profile\'s plugin manager, and no Casper checks', () => {
+it('gives the Casper preset the agent-preset skills and the profile\'s plugin manager, and no plugin market', () => {
   const rows = desktopRows()
   const plugins = rows.find(entry => entry.id === 'preset-casper')?.config?.['plugins'] as Row[] | undefined
   const of = (id: string): Row | undefined => plugins?.find(plugin => plugin.id === id)
@@ -137,7 +137,7 @@ it('gives the Casper preset the agent-preset skills and the profile\'s plugin ma
   expect(evaluate(manager, { get: () => undefined })).toBe(true)
   // The rows serve plugin_manager from the profile's existing plugin-manager service, whose hidden bundles stay refused.
   expect(rows.find(entry => entry.id === 'plugin-manager')?.config?.['hiddenBundles']).toContain('@deepseek-ai/dsh-experimental-plugin-market-bundle')
-  expect(plugins?.some(plugin => plugin.name === '@deepseek-ai/dsh-casper-checks' || plugin.name === '@deepseek-ai/dsh-plugin-market/tools')).toBe(false)
+  expect(plugins?.some(plugin => plugin.name === '@deepseek-ai/dsh-plugin-market/tools')).toBe(false)
 })
 
 it('starts new Sessions on Casper on Desktop and on Standard elsewhere', () => {

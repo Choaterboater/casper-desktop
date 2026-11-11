@@ -35,7 +35,6 @@ export const PRODUCT_PACKAGE_POLICY: Readonly<Record<string, ProductPackagePolic
   'packages/context/tmux-context': { category: 'optional', reason: 'Context contribution requiring a tmux pane.' },
   'packages/fs/tool-str-replace-editor': { category: 'optional', reason: 'Explicit alternative to the default filesystem editing tools.' },
   'packages/fs/fs-observation-policy': { category: 'optional', reason: 'Read-before-mutation guard that a deployment enables on the disabled dsh-base row.' },
-  'packages/casper/tool-checks': { category: 'optional', reason: 'Casper checks that a deployment enables on the disabled Standard, Cordis and PTC preset rows.' },
   'packages/client/ui-settings-account': { category: 'optional', reason: 'Account Settings page that a deployment enables on the disabled web-app row.' },
   'packages/host/product-telemetry-otel': { category: 'optional', reason: 'Desktop product telemetry that a deployment enables on the disabled web-app row.' },
   'packages/sdk/client': { category: 'sdk', reason: 'Published TypeScript embedding client runs in the consumer process.' },

@@ -9,8 +9,8 @@
   en: 6cc2cd9ced70bb09
   zh: 1c0e6cb4ba2ed637
 /tool-schema-catalog/tool-package-map:
-  en: e680bf2f4cc2f897
-  zh: ae09f555b6ee46ee
+  en: c1a71674f05e0f44
+  zh: 431b1c243f9dd601
 /tool-schema-catalog/deepseek-ai-dsh-plugin-manager:
   en: e0143916bb634762
   zh: e0143916bb634762
@@ -291,20 +291,8 @@
   en: 8001eda7e9ff6a25
   zh: 2414761029f21404
 /tool-schema-catalog/deepseek-ai-dsh-tool-agent-team/team-task-update:
-  en: e7d945ddf7dfcc5f
-  zh: 03e7175436f1c4fd
-/tool-schema-catalog/deepseek-ai-dsh-casper-checks:
-  en: 085796c5d94fdad8
-  zh: 085796c5d94fdad8
-/tool-schema-catalog/deepseek-ai-dsh-casper-checks/check-list:
-  en: 6191cd9d0ccd43cc
-  zh: bdef21c6a5d672bf
-/tool-schema-catalog/deepseek-ai-dsh-casper-checks/check-record:
-  en: 33f12b67a5b68268
-  zh: 14e8a16f552dc941
-/tool-schema-catalog/deepseek-ai-dsh-casper-checks/check-replay:
-  en: 3a9015595d54bdf3
-  zh: 0a0ca4619a9a5b74
+  en: 9b48276f28cd2408
+  zh: 371a7ab3bac1db93
 /tool-schema-catalog/deepseek-ai-dsh-casper-sidebar-browser:
   en: 5470377d0812eca2
   zh: 5470377d0812eca2

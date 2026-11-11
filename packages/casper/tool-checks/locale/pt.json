@@ -1,6 +1,0 @@
-{
-  "meta": {
-    "title": "Verificações do Casper",
-    "description": "Executa as verificações do próprio projeto após as edições do agente, devolve falhas reais para correção e encerra o turno com um recibo."
-  }
-}

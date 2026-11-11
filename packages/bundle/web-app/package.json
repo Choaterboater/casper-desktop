@@ -71,7 +71,6 @@
     "@deepseek-ai/dsh-api-workspace-files": "workspace:*",
     "@deepseek-ai/dsh-app-boot": "workspace:*",
     "@deepseek-ai/dsh-casper-agent": "workspace:*",
-    "@deepseek-ai/dsh-casper-checks": "workspace:*",
     "@deepseek-ai/dsh-casper-sidebar-browser": "workspace:*",
     "@deepseek-ai/dsh-casper-sidebar-browser-client": "workspace:*",
     "@deepseek-ai/dsh-client-connection": "workspace:*",

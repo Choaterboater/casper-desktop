@@ -60,7 +60,6 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | Package | Config | Description |
 |---|---|---|
 | `@deepseek-ai/dsh-casper-agent` | yes | Casper agent: drive a Session with the Casper agent over its ACP server instead of the DeepSeek agent loop |
-| `@deepseek-ai/dsh-casper-checks` | yes | Casper checks: run the project's own checks after edits, send real failures back for repair, close the turn with a receipt, and never report a check that did not run as passed |
 | `@deepseek-ai/dsh-casper-sidebar-browser` | no | Casper Sidebar browser tools: let the agent list, open, read, and screenshot the Desktop app's browser tabs, and click and type on sites the user allows |
 | `@deepseek-ai/dsh-casper-sidebar-browser-client` | no | Desktop Client half of the Casper Sidebar browser tools: runs the agent's browser requests in the browser tabs of the Session they belong to |
 

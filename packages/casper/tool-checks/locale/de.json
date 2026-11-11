@@ -1,6 +1,0 @@
-{
-  "meta": {
-    "title": "Casper-Prüfungen",
-    "description": "Führt nach Änderungen des Agenten die eigenen Prüfungen des Projekts aus, gibt echte Fehler zur Reparatur zurück und schließt die Runde mit einem Beleg ab."
-  }
-}

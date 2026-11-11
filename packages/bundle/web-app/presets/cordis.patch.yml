@@ -114,11 +114,6 @@
             name: '@deepseek-ai/dsh-tool-todo'
             config:
               allowParallelInProgress: true
-          - id: casper-checks
-            name: '@deepseek-ai/dsh-casper-checks'
-            # Off until Casper itself runs in the app: these re-run the tests after every edit,
-            # cost tokens without catching more bugs, and misreport passing checks as sandbox-blocked.
-            disabled: true
           # Desktop only: the Sidebar browser exists only in the Desktop app.
           - id: casper-sidebar-browser
             name: '@deepseek-ai/dsh-casper-sidebar-browser'
