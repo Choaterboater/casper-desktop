@@ -24,7 +24,7 @@ This plugin makes the Casper agent the main AI for Sessions on the `casper` pres
 <a id="use-this-package"></a>
 ## Use this package
 
-The Desktop profile mounts the plugin from `packages/bundle/web-app/cordis.patch.yml` (row `casper-agent`, disabled outside Desktop and in the in-browser preview) and declares the `casper` preset in `packages/bundle/web-app/presets/casper.patch.yml`. The preset mounts `tool-todo`, which shows Casper's plan as the todo list, and the rows the app tools run: `tool-cordis`, `skill-filesystem` (with the Cordis preset's skill folders), `tool-skill`, and `tool-plugin-manager`, which binds the app's existing plugin manager and is off when the app runs without a profile. It also mounts `present`, and `tool-subagent-control` with `tool-subagent` (the `spawn` backend, `agentPreset: standard`, model choice and `list_subagent_models` on), which give Casper the app's [subagents](#subagents). The plugin market is not mounted. On Desktop the preset registry's default is `casper`; a default saved in Settings still wins. The plugin injects `agents`, `sessions`, `sessionProjections`, `sessionPersistence`, `subprocess`, `storageDomain`, and `tools`, and uses `userQuestions`, `skills`, `profileContext`, `attachments`, `commands`, `permissionPresets`, `sandboxPolicy`, `mcpManager`, `credentials`, and `sessionReferenceResolver` when they are mounted.
+The Desktop profile mounts the plugin from `packages/bundle/web-app/cordis.patch.yml` (row `casper-agent`, disabled outside Desktop and in the in-browser preview) and declares the `casper` preset in `packages/bundle/web-app/presets/casper.patch.yml`. The preset mounts `tool-todo`, which shows Casper's plan as the todo list, and the rows the app tools run: `tool-cordis`, `skill-filesystem` (with the Cordis preset's skill folders), `tool-skill`, and `tool-plugin-manager`, which binds the app's existing plugin manager and is off when the app runs without a profile. It also mounts `present`, and `tool-subagent-control` with `tool-subagent` (the `spawn` backend, `agentPreset: standard`, model choice and `list_subagent_models` on), which give Casper the app's [subagents](#subagents), and `command-goal` with `tool-goal`, which give a Casper Session the app's [goals](#goals). The plugin market is not mounted. On Desktop the preset registry's default is `casper`; a default saved in Settings still wins. The plugin injects `agents`, `sessions`, `sessionProjections`, `sessionPersistence`, `subprocess`, `storageDomain`, and `tools`, and uses `userQuestions`, `skills`, `profileContext`, `attachments`, `commands`, `permissionPresets`, `sandboxPolicy`, `mcpManager`, `credentials`, and `sessionReferenceResolver` when they are mounted.
 
 | Field | Default | Meaning |
 |---|---|---|
@@ -41,6 +41,7 @@ The Desktop profile mounts the plugin from `packages/bundle/web-app/cordis.patch
 | `stderrTailBytes` | `4096` | Bytes of Casper's stderr kept for failure messages |
 | `appTools` | `true` | Offer the app tools to Casper; `false` sends an empty `mcpServers` list |
 | `appSubagents` | `true` | Serve Casper the app's [subagent tools](#subagents) with the app tools; it needs `appTools`, and `false` leaves them out |
+| `appGoals` | `true` | Serve Casper the app's [goal tools](#goals) with the app tools and run a goal's rounds as Casper turns; the tools need `appTools`, and `false` leaves them out and drops a round that comes due, which pauses the goal |
 | `casperChildModel` | `true` | Run a [child](#subagents) on Casper's current model when the app has the same provider and model; `false` runs every child on the app's default model |
 | `accessModes` | `{ read-only: read, workspace-write: ask, danger-full-access: full }` | The [access mode](#access-control) each permission preset sets; `custom` and `auto` cannot be listed |
 | `approvalCard` | `true` | Show Casper's boxes with [Casper's approval card](#approvals); `false` shows the generic question card |
@@ -213,6 +214,9 @@ The server speaks MCP Streamable HTTP as `dsh-desktop`, with the app's dsh runti
 | `interrupt_agent` | dsh `interrupt_agent` | |
 | `list_agents` | dsh `list_agents` | read-only |
 | `list_subagent_models` | dsh `list_subagent_models` | read-only |
+| `get_goal` | dsh `get_goal` | read-only |
+| `create_goal` | dsh `create_goal` | |
+| `update_goal` | dsh `update_goal` | |
 | `list_mcp_resources` | dsh `list_mcp_resources` | read-only |
 | `list_mcp_resource_templates` | dsh `list_mcp_resource_templates` | read-only |
 | `read_mcp_resource` | dsh `read_mcp_resource` | read-only |
@@ -241,6 +245,19 @@ The Session's route is Casper's current model when the app has a route with the 
 The call returns at once. When the child finishes, the app's completion notice goes to Casper: as steering while a Casper turn runs, or as the next prompt when Casper is idle, which starts a new Casper turn. `send_message`, `interrupt_agent`, `list_agents` and `list_subagent_models` work on Casper's children as they do for a Standard parent. `wait_agent` is not served: Casper ends any MCP call after 10 minutes however much progress it sends, which would fail a longer wait and take the app tools away for the rest of the task, and the notice arrives on its own anyway.
 
 Children follow the app's own rules, as a Standard Session's children do, not Casper's list of private places. They use the app's sandbox, never ask (anything that would ask is refused), and get Auto or Full access only when the Casper Session is on it. So a child may read a place such as `~/.ssh` that Casper itself would ask about or refuse. Casper's own reads are unchanged. Casper's access mode still applies to the call itself: under Read Only Casper refuses `subagent`, `send_message` and `interrupt_agent`; under Full access Casper ignores `clientAsks` and asks in its own box, where "Yes, for this session" covers later calls, as for `plugin_manager`; Workspace Write adds no box. A child changes files outside Casper's own steps.
+
+<a id="goals"></a>
+### Goals
+
+The preset's `command-goal` and `tool-goal` rows give a Casper Session the app's `/goal` command and goal tools. The goal service, its round driver and the goal bar belong to the app and already work for every Session. `/goal <objective>` in a Casper Session sets the goal as in a Standard Session, and the goal bar shows it. Casper has no `/goal` of its own, and the app's command would win a clash anyway.
+
+While `appGoals` is on, the app tools also serve `get_goal`, `create_goal` and `update_goal`, after the subagent tools and not pinned, so Casper's fixed prompt is the same size. Each call runs as the Casper Agent inside its initiator boundary, so the app's goal checks see the open Casper turn. `create_goal`, and `update_goal` with `edit`, `pause` or `resume`, need a turn the person started; `complete` and `blocked` also work in the goal's own round. A Standard agent reads the goal rules in its system prompt, which Casper never sees, so `create_goal` and `update_goal` carry them at the end of their descriptions. When `update_goal` marks a goal complete or blocked in its round, the app's closing instruction, which a Standard agent gets as context for its next step, follows the tool's result.
+
+Each round the driver queues runs as a Casper turn whose prompt is the round's text. Before the turn logs a round, it runs the app's `agent/pre-step` check, as the DeepSeek loop does before a step, with the claimed lines and Casper's current model as the route. The driver refuses a round that is no longer current, such as one queued while Casper was busy and then changed by `/goal edit`, pause or clear, and puts the other claimed lines back in the queue. The refused turn logs and sends nothing and ends `blocked`; the lines put back run as the next turn. Only a refusal counts: lines a check adds, such as a skill list or a model notice, are for the DeepSeek loop's request and are not sent. Other turns run no check. A Stop during the check, or while mentioned Sessions are read, drops the round without logging it, and the driver pauses the goal. A round that Casper ends with an error, such as its turn limit, reports the error as the DeepSeek loop does, so the driver stops queueing rounds; an ordinary turn's error is not reported this way.
+
+With `appGoals` off the rows still mount, so `/goal` still sets a goal, but the tools are not served, and a round that comes due is dropped with no check and no prompt. A turn that held only the round ends `blocked`; lines claimed with it still run. The driver then pauses the goal.
+
+Casper's access mode applies to the calls as to the subagent tools: under Read Only Casper refuses `create_goal` and `update_goal`; under Full access Casper asks in its own box; Workspace Write adds no box.
 
 <a id="settings-mcp-servers"></a>
 ### Settings MCP servers
@@ -289,7 +306,7 @@ The plugin sends no model request, so it has no cache effect; Casper's own reque
 - Scheduled tasks run in Casper when they have no saved preset: a task made on the Schedule page creates its Session on the default preset, which is Casper on Desktop unless Settings names another. A task made by a Standard Session's reminder tools keeps that Session's preset, and a task aimed at an existing Casper Session runs there as its next prompt. Casper Sessions have no reminder tools of their own.
 - Only Desktop on macOS and Linux has run Casper Sessions. On Windows the executable lookup is checked by unit tests only, and the app does not read the Path the installer saved, so a custom install folder outside the app's own environment is found only after the app restarts.
 - A deleted Session's sidecar record goes only at the next start, and an archived Session keeps its process until it is idle for `idleExitMs`. A Casper from before decision 91 is never closed while idle.
-- Team and goal features do not run inside Casper Sessions. Casper's children are Standard agents on Casper's model only when the app has the same route, else on the app's default model; they follow the app's rules rather than Casper's private places, and cannot be waited on with `wait_agent`.
+- Team features do not run inside Casper Sessions. Casper's children are Standard agents on Casper's model only when the app has the same route, else on the app's default model; they follow the app's rules rather than Casper's private places, and cannot be waited on with `wait_agent`.
 - A Casper Session's written title is made on the app's default model, which may be a DeepSeek model, not on the model Casper runs.
 
 <a id="dev-note"></a>

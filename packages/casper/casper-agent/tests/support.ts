@@ -149,6 +149,7 @@ export function fakeCasper(script: FakeScript = { prompts: [] }): FakeCasper {
       stderrTailBytes: 4_096,
       appTools: false,
       appSubagents: true,
+      appGoals: true,
       casperChildModel: true,
       accessModes: { ...DEFAULT_ACCESS_MODES },
       approvalCard: true,

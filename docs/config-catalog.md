@@ -516,6 +516,12 @@ export interface Config {
    */
   appSubagents: boolean
   /**
+   * Serve Casper the app's goal tools with the app tools (`get_goal`, `create_goal`, `update_goal`) and run the
+   * rounds of a goal set with `/goal` or those tools as Casper turns; false leaves the tools out, and a round that
+   * comes due is dropped, which pauses the goal. Needs appTools for the tools.
+   */
+  appGoals: boolean
+  /**
    * Run a child the app's subagent tool starts on Casper's current model when the app has a route with the same
    * provider and model id, keeping Casper's effort only when that model lists it; otherwise, and when false, the child
    * runs on the app's default model.
