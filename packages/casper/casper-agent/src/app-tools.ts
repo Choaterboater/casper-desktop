@@ -59,6 +59,8 @@ interface BridgedTool {
   readonly pin: boolean
   /** Whether its description starts with {@link GUIDE_FIRST}. */
   readonly guide: boolean
+  /** Whether it is one of the app's subagent tools, served only while {@link AppToolsOptions.subagents} is on. */
+  readonly subagents: boolean
 }
 
 /**
@@ -67,14 +69,24 @@ interface BridgedTool {
  * hands the user a file the app shows as a card in the Casper turn. Four are
  * pinned; `cordis_inspect_query` gave its pin to `present`, so each request
  * costs the same, and Casper reaches it through find_capability.
+ *
+ * The app's subagent tools come last and are never pinned, so Casper's fixed
+ * prompt does not grow; Casper finds them through its tool search. `wait_agent`
+ * is not served: Casper ends an MCP call after 10 minutes however much progress
+ * it sends, and the completion notice reaches Casper on its own.
  */
 const BRIDGED: readonly BridgedTool[] = [
-  { mcp: 'app_skill', dsh: 'skill', readOnly: true, pin: true, guide: false },
-  { mcp: 'plugin_manager', dsh: 'plugin_manager', readOnly: false, pin: true, guide: true },
-  { mcp: 'app_read_file', dsh: undefined, readOnly: true, pin: true, guide: false },
-  { mcp: 'present', dsh: 'present', readOnly: true, pin: true, guide: false },
-  { mcp: 'cordis_inspect_query', dsh: 'cordis_inspect_query', readOnly: true, pin: false, guide: false },
-  { mcp: 'cordis_inspect_list', dsh: 'cordis_inspect_list', readOnly: true, pin: false, guide: true },
+  { mcp: 'app_skill', dsh: 'skill', readOnly: true, pin: true, guide: false, subagents: false },
+  { mcp: 'plugin_manager', dsh: 'plugin_manager', readOnly: false, pin: true, guide: true, subagents: false },
+  { mcp: 'app_read_file', dsh: undefined, readOnly: true, pin: true, guide: false, subagents: false },
+  { mcp: 'present', dsh: 'present', readOnly: true, pin: true, guide: false, subagents: false },
+  { mcp: 'cordis_inspect_query', dsh: 'cordis_inspect_query', readOnly: true, pin: false, guide: false, subagents: false },
+  { mcp: 'cordis_inspect_list', dsh: 'cordis_inspect_list', readOnly: true, pin: false, guide: true, subagents: false },
+  { mcp: 'subagent', dsh: 'subagent', readOnly: false, pin: false, guide: false, subagents: true },
+  { mcp: 'send_message', dsh: 'send_message', readOnly: false, pin: false, guide: false, subagents: true },
+  { mcp: 'interrupt_agent', dsh: 'interrupt_agent', readOnly: false, pin: false, guide: false, subagents: true },
+  { mcp: 'list_agents', dsh: 'list_agents', readOnly: true, pin: false, guide: false, subagents: true },
+  { mcp: 'list_subagent_models', dsh: 'list_subagent_models', readOnly: true, pin: false, guide: false, subagents: true },
 ]
 
 /** Result of a resource tool while no MCP server in the app offers resources. */
@@ -197,6 +209,18 @@ export interface AppToolsOptions {
   readonly roots: readonly string[]
   /** Whether the app runs from installed packages, which carry no `lib/types`, `src/` or repository `docs/`. */
   readonly installed: boolean
+  /**
+   * Serve the app's subagent tools: `subagent`, `send_message`, `interrupt_agent`, `list_agents` and
+   * `list_subagent_models`; true when omitted.
+   */
+  readonly subagents?: boolean | undefined
+  /**
+   * Run a call inside the caller's initiator boundary, so the app tool sees the Casper Agent as the initiator of
+   * what it starts, as a Standard parent's tool call does; the call runs as it is when omitted.
+   * @param operation - the call.
+   * @returns what `operation` returns.
+   */
+  readonly initiate?: (<T>(operation: () => T) => T) | undefined
   /**
    * The Settings and plugin-registered servers this connection hands Casper, which the resource tools reach; read at each request.
    * @returns their names, without Casper's `acp-` prefix; none when omitted.
@@ -379,12 +403,13 @@ async function mcpServer(options: AppToolsOptions, version: string): Promise<Mcp
     const acpId = acpIdOf(ctx.mcpReq._meta)
     const id = acpId === undefined ? ToolCallId(`casper-app:${randomUUID()}`) : options.callId(acpId)
     const stop = heartbeat(ctx, options.onError)
+    const initiate = options.initiate ?? (<T>(operation: () => T): T => operation())
     try {
-      const batch = await options.tools.execute({
+      const batch = await initiate(() => options.tools.execute({
         calls: [{ type: 'tool-call', id, name: dsh, arguments: JSON.stringify(args) }],
         signal: AbortSignal.any([ctx.mcpReq.signal, turn]),
         agent: options.agent,
-      })
+      }))
       const result = batch.results[0]?.result
       /* v8 ignore next -- an executor returns one result per call. */
       if (result === undefined) return errorResult(`${tool.mcp} returned no result.`)
@@ -419,7 +444,9 @@ async function mcpServer(options: AppToolsOptions, version: string): Promise<Mcp
     }
     return tool.guide ? `${GUIDE_FIRST} ${own}` : own
   }
+  const subagents = options.subagents ?? true
   for (const tool of BRIDGED) {
+    if (tool.subagents && !subagents) continue
     const dsh = tool.dsh
     if (dsh === undefined) {
       server.registerTool(tool.mcp, {
@@ -439,7 +466,7 @@ async function mcpServer(options: AppToolsOptions, version: string): Promise<Mcp
   }
   const forwarded = options.resourceServers?.() ?? []
   for (const tool of RESOURCE_TOOLS) {
-    const bridged: BridgedTool = { mcp: tool.mcp, dsh: tool.mcp, readOnly: true, pin: false, guide: false }
+    const bridged: BridgedTool = { mcp: tool.mcp, dsh: tool.mcp, readOnly: true, pin: false, guide: false, subagents: false }
     server.registerTool(tool.mcp, {
       description: resourceDescription(tool.does, forwarded),
       inputSchema: fromJsonSchema<Record<string, unknown>>(tool.schema),

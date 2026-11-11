@@ -159,6 +159,39 @@ describe('app tools in a Casper Session', { timeout: 60_000 }, () => {
     expect(fake.log().find(entry => entry.event === 'start')?.profile).toEqual({ name: 'desktop', dir })
   })
 
+  it('runs Casper\'s subagent call as the Casper Agent and with it as the initiator, as a Standard parent\'s call', async () => {
+    const SUBAGENT_ARGS = { description: 'scan', prompt: 'Scan the folder.' }
+    const script: FakeScript = { prompts: [[{ tool: 'subagent', target: 'scan' }, { mcp: 'subagent', args: SUBAGENT_ARGS }, { toolEnd: 1 }]] }
+    for (const appSubagents of [true, false]) {
+      const fake = fakeCasper(script)
+      cleanups.push(() => { fake.remove() })
+      const booted = await boot(fake, { appTools: true, appSubagents })
+      cleanups.push(() => booted.ctx.fiber.dispose())
+      const ran: { agent: unknown; initiator: unknown }[] = []
+      booted.ctx.tools.register(defineTool({
+        name: 'subagent', description: 'Start a child.',
+        parameters: { description: { type: 'string', required: true }, prompt: { type: 'string', required: true } },
+        output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
+        execute: (_args, exec) => {
+          ran.push({ agent: exec.agent, initiator: booted.ctx.agents.currentInitiator() })
+          return Promise.resolve('started subagent child-1')
+        },
+      }))
+      const { agent } = await booted.create(`casper-app-subagent-${String(appSubagents)}`)
+      agent.followup(prompt('delegate'))
+      await agent.whenIdle()
+      const call = await waitFor(() => fake.log().find(entry => entry.event === 'mcp'))
+      if (appSubagents) {
+        expect(call.result).toEqual({ content: [{ type: 'text', text: 'started subagent child-1' }], isError: false })
+        expect(ran).toEqual([{ agent, initiator: agent }])
+      } else {
+        // Off: the tool is not listed, so Casper's call finds no such tool and nothing runs.
+        expect(call.error).toMatch(/Tool subagent not found/)
+        expect(ran).toEqual([])
+      }
+    }
+  })
+
   it('offers no server when the app tools are off', async () => {
     const fake = fakeCasper({ prompts: [[]] })
     cleanups.push(() => { fake.remove() })

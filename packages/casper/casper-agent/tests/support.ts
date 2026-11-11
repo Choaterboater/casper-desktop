@@ -148,6 +148,7 @@ export function fakeCasper(script: FakeScript = { prompts: [] }): FakeCasper {
       killGraceMs: 2_000,
       stderrTailBytes: 4_096,
       appTools: false,
+      appSubagents: true,
       accessModes: { ...DEFAULT_ACCESS_MODES },
       approvalCard: true,
       approvalDiff: true,

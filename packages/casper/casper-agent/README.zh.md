@@ -24,7 +24,7 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-桌面端 profile 通过 `packages/bundle/web-app/cordis.patch.yml` 挂载本插件（条目 `casper-agent`，在桌面端以外和浏览器内预览中禁用），并在 `packages/bundle/web-app/presets/casper.patch.yml` 中声明 `casper` 预设。该预设挂载 `tool-todo`（用待办列表展示 Casper 的计划），以及应用工具所运行的条目：`tool-cordis`、`skill-filesystem`（使用 Cordis 预设的技能目录）、`tool-skill` 与 `tool-plugin-manager`；后者绑定应用已有的插件管理器，应用不带 profile 运行时关闭。插件市场不会挂载。在桌面端，预设注册表的默认值为 `casper`；设置中保存的默认值仍然优先。本插件注入 `agents`、`sessions`、`sessionProjections`、`sessionPersistence`、`subprocess`、`storageDomain` 与 `tools`，并在挂载了 `userQuestions`、`skills`、`profileContext`、`attachments`、`commands`、`permissionPresets`、`sandboxPolicy`、`mcpManager`、`credentials` 与 `sessionReferenceResolver` 时使用它们。
+桌面端 profile 通过 `packages/bundle/web-app/cordis.patch.yml` 挂载本插件（条目 `casper-agent`，在桌面端以外和浏览器内预览中禁用），并在 `packages/bundle/web-app/presets/casper.patch.yml` 中声明 `casper` 预设。该预设挂载 `tool-todo`（用待办列表展示 Casper 的计划），以及应用工具所运行的条目：`tool-cordis`、`skill-filesystem`（使用 Cordis 预设的技能目录）、`tool-skill` 与 `tool-plugin-manager`；后者绑定应用已有的插件管理器，应用不带 profile 运行时关闭。该预设还挂载 `present`，以及 `tool-subagent-control` 与 `tool-subagent`（`spawn` 后端、`agentPreset: standard`，并开启模型选择与 `list_subagent_models`），它们把应用的[子代理](#subagents)交给 Casper。插件市场不会挂载。在桌面端，预设注册表的默认值为 `casper`；设置中保存的默认值仍然优先。本插件注入 `agents`、`sessions`、`sessionProjections`、`sessionPersistence`、`subprocess`、`storageDomain` 与 `tools`，并在挂载了 `userQuestions`、`skills`、`profileContext`、`attachments`、`commands`、`permissionPresets`、`sandboxPolicy`、`mcpManager`、`credentials` 与 `sessionReferenceResolver` 时使用它们。
 
 | 字段 | 默认值 | 含义 |
 |---|---|---|
@@ -40,6 +40,7 @@ kind: "package-reference"
 | `killGraceMs` | `5000` | SIGTERM 与 SIGKILL 之间的宽限时间 |
 | `stderrTailBytes` | `4096` | 为失败信息保留的 Casper stderr 字节数 |
 | `appTools` | `true` | 向 Casper 提供应用工具；`false` 时发送空的 `mcpServers` 列表 |
+| `appSubagents` | `true` | 随应用工具向 Casper 提供应用的[子代理工具](#subagents)；需要 `appTools`，`false` 时不提供 |
 | `accessModes` | `{ read-only: read, workspace-write: ask, danger-full-access: full }` | 每个权限预设设置的[访问模式](#access-control)；不能列出 `custom` 与 `auto` |
 | `approvalCard` | `true` | 用 [Casper 的审批卡片](#approvals)显示 Casper 的审批框；`false` 时显示通用问题卡片 |
 | `approvalDiff` | `true` | 在 [Casper 的审批卡片](#approvals)中绘制编辑的审批框所带的差异；需要 `approvalCard`，`false` 时以文本行显示差异 |
@@ -205,6 +206,11 @@ Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打�
 | `present` | dsh `present` | 只读，置顶 |
 | `cordis_inspect_query` | dsh `cordis_inspect_query` | 只读 |
 | `cordis_inspect_list` | dsh `cordis_inspect_list` | 只读 |
+| `subagent` | dsh `subagent` | |
+| `send_message` | dsh `send_message` | |
+| `interrupt_agent` | dsh `interrupt_agent` | |
+| `list_agents` | dsh `list_agents` | 只读 |
+| `list_subagent_models` | dsh `list_subagent_models` | 只读 |
 | `list_mcp_resources` | dsh `list_mcp_resources` | 只读 |
 | `list_mcp_resource_templates` | dsh `list_mcp_resource_templates` | 只读 |
 | `read_mcp_resource` | dsh `read_mcp_resource` | 只读 |
@@ -220,6 +226,17 @@ Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打�
 `plugin_manager` 保留自己的规则：应用隐藏的 bundle 以 `not-offered` 拒绝，每个操作（包括 `install_bundle`）都像在 DeepSeek 循环中一样通过应用自己的审批卡片询问。`clientAsks` 告诉 Casper 该卡片就是关口，因此 Casper 不会为此服务器显示自己的变更框，它的自动回答也永远不会批准安装。在「完全权限」下应用的卡片不再询问，因此处于 `full` 模式的 Casper 会忽略 `clientAsks`，改用自己的框询问：无论哪种情况都只有一个框。
 
 `app_skill` 的描述在 1,000 个字符以内列出 Agent 可加载的技能，以 `cordis-plugin-development` 开头。加载的技能以一行说明开头，告诉 Casper 在其工作区中编写 bundle、用 `app_read_file` 读取技能文件，并使用它获得的 `DSH_PROFILE` 与 `DSH_PROFILE_DIR`；在已安装的应用中，这行说明还会指出那里的包没有 `lib/types`、`src` 与仓库文档，因此插槽属性与主题令牌取自 `cordis_inspect_query`。`app_read_file` 只读取存放应用已安装包的目录（本包之上最近的 `node_modules`；在源码检出中为其 `packages` 与 `docs` 目录）以及 profile 的 `node_modules`。路径以 `path.relative` 比较，真实路径离开该目录的符号链接会被拒绝。一次调用最多按行窗口返回 256 KB 文本；超过这一长度的单行会截取前 256 KB，说明中会注明，下一个窗口从它之后开始。SVG 以外的二进制文件得到一行说明，目录最多列出 500 项，超过 32 MB 的文件会被拒绝。
+
+<a id="subagents"></a>
+### 子代理
+
+这五个子代理工具来自预设的 `tool-subagent` 与 `tool-subagent-control` 条目，在 `appSubagents` 开启时提供。它们不置顶，因此 Casper 的固定提示大小不变；Casper 通过其工具搜索（find_capability）找到它们，就像找到 `cordis_inspect_query` 一样。关闭后，这些条目仍会挂载，但工具不会提供给 Casper。
+
+`subagent` 为 Casper 会话启动一个子代理，与标准会话中相同。子代理是运行在 DeepSeek 代理循环上的标准代理：它挂载 `standard` 预设，因为 `casper` 预设没有 shell 与文件工具；Casper 路由从不接收子代理，因此不会再启动第二个 `casper acp`。它在会话的文件夹中工作，并以 Casper 会话为父会话列在其下。该调用以 Casper Agent 的身份、在其发起者边界内运行，因此子代理与标准父会话的调用一样归属于 Casper 会话，Casper 的步骤显示应用的子代理卡片。子代理在会话的路由上运行，即应用的默认模型；调用中的 `provider` 与 `model` 只能在应用的模型设置允许时指定其他路由。
+
+该调用立即返回。子代理完成时，应用的完成通知会发给 Casper：Casper 一轮正在运行时作为引导消息，Casper 空闲时作为下一条提示，这会开始新的一轮 Casper。`send_message`、`interrupt_agent`、`list_agents` 与 `list_subagent_models` 对 Casper 的子代理的作用，与对标准父会话的子代理相同。`wait_agent` 不提供：无论发送多少进度，Casper 都会在 10 分钟后结束任何 MCP 调用，这会使更长的等待失败，并在本次任务剩余时间内失去应用工具；而且通知本来就会自行到达。
+
+子代理与标准会话的子代理一样遵循应用自己的规则，而不是 Casper 的私密位置列表。它们使用应用的沙箱，从不询问（任何需要询问的操作都会被拒绝），并且只有在 Casper 会话处于 Auto 或「完全权限」时才获得相应权限。因此，子代理可能读取 `~/.ssh` 这类 Casper 自己会询问或拒绝的位置。Casper 自己的读取不变。Casper 的访问模式仍作用于调用本身：在「仅可查看」下，Casper 拒绝 `subagent`、`send_message` 与 `interrupt_agent`；在「完全权限」下，Casper 忽略 `clientAsks`，在自己的审批框中询问，选择「本会话内都同意」后会覆盖之后的调用，与 `plugin_manager` 相同；「工作区内修改」不增加审批框。子代理在 Casper 自己的步骤之外改动文件。
 
 <a id="settings-mcp-servers"></a>
 ### 设置中的 MCP 服务器
@@ -268,7 +285,7 @@ Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打�
 - 没有保存预设的定时任务在 Casper 中运行：在自动化任务页面创建的任务会在默认预设上创建其会话，而桌面端的默认预设是 Casper，除非设置中指定了其他预设。由 Standard 会话的提醒工具创建的任务会保留该会话的预设，指向现有 Casper 会话的任务会作为其下一条提示在那里运行。Casper 会话自身没有提醒工具。
 - 只有 macOS 与 Linux 上的桌面端运行过 Casper 会话。在 Windows 上，可执行文件查找只由单元测试检查，且应用不会读取安装程序保存的 Path，因此不在应用自身环境中的自定义安装文件夹要在应用重启后才能找到。
 - 已删除会话的 sidecar 记录要到下次启动时才会删除；已归档的会话会保留其进程，直到空闲满 `idleExitMs`。决策 91 之前的 Casper 在空闲时不会被关闭。
-- Subagent、团队与目标功能不在 Casper 会话中运行。
+- 团队与目标功能不在 Casper 会话中运行。Casper 的子代理是使用应用默认模型的标准代理，遵循应用的规则而不是 Casper 的私密位置，并且不能用 `wait_agent` 等待。
 - Casper 会话的标题由应用的默认模型（可能是 DeepSeek 模型）生成，而不是由 Casper 所运行的模型生成。
 
 <a id="dev-note"></a>
