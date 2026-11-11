@@ -5,8 +5,12 @@
 # the todo list that shows Casper's plan, the plugin kit (Cordis
 # inspection, the app's skills with the agent-preset skills folder, and
 # plugin_manager on the app's own plugin-manager service), and present, whose
-# deliveries show as file cards in the Casper turn. Casper runs its own
-# checks, and plugin-market has no service in this deployment.
+# deliveries show as file cards in the Casper turn. The subagent rows serve
+# Casper the app's subagent tool and its controls: each child is a Standard
+# agent on agent-loop (agentPreset standard, since this preset has no bash or
+# file tools), not another Casper. Fork is left out: Casper Sessions cannot
+# fork. Casper runs its own checks, and plugin-market has no service in this
+# deployment.
 # Desktop only, never in a Worker, exactly like the casper-agent row.
 - insert:
     - id: preset-casper
@@ -37,3 +41,13 @@
             disabled: !!js "!ctx.get('profileContext')"
           - id: present
             name: '@deepseek-ai/dsh-tool-present'
+          - id: tool-subagent-control
+            name: '@deepseek-ai/dsh-tool-subagent-control'
+          - id: tool-subagent
+            name: '@deepseek-ai/dsh-tool-subagent'
+            config:
+              provider: spawn
+              toolName: subagent
+              agentPreset: standard
+              modelSelection: true
+              modelDiscovery: true

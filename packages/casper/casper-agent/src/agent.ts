@@ -842,6 +842,9 @@ export class CasperAgent implements Agent {
       callId: acpId => connection.toolCallId(acpId),
       record: (acpId, call) => { this.sinkFor(connection)?.writer.bridged(acpId, call) },
       resourceServers: () => connection.forwardedNames,
+      subagents: this.config.appSubagents,
+      // A child the app's subagent tool starts is attributed to this Agent, as a Standard parent's tool call is.
+      initiate: operation => this.pluginCtx.agents.withInitiator(this, operation),
       onError: (error) => { this.pluginCtx.logger.debug(`casper agent "${this.id}": app tools: ${error.message}`) },
     })
   }

@@ -24,7 +24,7 @@ This plugin makes the Casper agent the main AI for Sessions on the `casper` pres
 <a id="use-this-package"></a>
 ## Use this package
 
-The Desktop profile mounts the plugin from `packages/bundle/web-app/cordis.patch.yml` (row `casper-agent`, disabled outside Desktop and in the in-browser preview) and declares the `casper` preset in `packages/bundle/web-app/presets/casper.patch.yml`. The preset mounts `tool-todo`, which shows Casper's plan as the todo list, and the rows the app tools run: `tool-cordis`, `skill-filesystem` (with the Cordis preset's skill folders), `tool-skill`, and `tool-plugin-manager`, which binds the app's existing plugin manager and is off when the app runs without a profile. The plugin market is not mounted. On Desktop the preset registry's default is `casper`; a default saved in Settings still wins. The plugin injects `agents`, `sessions`, `sessionProjections`, `sessionPersistence`, `subprocess`, `storageDomain`, and `tools`, and uses `userQuestions`, `skills`, `profileContext`, `attachments`, `commands`, `permissionPresets`, `sandboxPolicy`, `mcpManager`, `credentials`, and `sessionReferenceResolver` when they are mounted.
+The Desktop profile mounts the plugin from `packages/bundle/web-app/cordis.patch.yml` (row `casper-agent`, disabled outside Desktop and in the in-browser preview) and declares the `casper` preset in `packages/bundle/web-app/presets/casper.patch.yml`. The preset mounts `tool-todo`, which shows Casper's plan as the todo list, and the rows the app tools run: `tool-cordis`, `skill-filesystem` (with the Cordis preset's skill folders), `tool-skill`, and `tool-plugin-manager`, which binds the app's existing plugin manager and is off when the app runs without a profile. It also mounts `present`, and `tool-subagent-control` with `tool-subagent` (the `spawn` backend, `agentPreset: standard`, model choice and `list_subagent_models` on), which give Casper the app's [subagents](#subagents). The plugin market is not mounted. On Desktop the preset registry's default is `casper`; a default saved in Settings still wins. The plugin injects `agents`, `sessions`, `sessionProjections`, `sessionPersistence`, `subprocess`, `storageDomain`, and `tools`, and uses `userQuestions`, `skills`, `profileContext`, `attachments`, `commands`, `permissionPresets`, `sandboxPolicy`, `mcpManager`, `credentials`, and `sessionReferenceResolver` when they are mounted.
 
 | Field | Default | Meaning |
 |---|---|---|
@@ -40,6 +40,7 @@ The Desktop profile mounts the plugin from `packages/bundle/web-app/cordis.patch
 | `killGraceMs` | `5000` | Grace between SIGTERM and SIGKILL |
 | `stderrTailBytes` | `4096` | Bytes of Casper's stderr kept for failure messages |
 | `appTools` | `true` | Offer the app tools to Casper; `false` sends an empty `mcpServers` list |
+| `appSubagents` | `true` | Serve Casper the app's [subagent tools](#subagents) with the app tools; it needs `appTools`, and `false` leaves them out |
 | `accessModes` | `{ read-only: read, workspace-write: ask, danger-full-access: full }` | The [access mode](#access-control) each permission preset sets; `custom` and `auto` cannot be listed |
 | `approvalCard` | `true` | Show Casper's boxes with [Casper's approval card](#approvals); `false` shows the generic question card |
 | `approvalDiff` | `true` | Draw the diff an edit's box carries in [Casper's approval card](#approvals); it needs `approvalCard`, and `false` shows the diff as text lines |
@@ -205,6 +206,11 @@ The server speaks MCP Streamable HTTP as `dsh-desktop`, with the app's dsh runti
 | `present` | dsh `present` | read-only, pinned |
 | `cordis_inspect_query` | dsh `cordis_inspect_query` | read-only |
 | `cordis_inspect_list` | dsh `cordis_inspect_list` | read-only |
+| `subagent` | dsh `subagent` | |
+| `send_message` | dsh `send_message` | |
+| `interrupt_agent` | dsh `interrupt_agent` | |
+| `list_agents` | dsh `list_agents` | read-only |
+| `list_subagent_models` | dsh `list_subagent_models` | read-only |
 | `list_mcp_resources` | dsh `list_mcp_resources` | read-only |
 | `list_mcp_resource_templates` | dsh `list_mcp_resource_templates` | read-only |
 | `read_mcp_resource` | dsh `read_mcp_resource` | read-only |
@@ -220,6 +226,17 @@ Every call runs through `ctx.tools.execute` with the Casper Agent as `agent`, so
 `plugin_manager` keeps its own rules: bundles the app hides are refused as `not-offered`, and each action, `install_bundle` included, asks with the app's own approval card as it does in the DeepSeek loop. `clientAsks` tells Casper that card is the gate, so Casper shows no change box of its own for this server and its automatic answers never approve an install. Under Full access the app's card no longer asks, so Casper in its `full` mode ignores `clientAsks` and asks in its own box: one box either way.
 
 `app_skill`'s description names the skills the Agent can load, starting with `cordis-plugin-development`, within 1,000 characters. A loaded skill opens with a line telling Casper to write bundles in its workspace, read the skill's files with `app_read_file`, and use the `DSH_PROFILE` and `DSH_PROFILE_DIR` it was given; in an installed app the line adds that packages there have no `lib/types` or `src` and no repository docs, so slot props and theme tokens come from `cordis_inspect_query`. `app_read_file` reads only under the folder holding the app's installed packages (the nearest `node_modules` above this package; in a source checkout, its `packages` and `docs` folders) and the profile's `node_modules`. Paths are compared with `path.relative`, and a symlink whose real path leaves the folder is refused. One call returns at most 256 KB of text in a line window; a single line longer than that is cut to its first 256 KB, the note says so, and the next window starts after it. A binary file other than SVG gets a one-line note, a folder lists at most 500 entries, and a file over 32 MB is refused.
+
+<a id="subagents"></a>
+### Subagents
+
+The five subagent tools come from the preset's `tool-subagent` and `tool-subagent-control` rows and are served while `appSubagents` is on. They are not pinned, so Casper's fixed prompt is the same size; Casper finds them through its tool search (find_capability), as it finds `cordis_inspect_query`. Turned off, the rows still mount, but the tools are not served.
+
+`subagent` starts a child of the Casper Session as it does for a Standard Session. The child is a Standard agent on the DeepSeek agent loop: it mounts the `standard` preset, since the `casper` preset has no shell or file tools, and the Casper route never takes a child, so no second `casper acp` starts. It works in the Session's folder and lists under the Casper Session as its parent. The call runs as the Casper Agent and inside its initiator boundary, so the child is attributed to the Casper Session as a Standard parent's call is, and Casper's step shows the app's subagent card. The child runs on the Session's route, which is the app's default model; `provider` and `model` in the call can name another route only as the app's model settings allow.
+
+The call returns at once. When the child finishes, the app's completion notice goes to Casper: as steering while a Casper turn runs, or as the next prompt when Casper is idle, which starts a new Casper turn. `send_message`, `interrupt_agent`, `list_agents` and `list_subagent_models` work on Casper's children as they do for a Standard parent. `wait_agent` is not served: Casper ends any MCP call after 10 minutes however much progress it sends, which would fail a longer wait and take the app tools away for the rest of the task, and the notice arrives on its own anyway.
+
+Children follow the app's own rules, as a Standard Session's children do, not Casper's list of private places. They use the app's sandbox, never ask (anything that would ask is refused), and get Auto or Full access only when the Casper Session is on it. So a child may read a place such as `~/.ssh` that Casper itself would ask about or refuse. Casper's own reads are unchanged. Casper's access mode still applies to the call itself: under Read Only Casper refuses `subagent`, `send_message` and `interrupt_agent`; under Full access Casper ignores `clientAsks` and asks in its own box, where "Yes, for this session" covers later calls, as for `plugin_manager`; Workspace Write adds no box. A child changes files outside Casper's own steps.
 
 <a id="settings-mcp-servers"></a>
 ### Settings MCP servers
@@ -268,7 +285,7 @@ The plugin sends no model request, so it has no cache effect; Casper's own reque
 - Scheduled tasks run in Casper when they have no saved preset: a task made on the Schedule page creates its Session on the default preset, which is Casper on Desktop unless Settings names another. A task made by a Standard Session's reminder tools keeps that Session's preset, and a task aimed at an existing Casper Session runs there as its next prompt. Casper Sessions have no reminder tools of their own.
 - Only Desktop on macOS and Linux has run Casper Sessions. On Windows the executable lookup is checked by unit tests only, and the app does not read the Path the installer saved, so a custom install folder outside the app's own environment is found only after the app restarts.
 - A deleted Session's sidecar record goes only at the next start, and an archived Session keeps its process until it is idle for `idleExitMs`. A Casper from before decision 91 is never closed while idle.
-- Subagent, team, and goal features do not run inside Casper Sessions.
+- Team and goal features do not run inside Casper Sessions. Casper's children are Standard agents on the app's default model, follow the app's rules rather than Casper's private places, and cannot be waited on with `wait_agent`.
 - A Casper Session's written title is made on the app's default model, which may be a DeepSeek model, not on the model Casper runs.
 
 <a id="dev-note"></a>

@@ -33,6 +33,8 @@ import { fakeCasper } from './support.ts'
 
 /** The app tools in list order, which is the order Casper takes pins in. */
 const APP_TOOLS = ['app_skill', 'plugin_manager', 'app_read_file', 'present', 'cordis_inspect_query', 'cordis_inspect_list']
+/** The app's subagent tools, listed after the app tools and never pinned. */
+const SUBAGENT_TOOLS = ['subagent', 'send_message', 'interrupt_agent', 'list_agents', 'list_subagent_models']
 /** The resource tools, listed after the app tools. */
 const RESOURCE_TOOLS = ['list_mcp_resources', 'list_mcp_resource_templates', 'read_mcp_resource']
 
@@ -359,8 +361,8 @@ describe('app tools over MCP', { timeout: 60_000 }, () => {
   })
 
   it('names each served tool after the app tool it runs', () => {
-    expect([...APP_TOOLS, ...RESOURCE_TOOLS, 'other'].map(dshNameOf))
-      .toEqual(['skill', 'plugin_manager', 'app_read_file', 'present', 'cordis_inspect_query', 'cordis_inspect_list', ...RESOURCE_TOOLS, undefined])
+    expect([...APP_TOOLS, ...SUBAGENT_TOOLS, ...RESOURCE_TOOLS, 'wait_agent', 'other'].map(dshNameOf))
+      .toEqual(['skill', 'plugin_manager', 'app_read_file', 'present', 'cordis_inspect_query', 'cordis_inspect_list', ...SUBAGENT_TOOLS, ...RESOURCE_TOOLS, undefined, undefined])
   })
 
   it('gives a call without a Casper call id a fresh id of its own, and records no step result for it', async () => {
@@ -531,5 +533,65 @@ describe('app tools over MCP', { timeout: 60_000 }, () => {
     expect(other.isError).toBe(true)
     expect(other.content[0]?.text).toBe('The app hands Casper no MCP server named acp-network. Servers: acp-docs.')
     expect(seen).toHaveLength(1)
+  })
+})
+
+describe('the app\'s subagent tools over MCP', { timeout: 60_000 }, () => {
+  /** A Host whose Agent scope has stand-ins for the subagent tools and their controls, wait_agent included. */
+  async function withSubagentTools() {
+    const booted = await host()
+    const ran: { name: string; agent: unknown; initiator: unknown }[] = []
+    for (const name of [...SUBAGENT_TOOLS, 'wait_agent']) {
+      booted.ctx.tools.register(defineTool({
+        name, description: `Stand-in ${name}.`, parameters: { agent_id: { type: 'string' } },
+        output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
+        execute: (_args, exec) => {
+          ran.push({ name, agent: exec.agent, initiator: booted.ctx.agents.currentInitiator() })
+          return Promise.resolve(`${name} ran`)
+        },
+      }))
+    }
+    return { ...booted, ran }
+  }
+
+  it('lists them after cordis_inspect_list, unpinned, with read-only hints on the two lists only, and never wait_agent', async () => {
+    const { ctx, agent } = await withSubagentTools()
+    const { tools } = await (await client(await serve(agent, ctx))).listTools()
+    expect(tools.map(tool => tool.name)).toEqual([...APP_TOOLS, ...SUBAGENT_TOOLS, ...RESOURCE_TOOLS])
+    const byName = new Map(tools.map(tool => [tool.name, tool]))
+    for (const name of SUBAGENT_TOOLS) expect(byName.get(name)?._meta).toBeUndefined()
+    const readOnly = { readOnlyHint: true }
+    expect(SUBAGENT_TOOLS.map(name => byName.get(name)?.annotations)).toEqual([undefined, undefined, undefined, readOnly, readOnly])
+    // The pins are the same four, so Casper's fixed prompt does not grow.
+    expect(tools.filter(tool => tool._meta?.['casper/pin'] === true).map(tool => tool.name)).toEqual(['app_skill', 'plugin_manager', 'app_read_file', 'present'])
+    expect(byName.get('subagent')?.description).toBe('Stand-in subagent.')
+  })
+
+  it('leaves them all out with subagents off, and serves the other tools as before', async () => {
+    const { ctx, agent, ran } = await withSubagentTools()
+    const mcp = await client(await serve(agent, ctx, { subagents: false }))
+    expect((await mcp.listTools()).tools.map(tool => tool.name)).toEqual([...APP_TOOLS, ...RESOURCE_TOOLS])
+    await expect(mcp.callTool({ name: 'subagent', arguments: {} })).rejects.toThrow(/Tool subagent not found/)
+    expect(ran).toEqual([])
+  })
+
+  it('runs each call as the Casper Agent inside the initiator boundary it is given', async () => {
+    const { ctx, agent, ran } = await withSubagentTools()
+    let boundaries = 0
+    const initiate = <T>(operation: () => T): T => {
+      boundaries += 1
+      return ctx.agents.withInitiator(agent, operation)
+    }
+    const mcp = await client(await serve(agent, ctx, { initiate }))
+    for (const name of SUBAGENT_TOOLS) {
+      const result = await mcp.callTool({ name, arguments: { agent_id: 'child' } })
+      expect(result).toEqual({ content: [{ type: 'text', text: `${name} ran` }], isError: false })
+    }
+    expect(ran).toEqual(SUBAGENT_TOOLS.map(name => ({ name, agent, initiator: agent })))
+    expect(boundaries).toBe(SUBAGENT_TOOLS.length)
+    // Without a boundary the call still runs as the Agent, with no initiator of its own.
+    const bare = await client(await serve(agent, ctx))
+    await bare.callTool({ name: 'list_agents', arguments: {} })
+    expect(ran.at(-1)).toEqual({ name: 'list_agents', agent, initiator: undefined })
   })
 })

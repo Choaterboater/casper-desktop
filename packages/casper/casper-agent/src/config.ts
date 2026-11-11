@@ -37,6 +37,12 @@ export interface Config {
    */
   appTools: boolean
   /**
+   * Serve Casper the app's subagent tools with the app tools: `subagent` starts a Standard agent as a child of the
+   * Casper Session, and `send_message`, `interrupt_agent`, `list_agents` and `list_subagent_models` control it; false
+   * leaves them out. Needs appTools.
+   */
+  appSubagents: boolean
+  /**
    * The app's permission presets and the Casper access mode each sets: `read`, `ask`, or `full`. A preset the
    * table does not list, the derived `custom`, and Auto set `ask`; a read-only sandbox always sets `read`.
    */
@@ -81,6 +87,7 @@ export const Config: z<Config> = z.object({
   killGraceMs: z.natural().min(1).default(5_000),
   stderrTailBytes: z.natural().min(1).default(4_096),
   appTools: z.boolean().default(true),
+  appSubagents: z.boolean().default(true),
   accessModes: z.dict(z.union(ACCESS_MODE_IDS as AccessModeId[])).default({ ...DEFAULT_ACCESS_MODES }),
   approvalCard: z.boolean().default(true),
   approvalDiff: z.boolean().default(true),
