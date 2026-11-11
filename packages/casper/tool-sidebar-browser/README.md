@@ -15,6 +15,7 @@ These tools let the agent see and drive the browser tabs beside a conversation i
 - [Understand the implementation](#understand-the-implementation)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
 
 -----
 
@@ -100,3 +101,13 @@ Append-only: results follow the latest step.
 - **Session on screen** — the Client service controls a tab only while its Session's Sidebar is mounted; a call for a conversation the user is not viewing returns `unavailable`.
 - **Grant revocation** — the user cannot withdraw a site grant during a conversation. A grant whose first input failed, or that was used only from code mode, is not logged and lasts until the plugin restarts.
 - **No click by element** — elements are addressed by coordinates; there is no command that targets an element reference, and frames and shadow DOM are not read.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

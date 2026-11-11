@@ -15,6 +15,7 @@ After a top-level turn changes files, this plugin runs the project's own checks,
 - [Understand the implementation](#understand-the-implementation)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
 
 -----
 
@@ -128,3 +129,15 @@ Append-only: steering is appended after the latest step.
 - **Subagent edits** — project checks follow the top-level agent's own mutation calls; files changed only by a subagent bring no project checks to the parent's turn.
 - **Narrower CLI behaviour** — named checks (`verify.checks.<name>`), declared scopes and reuse by fingerprint, changed-test selection, proof that a test fails without the change, app smoke and page checks, keeping app data, the `check` script fallback, Python `unittest` and build detection, and output/database-only skips are not rebuilt.
 - **Project-file guard** — the prompt tells the model not to weaken the checks; nothing yet stops an edit to `.casper/project.yaml` or the scripts it names.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+This Dev Note is working context for maintainers: open questions and undecided directions. It is explicitly non-authoritative — shipped behavior and limits live in the sections above and in the package code.
+
+- **Removal** — this package stays until Casper Sessions are proven live; after that it can be removed from the Standard preset.
+
+</details>
