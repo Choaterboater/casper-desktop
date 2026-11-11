@@ -61,7 +61,7 @@ import { ACCESS_RECORD } from './access-record.ts'
 import type { CasperOwnAccess } from './access-record.ts'
 import { appReadRoots, isInstalled, selfAnchor } from './app-read.ts'
 import { matchChildRoute, routedOptions } from './child-route.ts'
-import { startAppTools } from './app-tools.ts'
+import { clientRows, rowEntry, startAppTools } from './app-tools.ts'
 import type { AppToolsProfile, AppToolsServer } from './app-tools.ts'
 import { casperCommandId, casperCommands } from './commands.ts'
 import type { CasperCommand, CasperCommandCache } from './commands.ts'
@@ -1014,6 +1014,8 @@ export class CasperAgent implements Agent {
       callId: acpId => connection.toolCallId(acpId),
       record: (acpId, call) => { this.sinkFor(connection)?.writer.bridged(acpId, call) },
       resourceServers: () => connection.forwardedNames,
+      // Empty while forwardMcpClientRows is off, since no row is handed over then.
+      rows: () => connection.forwardedRows,
       subagents: this.config.appSubagents,
       goals: this.config.appGoals,
       teams: this.config.appTeams,
@@ -1028,18 +1030,27 @@ export class CasperAgent implements Agent {
 
   /**
    * The builder of the Settings servers, then the plugin-registered ones unless `forwardPluginMcpServers` is off,
-   * handed to Casper, when forwarding is on and the app has an MCP manager. Each build reads both again, so a plugin
-   * that loads or unloads reaches Casper at the next turn. A server left out is logged with its reason, never with a value.
+   * then the app's own MCP client rows unless `forwardMcpClientRows` is off, handed to Casper, when forwarding is on
+   * and the app has an MCP manager. Each build reads them all again, so a plugin that loads or unloads, or a row whose
+   * tools appear or change, reaches Casper at the next turn. A row goes only through the connection's app tools server,
+   * and never one the manager owns. A server left out is logged with its reason, never with a value.
    * @returns the builder, or undefined when nothing is forwarded.
    */
-  private forwarder(): ((signal: AbortSignal) => Promise<ForwardedServers>) | undefined {
+  private forwarder(): ((signal: AbortSignal, appTools: AppToolsServer | undefined) => Promise<ForwardedServers>) | undefined {
     const manager = this.pluginCtx.get('mcpManager')
     if (!this.config.forwardMcpServers || manager === undefined) return undefined
-    return (signal) => {
+    return (signal, appTools) => {
       const credentials = this.pluginCtx.get('credentials')
+      const entries = manager.config.servers.get()
+      const registered = manager.registeredEntries()
+      const owned = new Set([...Object.keys(entries), ...Object.keys(registered)])
+      const rows = appTools === undefined || !this.config.forwardMcpClientRows
+        ? []
+        : clientRows(this.pluginCtx.tools, this, owned).map(row => ({ ...row, entry: rowEntry(appTools, row.name) }))
       return forwardedServers({
-        entries: manager.config.servers.get(),
-        registered: this.config.forwardPluginMcpServers ? manager.registeredEntries() : {},
+        entries,
+        registered: this.config.forwardPluginMcpServers ? registered : {},
+        rows,
         // Without a credentials provider, a server that names a credential is left out as not set.
         credential: ref => credentials === undefined
           ? Promise.resolve(undefined)
@@ -1065,7 +1076,7 @@ export class CasperAgent implements Agent {
     if (live === undefined || live.dead || live.forwardedDigest === undefined || build === undefined) return
     let rebuilt: ForwardedServers
     try {
-      rebuilt = await build(signal)
+      rebuilt = await build(signal, live.appToolsServer)
     } catch (error: unknown) {
       signal.throwIfAborted()
       /* v8 ignore next 2 -- the builder turns each server's failure into a skip; only reading the entries can throw. */

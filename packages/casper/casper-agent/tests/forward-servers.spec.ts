@@ -1,12 +1,12 @@
 /**
- * The Settings > MCP servers and plugin-registered servers the app hands Casper: which go, how their credentials
- * resolve, and why one is left out.
+ * The Settings > MCP servers, plugin-registered servers and the app's own MCP client rows the app hands Casper:
+ * which go, how their credentials resolve, and why one is left out.
  */
 
 import { describe, expect, it } from 'vitest'
 import { SubprocessExecutableNotFoundError } from '@deepseek-ai/dsh-subprocess'
 import { CWD_META, forwardedServers, MAX_FORWARDED, SKIP } from '../src/forward-servers.ts'
-import type { ForwardEntry, ForwardOptions } from '../src/forward-servers.ts'
+import type { ForwardEntry, ForwardOptions, ForwardRow } from '../src/forward-servers.ts'
 
 /** A stdio entry with the manager's defaults. */
 function stdio(fields: Partial<ForwardEntry> = {}): ForwardEntry {
@@ -191,5 +191,46 @@ describe('forwardedServers with plugin-registered servers', () => {
   it('a registered server named only with digits still follows every Settings server', async () => {
     const { names } = await build({ zeta: stdio(), alpha: stdio() }, { registered: { 7: stdio(), plug: stdio() } })
     expect(names).toEqual(['zeta', 'alpha', '7', 'plug'])
+  })
+})
+
+describe('forwardedServers with the app\'s own MCP client rows', () => {
+  /** A row served at the app tools server's own endpoint for it. */
+  const row = (name: string, tools: readonly string[] = ['find_tool', 'access_check']): ForwardRow => ({
+    name,
+    entry: { type: 'http', name, url: `http://127.0.0.1:1/mcp/path/${name}`, headers: [{ name: 'Authorization', value: 'Bearer app-token' }] },
+    tools,
+  })
+
+  it('rows follow the Settings and registered servers, take no credential, and say which they are', async () => {
+    const { entries, names, rows, skipped, secrets } = await build({ set0: stdio() }, { registered: { plug: stdio() }, rows: [row('network')] })
+    expect(skipped).toEqual([])
+    expect(names).toEqual(['set0', 'plug', 'network'])
+    expect(rows).toEqual(['network'])
+    expect(entries[2]).toEqual(row('network').entry)
+    // The row entry carries no casper/clientAsks, so Casper asks before its changes in its own box.
+    expect(JSON.stringify(entries[2])).not.toContain('casper/clientAsks')
+    expect(secrets).toEqual([])
+  })
+
+  it('the 7-place cap takes Settings, then plugins, then rows, and a row named app or one Casper refuses is left out', async () => {
+    const settings = Object.fromEntries(Array.from({ length: MAX_FORWARDED - 2 }, (_, at) => [`set${at}`, stdio()]))
+    const { names, rows, skipped } = await build(settings, {
+      registered: { plug: stdio() },
+      rows: [row('app'), row('bad name'), row('network'), row('later')],
+    })
+    expect(names).toEqual([...Object.keys(settings), 'plug', 'network'])
+    expect(rows).toEqual(['network'])
+    expect(skipped).toEqual([['app', SKIP.appName], ['bad name', 'a name Casper does not take'], ['later', SKIP.tooMany]])
+  })
+
+  it('the digest changes when a row appears or its tool set changes, and not with the order its tools are listed in', async () => {
+    const without = await build({ set0: stdio() })
+    const first = await build({ set0: stdio() }, { rows: [row('network', ['find_tool', 'access_check'])] })
+    const reordered = await build({ set0: stdio() }, { rows: [row('network', ['access_check', 'find_tool'])] })
+    const grown = await build({ set0: stdio() }, { rows: [row('network', ['find_tool', 'access_check', 'invoke_tool'])] })
+    expect(first.digest).not.toBe(without.digest)
+    expect(reordered.digest).toBe(first.digest)
+    expect(grown.digest).not.toBe(first.digest)
   })
 })

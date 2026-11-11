@@ -17,11 +17,14 @@ import type { SkillSummary } from '@deepseek-ai/dsh-skill'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { ToolBatchInput, ToolExecution } from '@deepseek-ai/dsh-tools'
 import {
+  ACCESS_CHECK,
   appToolsEntry,
+  clientRows,
   DESCRIPTION_MAX,
   dshNameOf,
   GOAL_RULES,
   INSTALLED_NOTE,
+  isConnectCheck,
   MAX_REPLY_BYTES,
   mcpContent,
   NO_RESOURCES,
@@ -29,6 +32,8 @@ import {
   PICTURE_UNREADABLE,
   PLUGIN_SKILL,
   PROGRESS_INTERVAL_MS,
+  rowEntry,
+  rowResult,
   servedAnnotations,
   skillDescription,
   startAppTools,
@@ -144,11 +149,12 @@ async function serve(agent: Agent, ctx: Awaited<ReturnType<typeof host>>['ctx'],
   return server
 }
 
-/** An MCP 1.x client, as Casper uses, connected with the server's bearer header. */
-async function client(server: AppToolsServer): Promise<Client> {
+/** An MCP 1.x client, as Casper uses, connected with the server's bearer header, to the server or one row's endpoint. */
+async function client(server: AppToolsServer, row?: string): Promise<Client> {
   const connected = new Client({ name: 'casper-test', version: '0.0.0' })
   const headers = { Authorization: `Bearer ${server.token}` }
-  await connected.connect(new StreamableHTTPClientTransport(new URL(server.url), { requestInit: { headers } }) as Transport)
+  const url = new URL(row === undefined ? server.url : `${server.url}/${row}`)
+  await connected.connect(new StreamableHTTPClientTransport(url, { requestInit: { headers } }) as Transport)
   cleanups.push(() => connected.close())
   return connected
 }
@@ -178,6 +184,8 @@ describe('app tools listener', { timeout: 60_000 }, () => {
     expect(await post(server.url, auth)).toBe(200)
     expect(await post(`${url.origin}/mcp/other`, auth)).toBe(404)
     expect(await post(`${url.origin}/mcp`, auth)).toBe(404)
+    // A server handed no rows finds no path below its own.
+    expect(await post(`${server.url}/network`, auth)).toBe(404)
     expect(await post(server.url, { ...auth, host: `localhost:${url.port}` })).toBe(403)
     expect(await post(server.url, { ...auth, host: 'attacker.example' })).toBe(403)
     expect(await post(server.url, { ...auth, origin: `http://127.0.0.1:${url.port}` })).toBe(403)
@@ -246,6 +254,7 @@ describe('app tools over MCP', { timeout: 60_000 }, () => {
     }
     const withOrigins: AppToolsOptions['tools'] = {
       schemas: scope => ctx.tools.schemas(scope),
+      definitions: scope => ctx.tools.definitions(scope),
       execute: input => ctx.tools.execute(input),
       resolve: input => ctx.tools.resolve(input),
       get: (name, scope) => {
@@ -344,6 +353,7 @@ describe('app tools over MCP', { timeout: 60_000 }, () => {
       schemas: scope => ctx.tools.schemas(scope).filter(schema => schema.name !== 'plugin_manager'),
       execute: input => ctx.tools.execute(input),
       resolve: input => ctx.tools.resolve(input),
+      definitions: scope => ctx.tools.definitions(scope),
       get: (name, scope) => ctx.tools.get(name, scope),
     }
     const mcp = await client(await serve(agent, ctx, { tools: hidden }))
@@ -461,6 +471,7 @@ describe('app tools over MCP', { timeout: 60_000 }, () => {
       schemas: scope => ctx.tools.schemas(scope),
       execute: () => Promise.reject(new Error('executor unloaded')),
       resolve: input => ctx.tools.resolve(input),
+      definitions: scope => ctx.tools.definitions(scope),
       get: (name, scope) => ctx.tools.get(name, scope),
     }
     const mcp = await client(await serve(agent, ctx, { tools: failing }))
@@ -771,6 +782,7 @@ describe('pictures in an app tool result', { timeout: 60_000 }, () => {
       schemas: scope => ctx.tools.schemas(scope),
       get: (name, scope) => ctx.tools.get(name, scope),
       resolve: input => ctx.tools.resolve(input),
+      definitions: scope => ctx.tools.definitions(scope),
       execute: input => Promise.resolve({
         results: input.calls.map(call => ({
           callId: call.id,
@@ -905,5 +917,213 @@ describe('pictures in an app tool result', { timeout: 60_000 }, () => {
     const { ctx, agent } = await host()
     const { tools } = await (await client(await serve(agent, ctx, { attachments }))).listTools()
     expect(tools.filter(tool => tool._meta?.['casper/pin'] === true).map(tool => tool.name)).toEqual(['app_skill', 'plugin_manager', 'app_read_file', 'present'])
+  })
+})
+
+describe('the app\'s own MCP client rows over MCP', { timeout: 60_000 }, () => {
+  /** A 1x1 PNG, base64. */
+  const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+
+  /** One MCP result as a server sends it. */
+  type Raw = { content: Record<string, unknown>[]; structuredContent?: Record<string, unknown>; isError?: boolean }
+
+  /**
+   * A Host whose tool registry holds the `network` row's tools as the MCP client registers them, plus one tool of the
+   * `docs` server, which another endpoint serves. Every call the registry runs is recorded.
+   */
+  async function rowHost() {
+    const base = await host()
+    const { ctx } = base
+    const calls: { name: string; args: unknown; agent: unknown; aborted: boolean }[] = []
+    type Fields = Record<string, unknown>
+    const register = (server: string, rawName: string, annotations: Fields, inputSchema: Fields, answer: (args: Fields) => Raw) => {
+      ctx.tools.register(createMcpToolDefinition(ctx, {
+        name: `mcp__${server}__${rawName}`, rawName, description: `The ${rawName} tool of ${server}.`, inputSchema: { type: 'object', ...inputSchema },
+        server, annotations,
+        call: args => Promise.resolve(answer(args)),
+      }))
+    }
+    register('network', 'find_tool', { readOnlyHint: true, openWorldHint: true }, { properties: { query: { type: 'string' } }, required: ['query'] }, args => ({
+      content: [{ type: 'text', text: `found ${String(args.query)}` }], structuredContent: { tools: ['list_sites'] },
+    }))
+    register('network', ACCESS_CHECK, { readOnlyHint: true, destructiveHint: false }, {}, () => ({
+      content: [{ type: 'text', text: '{"products":[]}' }],
+    }))
+    register('network', 'invoke_tool', { destructiveHint: true }, { properties: { name: { type: 'string' } } }, () => ({
+      content: [{ type: 'text', text: 'writes are off' }], isError: true,
+    }))
+    register('network', 'snapshot', { readOnlyHint: true }, {}, () => ({
+      content: [{ type: 'text', text: 'before' }, { type: 'image', data: PNG, mimeType: 'image/png' }, { type: 'text', text: 'after' }],
+    }))
+    register('docs', 'search', {}, {}, () => ({ content: [{ type: 'text', text: 'docs' }] }))
+    const tools: AppToolsOptions['tools'] = {
+      schemas: scope => ctx.tools.schemas(scope),
+      definitions: scope => ctx.tools.definitions(scope),
+      get: (name, scope) => ctx.tools.get(name, scope),
+      resolve: input => ctx.tools.resolve(input),
+      execute: (input) => {
+        for (const call of input.calls) {
+          calls.push({ name: call.name, args: JSON.parse(call.arguments), agent: input.agent, aborted: input.signal.aborted })
+        }
+        return ctx.tools.execute(input)
+      },
+    }
+    return { ...base, tools, calls }
+  }
+
+  it('serves a row only at its own path while the row is handed over, with the same Host, Origin and token checks', async () => {
+    const { ctx, agent, tools } = await rowHost()
+    let rows: string[] = ['network']
+    const server = await serve(agent, ctx, { tools, rows: () => rows })
+    const url = new URL(server.url)
+    const auth = { authorization: `Bearer ${server.token}` }
+    expect(await post(`${server.url}/network`, auth)).toBe(200)
+    expect(await post(`${server.url}/docs`, auth)).toBe(404)
+    expect(await post(`${server.url}/network/more`, auth)).toBe(404)
+    expect(await post(`${server.url}/`, auth)).toBe(404)
+    expect(await post(`${url.origin}/mcp/other/network`, auth)).toBe(404)
+    expect(await post(`${server.url}/network`, { ...auth, host: `localhost:${url.port}` })).toBe(403)
+    expect(await post(`${server.url}/network`, { ...auth, origin: `http://127.0.0.1:${url.port}` })).toBe(403)
+    expect(await post(`${server.url}/network`, {})).toBe(401)
+    expect(await post(`${server.url}/network`, { authorization: `Bearer ${server.token}x` })).toBe(401)
+    // The list is read at each request: a row no longer handed over is not found.
+    rows = []
+    expect(await post(`${server.url}/network`, auth)).toBe(404)
+    expect(await post(server.url, auth)).toBe(200)
+  })
+
+  it('lists only the row\'s tools under their raw names, with the server\'s own hints and descriptions, never pinned', async () => {
+    const { ctx, agent, tools } = await rowHost()
+    const server = await serve(agent, ctx, { tools, rows: () => ['network'] })
+    const mcp = await client(server, 'network')
+    const listed = (await mcp.listTools()).tools
+    expect(listed.map(tool => tool.name)).toEqual(['find_tool', ACCESS_CHECK, 'invoke_tool', 'snapshot'])
+    const byName = new Map(listed.map(tool => [tool.name, tool]))
+    expect(byName.get('find_tool')?.annotations).toEqual({ readOnlyHint: true, openWorldHint: true })
+    expect(byName.get(ACCESS_CHECK)?.annotations).toEqual({ readOnlyHint: true, destructiveHint: false })
+    expect(byName.get('invoke_tool')?.annotations).toEqual({ destructiveHint: true })
+    expect(byName.get('find_tool')?.description).toBe('The find_tool tool of network.')
+    expect(byName.get('find_tool')?.inputSchema).toMatchObject({ type: 'object', required: ['query'], properties: { query: { type: 'string' } } })
+    for (const tool of listed) expect(tool._meta).toBeUndefined()
+    expect(mcp.getServerVersion()).toEqual({ name: 'dsh-desktop/network', version: APP_VERSION })
+    // A tool with no hints from its server is listed with none.
+    const docs = await client(await serve(agent, ctx, { tools, rows: () => ['docs'] }), 'docs')
+    expect((await docs.listTools()).tools.map(tool => [tool.name, tool.annotations])).toEqual([['search', undefined]])
+    // The app's own server keeps its tools and its four pins.
+    const own = (await (await client(server)).listTools()).tools
+    expect(own.some(tool => tool.name === 'find_tool' || tool.name.startsWith('mcp__'))).toBe(false)
+    expect(own.filter(tool => tool._meta?.['casper/pin'] === true).map(tool => tool.name)).toEqual(['app_skill', 'plugin_manager', 'app_read_file', 'present'])
+  })
+
+  it('runs a call through the app\'s tools as the Casper Agent and answers with the server\'s own result, never recording it', async () => {
+    const { ctx, agent, tools, calls } = await rowHost()
+    const record = vi.fn()
+    const mcp = await client(await serve(agent, ctx, { tools, record, rows: () => ['network'] }), 'network')
+    const found = await mcp.callTool({ name: 'find_tool', arguments: { query: 'sites' }, _meta: { 'casper/acpToolCallId': 'casper-tool-1' } })
+    expect(found).toEqual({ content: [{ type: 'text', text: 'found sites' }], structuredContent: { tools: ['list_sites'] } })
+    expect(calls).toEqual([{ name: 'mcp__network__find_tool', args: { query: 'sites' }, agent, aborted: false }])
+    expect(record).not.toHaveBeenCalled()
+    // A failed call goes as the app's own failure text.
+    expect(await mcp.callTool({ name: 'invoke_tool', arguments: { name: 'x' } })).toEqual({
+      content: [{ type: 'text', text: 'Error: writes are off' }], isError: true,
+    })
+  })
+
+  it('sends the server\'s own pictures in their place, and a note for each with images off', async () => {
+    const { ctx, agent, tools } = await rowHost()
+    const on = await client(await serve(agent, ctx, { tools, rows: () => ['network'] }), 'network')
+    expect(await on.callTool({ name: 'snapshot', arguments: {} })).toEqual({
+      content: [{ type: 'text', text: 'before' }, { type: 'image', data: PNG, mimeType: 'image/png' }, { type: 'text', text: 'after' }],
+    })
+    const off = await client(await serve(agent, ctx, { tools, rows: () => ['network'], images: false }), 'network')
+    expect(await off.callTool({ name: 'snapshot', arguments: {} })).toEqual({
+      content: [{ type: 'text', text: 'before' }, { type: 'text', text: '[image result not sent]' }, { type: 'text', text: 'after' }],
+    })
+  })
+
+  it('outside a turn only the connect check runs; every other call is refused as the turn being over', async () => {
+    const { ctx, agent, tools, calls } = await rowHost()
+    const mcp = await client(await serve(agent, ctx, { tools, rows: () => ['network'], turn: () => undefined }), 'network')
+    expect(await mcp.callTool({ name: ACCESS_CHECK, arguments: {} })).toEqual({ content: [{ type: 'text', text: '{"products":[]}' }] })
+    for (const name of ['find_tool', 'invoke_tool', 'snapshot']) {
+      expect(await mcp.callTool({ name, arguments: name === 'find_tool' ? { query: 'x' } : {} })).toEqual({ content: [{ type: 'text', text: TURN_OVER }], isError: true })
+    }
+    expect(calls.map(call => call.name)).toEqual([`mcp__network__${ACCESS_CHECK}`])
+    const ended = new AbortController()
+    ended.abort()
+    const over = await client(await serve(agent, ctx, { tools, rows: () => ['network'], turn: () => ended.signal }), 'network')
+    expect(await over.callTool({ name: 'find_tool', arguments: { query: 'x' } })).toEqual({ content: [{ type: 'text', text: TURN_OVER }], isError: true })
+  })
+
+  it('answers with the app\'s own content for a value that is not an MCP result, and a failure in the app as an error', async () => {
+    const { ctx, agent, tools } = await rowHost()
+    const picture: ContentBlock = {
+      type: 'image', attachment: { attachmentId: AttachmentId(`sha256:${'a'.repeat(64)}`), mediaType: 'image/png', bytes: 68, width: 1, height: 1 },
+    }
+    const plain: AppToolsOptions['tools'] = {
+      ...tools,
+      execute: input => Promise.resolve({
+        results: input.calls.map(call => ({ callId: call.id, result: { isError: false, value: 'plain', content: [{ type: 'text', text: 'plain' }, picture] } })),
+        additionalContexts: [createUserMessage({ content: [{ type: 'text', text: 'wrap up' }], source: { kind: 'user' } })],
+        concluded: false,
+      }),
+    }
+    const on = await client(await serve(agent, ctx, { tools: plain, rows: () => ['network'] }), 'network')
+    expect(await on.callTool({ name: 'snapshot', arguments: {} })).toEqual({
+      content: [{ type: 'text', text: 'plain' }, { type: 'text', text: PICTURE_UNREADABLE }, { type: 'text', text: 'wrap up' }],
+    })
+    const off = await client(await serve(agent, ctx, { tools: plain, rows: () => ['network'], images: false }), 'network')
+    expect(await off.callTool({ name: 'snapshot', arguments: {} })).toEqual({
+      content: [{ type: 'text', text: 'plain' }, { type: 'text', text: '[image result not sent]' }, { type: 'text', text: 'wrap up' }],
+    })
+    const failing: AppToolsOptions['tools'] = { ...tools, execute: () => Promise.reject(new Error('registry closed')) }
+    const failed = await client(await serve(agent, ctx, { tools: failing, rows: () => ['network'] }), 'network')
+    expect(await failed.callTool({ name: 'snapshot', arguments: {} })).toEqual({
+      content: [{ type: 'text', text: 'mcp__network__snapshot failed in the app: Error: registry closed' }], isError: true,
+    })
+  })
+
+  it('isConnectCheck is Casper\'s own rule: access_check, read-only, not destructive, no required arguments', () => {
+    const origin: McpToolOrigin = { server: 'network', rawName: ACCESS_CHECK, annotations: { readOnlyHint: true } }
+    expect(isConnectCheck(origin, { type: 'object' })).toBe(true)
+    expect(isConnectCheck(origin, undefined)).toBe(true)
+    expect(isConnectCheck(origin, { type: 'object', required: [] })).toBe(true)
+    expect(isConnectCheck(origin, { type: 'object', required: ['product'] })).toBe(false)
+    expect(isConnectCheck({ ...origin, rawName: 'find_tool' }, {})).toBe(false)
+    expect(isConnectCheck({ ...origin, annotations: {} }, {})).toBe(false)
+    expect(isConnectCheck({ ...origin, annotations: { readOnlyHint: true, destructiveHint: true } }, {})).toBe(false)
+  })
+
+  it('rowResult keeps the other blocks and structured content first, then pictures while they fit in 7 MiB', () => {
+    const image = { type: 'image', data: PNG, mimeType: 'image/png' }
+    expect(rowResult({ content: [image], structuredContent: { a: 1 } }, true)).toEqual({ content: [image], structuredContent: { a: 1 } })
+    // Text that leaves less room than the picture needs sends the note in its place.
+    const text: ContentBlock = { type: 'text', text: 'x'.repeat(MAX_REPLY_BYTES - PNG.length) }
+    expect(rowResult({ content: [image, text] }, true)?.content).toEqual([{ type: 'text', text: PICTURE_OVER_BUDGET }, text])
+    // Pictures go in order while they fit.
+    const room: ContentBlock = { type: 'text', text: 'x'.repeat(MAX_REPLY_BYTES - PNG.length - 100) }
+    expect(rowResult({ content: [image, image, room] }, true)?.content).toEqual([image, { type: 'text', text: PICTURE_OVER_BUDGET }, room])
+    // Context the app adds after the result goes last and counts first.
+    expect(rowResult({ content: [image] }, true, [text])?.content).toEqual([{ type: 'text', text: PICTURE_OVER_BUDGET }, text])
+    expect(rowResult({ content: [image] }, false)?.content).toEqual([{ type: 'text', text: '[image result not sent]' }])
+    expect(rowResult('not a result', true)).toBeUndefined()
+  })
+
+  it('clientRows names each server the tools came from, in order, except the app and the manager\'s own servers', async () => {
+    const { ctx, agent, tools } = await rowHost()
+    ctx.tools.register(createMcpToolDefinition(ctx, {
+      name: 'mcp__app__x', rawName: 'x', description: '', inputSchema: { type: 'object' }, server: 'app', call: () => Promise.resolve({ content: [] }),
+    }))
+    expect(clientRows(tools, agent, new Set())).toEqual([
+      { name: 'network', tools: ['find_tool', ACCESS_CHECK, 'invoke_tool', 'snapshot'] },
+      { name: 'docs', tools: ['search'] },
+    ])
+    expect(clientRows(tools, agent, new Set(['docs']))).toEqual([{ name: 'network', tools: ['find_tool', ACCESS_CHECK, 'invoke_tool', 'snapshot'] }])
+  })
+
+  it('rowEntry is the row\'s own endpoint with the bearer header and no casper/clientAsks', () => {
+    expect(rowEntry({ url: 'http://127.0.0.1:1/mcp/path', token: 'tok' }, 'network')).toEqual({
+      type: 'http', name: 'network', url: 'http://127.0.0.1:1/mcp/path/network', headers: [{ name: 'Authorization', value: 'Bearer tok' }],
+    })
   })
 })

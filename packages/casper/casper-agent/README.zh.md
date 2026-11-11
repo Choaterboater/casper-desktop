@@ -52,6 +52,7 @@ kind: "package-reference"
 | `approvalDiff` | `true` | 在 [Casper 的审批卡片](#approvals)中绘制编辑的审批框所带的差异；需要 `approvalCard`，`false` 时以文本行显示差异 |
 | `forwardMcpServers` | `true` | 把已启用的[「设置 > MCP 服务器」](#settings-mcp-servers)交给 Casper；`false` 时只发送应用工具服务器 |
 | `forwardPluginMcpServers` | `true` | 同时把[插件向 MCP 管理器注册的服务器](#settings-mcp-servers)交给 Casper，排在设置中的服务器之后，并共用同样的 7 个名额；需要 `forwardMcpServers`，`false` 时不交给 Casper |
+| `forwardMcpClientRows` | `true` | 同时通过应用工具服务器把应用自己的 [MCP 客户端条目](#settings-mcp-servers)（例如内置的 network 服务器）交给 Casper，排在插件注册的服务器之后，并共用同样的 7 个名额；需要 `forwardMcpServers` 和 `appTools`，`false` 时不交给 Casper |
 | `modePill` | `true` | 把 [Casper 自己选择的访问模式](#access-control)作为一个标签显示在权限控件旁边；`false` 时不记录，并清除已显示的标签 |
 | `liveOutput` | `true` | 在 Casper 命令运行时，于[后台任务面板](#jobs-panel)中显示其最新的几行；在该任务上点停止会停止整个请求。`false` 时命令只在其卡片中显示最终输出 |
 | `idleExitMs` | `900000` | 空闲多久后询问 Casper 能否[关闭](#process-lifetime-and-resume)其进程（15 分钟）；`0` 时保留进程直到会话关闭 |
@@ -301,11 +302,15 @@ Casper 会话的模型菜单与标准会话一样显示应用的**启用智能�
 
 当 Casper 的 `initialize` 回复把 `mcpCapabilities.http` 设为 true 时（除非 Casper 的 `acp_mcp` 为 off，否则都会如此），每个进程还会在应用工具服务器之后获得「设置 > MCP 服务器」中已启用的服务器（`ctx.mcpManager` 配置的条目），按设置中的顺序最多 7 个。Casper 在该会话中以 `acp-<name>` 连接它们，并在它们做出每项更改前用自己的框询问：这些条目从不带 `casper/clientAsks`。命令不是绝对路径的 stdio 服务器会像应用启动它时那样查找命令，其 `env` 变为 ACP 的列表，设置了的 `cwd` 作为 `_meta["casper/cwd"]` 发送；streamable-http 服务器以 `type: "http"` 及其请求头发送。
 
-插件向 MCP 管理器注册的服务器（`ctx.mcpManager.registeredEntries()`）排在其后，按注册顺序，并共用同样的 7 个名额：设置中的服务器先占名额，第七个之后的服务器会被略过，日志中留下与其他服务器相同的一行 `at most 7 servers are forwarded`。因其他原因被略过的服务器会把名额让给下一个。插件注册的服务器遵守下面的全部规则；插件加载或卸载时，与设置中的更改一样，会在下一轮到达 Casper。内置的 network 服务器是自成一行的 MCP 客户端条目，不是注册的服务器，因此不在其中。
+插件向 MCP 管理器注册的服务器（`ctx.mcpManager.registeredEntries()`）排在其后，按注册顺序，并共用同样的 7 个名额：设置中的服务器先占名额，第七个之后的服务器会被略过，日志中留下与其他服务器相同的一行 `at most 7 servers are forwarded`。因其他原因被略过的服务器会把名额让给下一个。插件注册的服务器遵守下面的全部规则；插件加载或卸载时，与设置中的更改一样，会在下一轮到达 Casper。内置的 network 服务器是自成一行的 MCP 客户端条目，不是注册的服务器，因此排在它们之后。
+
+应用自己的 MCP 客户端条目排在最后，共用同样的 7 个名额。客户端条目是应用配置直接用 `@deepseek-ai/dsh-mcp-client` 挂载的服务器（例如内置的 network 服务器），而不是 MCP 管理器管理的服务器。Casper 不会为条目另起一个副本：它得到的是应用工具服务器为该条目提供的端点 `<url>/<row>`，使用同一个令牌，并做同样的 Host 与 Origin 检查；服务器路径下的其他路径一律找不到。该端点用服务器自己的名称列出该条目的工具，带有服务器自己的描述、参数结构和提示（只读、破坏性、幂等、开放世界）。这些工具都不固定，因此应用的四个固定工具和 Casper 的固定提示词都不变。每次调用都以 Casper Agent 的身份通过 `ctx.tools.execute` 运行，使用应用自己与该服务器的连接及其登录，并返回服务器自己的结果：文本、结构化内容和图片都与服务器发送的相同，由 Casper 自己缩小图片。7 MiB 的额度和 `appToolImages` 与应用工具相同：在结果其余部分之后放不下的图片变成超出额度的说明；`appToolImages` 关闭时，每张图片都变成 `[image result not sent]`。失败的调用返回应用的错误文本。该条目不带 `casper/clientAsks`，因此条目做出更改前，Casper 会在自己的确认框中询问。只有在 Casper 轮次运行期间才接受调用，只有一个例外：Casper 连接时、在任何提示之前会自行调用一次 `access_check`；当服务器把它标为只读且非破坏性、且它不需要参数时，它可以在轮次之外运行，这正是 Casper 自己对这次调用的规则。之后才出现工具的条目（例如其命令安装好以后），或工具列表有变化的条目，会在下一轮通过与设置更改相同的重新打开到达 Casper。
+
+内置的 network 服务器以只读方式运行；Casper 对它的调用会在 MCP 客户端默认的 60 秒后停止，这是应用对该条目的限制，而 Casper 给自己的 network 服务器 300 秒。早于「跳过与自身重复的应用服务器」这一更改的 Casper 会同时显示两个服务器：它自己的 `network` 和应用的 `acp-network`。
 
 凭据（`${credential:NAME}`）通过 `ctx.credentials` 解析，其值在 ACP 请求中发送，从不出现在 argv、env、日志或会话事件中；Casper 会在其显示的内容中隐藏每个这样的值及其 URL 编码形式。凭据只能是整个 env 或请求头的值，或者跟在 `Bearer`、`Basic`、`Token`、`Bot` 或 `ApiKey` 和一个空格之后。以下情况下服务器会被略过，并在应用日志中留下一行，写明其名称和固定原因但不含任何值：已停用、名为 `app`、命令、args、cwd 或 url 中带有凭据或凭据位于更长的值中、设置了 `PATH`、`NODE_OPTIONS`、`LD_*` 或 `DYLD_*`、设置了由连接自己管理的请求头（`Host`、`Content-*`、`Connection`、`Transfer-Encoding`、`Mcp-*`、`Cookie`、`Origin`）、cwd 为相对路径、引用的凭据未设置或无法读取、命令找不到，或 5 秒内未准备好。
 
-共有四个关闭开关：设置中服务器自己的开关、本插件的 `forwardMcpServers: false`（同时略过插件注册的服务器）、只针对插件注册服务器的 `forwardPluginMcpServers: false`，以及 Casper 的 `acp_mcp: off`。设置中的更改、插件的加载或卸载，或凭据的变化会在下一轮到达 Casper：在发送提示之前会重新构建列表，若与之前不同（以保存在内存中的 SHA-256 比较），进程会被关闭，该轮通过 `session/load` 用新列表重新打开对话。这次重新打开会结束 Casper 的「本会话内都同意」回答。无法构建的列表会保留正在运行的进程；若列表因凭据无法读取、命令查找失败或 5 秒内未就绪而漏掉 Casper 已获得的服务器，也会保留该进程。更改从不打断提示。每个对话都运行各 stdio 服务器自己的副本。
+共有五个关闭开关：设置中服务器自己的开关、本插件的 `forwardMcpServers: false`（同时略过插件注册的服务器和客户端条目）、只针对插件注册服务器的 `forwardPluginMcpServers: false`、只针对客户端条目的 `forwardMcpClientRows: false`，以及 Casper 的 `acp_mcp: off`。设置中的更改、插件的加载或卸载、条目工具的变化，或凭据的变化会在下一轮到达 Casper：在发送提示之前会重新构建列表，若与之前不同（以保存在内存中的 SHA-256 比较），进程会被关闭，该轮通过 `session/load` 用新列表重新打开对话。这次重新打开会结束 Casper 的「本会话内都同意」回答。无法构建的列表会保留正在运行的进程；若列表因凭据无法读取、命令查找失败或 5 秒内未就绪而漏掉 Casper 已获得的服务器，也会保留该进程。更改从不打断提示。每个对话都运行各 stdio 服务器自己的副本。
 
 <a id="session-mentions"></a>
 ### 会话提及
@@ -317,7 +322,7 @@ Casper 会话的模型菜单与标准会话一样显示应用的**启用智能�
 <a id="model-experience"></a>
 ## 模型体验
 
-无，因为 Casper 进程自行构造模型请求，本插件不向应用自己的 agent 循环的任何请求添加内容。应用工具的名称、描述与结果会进入 Casper 自己的请求，资源工具的描述还会列出交给 Casper 的服务器，被提及会话的快照也会作为上下文进入 Casper 的请求。
+无，因为 Casper 进程自行构造模型请求，本插件不向任何 DeepSeek 请求添加内容。应用工具的名称、描述与结果会进入 Casper 自己的请求，资源工具的描述还会列出交给 Casper 的服务器，客户端条目的工具以服务器自己的名称和描述到达 Casper，被提及会话的快照也会作为上下文进入 Casper 的请求。
 
 #### KV Cache 影响
 
@@ -331,8 +336,8 @@ Casper 会话的模型菜单与标准会话一样显示应用的**启用智能�
 - 选择按 Casper 最后发送的列表检查；Casper 之后发现已退出登录的模型，会在发送选择时被拒绝。
 - 自身既无文本也无调用的响应，其用量计入下一个调用的步骤；若接着出现的是文本，则不计入；不发送 `usage_update` 的 Casper 不显示上下文环与 token 数。提示看起来与模型文本相同。推理只显示 Casper 作为思考发送的标题与重试，不显示模型自身的推理。`session/load` 的回放也不显示。
 - 正在运行的 shell 步骤在结束前不显示输出。
-- 自成一行的 MCP 客户端条目（例如内置的 network 服务器）尚不会交给 Casper；只有「设置 > MCP 服务器」和插件向 MCP 管理器注册的服务器会。每个对话都会启动各 stdio 服务器自己的副本。
-- 目前提供的工具都不返回图片；会返回图片的应用文件读取与浏览器截图并未提供。不向模型展示 MCP 图片的 Casper 仍会收到图片字节，每次回复最多 7 MiB。
+- MCP 客户端条目（例如内置的 network 服务器）只能通过应用工具服务器到达 Casper，因此需要 `appTools`。早于「跳过与自身重复的应用服务器」这一更改的 Casper 会同时显示 `network` 和 `acp-network`。内置条目的调用会在 MCP 客户端默认的 60 秒后停止。每个对话都会启动各 stdio 服务器自己的副本。
+- 目前提供的应用工具都不返回图片，但客户端条目的工具可能返回；会返回图片的应用文件读取与浏览器截图并未提供。不向模型展示 MCP 图片的 Casper 仍会收到图片字节，每次回复最多 7 MiB。
 - 在打包的应用中，`app_read_file` 能读到每个已安装包的 `README.md`、`package.json` 与构建出的 `lib/*.js`、技能文件，以及 `ui-theme` 的 `lib/styles`。Desktop 运行时副本会去掉所有 `.d.ts`，各包不发布 `src/`，仓库的 `docs/` 也不在任何包中，因此那里无法读取 `lib/types`、`ui-sidebar` 的 `slots.ts`、`docs/cordis-tutorial` 与 `docs/web-styling.md`；插槽属性与主题令牌改由 `cordis_inspect_query` 获得。尚未随应用提供这些指南。
 - Casper 的审批卡片只为编辑的审批框绘制差异。Casper 在写入的审批框中不发送差异，含有密钥、某一侧大于 256 KB 或涉及其未检查路径的编辑也不发送，因此这些审批框只显示文本。
 - 应用未经正常关闭就退出后，在会话下次打开之前，会话日志仍记着 Casper 自己选择的访问模式；只有打开的会话会清除它。

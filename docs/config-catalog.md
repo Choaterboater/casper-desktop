@@ -569,6 +569,13 @@ export interface Config {
    */
   forwardPluginMcpServers: boolean
   /**
+   * Also hand Casper the app's own MCP client rows, such as the bundled network server, through the app tools server:
+   * each row gets its own endpoint with its tools under their own names and the server's own hints, after the Settings
+   * and plugin servers and within the same 7; needs forwardMcpServers and appTools. A row that appears later reaches
+   * Casper at the next turn.
+   */
+  forwardMcpClientRows: boolean
+  /**
    * Show the access mode Casper picks itself, such as "Yes to everything this session", as a pill next to the access
    * control until Casper's process closes; the control never moves. Off records none and clears one already shown.
    */
