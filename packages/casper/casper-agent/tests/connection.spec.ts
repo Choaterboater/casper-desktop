@@ -431,10 +431,22 @@ describe('CasperConnection', { timeout: 30_000 }, () => {
   it('delivers every update before the prompt reply resolves', async () => {
     const { start, updates } = await setup({ prompts: [[{ text: 'one\n' }, { tool: 'bash', target: 'ls' }, { toolEnd: 1 }]] })
     const { connection } = await start()
-    expect(await connection.prompt([{ type: 'text', text: 'go' }])).toBe('end_turn')
+    expect((await connection.prompt([{ type: 'text', text: 'go' }])).stopReason).toBe('end_turn')
     expect(updates.map(entry => entry.update.sessionUpdate)).toEqual(['agent_message_chunk', 'tool_call', 'tool_call_update', 'agent_message_chunk'])
     expect(updates.at(-1)?.update).toMatchObject({ _meta: { casper: { receipt: { outcome: 'verified' } } } })
     expect(connection.toolCallId('casper-tool-1')).toBe(`casper:${connection.epoch}:casper-tool-1`)
+  })
+
+  it('returns the conversation a prompt was sent on, with Casper\'s mark only in the shape session/fork takes', async () => {
+    const { fake, start } = await setup({ prompts: [[{ mark: 'entry_1-a' }], [], [{ mark: 'a/b' }]] })
+    const { connection } = await start()
+    const first = await connection.prompt([{ type: 'text', text: 'one' }])
+    const acpSessionId = fake.calls('session/prompt')[0]?.params?.sessionId
+    expect(acpSessionId).toEqual(expect.any(String))
+    expect(first).toEqual({ stopReason: 'end_turn', acpSessionId, mark: 'entry_1-a' })
+    // An older Casper sends no mark.
+    expect(await connection.prompt([{ type: 'text', text: 'two' }])).toEqual({ stopReason: 'end_turn', acpSessionId, mark: undefined })
+    expect(await connection.prompt([{ type: 'text', text: 'three' }])).toEqual({ stopReason: 'end_turn', acpSessionId, mark: undefined })
   })
 
   it('initialize offers form elicitation and routes elicitation/create to the handler', async () => {
@@ -450,7 +462,7 @@ describe('CasperConnection', { timeout: 30_000 }, () => {
       })
     const { connection } = await start()
     expect(fake.calls('initialize')[0]?.params).toMatchObject({ clientCapabilities: { elicitation: { form: {} } } })
-    expect(await connection.prompt([{ type: 'text', text: 'go' }])).toBe('end_turn')
+    expect((await connection.prompt([{ type: 'text', text: 'go' }])).stopReason).toBe('end_turn')
     expect(forms[0]?.params).toMatchObject({
       sessionId: fake.calls('session/prompt')[0]?.params?.sessionId, toolCallId: 'casper-question-1', mode: 'form', message: 'Which database?',
       _meta: { casper: { question: { from: 'ai', multi: false, typed: true } } },
@@ -479,7 +491,7 @@ describe('CasperConnection', { timeout: 30_000 }, () => {
     const failure = await connection.prompt([{ type: 'text', text: 'go' }]).catch((error: unknown) => error)
     expect(codeOf(failure)).toBe('CASPER_RPC_-32603')
     expect(connection.dead).toBe(false)
-    expect(await connection.prompt([{ type: 'text', text: 'again' }])).toBe('end_turn')
+    expect((await connection.prompt([{ type: 'text', text: 'again' }])).stopReason).toBe('end_turn')
   })
 
   it('sends session/cancel once per prompt', async () => {
@@ -489,7 +501,7 @@ describe('CasperConnection', { timeout: 30_000 }, () => {
     await waitFor(() => fake.calls('session/prompt').length === 1)
     connection.cancel()
     connection.cancel()
-    expect(await reply).toBe('cancelled')
+    expect((await reply).stopReason).toBe('cancelled')
     expect(fake.calls('session/cancel')).toHaveLength(1)
   })
 

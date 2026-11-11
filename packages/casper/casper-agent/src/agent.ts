@@ -62,6 +62,8 @@ import { casperCommandId, casperCommands } from './commands.ts'
 import type { CasperCommand, CasperCommandCache } from './commands.ts'
 import type { Config } from './config.ts'
 import { CasperConnection, CasperError } from './connection.ts'
+import type { PromptReply } from './connection.ts'
+import { CONVERSATION_RECORD, conversationRecord } from './conversation.ts'
 import { answerElicitation, elicitationQuestion, elicitationStep } from './elicitation.ts'
 import { forwardedServers } from './forward-servers.ts'
 import type { ForwardedServers } from './forward-servers.ts'
@@ -583,6 +585,7 @@ export class CasperAgent implements Agent {
     })
     let interrupted = true
     let sink: PromptSink | undefined
+    let answered: PromptReply | undefined
     try {
       if (readFailure !== undefined) throw readFailure.error
       if (!hasPromptContent(claimed)) throw new CasperError('CASPER_EMPTY_PROMPT', 'The request is empty, so nothing was sent to Casper.')
@@ -635,9 +638,9 @@ export class CasperAgent implements Agent {
       if (accessNote !== undefined) writer.text(accessNote)
       if (lateNote !== undefined) writer.text(lateNote)
       for (const note of content.notes) writer.text(note)
-      let stopReason: StopReason
       try {
-        stopReason = await this.promptUntilSettled(connection, content.blocks, promptSignal)
+        // Casper's conversation moved on whatever the turn ends with, so the reply is recorded even when the turn fails.
+        answered = await this.promptUntilSettled(connection, content.blocks, promptSignal)
       } catch (error: unknown) {
         // A prompt stopped because the chip's mode could not reach Casper ends with that error.
         throw this.takeUpdateFailure() ?? error
@@ -645,8 +648,8 @@ export class CasperAgent implements Agent {
       const failure = this.takeUpdateFailure()
       /* v8 ignore next -- see record(). */
       if (failure !== undefined) throw failure
-      interrupted = stopReason !== 'end_turn'
-      return turnEndFor(stopReason)
+      interrupted = answered.stopReason !== 'end_turn'
+      return turnEndFor(answered.stopReason)
     } finally {
       this.sink = undefined
       for (const asks of this.asks.values()) for (const ask of asks) ask.abort()
@@ -655,6 +658,23 @@ export class CasperAgent implements Agent {
       if (sink !== undefined) await settlesWithin(sink.steers.chain, this.config.cancelGraceMs)
       onStep(writer.step)
       writer.close(interrupted)
+      // After the turn's last step and before its `turn/end`, so a fork can cut the conversation at this turn.
+      if (answered !== undefined) this.recordConversation(answered)
+    }
+  }
+
+  /**
+   * Record which Casper conversation the prompt reply ended, and Casper's mark when it sent one.
+   * A failed record costs only an exact fork at this turn, never the turn.
+   * @param reply - the prompt's reply.
+   */
+  private recordConversation(reply: PromptReply): void {
+    try {
+      appendPluginRecord(this.session, CONVERSATION_RECORD, conversationRecord(reply.acpSessionId, reply.mark))
+    } catch (error: unknown) {
+      /* v8 ignore start -- an append fails only when the Session is closed under the Agent. */
+      this.pluginCtx.logger.warn(`casper agent "${this.id}": conversation not recorded: ${String(error)}`)
+      /* v8 ignore stop */
     }
   }
 
@@ -701,7 +721,7 @@ export class CasperAgent implements Agent {
   }
 
   /** Send the prompt; on abort send `session/cancel` and wait the cancel grace before killing Casper. */
-  private async promptUntilSettled(connection: CasperConnection, blocks: Parameters<CasperConnection['prompt']>[0], signal: AbortSignal): Promise<StopReason> {
+  private async promptUntilSettled(connection: CasperConnection, blocks: Parameters<CasperConnection['prompt']>[0], signal: AbortSignal): Promise<PromptReply> {
     const reply = connection.prompt(blocks)
     // Steering queued while the prompt was prepared goes after it, so Casper has a prompt to steer.
     this.forwardSteers()

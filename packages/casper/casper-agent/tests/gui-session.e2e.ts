@@ -154,7 +154,7 @@ it('runs a Casper Session from the GUI: stream, tools, approval, plan, receipt, 
     'step/start', 'assistant/message', 'tool/call', 'tool/result', 'step/end',
     'step/start', 'assistant/message', 'tool/call', 'tool/result', 'todo/write', 'step/end',
     'step/start', 'assistant/message', 'step/end',
-    'turn/end',
+    'plugin:casper-agent/conversation', 'turn/end',
   ])
   const user = events(agent).find(event => event.type === 'user/message')
   expect(user?.type === 'user/message' && user.data.source).toMatchObject({ kind: 'user', rpcId: 'req-fix' })
