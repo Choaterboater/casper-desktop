@@ -26,8 +26,8 @@ Invocations: `dsh --help`
 Usage: dsh [--profile] <name> [options] [app-args...]
        dsh plugin --profile <name> <pnpm-args...>
 
-dsh: boot a Casper profile — an ordered stack of plugin-bundle patch
-layers under your own overrides.
+dsh: boot a Casper profile — an ordered stack of plugin-bundle patch layers
+under your own overrides.
 
 Arguments:
   args                           arguments for the booted profile's app (see:
