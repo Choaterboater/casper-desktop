@@ -277,6 +277,16 @@ export default class McpServerManager extends TypertRemoteService {
   }
 
   /**
+   * Read the entries plugins registered, without mounting or probing.
+   * @returns a fresh frozen record of each registered entry by name in registration order
+   * (names made only of digits come first, as in any record), enabled and with schema
+   * defaults filled in; configured entries and retained records are not included.
+   */
+  registeredEntries(): Readonly<Record<string, VolatileSnapshot<McpManagedServerEntry>>> {
+    return Object.freeze(Object.fromEntries(this.registrations))
+  }
+
+  /**
    * Contribute one server for the calling plugin's lifetime. A registered
    * entry is enabled while registered; its removal awaits the instance's
    * unmount, so plugin disposal withdraws the server's tools before settling.

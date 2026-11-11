@@ -136,6 +136,14 @@ The manager service. Reconciliation and `restart` serialize instance replacement
 list(): McpManagedServerView[]
 
 /**
+ * Read the entries plugins registered, without mounting or probing.
+ * @returns a fresh frozen record of each registered entry by name in registration order
+ * (names made only of digits come first, as in any record), enabled and with schema
+ * defaults filled in; configured entries and retained records are not included.
+ */
+registeredEntries(): Readonly<Record<string, VolatileSnapshot<McpManagedServerEntry>>>
+
+/**
  * Contribute one server for the calling plugin's lifetime. A registered
  * entry is enabled while registered; its removal awaits the instance's
  * unmount, so plugin disposal withdraws the server's tools before settling.

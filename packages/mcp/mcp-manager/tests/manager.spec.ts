@@ -1059,6 +1059,26 @@ describe('mcp-manager', () => {
     await vi.waitFor(() => { expect(manager.list().map(view => view.name)).toEqual(['base']) })
   })
 
+  it('reads registered entries in registration order without configured ones and without side effects', async () => {
+    const { manager, events } = await mountWorld({ managerConfig: { servers: { base: stdioEntry() } }, withSettings: false })
+    const disposeBeta = manager.register('beta', { transport: 'stdio', command: 'echo' })
+    manager.register('alpha', { transport: 'streamable-http', url: 'https://mcp.example.com/mcp' })
+    await waitForState(manager, 'alpha', 'connected')
+    await waitForState(manager, 'beta', 'connected')
+    const listed = manager.list()
+    const eventCount = events.length
+    const entries = manager.registeredEntries()
+    expect(Object.keys(entries)).toEqual(['beta', 'alpha'])
+    expect(entries.beta).toMatchObject({ transport: 'stdio', command: 'echo', enabled: true, startupTimeoutMs: 30_000 })
+    expect(entries.alpha).toMatchObject({ transport: 'streamable-http', url: 'https://mcp.example.com/mcp', enabled: true })
+    expect(Object.isFrozen(entries)).toBe(true)
+    expect(manager.registeredEntries()).not.toBe(entries)
+    expect(manager.list()).toEqual(listed)
+    expect(events).toHaveLength(eventCount)
+    disposeBeta()
+    await vi.waitFor(() => { expect(Object.keys(manager.registeredEntries())).toEqual(['alpha']) })
+  })
+
   it('refuses a settings entry that takes a registered name', async () => {
     const { manager, settings } = await mountWorld()
     manager.register('app', { transport: 'stdio', command: 'echo' })
