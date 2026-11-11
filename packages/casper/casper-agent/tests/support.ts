@@ -88,6 +88,12 @@ export interface FakeScript {
   readonly loadConfigOptions?: readonly SessionConfigOption[]
   /** Casper's stored name, sent as a `session_info_update` right after a successful `session/load` reply. */
   readonly title?: string
+  /** Say in `initialize` that Casper takes `session/fork`. */
+  readonly fork?: boolean
+  /** `session/fork` fails with this error. */
+  readonly forkError?: { readonly code: number; readonly message: string }
+  /** The id of a copy `session/fork` makes. */
+  readonly forkSessionId?: string
 }
 
 /** One command the stand-in offers, in ACP's `available_commands_update` shape. */
@@ -155,6 +161,7 @@ export function fakeCasper(script: FakeScript = { prompts: [] }): FakeCasper {
       appTeams: true,
       casperChildModel: true,
       casperTitles: true,
+      copyOnFork: true,
       accessModes: { ...DEFAULT_ACCESS_MODES },
       approvalCard: true,
       approvalDiff: true,

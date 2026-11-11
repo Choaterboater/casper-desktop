@@ -27,6 +27,14 @@ function memorySidecar(ids: string[]) {
 }
 
 describe('Casper\'s sidecar records', { timeout: 60_000 }, () => {
+  it('has says whether a Session has a record in any folder, which read keeps to its own folder', () => {
+    const records = new Map<string, CasperSessionRecord>([['live', { acpSessionId: 'conversation-live', cwd: '/project' }]])
+    const sidecar = new CasperSidecar({ table: () => ({ get: (id: string) => records.get(id) }) } as never)
+    expect(sidecar.has('live' as SessionId)).toBe(true)
+    expect(sidecar.read('live' as SessionId, '/elsewhere')).toBeUndefined()
+    expect(sidecar.has('other' as SessionId)).toBe(false)
+  })
+
   it('prune deletes a record whose session is gone and keeps an archived or unreadable one', async () => {
     const { sidecar, records, deletes } = memorySidecar(['live', 'gone', 'archived', 'unreadable'])
     // An archived Session is still stored; a Session that cannot be read now may still be there.

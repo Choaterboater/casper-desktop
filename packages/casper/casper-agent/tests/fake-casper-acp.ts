@@ -147,6 +147,16 @@
  * reply and from then on, as Casper does when it puts back the conversation's
  * own model (decision 89).
  *
+ * Forks as Casper's session/fork does: with `fork: true` the `initialize`
+ * reply sets `sessionCapabilities.fork`. `session/fork` (logged like any
+ * request) fails with `forkError` when set; otherwise an id that is not saved
+ * fails with -32002 (`No saved conversation <id> in <folder>`), and an
+ * `_meta.casper.at` that is not a mark a reply on that conversation sent fails
+ * with -32602 (`No point <at> in conversation <id>`). A copy is saved at once
+ * under `forkSessionId` (default a new id), replays nothing, and gets the
+ * `session/new` reply fields; `commands` and `title` follow the reply. A
+ * `{ mark }` is logged with its conversation when the prompt replies.
+ *
  * @module @deepseek-ai/dsh-casper-agent/tests/fake-casper-acp
  */
 
@@ -312,6 +322,9 @@ interface Script {
   holdIdle?: string
   loadConfigOptions?: SessionConfigOption[]
   title?: string
+  fork?: boolean
+  forkError?: { code: number; message: string }
+  forkSessionId?: string
 }
 
 /** The `_casper/idle` reply C17 sends. */
@@ -326,6 +339,13 @@ const script: Script = JSON.parse(readFileSync(process.env.FAKE_CASPER_SCRIPT ??
 
 function log(entry: Record<string, unknown>): void {
   appendFileSync(logFile, `${JSON.stringify({ pid: process.pid, ...entry })}\n`)
+}
+
+/** The marks prompt replies sent on one conversation, in any run. */
+function marksOf(conversation: string): unknown[] {
+  return readFileSync(logFile, 'utf8').split('\n').filter(line => line.includes('"event":"saved"'))
+    .map(line => JSON.parse(line) as { sessionId: string; mark?: unknown })
+    .filter(entry => entry.sessionId === conversation && entry.mark !== undefined).map(entry => entry.mark)
 }
 
 /** Conversations saved before the test plus those saved by an earlier prompt reply in any run. */
@@ -741,6 +761,7 @@ createAcpAgent({ name: 'fake-casper' })
         loadSession: true,
         promptCapabilities: script.promptCapabilities ?? { image: false, audio: false, embeddedContext: false },
         mcpCapabilities: { http: script.mcpHttp === true, sse: false },
+        ...script.fork === true ? { sessionCapabilities: { fork: {} } } : {},
         ...script.steer === true ? { _meta: { casper: { steer: true } } } : {},
       },
       agentInfo: { name: 'casper', title: 'Casper', version: '0.0.0-test' },
@@ -778,10 +799,30 @@ createAcpAgent({ name: 'fake-casper' })
     if (title !== undefined) setImmediate(() => { void update(client, { sessionUpdate: 'session_info_update', title, updatedAt: new Date().toISOString() }) })
     return opened()
   })
+  .onRequest(methods.agent.session.fork, ({ params, client }) => {
+    log({ method: 'session/fork', params })
+    if (script.forkError !== undefined) throw new RequestError(script.forkError.code, script.forkError.message)
+    if (!savedConversations().includes(params.sessionId)) throw new RequestError(-32002, `No saved conversation ${params.sessionId} in ${params.cwd}`)
+    const at = (params._meta as { casper?: { at?: unknown } } | undefined)?.casper?.at
+    if (at !== undefined && !marksOf(params.sessionId).includes(at)) {
+      throw new RequestError(-32602, `No point ${JSON.stringify(at)} in conversation ${params.sessionId}`)
+    }
+    sessionId = script.forkSessionId ?? randomUUID()
+    mcpServers = params.mcpServers ?? []
+    log({ event: 'saved', sessionId })
+    // Like Casper, the commands and the copy's name follow the reply.
+    const { commands: availableCommands, title } = script
+    setImmediate(() => {
+      if (availableCommands !== undefined) void update(client, { sessionUpdate: 'available_commands_update', availableCommands })
+      if (title !== undefined) void update(client, { sessionUpdate: 'session_info_update', title, updatedAt: new Date().toISOString() })
+    })
+    return { sessionId, ...opened() }
+  })
   .onRequest(methods.agent.session.prompt, ({ params, client }) => {
     log({ method: 'session/prompt', params })
     return play(params, client).then((reply) => {
-      log({ event: 'saved', sessionId: params.sessionId })
+      const mark = (reply._meta as { casper?: { mark?: unknown } } | undefined)?.casper?.mark
+      log({ event: 'saved', sessionId: params.sessionId, ...mark === undefined ? {} : { mark } })
       return reply
     })
   })

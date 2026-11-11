@@ -8,7 +8,7 @@ import type { AgentFactory, AgentFactoryRoute } from '@deepseek-ai/dsh-agent'
 /**
  * Route root Sessions on the configured presets to `factory`. Delegated
  * children and Sessions without a named preset keep the default factory;
- * forks reach the factory, which refuses them.
+ * forks reach the factory, which copies Casper's conversation into them.
  * @param presets - presets Casper drives.
  * @param factory - the Casper Agent factory.
  * @returns the route to register with `ctx.agents.route`.
