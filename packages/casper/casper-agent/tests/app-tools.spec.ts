@@ -8,7 +8,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import { ToolCallId } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
 import { createMcpToolDefinition, type McpToolOrigin } from '@deepseek-ai/dsh-mcp-client'
 import type { SkillSummary } from '@deepseek-ai/dsh-skill'
 import { defineTool } from '@deepseek-ai/dsh-tools'
@@ -17,6 +17,7 @@ import {
   appToolsEntry,
   DESCRIPTION_MAX,
   dshNameOf,
+  GOAL_RULES,
   INSTALLED_NOTE,
   mcpContent,
   NO_RESOURCES,
@@ -35,6 +36,8 @@ import { fakeCasper } from './support.ts'
 const APP_TOOLS = ['app_skill', 'plugin_manager', 'app_read_file', 'present', 'cordis_inspect_query', 'cordis_inspect_list']
 /** The app's subagent tools, listed after the app tools and never pinned. */
 const SUBAGENT_TOOLS = ['subagent', 'send_message', 'interrupt_agent', 'list_agents', 'list_subagent_models']
+/** The app's goal tools, listed after the subagent tools and never pinned. */
+const GOAL_TOOLS = ['get_goal', 'create_goal', 'update_goal']
 /** The resource tools, listed after the app tools. */
 const RESOURCE_TOOLS = ['list_mcp_resources', 'list_mcp_resource_templates', 'read_mcp_resource']
 
@@ -361,8 +364,8 @@ describe('app tools over MCP', { timeout: 60_000 }, () => {
   })
 
   it('names each served tool after the app tool it runs', () => {
-    expect([...APP_TOOLS, ...SUBAGENT_TOOLS, ...RESOURCE_TOOLS, 'wait_agent', 'other'].map(dshNameOf))
-      .toEqual(['skill', 'plugin_manager', 'app_read_file', 'present', 'cordis_inspect_query', 'cordis_inspect_list', ...SUBAGENT_TOOLS, ...RESOURCE_TOOLS, undefined, undefined])
+    expect([...APP_TOOLS, ...SUBAGENT_TOOLS, ...GOAL_TOOLS, ...RESOURCE_TOOLS, 'wait_agent', 'other'].map(dshNameOf))
+      .toEqual(['skill', 'plugin_manager', 'app_read_file', 'present', 'cordis_inspect_query', 'cordis_inspect_list', ...SUBAGENT_TOOLS, ...GOAL_TOOLS, ...RESOURCE_TOOLS, undefined, undefined])
   })
 
   it('gives a call without a Casper call id a fresh id of its own, and records no step result for it', async () => {
@@ -593,5 +596,61 @@ describe('the app\'s subagent tools over MCP', { timeout: 60_000 }, () => {
     const bare = await client(await serve(agent, ctx))
     await bare.callTool({ name: 'list_agents', arguments: {} })
     expect(ran.at(-1)).toEqual({ name: 'list_agents', agent, initiator: undefined })
+  })
+})
+
+describe('the app\'s goal tools over MCP', { timeout: 60_000 }, () => {
+  /** A Host whose Agent scope has stand-ins for the goal tools; update_goal defers a wrap-up, as in a goal round. */
+  async function withGoalTools() {
+    const booted = await host()
+    const ran: { name: string; agent: unknown }[] = []
+    for (const name of GOAL_TOOLS) {
+      booted.ctx.tools.register(defineTool({
+        name, description: `Stand-in ${name}.`, parameters: { action: { type: 'string' } },
+        output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
+        execute: (_args, exec) => {
+          ran.push({ name, agent: exec.agent })
+          if (name === 'update_goal') {
+            exec.deferContext(createUserMessage({ content: [{ type: 'text', text: '<goal_complete>wrap up</goal_complete>' }], source: { kind: 'user' } }))
+          }
+          return Promise.resolve(`${name} ran`)
+        },
+      }))
+    }
+    return { ...booted, ran }
+  }
+
+  it('lists them after the subagent tools, unpinned, read-only only for get_goal, with the rules on the two that change a goal', async () => {
+    const { ctx, agent } = await withGoalTools()
+    const { tools } = await (await client(await serve(agent, ctx))).listTools()
+    expect(tools.map(tool => tool.name)).toEqual([...APP_TOOLS, ...GOAL_TOOLS, ...RESOURCE_TOOLS])
+    const byName = new Map(tools.map(tool => [tool.name, tool]))
+    for (const name of GOAL_TOOLS) expect(byName.get(name)?._meta).toBeUndefined()
+    expect(GOAL_TOOLS.map(name => byName.get(name)?.annotations)).toEqual([{ readOnlyHint: true }, undefined, undefined])
+    // The pins are the same four, so Casper's fixed prompt does not grow.
+    expect(tools.filter(tool => tool._meta?.['casper/pin'] === true).map(tool => tool.name)).toEqual(['app_skill', 'plugin_manager', 'app_read_file', 'present'])
+    expect(byName.get('get_goal')?.description).toBe('Stand-in get_goal.')
+    expect(byName.get('create_goal')?.description).toBe(`Stand-in create_goal. ${GOAL_RULES}`)
+    expect(byName.get('update_goal')?.description).toBe(`Stand-in update_goal. ${GOAL_RULES}`)
+    expect(GOAL_RULES.length).toBeLessThan(DESCRIPTION_MAX / 2)
+  })
+
+  it('leaves them all out with goals off, and serves the other tools as before', async () => {
+    const { ctx, agent, ran } = await withGoalTools()
+    const mcp = await client(await serve(agent, ctx, { goals: false }))
+    expect((await mcp.listTools()).tools.map(tool => tool.name)).toEqual([...APP_TOOLS, ...RESOURCE_TOOLS])
+    await expect(mcp.callTool({ name: 'update_goal', arguments: {} })).rejects.toThrow(/Tool update_goal not found/)
+    expect(ran).toEqual([])
+  })
+
+  it('sends the context a tool defers, such as a goal round\'s wrap-up, after the tool\'s own result', async () => {
+    const { ctx, agent, ran } = await withGoalTools()
+    const mcp = await client(await serve(agent, ctx))
+    expect(await mcp.callTool({ name: 'get_goal', arguments: {} })).toEqual({ content: [{ type: 'text', text: 'get_goal ran' }], isError: false })
+    expect(await mcp.callTool({ name: 'update_goal', arguments: { action: 'complete' } })).toEqual({
+      content: [{ type: 'text', text: 'update_goal ran' }, { type: 'text', text: '<goal_complete>wrap up</goal_complete>' }],
+      isError: false,
+    })
+    expect(ran).toEqual([{ name: 'get_goal', agent }, { name: 'update_goal', agent }])
   })
 })

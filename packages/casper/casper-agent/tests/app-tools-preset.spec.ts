@@ -2,8 +2,9 @@
  * The shipped casper preset rows give a Casper Session the app's real plugin tools: the bridge serves the
  * Cordis inspection, skill, present and plugin_manager tools those rows bind in the Casper Agent's scope, a
  * bridged install asks once, through the app's own approval, on the app's existing plugin manager, a bridged
- * present records the delivery the app's file card reads in the Casper turn, and a bridged subagent call starts
- * a Standard child of the Casper Session whose completion notice reaches Casper.
+ * present records the delivery the app's file card reads in the Casper turn, a bridged subagent call starts
+ * a Standard child of the Casper Session whose completion notice reaches Casper, and a goal set with `/goal` or
+ * the bridged goal tools runs its rounds as Casper turns.
  */
 
 import { writeFileSync } from 'node:fs'
@@ -20,6 +21,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import AgentPresetRegistry from '@deepseek-ai/dsh-agent-preset-registry'
+import CommandRuntime from '@deepseek-ai/dsh-commands'
 import { loadOverlayPatches } from '@deepseek-ai/dsh-app-boot'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
@@ -38,6 +40,10 @@ import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import { MockAdapter, textResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 // The preset's other rows, imported from their sources as the Loader would load their packages.
 import * as PluginManagerTools from '../../../boot/plugin-manager/src/tools.ts'
+import * as CommandGoal from '../../../goal/command-goal/src/index.ts'
+import GoalService from '../../../goal/goal/src/index.ts'
+import * as GoalRoundDriver from '../../../goal/goal-round-driver/src/index.ts'
+import * as ToolGoal from '../../../goal/tool-goal/src/index.ts'
 import * as ToolPresent from '../../../deliverables/tool-present/src/index.ts'
 import * as ToolCordis from '../../../extensions/tool-cordis/src/index.ts'
 import SandboxPolicy from '../../../sandbox/sandbox-policy/src/index.ts'
@@ -51,7 +57,7 @@ import * as CasperAgentPlugin from '../src/index.ts'
 import { CasperAgent } from '../src/agent.ts'
 import { PLUGIN_SKILL, TURN_OVER } from '../src/app-tools.ts'
 import type { Config } from '../src/config.ts'
-import { prompt, eventsOf } from './harness.ts'
+import { prompt, eventsOf, turnEnds } from './harness.ts'
 import { casperOptions, fakeCasper, waitFor } from './support.ts'
 import type { FakeCasper, FakeLogEntry, FakeScript } from './support.ts'
 
@@ -117,6 +123,8 @@ async function host(fake: FakeCasper, childReplies: string[] = [], config: Parti
     '@deepseek-ai/dsh-tool-present': ToolPresent,
     '@deepseek-ai/dsh-tool-subagent-control': ToolSubagentControl,
     '@deepseek-ai/dsh-tool-subagent': ToolSubagent,
+    '@deepseek-ai/dsh-command-goal': CommandGoal,
+    '@deepseek-ai/dsh-tool-goal': ToolGoal,
   }
   ctx.loader.internal = {
     version: 'v2',
@@ -139,6 +147,10 @@ async function host(fake: FakeCasper, childReplies: string[] = [], config: Parti
   await ctx.plugin(SubagentRuntime)
   await ctx.plugin(SubagentSpawn, { providerName: 'spawn' })
   await ctx.plugin(StandInQuery)
+  // The Host composition's command registry, goal service and goal round driver, as the base patch mounts them.
+  await ctx.plugin(CommandRuntime)
+  await ctx.plugin(GoalService)
+  await ctx.plugin(GoalRoundDriver)
   const adapter = new MockAdapter(childReplies.map(reply => reply === 'hang' ? 'hang' as const : textResponse(reply)))
   ctx.llm.registerAdapter(['mock'], adapter)
   const dir = join(fake.root, 'profiles', 'desktop')
@@ -309,7 +321,7 @@ function findCapability(query: string, server: string, tools: readonly { name: s
   return scored.filter(entry => entry.score > 0).sort((a, b) => b.score - a.score || a.id.localeCompare(b.id)).map(entry => entry.id)
 }
 
-it('lists all six app tools and the five subagent tools, then the resource tools, to Casper from the preset rows', { timeout: 60_000 }, async () => {
+it('lists all six app tools, the five subagent tools and the three goal tools, then the resource tools, to Casper from the preset rows', { timeout: 60_000 }, async () => {
   const fake = fakeCasper({ prompts: [[]] })
   cleanups.push(() => { fake.remove() })
   const { create } = await host(fake)
@@ -321,6 +333,7 @@ it('lists all six app tools and the five subagent tools, then the resource tools
   expect((await client.listTools()).tools.map(tool => tool.name)).toEqual([
     'app_skill', 'plugin_manager', 'app_read_file', 'present', 'cordis_inspect_query', 'cordis_inspect_list',
     'subagent', 'send_message', 'interrupt_agent', 'list_agents', 'list_subagent_models',
+    'get_goal', 'create_goal', 'update_goal',
     'list_mcp_resources', 'list_mcp_resource_templates', 'read_mcp_resource',
   ])
 })
@@ -393,7 +406,7 @@ const SUBAGENT_TOOLS = ['subagent', 'send_message', 'interrupt_agent', 'list_age
 it('the subagent rows follow present, and every child mounts the standard preset with the app\'s route choices', () => {
   const rows = presetRows() as { id?: unknown; name?: unknown; config?: unknown }[]
   const ids = rows.map(row => row.id)
-  expect(ids.slice(ids.indexOf('present') + 1)).toEqual(['tool-subagent-control', 'tool-subagent'])
+  expect(ids.slice(ids.indexOf('present') + 1, ids.indexOf('tool-subagent') + 1)).toEqual(['tool-subagent-control', 'tool-subagent'])
   expect(rows).toContainEqual({ id: 'tool-subagent-control', name: '@deepseek-ai/dsh-tool-subagent-control' })
   expect(rows).toContainEqual({
     id: 'tool-subagent', name: '@deepseek-ai/dsh-tool-subagent',
@@ -541,4 +554,138 @@ it('a child of a Casper Session runs on Casper\'s model when the app has the sam
   expect(adapter.requests).toEqual([])
   await waitFor(() => fake.calls('session/prompt')[2])
   await agent.whenIdle()
+})
+
+/** The goal tools the bridge serves, in list order. */
+const GOAL_TOOLS = ['get_goal', 'create_goal', 'update_goal']
+
+/** The text of each Casper prompt, its blocks joined. */
+function promptTexts(fake: FakeCasper): string[] {
+  return fake.calls('session/prompt').map(entry => (entry.params?.['prompt'] as { text?: string }[]).map(block => block.text ?? '').join('|'))
+}
+
+/** Run one `/goal` line in a Session, as the composer does. */
+async function goalCommand(ctx: Context, agent: Agent, line: string): Promise<unknown> {
+  return (await ctx.commands.execute(agent, line, [], new AbortController().signal))?.result
+}
+
+it('the goal rows follow the subagent rows, as in the standard preset', () => {
+  const rows = presetRows() as { id?: unknown; name?: unknown; config?: unknown }[]
+  const ids = rows.map(row => row.id)
+  expect(ids.slice(ids.indexOf('tool-subagent') + 1)).toEqual(['command-goal', 'tool-goal'])
+  expect(rows).toContainEqual({ id: 'command-goal', name: '@deepseek-ai/dsh-command-goal' })
+  expect(rows).toContainEqual({ id: 'tool-goal', name: '@deepseek-ai/dsh-tool-goal' })
+})
+
+it('serves the goal tools unpinned, with the four pins unchanged, and none of them with appGoals off', { timeout: 60_000 }, async () => {
+  const fake = fakeCasper({ prompts: [[]] })
+  cleanups.push(() => { fake.remove() })
+  const { ctx, create } = await host(fake)
+  const agent = await create('casper-preset-goal-list')
+  // /goal is in the Casper Session's command menu.
+  expect(ctx.commands.list(agent).map(command => command.name)).toContain('goal')
+  agent.followup(prompt('hi'))
+  await agent.whenIdle()
+  const { tools } = await (await appClient(fake)).listTools()
+  const byName = new Map(tools.map(tool => [tool.name, tool]))
+  expect(tools.filter(tool => tool._meta?.['casper/pin'] === true).map(tool => tool.name)).toEqual(['app_skill', 'plugin_manager', 'app_read_file', 'present'])
+  for (const name of GOAL_TOOLS) expect(byName.get(name)?._meta).toBeUndefined()
+  expect(GOAL_TOOLS.map(name => byName.get(name)?.annotations)).toEqual([{ readOnlyHint: true }, undefined, undefined])
+  expect(byName.get('update_goal')?.description).toContain('action resume')
+  expect(findCapability('create a goal for this long task', 'acp-app', tools)[0]).toBe('mcp:acp-app:create_goal')
+
+  const offFake = fakeCasper({ prompts: [[]] })
+  cleanups.push(() => { offFake.remove() })
+  const off = await host(offFake, [], { appGoals: false })
+  const offAgent = await off.create('casper-preset-goal-off')
+  expect(off.ctx.tools.schemas(offAgent).map(schema => schema.name)).toContain('create_goal')
+  offAgent.followup(prompt('hi'))
+  await offAgent.whenIdle()
+  const listed = (await (await appClient(offFake)).listTools()).tools.map(tool => tool.name)
+  for (const name of GOAL_TOOLS) expect(listed).not.toContain(name)
+  expect(listed).toContain('present')
+})
+
+it('a goal set with /goal runs its round as a Casper turn, and Casper ends it with the bridged update_goal', { timeout: 60_000 }, async () => {
+  const fake = fakeCasper({ prompts: [] })
+  cleanups.push(() => { fake.remove() })
+  const release = join(fake.root, 'release')
+  fake.script({ prompts: [[{ text: 'working\n' }, { waitFile: release }]] })
+  const { ctx, create } = await host(fake)
+  const agent = await create('casper-preset-goal-command')
+  expect(JSON.stringify(await goalCommand(ctx, agent, '/goal ship the report'))).toContain('Goal created')
+  // The round driver queues round 1, which reaches Casper as its prompt.
+  await waitFor(() => fake.calls('session/prompt').length === 1)
+  expect(promptTexts(fake)[0]).toContain('<goal_round>')
+  expect(promptTexts(fake)[0]).toContain('Objective: "ship the report"')
+  // While the round's turn is open, Casper reads the goal and marks it complete through the app tools.
+  const client = await appClient(fake)
+  const read = await client.callTool({ name: 'get_goal', arguments: {} })
+  const { goal } = JSON.parse((read.content as { text: string }[])[0]?.text ?? '') as { goal: { id: string; revision: number; roundsStarted: number } }
+  expect(goal.roundsStarted).toBe(1)
+  const done = await client.callTool({ name: 'update_goal', arguments: { goal_id: goal.id, revision: goal.revision, action: 'complete' } })
+  expect(done.isError).toBe(false)
+  // The round's wrap-up the app defers to the next step goes to Casper with the result.
+  expect(JSON.stringify(done.content)).toContain('<goal_complete>')
+  writeFileSync(release, '')
+  await agent.whenIdle()
+  expect(ctx.goals.get(agent)).toMatchObject({ phase: 'complete', roundsStarted: 1 })
+  // A complete goal starts no other round.
+  await new Promise(resolve => setTimeout(resolve, 100))
+  expect(fake.calls('session/prompt')).toHaveLength(1)
+  expect(JSON.stringify(await goalCommand(ctx, agent, '/goal'))).toContain('complete')
+})
+
+it('a goal Casper sets with the bridged create_goal advances across Casper turns until its round limit', { timeout: 60_000 }, async () => {
+  const args = { objective: 'tidy the docs', max_goal_rounds: 2 }
+  const fake = fakeCasper({ prompts: [
+    [{ tool: 'create_goal', target: 'tidy the docs', rawInput: args }, { mcp: 'create_goal', args }, { toolEnd: 1 }],
+    [{ text: 'round one\n' }],
+    [{ text: 'round two\n' }],
+  ] })
+  cleanups.push(() => { fake.remove() })
+  const { ctx, create } = await host(fake)
+  const agent = await create('casper-preset-goal-tool')
+  agent.followup(prompt('keep the docs tidy until they pass the checks'))
+  await waitFor(() => ctx.goals.get(agent)?.phase === 'blocked')
+  await agent.whenIdle()
+  const [created] = results(fake.log())
+  expect(created?.result).toMatchObject({ isError: false })
+  expect(ctx.goals.get(agent)).toMatchObject({ objective: 'tidy the docs', roundsStarted: 2, blockedReason: { code: 'round-limit' } })
+  const texts = promptTexts(fake)
+  expect(texts).toHaveLength(3)
+  expect(texts[1]).toContain('Round: 1/2')
+  expect(texts[2]).toContain('Round: 2/2')
+  expect(turnEnds(agent)).toEqual([{ kind: 'completed' }, { kind: 'completed' }, { kind: 'completed' }])
+})
+
+it('a round queued before /goal edit is refused by the round driver\'s check, and the edited round runs instead', { timeout: 60_000 }, async () => {
+  const fake = fakeCasper({ prompts: [] })
+  cleanups.push(() => { fake.remove() })
+  const release = join(fake.root, 'release')
+  fake.script({ prompts: [[{ text: 'edited round\n' }, { waitFile: release }]] })
+  const { ctx, create } = await host(fake)
+  const agent = await create('casper-preset-goal-stale')
+  // Maintenance reports idle, so the driver queues round 1 while no turn can claim it.
+  const maintenance = Promise.withResolvers<undefined>()
+  const job = agent.runMaintenance(() => maintenance.promise)
+  await goalCommand(ctx, agent, '/goal first objective')
+  await waitFor(() => agent.inbox.nextTurn.length === 1)
+  await goalCommand(ctx, agent, '/goal edit second objective')
+  await waitFor(() => agent.inbox.nextTurn.length === 2)
+  maintenance.resolve(undefined)
+  await job
+  await waitFor(() => fake.calls('session/prompt').length === 1)
+  expect(ctx.goals.get(agent)).toMatchObject({ objective: 'second objective', revision: 2, roundsStarted: 1 })
+  // Cleared during the round, so no later round follows it.
+  await goalCommand(ctx, agent, '/goal clear')
+  writeFileSync(release, '')
+  await agent.whenIdle()
+  // The stale round ends its turn blocked with nothing logged; the goal's fold never sees it.
+  expect(turnEnds(agent)).toEqual([{ kind: 'blocked' }, { kind: 'completed' }])
+  const texts = promptTexts(fake)
+  expect(texts).toHaveLength(1)
+  expect(texts[0]).toContain('Objective: "second objective"')
+  const logged = eventsOf(agent).flatMap(event => event.type === 'user/message' ? [JSON.stringify(event.data.content)] : [])
+  expect(logged.some(text => text.includes('first objective'))).toBe(false)
 })

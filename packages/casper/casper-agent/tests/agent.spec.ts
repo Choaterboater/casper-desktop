@@ -3,12 +3,12 @@ import { Buffer } from 'node:buffer'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type { Context } from '@deepseek-ai/cordis'
-import type { Agent } from '@deepseek-ai/dsh-agent'
+import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
 import CommandRuntime, { CommandDefinitionId } from '@deepseek-ai/dsh-commands'
 import * as McpClient from '@deepseek-ai/dsh-mcp-client'
 import AttachmentStore, { AttachmentId } from '@deepseek-ai/dsh-attachment'
 import type { FileAttachmentRef, ImageAttachmentLimits, ImageAttachmentRef, StoredImageAttachment } from '@deepseek-ai/dsh-attachment'
-import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { LlmResolvedModelInfo } from '@deepseek-ai/dsh-llm'
 import { appendPluginRecord, pluginRecordOf, SessionId } from '@deepseek-ai/dsh-session'
 import SessionQueryEngine from '@deepseek-ai/dsh-session-query'
@@ -3175,5 +3175,124 @@ describe('The model a Casper session\'s children run on', { timeout: 60_000 }, (
     await run(agent, 'hello')
     await new Promise(resolve => setTimeout(resolve, 50))
     expect(route(agent)).toEqual({ ...APP_DEFAULT, reasoningEffort: undefined, maxTokens: 777 })
+  })
+})
+
+describe('Goal rounds in a Casper session', { timeout: 60_000 }, () => {
+  /** The text of each goal round these tests queue. */
+  const ROUND_TEXT = '<goal_round>keep going</goal_round>'
+
+  /** A goal round as the app's goal round driver queues it. */
+  function goalRound(round: number) {
+    return createUserMessage({ content: [{ type: 'text', text: ROUND_TEXT }], source: { kind: 'goal', goalId: 'goal-1', revision: 1, round } as never })
+  }
+
+  /** The `user/message` texts the Session logged, in order. */
+  function logged(agent: Agent): string[] {
+    return eventsOf(agent).flatMap(event => event.type === 'user/message' ? [event.data.content.map(block => block.type === 'text' ? block.text : '').join('')] : [])
+  }
+
+  it('runs the app\'s step check for a goal round only, and sends Casper the claimed lines whatever the check adds', async () => {
+    const { fake, host } = await setup({ configOptions: casperOptions(), prompts: [[{ text: 'one\n' }], [{ text: 'two\n' }]] })
+    const { agent } = await host.create('casper-goal-check')
+    const seen: unknown[] = []
+    host.ctx.on('agent/pre-step', async ({ agent: subject, messages, turn, step, modelSelection }, next): Promise<PreStepDecision> => {
+      if (subject === agent) seen.push({ ids: messages.map(message => message.id), turn, step, modelSelection })
+      const decision = await next()
+      // A line a check adds is for the DeepSeek loop's request; Casper reads its own skills and mentions.
+      return decision.kind === 'enter' ? { ...decision, messages: [...decision.messages, prompt('added by a check')] } : decision
+    })
+    // An ordinary prompt runs no check, and neither does a goal line that is not a round.
+    agent.inject(goalRound(0))
+    agent.followup(prompt('plain'))
+    await agent.whenIdle()
+    expect(seen).toEqual([])
+    const round = goalRound(1)
+    agent.followup(round)
+    await agent.whenIdle()
+    // The check reads Casper's current model as the step's route.
+    expect(seen).toEqual([{ ids: [round.id], turn: 2, step: 1, modelSelection: agent.model.current() }])
+    expect(agent.model.current()).toMatchObject({ provider: 'openai-codex', model: 'gpt-6.1-sol' })
+    expect(promptTexts(fake)).toEqual([`${ROUND_TEXT}|plain`, ROUND_TEXT])
+    expect(logged(agent)).toEqual([ROUND_TEXT, 'plain', ROUND_TEXT])
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }, { kind: 'completed' }])
+  })
+
+  it('ends a refused round blocked with nothing logged or sent, and runs the lines the check put back as the next turn', async () => {
+    const { fake, host } = await setup({ prompts: [[{ text: 'after\n' }]] })
+    const { agent } = await host.create('casper-goal-reject')
+    const round = goalRound(2)
+    const routes: unknown[] = []
+    host.ctx.on('agent/pre-step', ({ agent: subject, messages, modelSelection }, next): Promise<PreStepDecision> => {
+      if (subject !== agent || !messages.some(message => message.id === round.id)) return next()
+      routes.push(modelSelection)
+      // As the goal round driver does for a round that is no longer current: the other lines go back to the queue.
+      for (const message of messages) if (message.id !== round.id) agent.inbox.prepend('next-step', message)
+      return Promise.resolve({ kind: 'reject' })
+    })
+    agent.inject(prompt('queued with the round'))
+    agent.followup(round)
+    await agent.whenIdle()
+    expect(turnEnds(agent)).toEqual([{ kind: 'blocked' }, { kind: 'completed' }])
+    expect(promptTexts(fake)).toEqual(['queued with the round'])
+    expect(logged(agent)).toEqual(['queued with the round'])
+    // Before Casper reported a model, the check reads the Casper label.
+    expect(routes).toEqual([{ provider: 'casper', model: 'casper' }])
+  })
+
+  it('logs and sends nothing when the turn stops during the check', async () => {
+    const { fake, host } = await setup({ prompts: [] })
+    const { agent } = await host.create('casper-goal-stop')
+    const started = Promise.withResolvers<undefined>()
+    const held = Promise.withResolvers<undefined>()
+    host.ctx.on('agent/pre-step', async (_payload, next): Promise<PreStepDecision> => {
+      started.resolve(undefined)
+      await held.promise
+      return next()
+    })
+    agent.followup(goalRound(1))
+    await started.promise
+    agent.cancel({ kind: 'user' })
+    held.resolve(undefined)
+    await agent.whenIdle()
+    expect(turnEnds(agent)).toEqual([{ kind: 'aborted', reason: { kind: 'user' } }])
+    expect(logged(agent)).toEqual([])
+    expect(fake.pids()).toEqual([])
+  })
+
+  it('stops the goal\'s rounds when Casper ends a round with an error, as the app\'s own loop does, and not for an ordinary turn', async () => {
+    const { host } = await setup({ prompts: [[{ stop: 'max_turn_requests' }], [{ stop: 'max_tokens' }]] })
+    const { agent } = await host.create('casper-goal-error')
+    agent.followup(prompt('plain'))
+    await agent.whenIdle()
+    expect(host.errors.filter(entry => entry.agent === agent)).toHaveLength(0)
+    agent.followup(goalRound(1))
+    await agent.whenIdle()
+    expect(turnEnds(agent)).toEqual([
+      { kind: 'error', error: { code: 'CASPER_TURN_LIMIT', message: 'Casper stopped at its turn limit.' } },
+      { kind: 'error', error: { code: 'CASPER_STOP_MAX_TOKENS', message: 'Casper stopped: max_tokens.' } },
+    ])
+    expect(host.errors.filter(entry => entry.agent === agent)).toHaveLength(1)
+  })
+
+  it('with appGoals off drops a goal round without the check, so a round alone ends blocked and other lines run', async () => {
+    const { fake, host } = await setup({ prompts: [[{ text: 'ok\n' }]] }, { appGoals: false })
+    const { agent } = await host.create('casper-goal-off')
+    let checks = 0
+    host.ctx.on('agent/pre-step', (_payload, next) => {
+      checks += 1
+      return next()
+    })
+    agent.followup(goalRound(1))
+    await agent.whenIdle()
+    expect(turnEnds(agent)).toEqual([{ kind: 'blocked' }])
+    expect(fake.pids()).toEqual([])
+    agent.inject(prompt('steering'))
+    agent.followup(goalRound(2))
+    await agent.whenIdle()
+    expect(turnEnds(agent)).toEqual([{ kind: 'blocked' }, { kind: 'completed' }])
+    expect(promptTexts(fake)).toEqual(['steering'])
+    expect(logged(agent)).toEqual(['steering'])
+    expect(checks).toBe(0)
   })
 })

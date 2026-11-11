@@ -106,7 +106,7 @@ it('looks Casper up on PATH, then the installer folders, and falls back to the b
   expect(lookup([join(home, '.local', 'bin', exe), join('/opt/tools', exe)], '/opt/tools')).toBe(join('/opt/tools', exe))
 })
 
-it('declares the Casper preset with the todo list, the plugin kit, present and the subagent tools, on Desktop only', () => {
+it('declares the Casper preset with the todo list, the plugin kit, present, the subagent tools and the goal rows, on Desktop only', () => {
   const row = desktopRows().find(entry => entry.id === 'preset-casper')
   expect(row?.config?.['id']).toBe('casper')
   const plugins = row?.config?.['plugins'] as Row[] | undefined
@@ -119,6 +119,8 @@ it('declares the Casper preset with the todo list, the plugin kit, present and t
     ['present', '@deepseek-ai/dsh-tool-present'],
     ['tool-subagent-control', '@deepseek-ai/dsh-tool-subagent-control'],
     ['tool-subagent', '@deepseek-ai/dsh-tool-subagent'],
+    ['command-goal', '@deepseek-ai/dsh-command-goal'],
+    ['tool-goal', '@deepseek-ai/dsh-tool-goal'],
   ])
   // Children are Standard agents on agent-loop: the casper preset has no shell or file tools to give them.
   expect(plugins?.find(plugin => plugin.id === 'tool-subagent')?.config).toEqual({

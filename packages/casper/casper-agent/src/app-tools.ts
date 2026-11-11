@@ -61,6 +61,8 @@ interface BridgedTool {
   readonly guide: boolean
   /** Whether it is one of the app's subagent tools, served only while {@link AppToolsOptions.subagents} is on. */
   readonly subagents: boolean
+  /** Whether it is one of the app's goal tools, served only while {@link AppToolsOptions.goals} is on. */
+  readonly goals: boolean
 }
 
 /**
@@ -74,20 +76,32 @@ interface BridgedTool {
  * prompt does not grow; Casper finds them through its tool search. `wait_agent`
  * is not served: Casper ends an MCP call after 10 minutes however much progress
  * it sends, and the completion notice reaches Casper on its own.
+ *
+ * The app's goal tools follow, also never pinned. The app gives a Standard
+ * agent their rules in its system prompt, which Casper never reads, so the two
+ * that change a goal carry them in {@link GOAL_RULES}.
  */
 const BRIDGED: readonly BridgedTool[] = [
-  { mcp: 'app_skill', dsh: 'skill', readOnly: true, pin: true, guide: false, subagents: false },
-  { mcp: 'plugin_manager', dsh: 'plugin_manager', readOnly: false, pin: true, guide: true, subagents: false },
-  { mcp: 'app_read_file', dsh: undefined, readOnly: true, pin: true, guide: false, subagents: false },
-  { mcp: 'present', dsh: 'present', readOnly: true, pin: true, guide: false, subagents: false },
-  { mcp: 'cordis_inspect_query', dsh: 'cordis_inspect_query', readOnly: true, pin: false, guide: false, subagents: false },
-  { mcp: 'cordis_inspect_list', dsh: 'cordis_inspect_list', readOnly: true, pin: false, guide: true, subagents: false },
-  { mcp: 'subagent', dsh: 'subagent', readOnly: false, pin: false, guide: false, subagents: true },
-  { mcp: 'send_message', dsh: 'send_message', readOnly: false, pin: false, guide: false, subagents: true },
-  { mcp: 'interrupt_agent', dsh: 'interrupt_agent', readOnly: false, pin: false, guide: false, subagents: true },
-  { mcp: 'list_agents', dsh: 'list_agents', readOnly: true, pin: false, guide: false, subagents: true },
-  { mcp: 'list_subagent_models', dsh: 'list_subagent_models', readOnly: true, pin: false, guide: false, subagents: true },
+  { mcp: 'app_skill', dsh: 'skill', readOnly: true, pin: true, guide: false, subagents: false, goals: false },
+  { mcp: 'plugin_manager', dsh: 'plugin_manager', readOnly: false, pin: true, guide: true, subagents: false, goals: false },
+  { mcp: 'app_read_file', dsh: undefined, readOnly: true, pin: true, guide: false, subagents: false, goals: false },
+  { mcp: 'present', dsh: 'present', readOnly: true, pin: true, guide: false, subagents: false, goals: false },
+  { mcp: 'cordis_inspect_query', dsh: 'cordis_inspect_query', readOnly: true, pin: false, guide: false, subagents: false, goals: false },
+  { mcp: 'cordis_inspect_list', dsh: 'cordis_inspect_list', readOnly: true, pin: false, guide: true, subagents: false, goals: false },
+  { mcp: 'subagent', dsh: 'subagent', readOnly: false, pin: false, guide: false, subagents: true, goals: false },
+  { mcp: 'send_message', dsh: 'send_message', readOnly: false, pin: false, guide: false, subagents: true, goals: false },
+  { mcp: 'interrupt_agent', dsh: 'interrupt_agent', readOnly: false, pin: false, guide: false, subagents: true, goals: false },
+  { mcp: 'list_agents', dsh: 'list_agents', readOnly: true, pin: false, guide: false, subagents: true, goals: false },
+  { mcp: 'list_subagent_models', dsh: 'list_subagent_models', readOnly: true, pin: false, guide: false, subagents: true, goals: false },
+  { mcp: 'get_goal', dsh: 'get_goal', readOnly: true, pin: false, guide: false, subagents: false, goals: true },
+  { mcp: 'create_goal', dsh: 'create_goal', readOnly: false, pin: false, guide: false, subagents: false, goals: true },
+  { mcp: 'update_goal', dsh: 'update_goal', readOnly: false, pin: false, guide: false, subagents: false, goals: true },
 ]
+
+/** The goal rules a Standard agent reads in its system prompt, added to the goal tools that change a goal. */
+export const GOAL_RULES = 'Rules: when the Session was reopened, an active goal waits until the person asks to go on; then call update_goal '
+  + 'with action resume. Mark a goal complete only when its objective is achieved, and blocked only when the same condition '
+  + 'has stopped progress for several goal rounds; difficulty or work left to do is not blocked.'
 
 /** Result of a resource tool while no MCP server in the app offers resources. */
 export const NO_RESOURCES = 'No MCP server in the app offers resources right now.'
@@ -214,6 +228,8 @@ export interface AppToolsOptions {
    * `list_subagent_models`; true when omitted.
    */
   readonly subagents?: boolean | undefined
+  /** Serve the app's goal tools: `get_goal`, `create_goal` and `update_goal`; true when omitted. */
+  readonly goals?: boolean | undefined
   /**
    * Run a call inside the caller's initiator boundary, so the app tool sees the Casper Agent as the initiator of
    * what it starts, as a Standard parent's tool call does; the call runs as it is when omitted.
@@ -416,6 +432,8 @@ async function mcpServer(options: AppToolsOptions, version: string): Promise<Mcp
       if (acpId !== undefined) options.record(acpId, { name: dsh, arguments: JSON.stringify(args), result })
       const content = mcpContent(result.content)
       if (tool.mcp === 'app_skill' && !result.isError) content.unshift({ type: 'text', text: skillPreface(options.profile, options.installed) })
+      // Context a tool defers to the next step, such as the wrap-up after a goal round's update_goal, goes with the result.
+      for (const context of batch.additionalContexts) content.push(...mcpContent(context.content))
       return { content, isError: result.isError }
     } catch (error: unknown) {
       return errorResult(`${tool.mcp} failed in the app: ${String(error)}`)
@@ -442,11 +460,14 @@ async function mcpServer(options: AppToolsOptions, version: string): Promise<Mcp
       const listed = options.skills === undefined ? [] : await options.skills.list({ cwd: options.cwd, scope: options.agent })
       return skillDescription(listed.filter(skill => skill.invocation.modelInvocable).map(skill => skill.name))
     }
+    if (tool.goals && !tool.readOnly) return `${own} ${GOAL_RULES}`
     return tool.guide ? `${GUIDE_FIRST} ${own}` : own
   }
   const subagents = options.subagents ?? true
+  const goals = options.goals ?? true
   for (const tool of BRIDGED) {
     if (tool.subagents && !subagents) continue
+    if (tool.goals && !goals) continue
     const dsh = tool.dsh
     if (dsh === undefined) {
       server.registerTool(tool.mcp, {
@@ -466,7 +487,7 @@ async function mcpServer(options: AppToolsOptions, version: string): Promise<Mcp
   }
   const forwarded = options.resourceServers?.() ?? []
   for (const tool of RESOURCE_TOOLS) {
-    const bridged: BridgedTool = { mcp: tool.mcp, dsh: tool.mcp, readOnly: true, pin: false, guide: false, subagents: false }
+    const bridged: BridgedTool = { mcp: tool.mcp, dsh: tool.mcp, readOnly: true, pin: false, guide: false, subagents: false, goals: false }
     server.registerTool(tool.mcp, {
       description: resourceDescription(tool.does, forwarded),
       inputSchema: fromJsonSchema<Record<string, unknown>>(tool.schema),

@@ -24,7 +24,7 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-桌面端 profile 通过 `packages/bundle/web-app/cordis.patch.yml` 挂载本插件（条目 `casper-agent`，在桌面端以外和浏览器内预览中禁用），并在 `packages/bundle/web-app/presets/casper.patch.yml` 中声明 `casper` 预设。该预设挂载 `tool-todo`（用待办列表展示 Casper 的计划），以及应用工具所运行的条目：`tool-cordis`、`skill-filesystem`（使用 Cordis 预设的技能目录）、`tool-skill` 与 `tool-plugin-manager`；后者绑定应用已有的插件管理器，应用不带 profile 运行时关闭。该预设还挂载 `present`，以及 `tool-subagent-control` 与 `tool-subagent`（`spawn` 后端、`agentPreset: standard`，并开启模型选择与 `list_subagent_models`），它们把应用的[子代理](#subagents)交给 Casper。插件市场不会挂载。在桌面端，预设注册表的默认值为 `casper`；设置中保存的默认值仍然优先。本插件注入 `agents`、`sessions`、`sessionProjections`、`sessionPersistence`、`subprocess`、`storageDomain` 与 `tools`，并在挂载了 `userQuestions`、`skills`、`profileContext`、`attachments`、`commands`、`permissionPresets`、`sandboxPolicy`、`mcpManager`、`credentials` 与 `sessionReferenceResolver` 时使用它们。
+桌面端 profile 通过 `packages/bundle/web-app/cordis.patch.yml` 挂载本插件（条目 `casper-agent`，在桌面端以外和浏览器内预览中禁用），并在 `packages/bundle/web-app/presets/casper.patch.yml` 中声明 `casper` 预设。该预设挂载 `tool-todo`（用待办列表展示 Casper 的计划），以及应用工具所运行的条目：`tool-cordis`、`skill-filesystem`（使用 Cordis 预设的技能目录）、`tool-skill` 与 `tool-plugin-manager`；后者绑定应用已有的插件管理器，应用不带 profile 运行时关闭。该预设还挂载 `present`，以及 `tool-subagent-control` 与 `tool-subagent`（`spawn` 后端、`agentPreset: standard`，并开启模型选择与 `list_subagent_models`），它们把应用的[子代理](#subagents)交给 Casper；还挂载 `command-goal` 与 `tool-goal`，它们让 Casper 会话使用应用的[目标](#goals)。插件市场不会挂载。在桌面端，预设注册表的默认值为 `casper`；设置中保存的默认值仍然优先。本插件注入 `agents`、`sessions`、`sessionProjections`、`sessionPersistence`、`subprocess`、`storageDomain` 与 `tools`，并在挂载了 `userQuestions`、`skills`、`profileContext`、`attachments`、`commands`、`permissionPresets`、`sandboxPolicy`、`mcpManager`、`credentials` 与 `sessionReferenceResolver` 时使用它们。
 
 | 字段 | 默认值 | 含义 |
 |---|---|---|
@@ -41,6 +41,7 @@ kind: "package-reference"
 | `stderrTailBytes` | `4096` | 为失败信息保留的 Casper stderr 字节数 |
 | `appTools` | `true` | 向 Casper 提供应用工具；`false` 时发送空的 `mcpServers` 列表 |
 | `appSubagents` | `true` | 随应用工具向 Casper 提供应用的[子代理工具](#subagents)；需要 `appTools`，`false` 时不提供 |
+| `appGoals` | `true` | 随应用工具向 Casper 提供应用的[目标工具](#goals)，并把目标的各轮作为 Casper 的轮次运行；这些工具需要 `appTools`，`false` 时不提供，到期的一轮会被丢弃，目标随之暂停 |
 | `casperChildModel` | `true` | 应用有相同提供方与模型时，让[子代理](#subagents)在 Casper 当前的模型上运行；`false` 时所有子代理都在应用的默认模型上运行 |
 | `accessModes` | `{ read-only: read, workspace-write: ask, danger-full-access: full }` | 每个权限预设设置的[访问模式](#access-control)；不能列出 `custom` 与 `auto` |
 | `approvalCard` | `true` | 用 [Casper 的审批卡片](#approvals)显示 Casper 的审批框；`false` 时显示通用问题卡片 |
@@ -213,6 +214,9 @@ Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打�
 | `interrupt_agent` | dsh `interrupt_agent` | |
 | `list_agents` | dsh `list_agents` | 只读 |
 | `list_subagent_models` | dsh `list_subagent_models` | 只读 |
+| `get_goal` | dsh `get_goal` | 只读 |
+| `create_goal` | dsh `create_goal` | |
+| `update_goal` | dsh `update_goal` | |
 | `list_mcp_resources` | dsh `list_mcp_resources` | 只读 |
 | `list_mcp_resource_templates` | dsh `list_mcp_resource_templates` | 只读 |
 | `read_mcp_resource` | dsh `read_mcp_resource` | 只读 |
@@ -241,6 +245,19 @@ Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打�
 该调用立即返回。子代理完成时，应用的完成通知会发给 Casper：Casper 一轮正在运行时作为引导消息，Casper 空闲时作为下一条提示，这会开始新的一轮 Casper。`send_message`、`interrupt_agent`、`list_agents` 与 `list_subagent_models` 对 Casper 的子代理的作用，与对标准父会话的子代理相同。`wait_agent` 不提供：无论发送多少进度，Casper 都会在 10 分钟后结束任何 MCP 调用，这会使更长的等待失败，并在本次任务剩余时间内失去应用工具；而且通知本来就会自行到达。
 
 子代理与标准会话的子代理一样遵循应用自己的规则，而不是 Casper 的私密位置列表。它们使用应用的沙箱，从不询问（任何需要询问的操作都会被拒绝），并且只有在 Casper 会话处于 Auto 或「完全权限」时才获得相应权限。因此，子代理可能读取 `~/.ssh` 这类 Casper 自己会询问或拒绝的位置。Casper 自己的读取不变。Casper 的访问模式仍作用于调用本身：在「仅可查看」下，Casper 拒绝 `subagent`、`send_message` 与 `interrupt_agent`；在「完全权限」下，Casper 忽略 `clientAsks`，在自己的审批框中询问，选择「本会话内都同意」后会覆盖之后的调用，与 `plugin_manager` 相同；「工作区内修改」不增加审批框。子代理在 Casper 自己的步骤之外改动文件。
+
+<a id="goals"></a>
+### 目标
+
+预设的 `command-goal` 与 `tool-goal` 条目让 Casper 会话使用应用的 `/goal` 命令与目标工具。目标服务、它的轮次驱动器与目标栏属于应用，已对每个会话生效。在 Casper 会话中输入 `/goal <目标>` 设置目标的方式与标准会话相同，目标栏会显示它。Casper 自己没有 `/goal`，即使有同名命令，应用的命令也会优先。
+
+`appGoals` 开启时，应用工具还会提供 `get_goal`、`create_goal` 与 `update_goal`，排在子代理工具之后且不置顶，因此 Casper 的固定提示大小不变。每次调用都以 Casper Agent 的身份、在其发起者边界内运行，因此应用的目标检查能看到当前的 Casper 轮次。`create_goal`，以及带 `edit`、`pause` 或 `resume` 的 `update_goal`，需要由用户发起的一轮；`complete` 与 `blocked` 在该目标自己的轮次中也可使用。标准代理在系统提示中读取目标规则，而 Casper 看不到系统提示，因此 `create_goal` 与 `update_goal` 在描述末尾带上这些规则。`update_goal` 在目标的轮次中把目标标为完成或受阻时，应用的收尾说明（标准代理会在下一步作为上下文收到）会跟在工具结果之后。
+
+驱动器排入的每一轮都作为一轮 Casper 运行，其提示就是该轮的文本。在记录这一轮之前，Casper 轮次会像 DeepSeek 循环在每一步之前那样运行应用的 `agent/pre-step` 检查，传入认领的消息，并以 Casper 当前的模型作为路由。驱动器会拒绝已不再有效的一轮，例如在 Casper 忙于其他工作时排入、随后又被 `/goal edit`、暂停或清除改动的一轮，并把认领的其他消息放回队列。被拒绝的一轮不记录也不发送任何内容，以 `blocked` 结束；放回的消息作为下一轮运行。只有拒绝才算数：检查添加的消息（例如技能列表或模型提示）是给 DeepSeek 循环的请求用的，不会发送。其他轮次不运行检查。在检查期间或读取被提及的会话时按下停止，这一轮会被丢弃而不记录，驱动器随之暂停目标。Casper 以错误结束的一轮（例如达到其轮次上限）会像 DeepSeek 循环那样报告该错误，因此驱动器不再排入新的轮次；普通轮次的错误不会这样报告。
+
+`appGoals` 关闭时，这些条目仍会挂载，因此 `/goal` 仍能设置目标，但工具不会提供，到期的一轮会被丢弃，既不检查也不发送提示。只含这一轮的轮次以 `blocked` 结束；与它一起认领的其他消息仍会运行。驱动器随后暂停目标。
+
+Casper 的访问模式对这些调用的作用与子代理工具相同：在「仅可查看」下，Casper 拒绝 `create_goal` 与 `update_goal`；在「完全权限」下，Casper 在自己的审批框中询问；「工作区内修改」不增加审批框。
 
 <a id="settings-mcp-servers"></a>
 ### 设置中的 MCP 服务器
@@ -289,7 +306,7 @@ Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打�
 - 没有保存预设的定时任务在 Casper 中运行：在自动化任务页面创建的任务会在默认预设上创建其会话，而桌面端的默认预设是 Casper，除非设置中指定了其他预设。由 Standard 会话的提醒工具创建的任务会保留该会话的预设，指向现有 Casper 会话的任务会作为其下一条提示在那里运行。Casper 会话自身没有提醒工具。
 - 只有 macOS 与 Linux 上的桌面端运行过 Casper 会话。在 Windows 上，可执行文件查找只由单元测试检查，且应用不会读取安装程序保存的 Path，因此不在应用自身环境中的自定义安装文件夹要在应用重启后才能找到。
 - 已删除会话的 sidecar 记录要到下次启动时才会删除；已归档的会话会保留其进程，直到空闲满 `idleExitMs`。决策 91 之前的 Casper 在空闲时不会被关闭。
-- 团队与目标功能不在 Casper 会话中运行。Casper 的子代理是标准代理，只有应用有相同路由时才使用 Casper 的模型，否则使用应用的默认模型；它们遵循应用的规则而不是 Casper 的私密位置，并且不能用 `wait_agent` 等待。
+- 团队功能不在 Casper 会话中运行。Casper 的子代理是标准代理，只有应用有相同路由时才使用 Casper 的模型，否则使用应用的默认模型；它们遵循应用的规则而不是 Casper 的私密位置，并且不能用 `wait_agent` 等待。
 - Casper 会话的标题由应用的默认模型（可能是 DeepSeek 模型）生成，而不是由 Casper 所运行的模型生成。
 
 <a id="dev-note"></a>

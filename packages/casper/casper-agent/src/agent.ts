@@ -24,6 +24,7 @@ import type {
   InboxState,
   InboxTarget,
   ModelSelection,
+  PreStepDecision,
 } from '@deepseek-ai/dsh-agent'
 import { AGENT_MODELS_RECORD, agentEvents } from '@deepseek-ai/dsh-agent'
 import { ReactLoopInbox } from '@deepseek-ai/dsh-agent-loop'
@@ -150,6 +151,17 @@ type Phase =
   | { kind: 'idle' }
   | { kind: 'maintenance'; abort: AbortController; wakeRequested: boolean }
   | { kind: 'running'; abort: AbortController; wakeRequested: boolean }
+
+/**
+ * Whether a line is one of the app's automatic goal rounds, which the goal round driver queues.
+ * @param message - a queued line.
+ * @returns true for a `goal` source with a positive round.
+ */
+function isGoalRound(message: UserMessage): boolean {
+  // The `goal` source kind belongs to the goal package, which this package does not depend on.
+  const source: { readonly kind: string; readonly round?: unknown } = message.source
+  return source.kind === 'goal' && Number(source.round) > 0
+}
 
 /**
  * Copy the cause `cancel()` aborted a signal with.
@@ -548,8 +560,11 @@ export class CasperAgent implements Agent {
     this.lastTurn = turn
     let reason: TurnEndReason
     let step = 0
+    const held = { goalRound: false }
     try {
-      reason = await this.runTurn(turn, signal, (current) => { step = current })
+      reason = await this.runTurn(turn, signal, (current) => { step = current }, () => { held.goalRound = true })
+      // As in the app's own loop, a goal round that ends with an error stops the goal's automatic rounds.
+      if (reason.kind === 'error' && held.goalRound) this.dispatch.emit('agent/error', { turn, step, error: reason.error })
     } catch (error: unknown) {
       const cause = cancelCauseOf(signal)
       if (cause !== undefined) {
@@ -569,17 +584,21 @@ export class CasperAgent implements Agent {
     return true
   }
 
-  private async runTurn(turn: number, signal: AbortSignal, onStep: (step: number) => void): Promise<TurnEndReason> {
+  private async runTurn(
+    turn: number, signal: AbortSignal, onStep: (step: number) => void, onGoalRound: () => void,
+  ): Promise<TurnEndReason> {
     // Mentioned Sessions are read before Casper starts, so a mention that can't be sent ends the turn without one.
     // The lines stay queued during the read, so a crash then keeps them; a line edited meanwhile is read again.
     const resolver = this.pluginCtx.get('sessionReferenceResolver')
     const read = new Map<MessageId, ReadLine>()
     let readFailure: { readonly error: unknown } | undefined
     let early: UserMessage[] | undefined
-    // A Stop during the read claims the lines first, so the turn it ends keeps them.
+    // A Stop during the read claims the lines first, so the turn it ends keeps them. A goal round is never
+    // logged unchecked: it is dropped, and the goal round driver pauses its goal when the turn ends.
     this.claimEarly = () => {
       this.claimEarly = undefined
-      early = this.claimTurn(turn, undefined, onStep)
+      early = this.claimLines(turn).filter(message => !isGoalRound(message))
+      this.logClaimed(turn, early, undefined, onStep)
     }
     try {
       for (;;) {
@@ -594,7 +613,16 @@ export class CasperAgent implements Agent {
       this.claimEarly = undefined
     }
     // Claimed in the same tick as the last check, so every claimed mention has been read.
-    const claimed = early ?? this.claimTurn(turn, readFailure === undefined ? read : undefined, onStep)
+    let claimed = early
+    if (claimed === undefined) {
+      const lines = this.claimLines(turn)
+      // Only a goal round waits for the goal round driver's check; any other turn logs its lines in this tick.
+      const admitted = lines.some(isGoalRound) ? await this.admitGoalRound(lines, turn, signal) : lines
+      if (admitted === undefined) return { kind: 'blocked' }
+      claimed = admitted
+      if (claimed.some(isGoalRound)) onGoalRound()
+      this.logClaimed(turn, claimed, readFailure === undefined ? read : undefined, onStep)
+    }
     if (claimed.length === 0) {
       /* v8 ignore next -- a failed read's lines leave the queue only by hand meanwhile */
       if (readFailure !== undefined) throw readFailure.error
@@ -718,19 +746,71 @@ export class CasperAgent implements Agent {
   }
 
   /**
-   * Claim the turn's lines and log them in the same tick, so no claimed line is
-   * missing from the log. Each snapshot is logged right after the message that
-   * mentions it, in the prompt's order, as a Standard Session logs it.
+   * Claim the turn's lines: the queued steering, then the first queued prompt.
    * @param turn - the turn that claims the lines.
-   * @param read - the lines whose mentions were read; undefined logs no snapshot.
-   * @param onStep - told the step the lines open.
    * @returns the claimed lines.
    */
-  private claimTurn(turn: number, read: ReadonlyMap<MessageId, ReadLine> | undefined, onStep: (step: number) => void): UserMessage[] {
+  private claimLines(turn: number): UserMessage[] {
     const claimed = this.inbox.claim('next-turn', turn)
     // A claimed line is this turn's prompt, never steering.
     for (const message of claimed) this.steerIds.delete(message.id)
-    if (claimed.length === 0) return claimed
+    return claimed
+  }
+
+  /**
+   * Run the app's step check for claimed lines that hold a goal round, as the
+   * DeepSeek loop does before a step: the goal round driver refuses a round
+   * that is no longer current, such as one queued before `/goal edit`, pause
+   * or clear, and puts the other lines back in the queue. Only a refusal
+   * counts: lines the check adds or rewrites are for the DeepSeek loop's
+   * request, and Casper reads its own skills and mentions. With `appGoals`
+   * off the round is dropped instead, and the driver pauses the goal.
+   * @param lines - the claimed lines, a goal round among them.
+   * @param turn - the turn that claimed them.
+   * @param signal - the turn's signal.
+   * @returns the lines to log and send, or undefined when the turn ends blocked without them.
+   * @throws the turn's abort when it stops during the check; nothing is logged then.
+   */
+  private async admitGoalRound(lines: UserMessage[], turn: number, signal: AbortSignal): Promise<UserMessage[] | undefined> {
+    if (!this.config.appGoals) {
+      const others = lines.filter(message => !isGoalRound(message))
+      return others.length === 0 ? undefined : others
+    }
+    const decision = await this.dispatch.waterfall(
+      'agent/pre-step',
+      { messages: lines, turn, step: 1, signal, modelSelection: this.routeSelection() },
+      () => Promise.resolve<PreStepDecision>({ kind: 'enter', messages: lines }),
+    )
+    // As in the DeepSeek loop, a Stop during the check logs nothing; the driver put the other lines back.
+    signal.throwIfAborted()
+    return decision.kind === 'reject' ? undefined : lines
+  }
+
+  /**
+   * The route the app's step checks read for this Agent: Casper's model, or
+   * the configured label before Casper reported one.
+   * @returns a detached selection.
+   */
+  private routeSelection(): ModelSelection {
+    return this.model.current() ?? { provider: CASPER_PROVIDER, model: this.modelLabel() }
+  }
+
+  /**
+   * Log claimed lines, so no line sent to Casper is missing from the log. Each
+   * snapshot is logged right after the message that mentions it, in the
+   * prompt's order, as a Standard Session logs it.
+   * @param turn - the turn that claimed the lines.
+   * @param claimed - the lines to log.
+   * @param read - the lines whose mentions were read; undefined logs no snapshot.
+   * @param onStep - told the step the lines open.
+   */
+  private logClaimed(
+    turn: number,
+    claimed: readonly UserMessage[],
+    read: ReadonlyMap<MessageId, ReadLine> | undefined,
+    onStep: (step: number) => void,
+  ): void {
+    if (claimed.length === 0) return
     this.session.append('step/start', { turn, step: 1 })
     onStep(1)
     for (const message of claimed) {
@@ -739,7 +819,6 @@ export class CasperAgent implements Agent {
       if (line?.message === message && line.reference !== undefined) this.session.append('user/message', line.reference.context, { surfaceOp: 'append' })
     }
     this.startTitle()
-    return claimed
   }
 
   /**
@@ -866,6 +945,7 @@ export class CasperAgent implements Agent {
       record: (acpId, call) => { this.sinkFor(connection)?.writer.bridged(acpId, call) },
       resourceServers: () => connection.forwardedNames,
       subagents: this.config.appSubagents,
+      goals: this.config.appGoals,
       // A child the app's subagent tool starts is attributed to this Agent, as a Standard parent's tool call is.
       initiate: operation => this.pluginCtx.agents.withInitiator(this, operation),
       onError: (error) => { this.pluginCtx.logger.debug(`casper agent "${this.id}": app tools: ${error.message}`) },
