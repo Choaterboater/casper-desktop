@@ -13,6 +13,7 @@ import ToolRuntime from '@deepseek-ai/dsh-tools'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 import type { PostToolDecision } from '@deepseek-ai/dsh-tools'
 import { McpToolRegistrationError, publicToolName, syncTools, type ToolBridgeOptions } from '@deepseek-ai/dsh-mcp-client/src/tools.ts'
+import { mcpToolOrigin } from '@deepseek-ai/dsh-mcp-client'
 import { createTransport } from '@deepseek-ai/dsh-mcp-client/src/transport.ts'
 import { Config } from '@deepseek-ai/dsh-mcp-client'
 
@@ -26,6 +27,7 @@ interface MockTool {
   inputSchema: Record<string, unknown>
   outputSchema?: Record<string, unknown>
   execution?: { taskSupport?: 'optional' | 'required' | 'forbidden' }
+  annotations?: Record<string, unknown>
 }
 
 interface MockCallResult {
@@ -195,6 +197,46 @@ describe('syncTools', () => {
     // Raw names are NOT registered.
     expect(ctx.tools.get('greet')).toBeUndefined()
     expect(ctx.tools.get('add')).toBeUndefined()
+  })
+
+  it("keeps the server name, raw name and the server's four hints as app-side data", async () => {
+    const client = createMockClient([
+      {
+        name: 'greet',
+        description: 'Say hello',
+        inputSchema: { type: 'object', properties: {} },
+        annotations: {
+          readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false, title: 'x',
+        },
+      },
+      { name: 'plain', inputSchema: { type: 'object' } },
+      { name: 'odd', inputSchema: { type: 'object' }, annotations: { readOnlyHint: 'yes', destructiveHint: true } },
+    ])
+
+    await syncTools(client as never, ctx, defaultOpts, new Map())
+
+    expect(mcpToolOrigin(ctx.tools.get('mcp__srv__greet'))).toEqual({
+      server: 'srv',
+      rawName: 'greet',
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    })
+    expect(mcpToolOrigin(ctx.tools.get('mcp__srv__plain'))).toEqual({ server: 'srv', rawName: 'plain', annotations: {} })
+    expect(mcpToolOrigin(ctx.tools.get('mcp__srv__odd'))?.annotations).toEqual({ destructiveHint: true })
+  })
+
+  it("never puts the origin or hints in the model's tool schema", async () => {
+    const client = createMockClient([{
+      name: 'greet',
+      description: 'Say hello',
+      inputSchema: { type: 'object', properties: {} },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    }])
+
+    await syncTools(client as never, ctx, defaultOpts, new Map())
+
+    const schema = ctx.tools.schemas().find(entry => entry.name === 'mcp__srv__greet')
+    expect(schema).toEqual({ name: 'mcp__srv__greet', description: 'Say hello', parameters: { type: 'object', properties: {} } })
+    expect(JSON.stringify(ctx.tools.schemas())).not.toMatch(/Hint|mcpOrigin/)
   })
 
   it('lets two servers publish the same raw name side by side', async () => {

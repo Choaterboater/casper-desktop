@@ -6,7 +6,7 @@ import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import type { ToolExecution } from '@deepseek-ai/dsh-tools'
 import { describe, expect, it, vi } from 'vitest'
-import { createMcpToolDefinition } from '../src/index.ts'
+import { createMcpToolDefinition, mcpToolOrigin } from '../src/index.ts'
 
 describe('MCP result callback adaptation', () => {
   it('preserves the exact execution, arguments and canonical structured results', async () => {
@@ -43,6 +43,17 @@ describe('MCP result callback adaptation', () => {
     } finally {
       await ctx.fiber.dispose()
     }
+  })
+
+  it('carries no MCP origin when the caller names no server', () => {
+    const ctx = new Context()
+    const definition = createMcpToolDefinition(ctx, {
+      name: 'native_window', rawName: 'window', description: 'Read the selected window.',
+      inputSchema: { type: 'object' }, annotations: { readOnlyHint: true }, call: async () => ({ content: [] }),
+    })
+    expect(definition.mcpOrigin).toBeUndefined()
+    expect(mcpToolOrigin(definition)).toBeUndefined()
+    expect(mcpToolOrigin(undefined)).toBeUndefined()
   })
 
   it.each([null, { content: [42] }, { content: [{ type: 'image' }] }])(
