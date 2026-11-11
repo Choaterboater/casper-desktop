@@ -34,7 +34,7 @@ import type {
   PreparedReferencedMessage, SessionReferenceCandidate, SessionReferenceInput,
   SessionReferenceMentionCandidate, SessionReferenceSource,
 } from './types.ts'
-import { formatSessionReferenceMention, parseSessionReferenceText } from './uri.ts'
+import { formatSessionReferenceMention, parseSessionReferenceContent } from './uri.ts'
 
 export type * from './types.ts'
 export type { Config, SessionReferenceErrorCode } from './config.ts'
@@ -49,8 +49,10 @@ export {
   decodeSessionReferenceUri,
   encodeSessionReferenceUri,
   formatSessionReferenceMention,
+  parseSessionReferenceContent,
   parseSessionReferenceText,
 } from './uri.ts'
+export type { ParsedSessionReferenceContent } from './uri.ts'
 
 const DEFAULT_REFERENCE_CONTEXT_FRACTION = 0.2
 
@@ -152,13 +154,7 @@ export class SessionReferenceResolver extends TypertRemoteService {
   ): Promise<UserMessage[]> {
     const prepared = await Promise.all(messages.map(async (message): Promise<UserMessage[]> => {
       if (message.source.kind !== 'user') return [message]
-      const references: SessionReferenceInput[] = []
-      const content = message.content.map((block): ContentBlock => {
-        if (block.type !== 'text') return block
-        const parsed = parseSessionReferenceText(block.text)
-        references.push(...parsed.references)
-        return { type: 'text', text: parsed.text }
-      })
+      const { content, references } = parseSessionReferenceContent(message.content)
       if (references.length === 0) return [message]
       const resolved = await this.prepare(agent, content, references, route, signal)
       const direct = freezeMessage({ ...message, content: resolved.content })

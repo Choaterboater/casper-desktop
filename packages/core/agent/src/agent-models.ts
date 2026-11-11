@@ -3,11 +3,11 @@
  * models reports, and a selection recorded before the Agent reported it.
  * @module @deepseek-ai/dsh-agent/agent-models
  */
-import { ReasoningEffortId } from '@deepseek-ai/dsh-llm/brand'
 import { pluginRecordOf } from '@deepseek-ai/dsh-session'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import { z } from 'zod'
-import type { AgentModelsProjection, AgentModelsReport, ModelSelection } from './types.ts'
+import type { AgentModelGroup, AgentModelsProjection, AgentModelsReport, ModelSelection } from './types.ts'
+import { modelSelectionSchema } from './model-selection.ts'
 
 /**
  * Plugin record type of the model list report. The Casper agent declares it in
@@ -24,25 +24,32 @@ export interface AgentModelsState {
   readonly wanted: ModelSelection | null
 }
 
-const selectionSchema = z.object({
-  provider: z.string().min(1),
-  model: z.string().min(1),
-  reasoningEffort: z.string().min(1).transform(ReasoningEffortId).exactOptional(),
-}).strict()
-
-const groupSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  models: z.array(z.object({
+/**
+ * Schemas of the model list's groups and of one selection.
+ * @param unknownKeys - `strict` rejects a key this version does not know, so the
+ * projection skips a record a newer writer extended; `strip` drops such a key,
+ * so a stored copy stays readable.
+ * @returns the group and selection schemas.
+ */
+export function agentModelSchemas(unknownKeys: 'strict' | 'strip'): { readonly group: z.ZodType<AgentModelGroup>; readonly selection: z.ZodType<ModelSelection> } {
+  const object = <S extends z.ZodRawShape>(shape: S) => unknownKeys === 'strict' ? z.strictObject(shape) : z.object(shape)
+  const group = object({
     id: z.string(),
     name: z.string(),
-    description: z.string().exactOptional(),
-    reasoning: z.object({
-      efforts: z.array(z.object({ id: z.string(), name: z.string(), description: z.string().exactOptional() }).strict()),
-      defaultEffort: z.string().exactOptional(),
-    }).strict().exactOptional(),
-  }).strict()),
-}).strict()
+    models: z.array(object({
+      id: z.string(),
+      name: z.string(),
+      description: z.string().exactOptional(),
+      reasoning: object({
+        efforts: z.array(object({ id: z.string(), name: z.string(), description: z.string().exactOptional() })),
+        defaultEffort: z.string().exactOptional(),
+      }).exactOptional(),
+    })),
+  })
+  return { group, selection: unknownKeys === 'strict' ? modelSelectionSchema.strict() : modelSelectionSchema }
+}
+
+const { group: groupSchema, selection: selectionSchema } = agentModelSchemas('strict')
 
 const reportSchema = z.object({ groups: z.array(groupSchema), current: selectionSchema.nullable(), started: z.boolean() }).strict()
 

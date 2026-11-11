@@ -56,13 +56,14 @@ export const pt = {
   approve: 'Permitir',
 } satisfies Record<keyof typeof en, string>
 
-/** Display translations resolved by the Client; the answer labels on the wire stay English. */
-export const siteAccessDisplay = {
-  question: {
-    en: en.question, zh: zh.question, ja: ja.question, es: es.question, fr: fr.question, de: de.question, ru: ru.question, pt: pt.question,
-  },
-  detail: { en: en.detail, zh: zh.detail, ja: ja.detail, es: es.detail, fr: fr.detail, de: de.detail, ru: ru.detail, pt: pt.detail },
-  approve: {
-    en: en.approve, zh: zh.approve, ja: ja.approve, es: es.approve, fr: fr.approve, de: de.approve, ru: ru.approve, pt: pt.approve,
-  },
+/**
+ * One message in every language.
+ * @param key - the message.
+ * @returns its text by locale.
+ */
+function byLocale(key: keyof typeof en): { en: string; [locale: string]: string } {
+  return { en: en[key], zh: zh[key], ja: ja[key], es: es[key], fr: fr[key], de: de[key], ru: ru[key], pt: pt[key] }
 }
+
+/** Display translations resolved by the Client; the answer labels on the wire stay English. */
+export const siteAccessDisplay = { question: byLocale('question'), detail: byLocale('detail'), approve: byLocale('approve') }

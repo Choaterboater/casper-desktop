@@ -1,6 +1,7 @@
 /** Canonical session URI and inline mention encoding. */
 
 import { brandString } from '@deepseek-ai/dsh-brand'
+import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { SessionId as SessionIdType } from '@deepseek-ai/dsh-session'
 import { SessionReferenceError } from './config.ts'
 import type { SessionReferenceInput } from './types.ts'
@@ -84,6 +85,31 @@ export function parseSessionReferenceText(text: string): ParsedSessionReferenceT
     return `@${label}`
   })
   return { text: rendered, references }
+}
+
+/** Result of extracting canonical mentions from message content. */
+export interface ParsedSessionReferenceContent {
+  /** Blocks with each text block's tokens replaced by readable `@label` spans. */
+  content: ContentBlock[]
+  /** Structured references in first-appearance order, before service deduplication. */
+  references: SessionReferenceInput[]
+}
+
+/**
+ * Extract mentions from every text block of one message, as
+ * {@link parseSessionReferenceText} does for one text value.
+ * @param content - message blocks; non-text blocks are kept as they are.
+ * @returns readable blocks and structured references in appearance order.
+ */
+export function parseSessionReferenceContent(content: readonly ContentBlock[]): ParsedSessionReferenceContent {
+  const references: SessionReferenceInput[] = []
+  const rendered = content.map((block): ContentBlock => {
+    if (block.type !== 'text') return block
+    const parsed = parseSessionReferenceText(block.text)
+    references.push(...parsed.references)
+    return { type: 'text', text: parsed.text }
+  })
+  return { content: rendered, references }
 }
 
 function escapeLabel(label: string): string {

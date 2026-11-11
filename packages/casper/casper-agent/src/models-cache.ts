@@ -5,8 +5,8 @@
  */
 
 import { z } from 'zod'
+import { agentModelSchemas } from '@deepseek-ai/dsh-agent'
 import type { AgentModelGroup, ModelSelection } from '@deepseek-ai/dsh-agent'
-import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import { defineDomain } from '@deepseek-ai/dsh-storage-domain'
 import type { Domain, DomainFacility } from '@deepseek-ai/dsh-storage-domain'
 
@@ -18,24 +18,9 @@ export interface CasperModelsRecord {
   readonly current: ModelSelection | null
 }
 
-const effortSchema = z.object({ id: z.string(), name: z.string(), description: z.string().exactOptional() })
-const groupSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  models: z.array(z.object({
-    id: z.string(),
-    name: z.string(),
-    description: z.string().exactOptional(),
-    reasoning: z.object({ efforts: z.array(effortSchema), defaultEffort: z.string().exactOptional() }).exactOptional(),
-  })),
-})
-const selectionSchema = z.object({
-  provider: z.string().min(1),
-  model: z.string().min(1),
-  reasoningEffort: z.string().min(1).transform(ReasoningEffortId).exactOptional(),
-})
-
-const recordSchema = z.object({ groups: z.array(groupSchema), current: selectionSchema.nullable() })
+// Unknown keys are dropped, as before, so a stored record written with more fields still opens.
+const { group, selection } = agentModelSchemas('strip')
+const recordSchema = z.object({ groups: z.array(group), current: selection.nullable() })
 
 /** One global record: the last model list any Casper process sent. */
 export const casperModelsDomain = defineDomain({

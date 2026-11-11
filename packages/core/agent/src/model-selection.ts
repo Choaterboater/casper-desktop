@@ -59,11 +59,14 @@ function selectionOfHeader({ config, adapterDefaults }: EpochHeader): ModelSelec
   return toSelection(config.provider, config.model, adapterDefaults?.reasoningEffort === true ? undefined : config.reasoningEffort)
 }
 
-const selectionSchema = z.object({
+/** One recorded model selection; unknown keys are stripped. */
+export const modelSelectionSchema = z.object({
   provider: z.string().min(1),
   model: z.string().min(1),
   reasoningEffort: z.string().min(1).transform(ReasoningEffortId).exactOptional(),
-}).nullable()
+})
+
+const selectionSchema = modelSelectionSchema.nullable()
 
 /**
  * Session selection fold: recorded selections become

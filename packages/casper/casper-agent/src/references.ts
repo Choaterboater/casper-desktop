@@ -9,8 +9,8 @@
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { ContentBlock, MessageId } from '@deepseek-ai/dsh-llm'
 import type { SessionId, UserMessage } from '@deepseek-ai/dsh-session'
-import { parseSessionReferenceText, SESSION_REFERENCE_SCHEME, SessionReferenceError } from '@deepseek-ai/dsh-session-reference'
-import type { SessionReferenceErrorCode, SessionReferenceInput, SessionReferenceResolver } from '@deepseek-ai/dsh-session-reference'
+import { parseSessionReferenceContent, SESSION_REFERENCE_SCHEME, SessionReferenceError } from '@deepseek-ai/dsh-session-reference'
+import type { SessionReferenceErrorCode, SessionReferenceResolver } from '@deepseek-ai/dsh-session-reference'
 import { CasperError } from './connection.ts'
 import { CASPER_PROVIDER } from './turn.ts'
 
@@ -77,13 +77,7 @@ export async function prepareReferences(
   try {
     for (const message of messages) {
       if (message.source.kind !== 'user') continue
-      const references: SessionReferenceInput[] = []
-      const content = message.content.map((block): ContentBlock => {
-        if (block.type !== 'text') return block
-        const parsed = parseSessionReferenceText(block.text)
-        references.push(...parsed.references)
-        return { type: 'text', text: parsed.text }
-      })
+      const { content, references } = parseSessionReferenceContent(message.content)
       const first = references[0]
       if (first === undefined) continue
       const resolved = await resolver.prepare(agent, content, references, { provider: CASPER_PROVIDER, model }, signal)
