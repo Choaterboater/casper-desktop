@@ -1,0 +1,85 @@
+# Casper CI: the checks this repository runs on GitHub's own runners.
+#
+# The other workflows in this folder come from upstream. They need upstream's
+# secrets, self-hosted runners and release accounts, so each one is switched off in
+# this repository's Actions settings rather than edited: their files stay as upstream
+# has them, which keeps upstream updates easy to merge. An upstream update that adds a
+# new workflow file needs that file switched off the same way.
+name: Casper CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '24'
+  # Nothing in CI reports to upstream's telemetry endpoint.
+  DSH_TELEMETRY_DISABLED: '1'
+
+jobs:
+  checks:
+    name: static, types and lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      # Full history: the archived-notes gate compares against the base commit.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install (immutable)
+        run: pnpm install --frozen-lockfile
+
+      - name: Static gates
+        env:
+          DSH_ARCHIVE_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD' }}
+        run: pnpm run check:ci:static
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Lint and duplication
+        run: pnpm run check:ci:lint:contracts-ready
+
+  tests:
+    name: unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install (immutable)
+        run: pnpm install --frozen-lockfile
+
+      # The sandbox tests use bubblewrap, which Ubuntu runners restrict by default.
+      - name: Prepare bubblewrap
+        run: bash scripts/prepare-ci-bubblewrap.sh
+
+      - name: Unit tests
+        run: pnpm run check:ci:unit

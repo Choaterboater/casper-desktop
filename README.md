@@ -55,6 +55,8 @@ Start with the [development guide](docs/development.md) and [architecture docume
 
 For agents, follow [AGENTS.md](AGENTS.md).
 
+Pull requests and pushes to `main` run [Casper CI](.github/workflows/casper-ci.yml) on GitHub's own runners: static gates, typecheck, lint and the unit tests. The other workflows in `.github/workflows` come from upstream; they need upstream's secrets and runners, so they are switched off in this repository's Actions settings and left unedited.
+
 ## Citation
 
 ```bibtex
