@@ -29,7 +29,7 @@ The Desktop profile mounts the plugin from `packages/bundle/web-app/cordis.patch
 | Field | Default | Meaning |
 |---|---|---|
 | `presets` | `['casper']` | Presets whose Sessions Casper drives |
-| `command` | `casper` | Casper executable; the Desktop row looks it up on PATH, `~/.local/bin`, `~/.bun/bin`, `/opt/homebrew/bin`, and `/usr/local/bin` |
+| `command` | `casper` | Casper executable; the Desktop row looks it up on PATH, `~/.local/bin`, `~/.bun/bin`, `/opt/homebrew/bin`, and `/usr/local/bin`. On Windows, when that finds nothing, the plugin also tries `casper` on PATH with each PATHEXT ending, then `casper.exe` in `CASPER_INSTALL_DIR`, `%LOCALAPPDATA%\Programs\casper` (Casper's installer folder), and `%BUN_INSTALL%\bin`; a `.cmd`, `.bat`, or other script it finds is named in the error, not started. A `command` other than `casper` or `casper.exe` turns this off |
 | `args` | `['acp']` | Arguments that start Casper's ACP server |
 | `model` | unset | Start model, passed as `--model`; unset keeps Casper's own default. The [model picker](#model-picker) changes it per Session |
 | `effort` | unset | Start effort, passed as `--effort`; unset keeps Casper's own default. The model picker changes it per Session |
@@ -57,6 +57,7 @@ A turn that cannot run ends with an error on `turn/end`: `CASPER_NOT_FOUND` when
 | File | Role |
 |---|---|
 | [`src/index.ts`](src/index.ts) | Plugin entry: registers the projections, opens the sidecar, and registers the factory route |
+| [`src/lookup.ts`](src/lookup.ts) | Finds the Casper executable, with the Windows fallback to the installer's and bun's folders |
 | [`src/route.ts`](src/route.ts) | Selects root Sessions on the configured presets; delegated children stay on agent-loop |
 | [`src/factory.ts`](src/factory.ts) | Creates and resumes Agents with agent-loop's publication order, refuses forks, and tears every Agent down in parallel on unload |
 | [`src/agent.ts`](src/agent.ts) | `CasperAgent`: inbox, phases, one prompt per turn, steering sent to the prompt in flight, cancel, and process restart |
@@ -247,7 +248,7 @@ The plugin sends no model request, so it has no cache effect; Casper's own reque
 - Forking a Casper Session is refused.
 - `dsh --profile acp` and the SDK server reopen a stored Session with no preset and have no Casper driver, so a Casper Session reopened there runs on the app's own agent loop and a model that app chooses, not in Casper. The next time Desktop opens it, Casper reloads its own conversation, which does not have the turns added elsewhere. The one-shot runner refuses a Session that records a preset, and webhooks only create new Sessions on the preset their rule names.
 - Scheduled tasks run in Casper when they have no saved preset: a task made on the Schedule page creates its Session on the default preset, which is Casper on Desktop unless Settings names another. A task made by a Standard Session's reminder tools keeps that Session's preset, and a task aimed at an existing Casper Session runs there as its next prompt. Casper Sessions have no reminder tools of their own.
-- Only Desktop on macOS and Linux is covered; the Windows lookup is untested.
+- Only Desktop on macOS and Linux has run Casper Sessions. On Windows the executable lookup is checked by unit tests only, and the app does not read the Path the installer saved, so a custom install folder outside the app's own environment is found only after the app restarts.
 - A deleted Session's sidecar record goes only at the next start, and an archived Session keeps its process until it is idle for `idleExitMs`. A Casper from before decision 91 is never closed while idle.
 - Subagent, team, and goal features do not run inside Casper Sessions.
 - A Casper Session's written title is made on the app's default model, which may be a DeepSeek model, not on the model Casper runs.
