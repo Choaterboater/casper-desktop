@@ -33,7 +33,7 @@ import type { CommandResult } from '@deepseek-ai/dsh-commands'
 import type { CredentialRef } from '@deepseek-ai/dsh-credentials'
 import { createUserMessage, MessageId } from '@deepseek-ai/dsh-llm'
 import type { LlmFailure } from '@deepseek-ai/dsh-llm'
-// Type-only: `ctx.mcpManager`, whose Settings servers are handed to Casper.
+// Type-only: `ctx.mcpManager`, whose Settings and plugin-registered servers are handed to Casper.
 import type {} from '@deepseek-ai/dsh-mcp-manager'
 import { CUSTOM_PRESET } from '@deepseek-ai/dsh-permission-presets'
 // Type-only: the `plan/mode` event and the `plan` projection the composer's plan chip reads.
@@ -834,8 +834,9 @@ export class CasperAgent implements Agent {
   }
 
   /**
-   * The builder of the Settings servers handed to Casper, when forwarding is on and the app has an MCP manager.
-   * A server left out is logged with its reason, never with a value.
+   * The builder of the Settings servers, then the plugin-registered ones unless `forwardPluginMcpServers` is off,
+   * handed to Casper, when forwarding is on and the app has an MCP manager. Each build reads both again, so a plugin
+   * that loads or unloads reaches Casper at the next turn. A server left out is logged with its reason, never with a value.
    * @returns the builder, or undefined when nothing is forwarded.
    */
   private forwarder(): ((signal: AbortSignal) => Promise<ForwardedServers>) | undefined {
@@ -845,6 +846,7 @@ export class CasperAgent implements Agent {
       const credentials = this.pluginCtx.get('credentials')
       return forwardedServers({
         entries: manager.config.servers.get(),
+        registered: this.config.forwardPluginMcpServers ? manager.registeredEntries() : {},
         // Without a credentials provider, a server that names a credential is left out as not set.
         credential: ref => credentials === undefined
           ? Promise.resolve(undefined)
@@ -857,7 +859,7 @@ export class CasperAgent implements Agent {
   }
 
   /**
-   * Before a turn, rebuild the Settings servers the live Casper was handed. When they changed, Casper is closed, and
+   * Before a turn, rebuild the Settings and plugin-registered servers the live Casper was handed. When they changed, Casper is closed, and
    * this turn reopens it through `session/load` with the new list; the session's "Yes, for this session" answers end
    * with it. A rebuild that fails keeps the live Casper, and so does one that leaves out a server Casper was handed for
    * a reason that may pass, so a slow credential store neither drops that server nor restarts Casper twice, unless

@@ -15,8 +15,8 @@
   en: 76368b6b1da79c80
   zh: 52384aee991ac542
 /deepseek-ai-dsh-casper-agent/use-this-package:
-  en: d2cb098e81b1831b
-  zh: 6d603caab4b31b97
+  en: 537ebfc05dc41928
+  zh: 0f60e79e18e85204
 /deepseek-ai-dsh-casper-agent/understand-the-implementation:
   en: 01814950180eb1c9
   zh: 7928e315cf0f1219
@@ -42,23 +42,23 @@
   en: 2a3e7478cef21506
   zh: 84e2a33c086577d9
 /deepseek-ai-dsh-casper-agent/understand-the-implementation/app-tools:
-  en: d8d806d85046f64f
-  zh: 1590955a3787e899
+  en: 38dc6a2cc6698518
+  zh: d66b0dd75183add9
 /deepseek-ai-dsh-casper-agent/understand-the-implementation/settings-mcp-servers:
-  en: ad3ef7e2ed015c53
-  zh: 5772b82dba139c64
+  en: 4ef1e35491596477
+  zh: 0b8275c00176fa6b
 /deepseek-ai-dsh-casper-agent/understand-the-implementation/session-mentions:
   en: 86e2f691f8889ba4
   zh: b1b82e319dc34329
 /deepseek-ai-dsh-casper-agent/model-experience:
-  en: f7662558229b7264
-  zh: 1d9d505533cfe65f
+  en: 845c76a28bf18753
+  zh: 7027c3e8418ff762
 /deepseek-ai-dsh-casper-agent/model-experience/kv-cache-effect:
   en: 99237c3b88b098af
   zh: da166b221288cd59
 /deepseek-ai-dsh-casper-agent/known-limitations-and-deferred-work:
-  en: d025aadc5a615854
-  zh: d9baee6ee0e2fef5
+  en: b19b97d64d7bb827
+  zh: cc56a8f66803b322
 /deepseek-ai-dsh-casper-agent/known-limitations-and-deferred-work/dev-note:
   en: 8b511eb13bb5a128
   zh: 8f0a85f8303f5440

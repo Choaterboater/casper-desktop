@@ -524,6 +524,11 @@ export interface Config {
    */
   forwardMcpServers: boolean
   /**
+   * Also hand Casper the servers plugins register with the MCP manager, after the Settings servers and within the
+   * same 7; needs forwardMcpServers. A plugin that loads or unloads reaches Casper at the next turn.
+   */
+  forwardPluginMcpServers: boolean
+  /**
    * Idle time after which the plugin asks Casper whether it may close the process (`_casper/idle`); a Casper that
    * says it is idle is closed and the next prompt reopens its conversation. 0 keeps the process until the Session closes.
    */

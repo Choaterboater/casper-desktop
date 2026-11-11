@@ -132,7 +132,7 @@ function serverList(servers: readonly string[]): string {
 /**
  * The app's name for a server Casper names: `acp-x` is `x`.
  * @param server - the server argument Casper sent.
- * @returns the name in the app's Settings.
+ * @returns the name the app gives it in Settings or in a plugin registration.
  */
 export function appServerName(server: string): string {
   return server.startsWith(ACP_PREFIX) ? server.slice(ACP_PREFIX.length) : server
@@ -197,7 +197,7 @@ export interface AppToolsOptions {
   /** Whether the app runs from installed packages, which carry no `lib/types`, `src/` or repository `docs/`. */
   readonly installed: boolean
   /**
-   * The Settings servers this connection hands Casper, which the resource tools reach; read at each request.
+   * The Settings and plugin-registered servers this connection hands Casper, which the resource tools reach; read at each request.
    * @returns their names, without Casper's `acp-` prefix; none when omitted.
    */
   readonly resourceServers?: (() => readonly string[]) | undefined
