@@ -40,7 +40,7 @@ export const inject = ['slots', 'locale', 'uiConversation']
  * @param ctx - Client root context.
  */
 export function apply(ctx: ClientContext): void {
-  ctx.effect(() => ctx.locale.register(NS, { zh, en, ja, es, fr, de, ru, pt }), 'casper-agent: receipt dictionaries')
+  ctx.effect(() => ctx.locale.register(NS, { zh, en, ja, es, fr, de, ru, pt }), 'casper-agent: card dictionaries')
   const match = receiptDefinition.match.bind(receiptDefinition)
   ctx.effect(() => ctx.uiConversation.events.register({
     ...receiptDefinition,
@@ -50,6 +50,7 @@ export function apply(ctx: ClientContext): void {
     name: 'conversation.composer',
     priority: -1,
     select: ({ pendingInteraction }: ComposerChainProps) => selectCasperBox(pendingInteraction),
+    locale: NS,
   }, CasperBoxCard))
   ctx.slots.inject('conversation.chat.turnTail', () => ctx.slots.register(
     { name: 'conversation.chat.turnTail', id: CASPER_RECEIPT, locale: NS },

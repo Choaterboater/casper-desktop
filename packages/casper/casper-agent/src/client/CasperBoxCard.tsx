@@ -6,9 +6,10 @@
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
 import { Button, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ComposerChainProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
-import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { PendingQuestion, QuestionAnswer } from '@deepseek-ai/dsh-client-ui-user-questions/client'
 import { CASPER_BOX_HEADER, MAX_CARD_OPTIONS, PERMISSION_QUESTION_ID } from '../box.ts'
+import type { NS } from './locales.ts'
 import css from './CasperBoxCard.module.css'
 
 /** How long the card waits before a click or key counts, so a key meant for the composer answers nothing. */
@@ -57,20 +58,20 @@ export function selectCasperBox(pending: ComposerChainProps['pendingInteraction'
     : null
 }
 
-/** Props of the composer entry: the chain's runtime share and the selected box. */
-export type CasperBoxCardProps = PropsRuntime<'conversation.composer'> & { matched: CasperBox }
+/** Props of the composer entry: the chain's runtime share, the card's copy and the selected box. */
+export type CasperBoxCardProps = PropsRuntime<'conversation.composer'> & PropsLocale<typeof NS> & { matched: CasperBox }
 
 /**
  * Render the selected box as Casper's card, reset for each box. The card
- * reads only the selected box from the chain's props.
- * @param props - the selected box.
+ * reads only the selected box and its copy from the chain's props.
+ * @param props - the selected box and the card's translate.
  * @returns the card.
  */
-export function CasperBoxCard(props: Pick<CasperBoxCardProps, 'matched'>) {
-  return <BoxFlow key={props.matched.key} box={props.matched} />
+export function CasperBoxCard(props: Pick<CasperBoxCardProps, 'matched' | 't'>) {
+  return <BoxFlow key={props.matched.key} box={props.matched} t={props.t} />
 }
 
-function BoxFlow({ box }: { box: CasperBox }) {
+function BoxFlow({ box, t }: { box: CasperBox; t: CasperBoxCardProps['t'] }) {
   const idPrefix = useId()
   const snapshot = useSyncExternalStore(box.subscribe, box.snapshot)
   const question = box.questions[0]
@@ -133,7 +134,7 @@ function BoxFlow({ box }: { box: CasperBox }) {
       onCompositionEndCapture={() => { composing.current = false; compositionEnded.current = true }}>
       <div className={css.card}>
         <div className={css.strip}><StateDot state={busy ? 'ongoing' : 'warning'} />{question.header}</div>
-        <div className={css.body} tabIndex={0} role="group" aria-label="Box details">
+        <div className={css.body} tabIndex={0} role="group" aria-label={t('box.details')}>
           <div className={css.headline}>{title}</div>
           {body !== '' && <pre className={css.detail}>{body}</pre>}
         </div>
