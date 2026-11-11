@@ -55,6 +55,15 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-sdk-app` | yes | The dsh SDK profile bundle: stdio JSON-RPC serving and process lifecycle over dsh-base |
 | `@deepseek-ai/dsh-web-app` | yes | The dsh browser-surface bundle: the web patch layer over dsh-base plus the runtime glue plugin (frontend dist serving, bash runtime variables, URL line) |
 
+## casper
+
+| Package | Config | Description |
+|---|---|---|
+| `@deepseek-ai/dsh-casper-agent` | yes | Casper agent: drive a Session with the Casper agent over its ACP server instead of the DeepSeek agent loop |
+| `@deepseek-ai/dsh-casper-checks` | yes | Casper checks: run the project's own checks after edits, send real failures back for repair, close the turn with a receipt, and never report a check that did not run as passed |
+| `@deepseek-ai/dsh-casper-sidebar-browser` | no | Casper Sidebar browser tools: let the agent list, open, read, and screenshot the Desktop app's browser tabs, and click and type on sites the user allows |
+| `@deepseek-ai/dsh-casper-sidebar-browser-client` | no | Desktop Client half of the Casper Sidebar browser tools: runs the agent's browser requests in the browser tabs of the Session they belong to |
+
 ## client
 
 | Package | Config | Description |
@@ -130,7 +139,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | Package | Config | Description |
 |---|---|---|
 | `@deepseek-ai/dsh-command-compact` | no | Human-facing slash command for explicit session compaction |
-| `@deepseek-ai/dsh-compaction-basic` | yes | Token-meter-driven compaction policy and LLM summarization backend for the Casper |
+| `@deepseek-ai/dsh-compaction-basic` | yes | Token-meter-driven compaction policy and LLM summarization backend for Casper |
 | `@deepseek-ai/dsh-compaction-image-offload` | no | Durable image offload for image-capable routes: replace over-budget request images with placeholders and retry |
 | `@deepseek-ai/dsh-compaction-tool-result-pruner` | yes | Replay-safe model-free head/middle/tail pruning for tool-result surface nodes |
 
@@ -155,22 +164,22 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 
 | Package | Config | Description |
 |---|---|---|
-| `@deepseek-ai/dsh-agent` | no | Agent interface, registry, initiator scope, and event vocabulary for the Casper |
+| `@deepseek-ai/dsh-agent` | no | Agent interface, registry, initiator scope, and event vocabulary for Casper |
 | `@deepseek-ai/dsh-agent-default-model` | yes | Default model selection shared by Agent entry points |
-| `@deepseek-ai/dsh-agent-loop` | yes | The concrete agent loop plugin for the Casper |
+| `@deepseek-ai/dsh-agent-loop` | yes | The concrete agent loop plugin for Casper |
 | `@deepseek-ai/dsh-agent-tool-presentation` | yes | Deprecated tool presentation selector; use dsh-tool-executor-native or dsh-tool-executor-ptc directly |
-| `@deepseek-ai/dsh-session` | no | Event-sourced session store for the Casper |
-| `@deepseek-ai/dsh-system-prompt` | yes | System prompt assembly registry for the Casper |
+| `@deepseek-ai/dsh-session` | no | Event-sourced session store for Casper |
+| `@deepseek-ai/dsh-system-prompt` | yes | System prompt assembly registry for Casper |
 | `@deepseek-ai/dsh-tool-executor-native` | no | Native tool execution plugin |
 | `@deepseek-ai/dsh-tool-executor-ptc` | yes | PTC program execution, tool bindings, and generated SDK prompts |
-| `@deepseek-ai/dsh-tools` | no | Tool registry and execution pipeline for the Casper |
+| `@deepseek-ai/dsh-tools` | no | Tool registry and execution pipeline for Casper |
 
 ## credentials
 
 | Package | Config | Description |
 |---|---|---|
 | `@deepseek-ai/dsh-authorization` | no | Authorization seam (ctx.authorization): plugin-owned flows that obtain a credential through a conversation with the human |
-| `@deepseek-ai/dsh-credentials-local` | yes | File-backed credentials provider ($DSH_HOME/.env under the live process environment) for the Casper |
+| `@deepseek-ai/dsh-credentials-local` | yes | File-backed credentials provider ($DSH_HOME/.env under the live process environment) for Casper |
 | `@deepseek-ai/dsh-deepseek-account-platform` | yes | Authorize DeepSeek accounts through browser PKCE |
 
 ## deliverables
@@ -178,8 +187,8 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | Package | Config | Description |
 |---|---|---|
 | `@deepseek-ai/dsh-deliverable-file-references` | no | Shared model guidance for file links and deliverables across Casper hosts |
-| `@deepseek-ai/dsh-tool-present` | yes | Explicit workspace file delivery declarations for the Casper |
-| `@deepseek-ai/dsh-workspace-changes` | yes | Per-turn workspace file changes recorded from git working-tree snapshots and whole-file captures, with per-file comparisons, for the Casper |
+| `@deepseek-ai/dsh-tool-present` | yes | Explicit workspace file delivery declarations for Casper |
+| `@deepseek-ai/dsh-workspace-changes` | yes | Per-turn workspace file changes recorded from git working-tree snapshots and whole-file captures, with per-file comparisons, for Casper |
 
 ## document
 
@@ -200,7 +209,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-experimental-api-speech-to-text` | yes | Authenticated experimental speech transcription for browser clients |
 | `@deepseek-ai/dsh-experimental-auto-review` | no | Per-tool LLM authorization review for the Casper Auto permission preset |
 | `@deepseek-ai/dsh-experimental-browser-use-chrome-devtools-mcp` | yes | Experimental per-Session Chromium browser tools through chrome-devtools-mcp |
-| `@deepseek-ai/dsh-experimental-browser-use-playwright-mcp` | yes | Experimental per-Session Chromium browser tools through @playwright/mcp |
+| `@deepseek-ai/dsh-experimental-browser-use-playwright-mcp` | yes | Experimental per-Session Chromium browser tools, or tools in the user's own Chrome, through @playwright/mcp |
 | `@deepseek-ai/dsh-experimental-browser-use-stagehand-native` | yes | Experimental Stagehand browser tools with separately configured native models |
 | `@deepseek-ai/dsh-experimental-claude-code-mods` | yes | Experimental bridge: load Claude Code mods (hooks modules) and run their hook chains on Casper extension points |
 | `@deepseek-ai/dsh-experimental-client-ui-claude-code-mods` | no | Web band above the prompt for Claude Code mods: draws each session's mod tree and sends button presses back to the bridge |
@@ -267,7 +276,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | Package | Config | Description |
 |---|---|---|
 | `@deepseek-ai/dsh-command-goal` | no | Human-facing slash command for persisted same-session goals |
-| `@deepseek-ai/dsh-goal` | yes | Event-sourced same-session goal state and lifecycle service for the Casper |
+| `@deepseek-ai/dsh-goal` | yes | Event-sourced same-session goal state and lifecycle service for Casper |
 | `@deepseek-ai/dsh-goal-round-driver` | no | Race-fenced same-session goal-round driver |
 | `@deepseek-ai/dsh-tool-goal` | yes | Model-facing same-session goal tools with execution-time authority checks |
 
@@ -313,13 +322,13 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | Package | Config | Description |
 |---|---|---|
 | `@deepseek-ai/dsh-deepseek-llm-api-extensions` | no | Additive request-field registry for the official DeepSeek LLM API adapter |
-| `@deepseek-ai/dsh-llm` | no | Provider-neutral LLM service interface for the Casper |
+| `@deepseek-ai/dsh-llm` | no | Provider-neutral LLM service interface for Casper |
 | `@deepseek-ai/dsh-llm-deepseek-account` | yes | DeepSeek account provider authentication and discovery |
 | `@deepseek-ai/dsh-llm-deepseek-api-key` | yes | DeepSeek api-key provider authentication and discovery |
 | `@deepseek-ai/dsh-llm-pi-ai` | yes | pi-ai-backed DeepSeek adapter for the Casper LLM seam (design-verification twin of dsh-llm-deepseek) |
-| `@deepseek-ai/dsh-llm-retry` | yes | Provider-routed LLM request retry policy for the Casper |
+| `@deepseek-ai/dsh-llm-retry` | yes | Provider-routed LLM request retry policy for Casper |
 | `@deepseek-ai/dsh-plugin-package-inventory-deepseek` | yes | Active Loader-backed plugin package inventory for official DeepSeek LLM API requests |
-| `@deepseek-ai/dsh-token-meter` | yes | Replay-aware token measurement service (ctx.tokenMeter) for the Casper |
+| `@deepseek-ai/dsh-token-meter` | yes | Replay-aware token measurement service (ctx.tokenMeter) for Casper |
 
 ## lsp
 
@@ -349,7 +358,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 |---|---|---|
 | `@deepseek-ai/dsh-agent-preset` | yes | Declare an Agent capability composition in Cordis YAML |
 | `@deepseek-ai/dsh-agent-preset-registry` | yes | Declarative Agent preset registry and profile-backed editing |
-| `@deepseek-ai/dsh-persona` | yes | Composition-authored deployment persona section for the Casper |
+| `@deepseek-ai/dsh-persona` | yes | Composition-authored deployment persona section for Casper |
 
 ## ptc-runtime
 
@@ -384,14 +393,14 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-message-quotes` | no | Selected-text quotation and Markdown blockquote presentation |
 | `@deepseek-ai/dsh-session-checkpoint-policy` | no | Semantic session durability checkpoints before model requests and tool side effects |
 | `@deepseek-ai/dsh-session-log-deepseek` | yes | Incremental lossless session-log request extension for the official DeepSeek LLM API |
-| `@deepseek-ai/dsh-session-persistence-jsonl` | yes | JSONL durable session persistence backend for the Casper |
+| `@deepseek-ai/dsh-session-persistence-jsonl` | yes | JSONL durable session persistence backend for Casper |
 | `@deepseek-ai/dsh-session-projection` | no | Session-projection seam: the merge-extensible projection type table, the provider contract, and the ctx.sessionProjections registry serving whole current values of log-derived per-session state |
 | `@deepseek-ai/dsh-session-projection-cache` | yes | Persisted projection cache (ctx.sessionProjectionCache): durable per-session checkpoint records on the session_projcache storage domain (per-record layout), throttled write-behind, and the cached listing read |
-| `@deepseek-ai/dsh-session-stats` | no | Whole-log conversation counts and wall times projection (sessionStats) for the Casper |
+| `@deepseek-ai/dsh-session-stats` | no | Whole-log conversation counts and wall times projection (sessionStats) for Casper |
 | `@deepseek-ai/dsh-session-telemetry-otel` | yes | Feedback-authorized Session logs over byte-bounded OpenTelemetry HTTP requests |
-| `@deepseek-ai/dsh-session-title` | yes | Log-backed session title service and provider registry for the Casper |
+| `@deepseek-ai/dsh-session-title` | yes | Log-backed session title service and provider registry for Casper |
 | `@deepseek-ai/dsh-session-title-first-prompt-llm` | yes | First-message LLM provider plugin for Casper session titles |
-| `@deepseek-ai/dsh-session-turn-outline` | no | Whole-log turn outline projection (turnOutline) for the Casper |
+| `@deepseek-ai/dsh-session-turn-outline` | no | Whole-log turn outline projection (turnOutline) for Casper |
 | `@deepseek-ai/dsh-tool-working-directory` | no | Read and change the active Session working directory |
 | `@deepseek-ai/dsh-working-directory` | yes | Session working directories with durable changes and model context |
 
@@ -406,7 +415,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 
 | Package | Config | Description |
 |---|---|---|
-| `@deepseek-ai/dsh-settings` | no | Abstract user-settings seam (ctx.settings) for the Casper |
+| `@deepseek-ai/dsh-settings` | no | Abstract user-settings seam (ctx.settings) for Casper |
 
 ## shell
 
@@ -426,10 +435,10 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 
 | Package | Config | Description |
 |---|---|---|
-| `@deepseek-ai/dsh-skill` | yes | Agent skill provider registry for the Casper |
-| `@deepseek-ai/dsh-skill-filesystem` | yes | Local filesystem skill provider for the Casper |
+| `@deepseek-ai/dsh-skill` | yes | Agent skill provider registry for Casper |
+| `@deepseek-ai/dsh-skill-filesystem` | yes | Local filesystem skill provider for Casper |
 | `@deepseek-ai/dsh-skill-office` | yes | Bundled Word, PowerPoint, and Excel workflows and LibreOffice Kit operations |
-| `@deepseek-ai/dsh-tool-skill` | yes | Model-facing skill loading tool for the Casper |
+| `@deepseek-ai/dsh-tool-skill` | yes | Model-facing skill loading tool for Casper |
 | `@deepseek-ai/dsh-tool-workspace-dependencies` | yes | The load_workspace_dependencies tool: absolute paths into a bundled Python, Node.js, and pnpm payload |
 
 ## spill
@@ -452,8 +461,8 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 
 | Package | Config | Description |
 |---|---|---|
-| `@deepseek-ai/dsh-storage` | no | Storage hub (ctx.storage): named backend registry plus mounted data-form facilities for the Casper |
-| `@deepseek-ai/dsh-storage-domain` | yes | Domain data form (ctx.storage.domain): schema-validated, event-emitting KV domains over storage backends for the Casper |
+| `@deepseek-ai/dsh-storage` | no | Storage hub (ctx.storage): named backend registry plus mounted data-form facilities for Casper |
+| `@deepseek-ai/dsh-storage-domain` | yes | Domain data form (ctx.storage.domain): schema-validated, event-emitting KV domains over storage backends for Casper |
 | `@deepseek-ai/dsh-storage-json` | yes | JSON file KV storage backend for the Casper storage hub |
 | `@deepseek-ai/dsh-storage-sqlite` | yes | SQLite storage backend (kv facet) for the Casper storage hub |
 
@@ -536,4 +545,4 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 
 | Package | Config | Description |
 |---|---|---|
-| `@deepseek-ai/dsh-workspace` | no | Workspace entity registry (ctx.workspaceRegistry): durable workspace records with validated session attachment over the domain data form for the Casper |
+| `@deepseek-ai/dsh-workspace` | no | Workspace entity registry (ctx.workspaceRegistry): durable workspace records with validated session attachment over the domain data form for Casper |
