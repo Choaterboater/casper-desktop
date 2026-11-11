@@ -152,7 +152,6 @@ flowchart TD
   end
   subgraph group_casper["packages/casper"]
     pkg_casper_agent["casper-agent"]
-    pkg_casper_bundle["casper-bundle"]
     pkg_casper_checks["casper-checks"]
     pkg_casper_sidebar_browser["casper-sidebar-browser"]
     pkg_casper_sidebar_browser_client["casper-sidebar-browser-client"]
@@ -1483,6 +1482,7 @@ flowchart TD
   pkg_casper_agent --> pkg_session_persistence
   pkg_casper_agent --> pkg_session_projection
   pkg_casper_agent --> pkg_session_reference
+  pkg_casper_agent --> pkg_session_title
   pkg_casper_agent --> pkg_skill
   pkg_casper_agent --> pkg_storage_domain
   pkg_casper_agent --> pkg_subprocess
@@ -1596,7 +1596,6 @@ flowchart TD
 | [`base`](../packages/bundle/base) | `bundle` | — |
 | [`sdk-app`](../packages/bundle/sdk-app) | `bundle` | — |
 | [`sdk-minimal`](../packages/bundle/sdk-minimal) | `bundle` | — |
-| [`casper-bundle`](../packages/casper/casper-bundle) | `casper` | — |
 | [`casper-sidebar-browser-client`](../packages/casper/sidebar-browser-client) | `casper` | — |
 | [`client-file-upload`](../packages/client/file-upload) | `client` | — |
 | [`client-hmr`](../packages/client/hmr) | `client` | — |
@@ -1930,7 +1929,7 @@ flowchart TD
 | [`sdk-protocol`](../packages/sdk/protocol) | `sdk` | [`commands`](../packages/interaction/commands), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`subagent`](../packages/subagent/subagent), [`user-questions`](../packages/interaction/user-questions) |
 | [`agent-team`](../packages/team/agent-team) | `team` | [`agent`](../packages/core/agent), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`session-persistence`](../packages/session/session-persistence), [`session-projection`](../packages/session/session-projection), [`subagent`](../packages/subagent/subagent), [`typert-protocol`](../packages/typert/protocol) |
 | [`workflow-ptc`](../packages/workflow/workflow-ptc) | `workflow` | [`agent`](../packages/core/agent), [`llm`](../packages/llm/llm), [`ptc-runtime`](../packages/ptc-runtime/ptc-runtime), [`sandbox`](../packages/sandbox/sandbox), [`sandbox-policy`](../packages/sandbox/sandbox-policy), [`session`](../packages/core/session), [`subagent`](../packages/subagent/subagent), [`tools`](../packages/core/tools), [`workflow`](../packages/workflow/workflow), [`working-directory`](../packages/session/working-directory) |
-| [`casper-agent`](../packages/casper/casper-agent) | `casper` | [`agent`](../packages/core/agent), [`agent-loop`](../packages/core/agent-loop), [`app-boot`](../packages/boot/app-boot), [`attachment`](../packages/attachment/attachment), [`commands`](../packages/interaction/commands), [`credentials`](../packages/credentials/credentials), [`llm`](../packages/llm/llm), [`mcp-client`](../packages/mcp/mcp-client), [`mcp-manager`](../packages/mcp/mcp-manager), [`permission-presets`](../packages/interaction/permission-presets), [`plan-mode`](../packages/plan/plan-mode), [`sandbox-policy`](../packages/sandbox/sandbox-policy), [`scope`](../packages/core/scope), [`session`](../packages/core/session), [`session-persistence`](../packages/session/session-persistence), [`session-projection`](../packages/session/session-projection), [`session-reference`](../packages/context/session-reference), [`skill`](../packages/skill/skill), [`storage-domain`](../packages/storage/storage-domain), [`subprocess`](../packages/subprocess/subprocess), [`tool-todo`](../packages/todo/tool-todo), [`tools`](../packages/core/tools), [`user-questions`](../packages/interaction/user-questions), [`util-code-language`](../packages/util/code-language) |
+| [`casper-agent`](../packages/casper/casper-agent) | `casper` | [`agent`](../packages/core/agent), [`agent-loop`](../packages/core/agent-loop), [`app-boot`](../packages/boot/app-boot), [`attachment`](../packages/attachment/attachment), [`commands`](../packages/interaction/commands), [`credentials`](../packages/credentials/credentials), [`llm`](../packages/llm/llm), [`mcp-client`](../packages/mcp/mcp-client), [`mcp-manager`](../packages/mcp/mcp-manager), [`permission-presets`](../packages/interaction/permission-presets), [`plan-mode`](../packages/plan/plan-mode), [`sandbox-policy`](../packages/sandbox/sandbox-policy), [`scope`](../packages/core/scope), [`session`](../packages/core/session), [`session-persistence`](../packages/session/session-persistence), [`session-projection`](../packages/session/session-projection), [`session-reference`](../packages/context/session-reference), [`session-title`](../packages/session/session-title), [`skill`](../packages/skill/skill), [`storage-domain`](../packages/storage/storage-domain), [`subprocess`](../packages/subprocess/subprocess), [`tool-todo`](../packages/todo/tool-todo), [`tools`](../packages/core/tools), [`user-questions`](../packages/interaction/user-questions), [`util-code-language`](../packages/util/code-language) |
 | [`schedule`](../packages/schedule/schedule) | `schedule` | [`agent`](../packages/core/agent), [`api-session-controller`](../packages/api/session-controller), [`brand`](../packages/util/brand), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`session-persistence`](../packages/session/session-persistence), [`session-projection`](../packages/session/session-projection), [`storage-domain`](../packages/storage/storage-domain), [`subagent`](../packages/subagent/subagent), [`tools`](../packages/core/tools), [`typert-protocol`](../packages/typert/protocol), [`util-time`](../packages/util/time), [`workspace`](../packages/workspace/workspace) |
 | [`sdk-client`](../packages/sdk/client) | `sdk` | [`llm`](../packages/llm/llm), [`sdk-protocol`](../packages/sdk/protocol), [`session`](../packages/core/session) |
 | [`tool-agent-team`](../packages/team/tool-agent-team) | `team` | [`agent`](../packages/core/agent), [`agent-team`](../packages/team/agent-team), [`session`](../packages/core/session), [`subagent`](../packages/subagent/subagent), [`system-prompt`](../packages/core/system-prompt), [`tools`](../packages/core/tools) |
