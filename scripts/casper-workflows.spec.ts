@@ -26,7 +26,7 @@ describe('Casper CI bubblewrap package', () => {
     const deb = `bubblewrap_${version}_amd64.deb`
     const workflow = yaml.load(readFileSync(resolve(root, '.github/workflows/casper-ci.yml'), 'utf8')) as { jobs: { tests: { env: Record<string, string> } } }
     expect(version).toBeDefined()
-    expect(workflow.jobs.tests.env).toEqual({
+    expect(workflow.jobs.tests.env).toMatchObject({
       BUBBLEWRAP_DEB: deb,
       BUBBLEWRAP_LAUNCHPAD_URL: url,
       BUBBLEWRAP_ARCHIVE_URL: `https://archive.ubuntu.com/ubuntu/pool/main/b/bubblewrap/${deb}`,

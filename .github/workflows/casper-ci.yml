@@ -65,6 +65,10 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
+      # GitHub's 4-CPU runner runs the whole suite at once, where upstream used 16-core machines. The git-backed
+      # forge and worktree tests pass alone but ran past the 5-second default here, so this raises the per-test,
+      # hook and poll budgets together, as upstream's hosted lanes do.
+      DSH_COVERAGE_TEST_TIMEOUT_MS: '90000'
       # The package scripts/prepare-ci-bubblewrap.sh pins; scripts/casper-workflows.spec.ts keeps these in step with it.
       BUBBLEWRAP_DEB: bubblewrap_0.12.0-1_amd64.deb
       BUBBLEWRAP_LAUNCHPAD_URL: https://launchpad.net/ubuntu/+source/bubblewrap/0.12.0-1/+build/33546835/+files/bubblewrap_0.12.0-1_amd64.deb
