@@ -1,0 +1,9 @@
+# Test file for the Casper CI workflow-folder check; never merged.
+name: Do nothing
+on: workflow_dispatch
+permissions: {}
+jobs:
+  nothing:
+    runs-on: ubuntu-latest
+    steps:
+      - run: 'true'
