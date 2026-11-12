@@ -2,17 +2,15 @@
 
 [English](README.md) | 中文
 
-这是 [Casper](https://github.com/Choaterboater/casper) 的桌面应用，由 Choaterboater 发布。它构建于 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（`dsh`，MIT 许可）之上，后者是由 [DeepSeek AI](https://deepseek.com) 开发的开源 agent harness（智能体框架）；本项目并非 DeepSeek 官方产品。
+这是 [Casper](https://github.com/Choaterboater/casper) 的桌面应用，由 Choaterboater 发布。它构建于 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（`dsh`，MIT 许可）之上，并非 DeepSeek 官方产品。
 
-新会话默认使用 **Casper 模式**：通过 ACP 运行真正的 Casper CLI（`casper acp`），即 Casper 自己的智能体循环、模型与检查（记录、重放，从不把没有运行的检查报告为通过），其审批框、提问、计划与回执以应用卡片显示。harness 自带的智能体循环仍可作为 Standard 模式使用。应用还内置只读的 casper-network-mcp 服务器；除非你把 DeepSeek 添加为模型提供方，否则不会向 DeepSeek 发送任何内容。
+新会话默认使用 **Casper 模式**：通过 ACP 运行真正的 Casper CLI（`casper acp`），即 Casper 自己的智能体循环、模型与检查（记录、重放，从不把没有运行的检查报告为通过），其审批框、提问、计划与回执以应用卡片显示。harness 自带的智能体循环仍可作为 Standard 模式使用。应用还内置只读的 casper-network-mcp 服务器；除非你把 DeepSeek 添加为模型提供方，否则不会向它发送任何内容。
 
 它构建于**一切皆插件**的架构之上，由 [Cordis](https://github.com/cordiverse/cordis) 驱动，其设计参见论文 [_A Programming Paradigm for Spatiotemporal Composability_](https://arxiv.org/abs/2608.25512)。
 
-Harness 文档：[https://deepseek-harness.github.io/deepseek-harness/](https://deepseek-harness.github.io/deepseek-harness/)
-
 ## 开发者预览
 
-Casper 及其所基于的 DeepSeek Harness 处于 _开发者预览_ 阶段，正在快速迭代。**未来将出现破坏兼容性的变更。**
+Casper 处于 _开发者预览_ 阶段，正在快速迭代。**未来将出现破坏兼容性的变更。**
 
 运行本项目前，请阅读[安全说明](SAFETY.zh.md)。
 
@@ -43,7 +41,6 @@ npx pnpm@11.28.5 run start:desktop
 ## 社区与支持
 
 - 在 [GitHub Issues](https://github.com/Choaterboater/casper-desktop/issues) 报告 Casper 桌面应用的问题，在 [Casper 仓库](https://github.com/Choaterboater/casper/issues) 报告 Casper CLI 的问题。
-- 关于 harness 本身的问题请到上游：[DeepSeek Harness Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions) 及其 <a href="https://discord.gg/4MrtZUhpxg">Discord 社区</a>。
 
 ## 参与贡献
 
@@ -58,18 +55,6 @@ npx pnpm@11.28.5 run start:desktop
 面向 agent：请遵循 [AGENTS.md](AGENTS.md)。
 
 拉取请求和推送到 `main` 的提交会在 GitHub 自带的 runner 上运行 [Casper CI](.github/workflows/casper-ci.yml)：静态检查、类型检查、lint 与单元测试。GitHub 会运行 `.github/workflows` 中的每个 workflow 文件，因此该目录只放 Casper CI；只要该目录中还有其他 workflow 文件，[一个单元测试](scripts/casper-workflows.spec.ts)就会失败。上游的 workflow 需要上游的密钥和 runner，因此原样保存在 `.github/upstream-workflows` 中，GitHub 不会运行那里的文件。上游合并新增 workflow 文件时，请在推送合并分支之前把它移到 `.github/upstream-workflows`，因为拉取请求新增的 workflow 会在该拉取请求上运行。
-
-## 引用
-
-```bibtex
-@misc{deepseek-harness2026,
-  title={DeepSeek Harness: Everything is a Plugin},
-  author={DeepSeek-AI},
-  year={2026},
-  publisher={GitHub},
-  howpublished={\url{https://github.com/deepseek-ai/deepseek-harness}},
-}
-```
 
 ## 许可证
 
