@@ -55,7 +55,7 @@ Start with the [development guide](docs/development.md) and [architecture docume
 
 For agents, follow [AGENTS.md](AGENTS.md).
 
-Pull requests and pushes to `main` run [Casper CI](.github/workflows/casper-ci.yml) on GitHub's own runners: static gates, typecheck, lint and the unit tests. The other workflows in `.github/workflows` come from upstream; they need upstream's secrets and runners, so they are switched off in this repository's Actions settings and left unedited.
+Pull requests and pushes to `main` run [Casper CI](.github/workflows/casper-ci.yml) on GitHub's own runners: static gates, typecheck, lint and the unit tests. GitHub runs every workflow file in `.github/workflows`, so Casper CI is the only one there, and [a unit test](scripts/casper-workflows.spec.ts) fails while that folder holds any other. Upstream's workflows need upstream's secrets and runners, so they are kept unedited in `.github/upstream-workflows`, where GitHub never runs them. When an upstream merge adds a workflow file, move it to `.github/upstream-workflows` before pushing the merge branch, because GitHub runs a workflow that a pull request adds on that pull request.
 
 ## Citation
 

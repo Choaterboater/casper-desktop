@@ -1,10 +1,12 @@
 # Casper CI: the checks this repository runs on GitHub's own runners.
 #
-# The other workflows in this folder come from upstream. They need upstream's
-# secrets, self-hosted runners and release accounts, so each one is switched off in
-# this repository's Actions settings rather than edited: their files stay as upstream
-# has them, which keeps upstream updates easy to merge. An upstream update that adds a
-# new workflow file needs that file switched off the same way.
+# GitHub runs every workflow file in this folder, so this is the only one here.
+# Upstream's workflows need upstream's secrets, self-hosted runners and release
+# accounts. They are kept unedited in .github/upstream-workflows/, where GitHub never
+# runs them, and git's rename detection still merges upstream's edits into them.
+# scripts/casper-workflows.spec.ts fails the unit tests below while this folder holds
+# any other workflow file; the README's Development section says what to do when an
+# upstream merge adds one.
 name: Casper CI
 
 on:

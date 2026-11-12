@@ -34,7 +34,7 @@ interface Workflow {
 }
 
 function workflow(file: string): Workflow {
-  return load(readFileSync(resolve(root, '.github/workflows', file), 'utf8')) as Workflow
+  return load(readFileSync(resolve(root, '.github/upstream-workflows', file), 'utf8')) as Workflow
 }
 
 // This canonical-case corpus has matching Actions/JavaScript comparison results.

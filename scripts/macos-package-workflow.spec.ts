@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 describe.each(['arm64', 'x64'])('macOS %s packaging', (arch) => {
   const filename = arch === 'arm64' ? 'macos-package.yml' : 'macos-intel-package.yml'
-  const workflow = yaml.load(readFileSync(resolve(import.meta.dirname, `../.github/workflows/${filename}`), 'utf8')) as {
+  const workflow = yaml.load(readFileSync(resolve(import.meta.dirname, `../.github/upstream-workflows/${filename}`), 'utf8')) as {
     on: Record<string, unknown>
     permissions: Record<string, string>
     concurrency: { group: string; 'cancel-in-progress': boolean }
