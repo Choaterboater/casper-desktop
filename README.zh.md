@@ -57,7 +57,7 @@ npx pnpm@11.28.5 run start:desktop
 
 面向 agent：请遵循 [AGENTS.md](AGENTS.md)。
 
-拉取请求和推送到 `main` 的提交会在 GitHub 自带的 runner 上运行 [Casper CI](.github/workflows/casper-ci.yml)：静态检查、类型检查、lint 与单元测试。`.github/workflows` 中的其他 workflow 来自上游，需要上游的密钥和 runner，因此在本仓库的 Actions 设置中逐个关闭，文件本身不做修改。
+拉取请求和推送到 `main` 的提交会在 GitHub 自带的 runner 上运行 [Casper CI](.github/workflows/casper-ci.yml)：静态检查、类型检查、lint 与单元测试。GitHub 会运行 `.github/workflows` 中的每个 workflow 文件，因此该目录只放 Casper CI；只要该目录中还有其他 workflow 文件，[一个单元测试](scripts/casper-workflows.spec.ts)就会失败。上游的 workflow 需要上游的密钥和 runner，因此原样保存在 `.github/upstream-workflows` 中，GitHub 不会运行那里的文件。上游合并新增 workflow 文件时，请在推送合并分支之前把它移到 `.github/upstream-workflows`，因为拉取请求新增的 workflow 会在该拉取请求上运行。
 
 ## 引用
 

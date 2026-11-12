@@ -5,7 +5,7 @@ import { expect, it } from 'vitest'
 
 it('presents common packaging fields in the same order with the same defaults', () => {
   const workflows = ['macos-package.yml', 'macos-intel-package.yml', 'windows-package.yml'].map(name =>
-    yaml.load(readFileSync(resolve(import.meta.dirname, '../.github/workflows', name), 'utf8')) as {
+    yaml.load(readFileSync(resolve(import.meta.dirname, '../.github/upstream-workflows', name), 'utf8')) as {
       on: { workflow_dispatch: { inputs: Record<string, Record<string, unknown>> } }
     })
   const common = ['source_ref', 'preset', 'update_channel', 'version_mode', 'build_version', 'test_release_id', 'compression_level']

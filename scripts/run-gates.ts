@@ -96,7 +96,7 @@ type ResultObserver = (result: GateResult) => void
 /** Worker cap of the documentation and hygiene aggregates, locally and in CI, whose leaves each build a full ts.Program. */
 const PROGRAM_MODE_CAP = 8
 
-/** CI pins this minor in .github/workflows/ci.yml; its compatibility leg owns the built CLI smoke. */
+/** CI pins this minor in .github/upstream-workflows/ci.yml; its compatibility leg owns the built CLI smoke. */
 export const BUILD_BACKED_NODE_COMPAT_VERSION = '24.9'
 
 const root = resolve(import.meta.dirname, '..')

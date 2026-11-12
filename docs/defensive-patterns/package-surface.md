@@ -117,10 +117,10 @@ Keys opened for one package's local purposes — here `./brand` and `./worker`, 
 
 Dependency declarations and version consistency are guaranteed mechanically by the dependency scan; this page repeats neither the `devDependencies` and `peerDependencies` field rules nor a package admission list of its own. When the scan fails, reproduce it locally and fix the manifest it names, because the scan and its policy file own the rules. Editing the scan or relaxing its policy so that a change can land is not a normal edit and needs the domain owner's confirmation.
 
-- Entry point: [verify-package-dependencies.ts](../../scripts/verify-package-dependencies.ts), run as `pnpm run verify-package-dependencies`, by `scripts/run-gates.ts` as the `package-dependencies` gate, and directly by `.github/workflows/release.yml`.
+- Entry point: [verify-package-dependencies.ts](../../scripts/verify-package-dependencies.ts), run as `pnpm run verify-package-dependencies`, by `scripts/run-gates.ts` as the `package-dependencies` gate, and directly by `.github/upstream-workflows/release.yml`.
 - Policy owner: [package-dependency-policy.ts](../../scripts/package-dependency-policy.ts) exports `PACKAGE_DEPENDENCY_POLICY`; the declaration sections, version forms, and exemptions are defined there, with package-level context in [packages/README.md](../../packages/README.md).
 - Boundary: this page lists no packages, field rules, or thresholds; it points at the owning file instead.
-- Find the wiring: `grep -rn "verify-package-dependencies" package.json .github/workflows scripts/run-gates.ts`.
+- Find the wiring: `grep -rn "verify-package-dependencies" package.json .github scripts/run-gates.ts`.
 - Exception: a change to the scan or to the policy requires the domain owner's confirmation and the reason recorded on the change.
 
 The repeatable procedure: reproduce, read the diagnostic, and fix the manifest it names.
