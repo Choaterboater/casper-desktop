@@ -64,6 +64,15 @@ jobs:
     name: unit tests
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    env:
+      # GitHub's 4-CPU runner runs the whole suite at once, where upstream used 16-core machines. The git-backed
+      # forge and worktree tests pass alone but ran past the 5-second default here, so this raises the per-test,
+      # hook and poll budgets together, as upstream's hosted lanes do.
+      DSH_COVERAGE_TEST_TIMEOUT_MS: '90000'
+      # The package scripts/prepare-ci-bubblewrap.sh pins; scripts/casper-workflows.spec.ts keeps these in step with it.
+      BUBBLEWRAP_DEB: bubblewrap_0.12.0-1_amd64.deb
+      BUBBLEWRAP_LAUNCHPAD_URL: https://launchpad.net/ubuntu/+source/bubblewrap/0.12.0-1/+build/33546835/+files/bubblewrap_0.12.0-1_amd64.deb
+      BUBBLEWRAP_ARCHIVE_URL: https://archive.ubuntu.com/ubuntu/pool/main/b/bubblewrap/bubblewrap_0.12.0-1_amd64.deb
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -79,9 +88,33 @@ jobs:
       - name: Install (immutable)
         run: pnpm install --frozen-lockfile
 
-      # The sandbox tests use bubblewrap, which Ubuntu runners restrict by default.
+      # The sandbox tests use bubblewrap, which Ubuntu runners restrict by default. Launchpad, the
+      # script's pinned source, has outages, so the package comes from GitHub's cache after its first
+      # verified download. Before that, Ubuntu's archive serves the same file when Launchpad fails;
+      # it prunes old packages, so it is only the fallback. The script checks the sha256 either way.
+      - name: Restore bubblewrap package
+        id: bubblewrap-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/${{ env.BUBBLEWRAP_DEB }}
+          key: ${{ env.BUBBLEWRAP_DEB }}
+
+      - name: Fetch bubblewrap package
+        if: steps.bubblewrap-cache.outputs.cache-hit != 'true'
+        run: |
+          curl --fail --silent --show-error --location --retry 3 --retry-all-errors --output "$RUNNER_TEMP/$BUBBLEWRAP_DEB" "$BUBBLEWRAP_LAUNCHPAD_URL" \
+            || curl --fail --silent --show-error --location --retry 3 --retry-all-errors --output "$RUNNER_TEMP/$BUBBLEWRAP_DEB" "$BUBBLEWRAP_ARCHIVE_URL"
+
       - name: Prepare bubblewrap
         run: bash scripts/prepare-ci-bubblewrap.sh
+
+      # Saved only after the script verified the package, and before the tests, so a failing test does not skip it.
+      - name: Save bubblewrap package
+        if: steps.bubblewrap-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/${{ env.BUBBLEWRAP_DEB }}
+          key: ${{ env.BUBBLEWRAP_DEB }}
 
       - name: Unit tests
         run: pnpm run check:ci:unit
