@@ -132,6 +132,11 @@ export interface Config {
    * says it is idle is closed and the next prompt reopens its conversation. 0 keeps the process until the Session closes.
    */
   idleExitMs: number
+  /**
+   * Start Casper as soon as a Session with no Casper conversation opens, so its first prompt does not wait for the
+   * start; an unused process closes after `idleExitMs`. Off: Casper starts with the first prompt.
+   */
+  prewarm: boolean
 }
 
 /** Runtime schema for {@link Config}; the defaults keep teardown inside a 10 s host shutdown window. */
@@ -167,4 +172,5 @@ export const Config: z<Config> = z.object({
   modePill: z.boolean().default(true),
   liveOutput: z.boolean().default(true),
   idleExitMs: z.natural().default(900_000),
+  prewarm: z.boolean().default(true),
 })

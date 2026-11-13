@@ -3444,3 +3444,115 @@ describe('Goal rounds in a Casper session', { timeout: 60_000 }, () => {
     expect(checks).toBe(0)
   })
 })
+
+describe('Starting Casper for a new Session', { timeout: 60_000 }, () => {
+  const WARM = { prewarm: true }
+
+  it('starts Casper before the first prompt, which then runs on that process', async () => {
+    const { fake, host } = await setup({ prompts: [[{ text: 'hi\n' }]], newSessionId: 'conversation-warm' }, WARM)
+    const { agent } = await host.create('casper-warm')
+    await waitFor(() => fake.calls('session/new').length === 1)
+    // The start is not a turn.
+    expect(agent.status).toBe('idle')
+    expect(turnEnds(agent)).toEqual([])
+    expect(fake.calls('session/prompt')).toEqual([])
+    // The conversation is recorded by its first prompt, since Casper saves it only then.
+    expect(host.record('casper-warm')).toBeUndefined()
+    await run(agent, 'first')
+    expect(host.record('casper-warm')).toEqual({ acpSessionId: 'conversation-warm', cwd: fake.cwd })
+    expect(fake.pids()).toHaveLength(1)
+    expect(fake.calls('session/prompt').map(entry => entry.pid)).toEqual(fake.pids())
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }])
+    expect(host.errors).toEqual([])
+  })
+
+  it('makes a prompt sent during the start wait for it and start no second process', async () => {
+    const { fake, host } = await setup({ prompts: [] }, WARM)
+    const hold = gate(fake, 'hold-initialize')
+    fake.script({ prompts: [[{ text: 'hi\n' }]], holdInitialize: hold.path })
+    const { agent } = await host.create('casper-warm-wait')
+    await waitFor(() => fake.calls('initialize').length === 1)
+    agent.followup(prompt('first'))
+    hold.open()
+    await agent.whenIdle()
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }])
+    expect(fake.pids()).toHaveLength(1)
+    expect(fake.calls('session/new')).toHaveLength(1)
+  })
+
+  it('lets the first prompt start Casper itself when the early start failed', async () => {
+    const { fake, host } = await setup({ prompts: [] }, { ...WARM, startTimeoutMs: 1_000 })
+    const hold = gate(fake, 'hold-initialize')
+    fake.script({ prompts: [[{ text: 'hi\n' }]], holdInitialize: hold.path })
+    const { agent } = await host.create('casper-warm-failed')
+    const [first] = await waitFor(() => fake.pids().length === 1 && fake.pids())
+    await waitFor(() => !alive(first ?? 0))
+    hold.open()
+    await run(agent, 'first')
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }])
+    expect(fake.pids()).toHaveLength(2)
+    // The failed early start is no turn and reaches no error listener.
+    expect(host.errors).toEqual([])
+  })
+
+  it('kills a Casper still starting when the Agent is disposed', async () => {
+    const { fake, host } = await setup({ prompts: [] }, WARM)
+    const hold = gate(fake, 'hold-initialize')
+    fake.script({ prompts: [[]], holdInitialize: hold.path })
+    const handle = await host.create('casper-warm-dispose')
+    await waitFor(() => fake.calls('initialize').length === 1)
+    const [pid] = fake.pids()
+    const started = Date.now()
+    await handle.dispose()
+    expect(Date.now() - started).toBeLessThan(5_000)
+    expect(alive(pid ?? 0)).toBe(false)
+    expect(host.record('casper-warm-dispose')).toBeUndefined()
+  })
+
+  it('closes a Casper started early that no prompt used once it sits idle, and the next prompt starts a new conversation', async () => {
+    const { fake, host } = await setup({ prompts: [[{ text: 'hi\n' }]] }, { ...WARM, idleExitMs: 200 })
+    const { agent } = await host.create('casper-warm-idle')
+    const [pid] = await waitFor(() => fake.pids().length === 1 && fake.pids())
+    await waitFor(() => fake.calls('_casper/idle').length === 1 && !alive(pid ?? 0))
+    expect(host.record('casper-warm-idle')).toBeUndefined()
+    await run(agent, 'first')
+    expect(turnEnds(agent)).toEqual([{ kind: 'completed' }])
+    expect(fake.calls('session/load')).toEqual([])
+    expect(fake.calls('session/new')).toHaveLength(2)
+    const text = eventsOf(agent).flatMap(event => event.type === 'assistant/message'
+      ? event.data.message.content.flatMap(block => block.type === 'text' ? [block.text] : [])
+      : []).join('')
+    expect(text).not.toContain(FRESH_CONVERSATION_NOTICE)
+  })
+
+  it('stops a Casper started early when its first prompt cannot record the conversation', async () => {
+    const { fake, host } = await setup({ prompts: [] }, WARM)
+    const { agent } = await host.create('casper-warm-sidecar')
+    const [pid] = await waitFor(() => fake.calls('session/new').length === 1 && fake.pids())
+    const table = host.ctx.storageDomain.get('casper_agent')?.table('sessions')
+    if (table === undefined) throw new Error('sidecar domain is not open')
+    const put = vi.spyOn(table, 'put').mockRejectedValueOnce(new Error('storage offline'))
+    await run(agent, 'go')
+    put.mockRestore()
+    expect(turnEnds(agent)).toMatchObject([{ kind: 'error', error: { code: 'CASPER_START_FAILED', message: expect.stringContaining('storage offline') as string } }])
+    await waitFor(() => !alive(pid ?? 0))
+    expect(fake.calls('session/prompt')).toEqual([])
+  })
+
+  it('starts no Casper early for a Session that has a conversation, or with prewarm off', async () => {
+    const { fake, host } = await setup({ prompts: [[{ text: 'one\n' }], [{ text: 'two\n' }]] })
+    const { agent } = await host.create('casper-warm-resume')
+    // prewarm off: the process starts with the first prompt.
+    await new Promise((resolve) => { setTimeout(resolve, 300) })
+    expect(fake.pids()).toEqual([])
+    await run(agent, 'first')
+    await host.ctx.fiber.dispose()
+    const second = await boot(fake, WARM)
+    cleanups.push(() => second.ctx.fiber.dispose())
+    const resumed = (await second.ctx.agents.resume({ resumeSessionId: SessionId('casper-warm-resume'), agentPreset: 'casper' })).agent
+    await new Promise((resolve) => { setTimeout(resolve, 300) })
+    expect(fake.pids()).toHaveLength(1)
+    await run(resumed, 'second')
+    expect(fake.calls('session/load')).toHaveLength(1)
+  })
+})

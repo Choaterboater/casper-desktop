@@ -82,7 +82,7 @@ import { hasPromptContent, promptContent } from './prompt.ts'
 import { casperReceiptOf, usageModelOf, usageOf } from './receipt.ts'
 import { hasSessionReference, prepareReferences } from './references.ts'
 import type { PreparedReference, PreparedReferences } from './references.ts'
-import type { CasperSidecar } from './sidecar.ts'
+import type { CasperSessionRecord, CasperSidecar } from './sidecar.ts'
 import { CASPER_PROVIDER, TurnWriter } from './turn.ts'
 
 /** Text that opens a turn whose earlier Casper conversation could not be reopened. */
@@ -269,6 +269,16 @@ export class CasperAgent implements Agent {
   private reapedModel: string | undefined
   /** Set by {@link closeConnection}: no idle check runs and no process starts after it. */
   private closed = false
+  /** The start {@link prewarm} began, until it settles; it never rejects, and the first prompt waits for it. */
+  private warming: Promise<void> | undefined
+  /** Stops the start {@link prewarm} began when the Agent closes. */
+  private readonly warmStop = new AbortController()
+  /**
+   * The process {@link prewarm} started and its new conversation, until a prompt runs on it and records the
+   * conversation. Casper saves a conversation only once a prompt on it replies, so a process closed before that
+   * leaves no record, and the next prompt starts a new conversation instead of failing to reopen one.
+   */
+  private unrecorded: { readonly connection: CasperConnection; readonly record: CasperSessionRecord } | undefined
   /** The app route matching Casper's current model, which {@link options} follow; undefined uses the start options. */
   private childRoute: ModelSelection | undefined
   /** The `provider/model/effort` {@link childRoute} was looked up for. */
@@ -541,12 +551,31 @@ export class CasperAgent implements Agent {
     this.closed = true
     this.disarmIdle()
     this.idleCheck?.abort()
+    this.warmStop.abort(new Error(CLOSING_MESSAGE))
     const connection = this.connection
     this.connection = undefined
     // A mode Casper picked itself ends with its process; recorded while the Session is still open.
     this.noteOwnAccess()
-    // A process closed earlier, while idle or for changed servers, is part of the range too.
-    await Promise.all([this.closing, connection?.dispose()])
+    // A process closed earlier, while idle or for changed servers, and one still starting early are part of the range too.
+    await Promise.all([this.closing, this.warming, connection?.dispose()])
+  }
+
+  /**
+   * With `prewarm` on, start Casper for a Session that has no conversation of its own, so its first prompt does not
+   * wait for the start. A fork, whose first prompt copies the source's conversation, and a Session with a recorded
+   * conversation start none. The start is no turn: a failure is logged, and the first prompt starts Casper itself.
+   * The idle time runs from the end of the start, so an unused process closes after `idleExitMs`. The factory calls
+   * this once, when it publishes the Agent, before any prompt can start.
+   */
+  prewarm(): void {
+    if (!this.config.prewarm || this.fork !== undefined || this.sidecar.has(this.id)) return
+    this.warming = this.connect(this.warmStop.signal, false).then(
+      () => { this.armIdle() },
+      (error: unknown) => {
+        if (this.closed) return
+        this.pluginCtx.logger.warn(`casper agent "${this.id}": Casper did not start ahead of the first prompt, so that prompt starts it: ${String(error)}`)
+      },
+    ).finally(() => { this.warming = undefined })
   }
 
   private wakeDriver(wakeAfterAbort = false): void {
@@ -685,6 +714,8 @@ export class CasperAgent implements Agent {
       // The prompt and its turn are durable before Casper can change files.
       await this.flush(true)
       signal.throwIfAborted()
+      // A prompt during an early start takes its process, once its servers are checked; a failed start leaves the start to it.
+      if (this.warming !== undefined) await settledUnlessStopped(this.warming, signal)
       // Between turns, never during a prompt: changed Settings servers reopen Casper through session/load.
       await this.refreshServers(signal)
       signal.throwIfAborted()
@@ -918,13 +949,35 @@ export class CasperAgent implements Agent {
   }
 
   /**
+   * The connection a prompt runs on, from {@link connect}. The first prompt on a process {@link prewarm} started
+   * records its conversation.
+   * @param signal - the turn's signal.
+   * @returns what {@link connect} returns.
+   */
+  private async ensureConnection(signal: AbortSignal): Promise<{ connection: CasperConnection; fresh: boolean; note?: string }> {
+    const opened = await this.connect(signal, true)
+    const early = this.unrecorded
+    this.unrecorded = undefined
+    if (early?.connection !== opened.connection) return opened
+    try {
+      await this.storeConversation(early.record)
+    } catch (error: unknown) {
+      this.dropConnection(opened.connection)
+      throw error
+    }
+    return opened
+  }
+
+  /**
    * The live connection, or a new process that reopens the stored conversation. A process closed earlier exits first.
    * A fork with no conversation of its own copies the source's, cut at the inherited mark, or starts fresh with a note.
    * A closed Agent starts none, and a process that finishes starting after the close is closed at once.
+   * @param signal - stops the start.
+   * @param record - whether a new conversation is recorded at once; otherwise it waits in {@link unrecorded}.
    * @returns the connection, whether its conversation is new, and a note when a fork's conversation was not copied or
    *   a Casper closed while idle came back on another model.
    */
-  private async ensureConnection(signal: AbortSignal): Promise<{ connection: CasperConnection; fresh: boolean; note?: string }> {
+  private async connect(signal: AbortSignal, record: boolean): Promise<{ connection: CasperConnection; fresh: boolean; note?: string }> {
     await settledUnlessStopped(this.closing, signal)
     if (this.closed) throw new CasperError('CASPER_START_FAILED', CLOSING_MESSAGE)
     const live = this.connection
@@ -971,12 +1024,14 @@ export class CasperAgent implements Agent {
       await started.connection.dispose()
       throw new CasperError('CASPER_START_FAILED', CLOSING_MESSAGE)
     }
+    const conversation = { acpSessionId: started.acpSessionId, cwd }
     try {
-      await this.sidecar.write(this.id, { acpSessionId: started.acpSessionId, cwd })
+      if (record) await this.storeConversation(conversation)
     } catch (error: unknown) {
       started.connection.terminate()
-      throw new CasperError('CASPER_START_FAILED', `Casper's conversation could not be recorded: ${String(error)}`, { cause: error })
+      throw error
     }
+    this.unrecorded = record ? undefined : { connection: started.connection, record: conversation }
     this.fork = undefined
     this.connection = started.connection
     this.report(started.connection)
@@ -992,6 +1047,19 @@ export class CasperAgent implements Agent {
       return { connection: started.connection, fresh }
     }
     return { connection: started.connection, fresh, note: `[Casper reopened on ${after}; it was ${before}.]\n` }
+  }
+
+  /**
+   * Store the conversation this Session continues in the sidecar.
+   * @param record - Casper's conversation and its folder.
+   * @throws CasperError `CASPER_START_FAILED` when the record cannot be written.
+   */
+  private async storeConversation(record: CasperSessionRecord): Promise<void> {
+    try {
+      await this.sidecar.write(this.id, record)
+    } catch (error: unknown) {
+      throw new CasperError('CASPER_START_FAILED', `Casper's conversation could not be recorded: ${String(error)}`, { cause: error })
+    }
   }
 
   /**

@@ -186,6 +186,8 @@ export function fakeCasper(script: FakeScript = { prompts: [] }): FakeCasper {
       liveOutput: true,
       // Tests that close an idle Casper set their own idle time.
       idleExitMs: 0,
+      // Tests of the warm start turn it on; the others count processes from the first prompt.
+      prewarm: false,
       ...overrides,
     }),
     remove: () => { rmSync(root, { recursive: true, force: true }) },

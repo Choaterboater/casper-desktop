@@ -607,6 +607,11 @@ export interface Config {
    * says it is idle is closed and the next prompt reopens its conversation. 0 keeps the process until the Session closes.
    */
   idleExitMs: number
+  /**
+   * Start Casper as soon as a Session with no Casper conversation opens, so its first prompt does not wait for the
+   * start; an unused process closes after `idleExitMs`. Off: Casper starts with the first prompt.
+   */
+  prewarm: boolean
 }
 
 /** Casper's access modes over ACP: Read only, Ask first, and Don't ask (`/permissions all`). */
