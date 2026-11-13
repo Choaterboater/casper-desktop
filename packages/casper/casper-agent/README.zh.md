@@ -84,8 +84,10 @@ kind: "package-reference"
 | [`src/box.ts`](src/box.ts) | 审批框的问题 id、标题与卡片上限，由两半共用 |
 | [`src/receipt.ts`](src/receipt.ts) | 从 ACP `_meta` 读取 Casper 的回执与一次响应的 token，由两半共用 |
 | [`src/conversation.ts`](src/conversation.ts) | `plugin:casper-agent/conversation` 记录，以及对提示回复 `_meta` 中 Casper 标记的检查 |
-| [`src/client/index.ts`](src/client/index.ts) | 客户端一半：把 Casper 的审批卡片注册为对话输入框链的第一项，把回执卡片注册到已完成一轮的尾部，把回执卡片注册为 `casper_receipt` 的工具视图，并把模式标签注册在输入框的模式控件之后 |
+| [`src/client/index.ts`](src/client/index.ts) | 客户端一半：把 Casper 的审批卡片注册为对话输入框链的第一项，把回执卡片注册到已完成一轮的尾部，把回执卡片注册为 `casper_receipt` 的工具视图，把检查视图注册在轨迹视图之后，并把模式标签注册在输入框的模式控件之后 |
 | [`src/client/receipt-turn.ts`](src/client/receipt-turn.ts) | 在 Chat 目标上认领 `casper_receipt` 调用及其结果，使其不属于任何步骤，并把回执发布到它所在的一轮 |
+| [`src/client/check-calls.ts`](src/client/check-calls.ts) | 在 Chat 目标上认领每个 `casper_check` 调用及其结果，使 Casper 在回答之后运行的检查不改变回答作为该轮最后一行的位置，该轮仍可从回答处分支；并在 `casper-checks` 目标上列出这些检查 |
+| [`src/client/ChecksView.tsx`](src/client/ChecksView.tsx) | Chat 与轨迹旁的检查视图：按轮列出会话中的检查，每项带结论、输出与查看调用链接 |
 | [`src/client/CasperBoxCard.tsx`](src/client/CasperBoxCard.tsx) | Casper 的审批卡片：它接管哪些问题、它的行、按键与回答 |
 | [`src/client/ReceiptRow.tsx`](src/client/ReceiptRow.tsx) | Casper 的回执卡片：结论、已更改的文件、检查与模型用量，文案在 [`src/client/locales.ts`](src/client/locales.ts) |
 | [`src/elicitation.ts`](src/elicitation.ts) | 把 Casper 的表单（`elicitation/create`）变成用户问题，并把答案映射回去 |
@@ -125,7 +127,7 @@ kind: "package-reference"
 | `tool_call_update` 完成或失败 | 带 Standard 结果文本与 meta 的 `tool/result`，从不只写状态词；已运行的 shell 步骤记录其退出码且不是错误，其他失败的步骤是错误，被拒绝的审批不是 |
 | 仍在进行中的 `tool_call_update` | 不写入任何内容：调用保持打开，已提出的审批框仍在等待回答 |
 | 带 `_meta.casper.live` 的仍在进行中的 `tool_call_update`（运行中命令的最新几行） | 步骤中不写入任何内容；`liveOutput` 开启时，这些行进入该命令在[后台任务面板](#jobs-panel)中的任务，任务注册表追加其 `job/registered` 与 `job/settled` 记录 |
-| 检查 `tool_call`（已完成或已失败） | 立即写入名为 `casper_check` 的 `tool/call` 及其结果 |
+| 检查 `tool_call`（已完成或已失败） | 立即写入名为 `casper_check` 的 `tool/call` 及其结果，显示在检查视图而非 Chat 中 |
 | `plan` | 带完整列表的 `todo/write` |
 | 带有 `title` 的 `session_info_update` | `casperTitles` 开启时，一个为会话命名的 `session/title` 事件（见上文），无论是否有提示在运行；缺少或为 null 的标题不改变任何东西 |
 | 模型响应后的 `usage_update` | 其上下文窗口（`size`，为正整数时）记为 `request/context`，provider 为 `casper`，model 为 `_meta.casper.model` 中的 `<provider>/<model>`，仅在与会话已有的不同时追加；其 token（`_meta.casper.response`，输入与输出均为计数时）作为 `usage` 块和结算该响应的 `assistant/message` 的 `usage`：带 `toolUse` 的响应由其第一个调用提交，纯文本响应立即提交，因此之后的文本开启新步骤 |

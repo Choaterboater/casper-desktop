@@ -1,6 +1,6 @@
-/** `casper-receipt` namespace dictionaries for Casper's receipt card, approval card and mode pill. */
+/** `casper-receipt` namespace dictionaries for Casper's receipt card, approval card, mode pill and Checks view. */
 
-/** Dictionary namespace owned by the receipt card, the approval card and the mode pill. */
+/** Dictionary namespace owned by the receipt card, the approval card, the mode pill and the Checks view. */
 export const NS = 'casper-receipt'
 
 /** English dictionary (the key-set source of truth). */
@@ -39,6 +39,13 @@ export const en = {
   'row.costUnknown': 'Cost not known',
   'row.open': 'Open {path}',
   'row.inspect': 'Inspect call',
+  'checks.view': 'Checks',
+  'checks.empty': 'No checks have run in this Session.',
+  'checks.turn': 'Turn {turn}',
+  'checks.running': 'running',
+  'checks.passed': 'passed',
+  'checks.failed': 'failed',
+  'checks.untitled': 'Check',
 } satisfies Record<string, string>
 
 /** The receipt namespace key union. */
@@ -46,7 +53,7 @@ export type CasperReceiptKey = keyof typeof en
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
-    /** Casper's receipt card, approval card and mode pill copy. */
+    /** Casper's receipt card, approval card, mode pill and Checks view copy. */
     'casper-receipt': CasperReceiptKey
   }
 }
@@ -87,6 +94,13 @@ export const zh = {
   'row.costUnknown': '费用未知',
   'row.open': '打开 {path}',
   'row.inspect': '查看调用',
+  'checks.view': '检查',
+  'checks.empty': '此会话中尚未运行任何检查。',
+  'checks.turn': '第 {turn} 轮',
+  'checks.running': '运行中',
+  'checks.passed': '通过',
+  'checks.failed': '失败',
+  'checks.untitled': '检查',
 } satisfies Record<CasperReceiptKey, string>
 
 /** Japanese dictionary. */
@@ -125,6 +139,13 @@ export const ja = {
   'row.costUnknown': '費用は不明です',
   'row.open': '{path} を開く',
   'row.inspect': '呼び出しを確認',
+  'checks.view': 'チェック',
+  'checks.empty': 'このセッションではまだチェックが実行されていません。',
+  'checks.turn': 'ターン {turn}',
+  'checks.running': '実行中',
+  'checks.passed': '合格',
+  'checks.failed': '失敗',
+  'checks.untitled': 'チェック',
 } satisfies Record<CasperReceiptKey, string>
 
 /** Spanish dictionary. */
@@ -163,6 +184,13 @@ export const es = {
   'row.costUnknown': 'Coste desconocido',
   'row.open': 'Abrir {path}',
   'row.inspect': 'Inspeccionar llamada',
+  'checks.view': 'Comprobaciones',
+  'checks.empty': 'No se ha ejecutado ninguna comprobación en esta sesión.',
+  'checks.turn': 'Turno {turn}',
+  'checks.running': 'en curso',
+  'checks.passed': 'superada',
+  'checks.failed': 'fallida',
+  'checks.untitled': 'Comprobación',
 } satisfies Record<CasperReceiptKey, string>
 
 /** French dictionary. */
@@ -201,6 +229,13 @@ export const fr = {
   'row.costUnknown': 'Coût inconnu',
   'row.open': 'Ouvrir {path}',
   'row.inspect': 'Inspecter l’appel',
+  'checks.view': 'Vérifications',
+  'checks.empty': 'Aucune vérification n’a été exécutée dans cette session.',
+  'checks.turn': 'Tour {turn}',
+  'checks.running': 'en cours',
+  'checks.passed': 'réussie',
+  'checks.failed': 'échouée',
+  'checks.untitled': 'Vérification',
 } satisfies Record<CasperReceiptKey, string>
 
 /** German dictionary. */
@@ -239,6 +274,13 @@ export const de = {
   'row.costUnknown': 'Kosten unbekannt',
   'row.open': '{path} öffnen',
   'row.inspect': 'Aufruf prüfen',
+  'checks.view': 'Prüfungen',
+  'checks.empty': 'In dieser Sitzung wurden noch keine Prüfungen ausgeführt.',
+  'checks.turn': 'Runde {turn}',
+  'checks.running': 'läuft',
+  'checks.passed': 'bestanden',
+  'checks.failed': 'fehlgeschlagen',
+  'checks.untitled': 'Prüfung',
 } satisfies Record<CasperReceiptKey, string>
 
 /** Russian dictionary. */
@@ -277,6 +319,13 @@ export const ru = {
   'row.costUnknown': 'Стоимость неизвестна',
   'row.open': 'Открыть {path}',
   'row.inspect': 'Просмотреть вызов',
+  'checks.view': 'Проверки',
+  'checks.empty': 'В этом сеансе проверки ещё не запускались.',
+  'checks.turn': 'Ход {turn}',
+  'checks.running': 'выполняется',
+  'checks.passed': 'пройдена',
+  'checks.failed': 'не пройдена',
+  'checks.untitled': 'Проверка',
 } satisfies Record<CasperReceiptKey, string>
 
 /** Portuguese dictionary. */
@@ -315,4 +364,11 @@ export const pt = {
   'row.costUnknown': 'Custo desconhecido',
   'row.open': 'Abrir {path}',
   'row.inspect': 'Inspecionar chamada',
+  'checks.view': 'Verificações',
+  'checks.empty': 'Nenhuma verificação foi executada nesta sessão.',
+  'checks.turn': 'Turno {turn}',
+  'checks.running': 'em execução',
+  'checks.passed': 'aprovada',
+  'checks.failed': 'reprovada',
+  'checks.untitled': 'Verificação',
 } satisfies Record<CasperReceiptKey, string>

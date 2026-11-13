@@ -84,8 +84,10 @@ A turn that cannot run ends with an error on `turn/end`: `CASPER_ENGINE_MISSING`
 | [`src/box.ts`](src/box.ts) | The box's question id, header, and card limit, shared by both halves |
 | [`src/receipt.ts`](src/receipt.ts) | Reads Casper's receipt and a response's tokens from ACP `_meta`, shared by both halves |
 | [`src/conversation.ts`](src/conversation.ts) | The `plugin:casper-agent/conversation` record, and the check of Casper's mark in a prompt reply's `_meta` |
-| [`src/client/index.ts`](src/client/index.ts) | Client half: registers Casper's approval card first in the conversation composer chain, the receipt card in a completed turn's tail, the receipt card as the `casper_receipt` tool view, and the mode pill after the composer's mode controls |
+| [`src/client/index.ts`](src/client/index.ts) | Client half: registers Casper's approval card first in the conversation composer chain, the receipt card in a completed turn's tail, the receipt card as the `casper_receipt` tool view, the Checks view after the trajectory view, and the mode pill after the composer's mode controls |
 | [`src/client/receipt-turn.ts`](src/client/receipt-turn.ts) | Claims the `casper_receipt` call and its result on the Chat target, so no step holds them, and publishes the receipt on its turn |
+| [`src/client/check-calls.ts`](src/client/check-calls.ts) | Claims each `casper_check` call and its result on the Chat target, so a check Casper runs after its answer leaves the answer the turn's last row and the turn can be branched from it, and lists the checks on the `casper-checks` target |
+| [`src/client/ChecksView.tsx`](src/client/ChecksView.tsx) | The Checks view beside Chat and Trajectory: the Session's checks by turn, each with its verdict, output, and Inspect link |
 | [`src/client/CasperBoxCard.tsx`](src/client/CasperBoxCard.tsx) | Casper's approval card: which questions it takes, its rows, keys, and answer |
 | [`src/client/ReceiptRow.tsx`](src/client/ReceiptRow.tsx) | Casper's receipt card: the verdict, changed files, checks, and model use, with its words in [`src/client/locales.ts`](src/client/locales.ts) |
 | [`src/elicitation.ts`](src/elicitation.ts) | Turns one of Casper's forms (`elicitation/create`) into a user question and maps the answer back |
@@ -125,7 +127,7 @@ A line steered in during a prompt goes to a Casper whose `initialize` reply sets
 | `tool_call_update` completed or failed | `tool/result` with the Standard result text and meta, never a bare status word; a shell step that ran records its exit code and is not an error, any other failed step is, and a refused approval is not |
 | `tool_call_update` still in progress | nothing: the call stays open and an asked approval box stays asked |
 | `tool_call_update` still in progress with `_meta.casper.live` (a running command's latest lines) | nothing in the step; with `liveOutput` on, the lines go to the command's job in the [Jobs panel](#jobs-panel), and the job registry adds its `job/registered` and `job/settled` records |
-| check `tool_call` (already completed or failed) | `tool/call` named `casper_check` and its result at once |
+| check `tool_call` (already completed or failed) | `tool/call` named `casper_check` and its result at once, shown in the Checks view rather than the Chat |
 | `plan` | `todo/write` with the whole list |
 | `session_info_update` with a `title` | with `casperTitles` on, a `session/title` event naming the Session, as above, whether a prompt runs or not; a missing or null title changes nothing |
 | `usage_update` after a model response | its window (`size`, when a positive integer) as `request/context` with provider `casper` and model `<provider>/<model>` from `_meta.casper.model`, appended only when it differs from the Session's; its tokens (`_meta.casper.response`, when input and output are counts) as a `usage` chunk and the `usage` of the `assistant/message` that settles the response: a response with `toolUse` is committed by its first call, a text-only one at once, so the next text opens a new step |
