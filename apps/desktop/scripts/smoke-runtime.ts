@@ -73,6 +73,20 @@ export function apply(ctx) {
     await runCli(['remove', installedName])
     if (existsSync(installedEntry)) throw new Error('desktop runtime: CLI did not remove the local plugin')
     console.log('desktop runtime: CLI offline plugin installation and removal passed')
+    const runCommand = (args: string[]) => promisify(execFile)(node, ['--expose-internals', cli, ...args],
+      { cwd: home, env: { ...hostEnvironment, ELECTRON_RUN_AS_NODE: '1' }, timeout: 120_000, windowsHide: true })
+    const { stdout: version } = await runCommand(['--version'])
+    if (version.trim() !== runtime.release.version) {
+      throw new Error(`desktop runtime: CLI reported version ${version.trim()}, expected ${runtime.release.version}`)
+    }
+    const refusal = await runCommand(['web']).then(
+      () => undefined,
+      (error: unknown) => error as { code?: unknown; stderr?: unknown },
+    )
+    if (refusal?.code !== 1 || typeof refusal.stderr !== 'string' || !refusal.stderr.includes('install the dsh CLI from npm')) {
+      throw new Error('desktop runtime: CLI did not refuse the web profile with the npm CLI install command')
+    }
+    console.log('desktop runtime: CLI version and refusal of other profiles passed')
     const primary = join(resourcesRuntime, 'primary-runtime')
     const dependencies = workspaceDependencyPaths(primary, await readPrimaryRuntime(primary))
     await promisify(execFile)(dependencies.python, ['-I', '-B',

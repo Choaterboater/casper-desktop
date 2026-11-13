@@ -10,7 +10,8 @@
  * - the Electron app's bundled entries, following their local and workspace imports, and its `renderer/` files;
  * - the installed third-party production closure, minus the files the packager drops (`desktopRuntimeFileExclusion`).
  *
- * An import of a forbidden package counts only from kept code; a forbidden package's own imports leave with it.
+ * The closure walk cuts {@link DESKTOP_OMITTED_PACKAGES}, as the packager does. An import of a forbidden or omitted
+ * package counts only from kept code; a forbidden package's own imports leave with it.
  *
  * Not seen: tsdown and Vite output and third-party code a build inlines; `scan-packaged-app.ts` covers those on a packaged app.
  * @module scripts/casper/desktop-shipped
@@ -24,6 +25,7 @@ import type { EntryOptions } from '@deepseek-ai/cordis-plugin-loader'
 import { applyEntryPatches, type PatchOptions } from '@deepseek-ai/cordis-plugin-include'
 import { selectDesktopPackageClosure, type PackedDesktopPackage } from '../../apps/desktop/scripts/prepare-package-set.ts'
 import { CASPER_DESKTOP_BUNDLES } from '../../apps/desktop/src/casper-desktop-profile.ts'
+import { DESKTOP_OMITTED_PACKAGES } from '../../apps/desktop/src/core-package-set.ts'
 import { desktopRuntimeFileExclusion } from '../../apps/desktop/scripts/runtime-file-policy.ts'
 import { isCordisGroupEntry, isJsExpr, loadCordisYaml } from '../cordis-yaml.ts'
 import { collectRuntimeLocalSourceSpecifiers, collectRuntimeSourceSpecifiers, packageNameOf } from '../source-parse-uses.ts'
@@ -147,7 +149,9 @@ function workspaceClosure(
   )
   const names = new Set<string>()
   for (const target of targets) {
-    for (const packed of selectDesktopPackageClosure(available, target)) names.add(packed.manifest.name as string)
+    for (const packed of selectDesktopPackageClosure(available, target, DESKTOP_OMITTED_PACKAGES)) {
+      names.add(packed.manifest.name as string)
+    }
   }
   return names
 }
@@ -192,6 +196,9 @@ function walkFiles(dir: string, skip: (relativePath: string) => boolean): string
   return files.sort()
 }
 
+/** Packages kept code must not import at runtime: forbidden ones, and omitted ones, which the package set leaves out. */
+const UNIMPORTABLE_PACKAGES: ReadonlySet<string> = new Set([...DESKTOP_FORBIDDEN_PACKAGES, ...DESKTOP_OMITTED_PACKAGES])
+
 /** Reads shipped files with the overlay applied and records findings. */
 class Scanner {
   readonly collector = new Collector()
@@ -233,7 +240,7 @@ class Scanner {
     if (SOURCE_FILE.test(label) && !this.forbiddenDirs.some(dir => label.startsWith(dir))) {
       for (const specifier of collectRuntimeSourceSpecifiers(label, this.readText(path))) {
         const name = packageNameOf(specifier)
-        if (name !== undefined && DESKTOP_FORBIDDEN_PACKAGES.includes(name)) this.collector.add('import', label, name)
+        if (name !== undefined && UNIMPORTABLE_PACKAGES.has(name)) this.collector.add('import', label, name)
       }
     }
   }
@@ -349,7 +356,8 @@ export function scanDesktopShipped(overlay: ShippedOverlay = new Map()): Shipped
     if (!SOURCE_FILE.test(label)) return
     for (const specifier of collectRuntimeSourceSpecifiers(label, scanner.readText(label))) {
       const name = packageNameOf(specifier)
-      if (name !== undefined && workspace.has(name) && !queued.has(name)) {
+      // An omitted package's import is an `import` finding; the package itself does not ship, so it is not scanned.
+      if (name !== undefined && workspace.has(name) && !queued.has(name) && !DESKTOP_OMITTED_PACKAGES.includes(name)) {
         queued.add(name)
         workspaceQueue.push(name)
       }

@@ -59,7 +59,7 @@ Desktop Host 的 Platform API 请求与更新策略请求用相同的 Platform �
 
 ## 终端命令
 
-应用菜单中的**管理 dsh 命令…**位于**检查更新…**下方，显示当前命令，并提供安装、修复和移除操作。命令复用 Desktop 已安装的运行时和普通 [dsh CLI](../cli/README.zh.md)，Desktop 应用关闭后也可以使用。安装后打开新终端，运行 `dsh --version`。
+应用菜单中的**管理 dsh 命令…**位于**检查更新…**下方，显示当前命令，并提供安装、修复和移除操作。命令复用 Desktop 已安装的运行时管理 desktop profile 的插件，Desktop 应用关闭后也可以使用；其他 profile 需要 npm 版 [dsh CLI](../cli/README.zh.md)。安装后打开新终端，运行 `dsh --version`。
 
 macOS 安装会创建 `/usr/local/bin/dsh`；目录权限需要时，系统会请求管理员认证，不会修改 shell 启动文件。Windows 管理对话框将命令注册到当前用户的 PATH。切换已有命令前会要求确认；修复当前已选中的 Desktop 命令不会重复要求切换确认。macOS 链接会保留并恢复被替换的启动器；Windows 会保留其他 PATH 条目，包括注册前就已存在的条目。若其他命令的 PATH 优先级更高，对话框会显示其位置。移动应用后，macOS 使用“修复”，Windows 从新位置使用“安装”。“移除”不会改动无关安装。
 
@@ -137,7 +137,7 @@ Desktop 自带其 Casper 会话运行的 Casper 引擎，因此 Casper 会话不
 
 ## 内置命令运行时
 
-安装后的 `resources/runtime/cli/bin/dsh` shell 脚本（Windows 为 `dsh.cmd`）使用 Desktop 的 Electron 可执行文件和内置 pnpm 运行普通 CLI 分派入口。Desktop 关闭时也可使用，并保留 Electron 运行时限制。普通 profile、配置和插件命令与 npm dsh 使用相同实现；该命令不会打开 Desktop。
+安装后的 `resources/runtime/cli/bin/dsh` shell 脚本（Windows 为 `dsh.cmd`）使用 Desktop 的 Electron 可执行文件和内置 pnpm 运行共享 CLI 分派入口。Desktop 关闭时也可使用，并保留 Electron 运行时限制。它只接受 `dsh plugin --profile desktop <pnpm arguments...>`、`dsh --version` 与 `dsh --help`，后者打印该命令自己的帮助。其他所有调用，包括 `dsh web` 等 profile 启动、配置转储以及针对其他 profile 的插件命令，都以状态码 1 退出，并给出 npm CLI 的安装命令 `npm install -g @deepseek-ai/dsh`。该命令不会打开 Desktop。
 
 管理 Desktop 插件前，先启动一次 Desktop 以初始化其 profile，完全退出应用，再运行 `dsh plugin --profile desktop add <package>`、`list` 或 `remove <package>`。重新打开 Desktop 后使用更改。包操作保留共享的 profile 写锁和兼容性检查。内置命令拒绝未初始化的 Desktop profile，不会在其位置创建普通 CLI profile。
 
@@ -147,7 +147,7 @@ Desktop 自带其 Casper 会话运行的 Casper 引擎，因此 Casper 会话不
 
 ## 安装归属
 
-Electron 拥有 `$DSH_HOME/profiles/desktop`。其 `dependencies` 包含 pnpm 安装的包；`dsh.profile.bundles` 包含 [Casper 桌面 bundle](../../packages/casper/desktop/README.zh.md)，后接已启用插件。签名应用从 `resources/app.asar/dsh` 提供 dsh、私有 Desktop Host 及其生产依赖。打包应用选择 runtime profile 解析，不创建包链接；开发 profile 使用文件系统链接。宿主与插件在同一个 Electron Node 模式进程中执行；Desktop 不启用 `--preserve-symlinks`。CLI 不能启动此 profile。Desktop 内置命令可在应用退出后管理其插件；npm 安装的 dsh 不能修改它。
+Electron 拥有 `$DSH_HOME/profiles/desktop`。其 `dependencies` 包含 pnpm 安装的包；`dsh.profile.bundles` 包含 [Casper 桌面 bundle](../../packages/casper/desktop/README.zh.md)，后接已启用插件。签名应用从 `resources/app.asar/dsh` 提供 dsh、私有 Desktop Host 及其生产依赖，不含[被排除的上游包](#develop)。打包应用选择 runtime profile 解析，不创建包链接；开发 profile 使用文件系统链接。宿主与插件在同一个 Electron Node 模式进程中执行；Desktop 不启用 `--preserve-symlinks`。CLI 不能启动此 profile。Desktop 内置命令可在应用退出后管理其插件；npm 安装的 dsh 不能修改它。
 
 应用 preload 只向 `dsh-app://app` 文档暴露启动就绪、致命启动失败上报、原生目录选择、用于 composer 路径引用的 `__DSH_HOST_PATHS__` 桥接和租约范围内的 Browser 桥接。同一个 preload 通过 `dshDesktop.deviceInfo()` 转发主进程采集的机器描述，按 `name=value` 字段以 `; ` 分隔：`platform`、`os`、`app_arch`（应用二进制实际运行的架构，模拟运行时与硬件架构不同）、`cpu` 和 `memory_gib`（物理内存总量，GiB，保留一位小数）。取值不可用时省略对应字段。该描述不包含主机名、用户名或序列号。产品页面还获得 Desktop 标记、更新展示数据和打开原生确认的操作，不能选择安装产物或授权安装。插件管理使用 Web 应用经过认证的 HTTP API；Electron 在 `dsh-app://shell/` 本地提供更新弹窗文档和资源，不依赖 Host 就绪。Electron 不提供插件管理 IPC 或独立管理页面。任何渲染进程都不会获得文件系统访问、原始 Electron IPC、shell 或任意 pnpm 参数。
 
@@ -207,7 +207,7 @@ pnpm run dev:desktop
 pnpm run start:desktop
 ```
 
-桌面包准备过程按安装包目标的操作系统和架构筛选可选原生包。Windows 的包集合不包含 macOS Computer Use tarball，即使输入包是在 macOS 上打包的。
+桌面包准备过程按安装包目标的操作系统和架构筛选可选原生包。Windows 的包集合不包含 macOS Computer Use tarball，即使输入包是在 macOS 上打包的。每个包集合都排除 [`DESKTOP_OMITTED_PACKAGES`](src/core-package-set.ts)，即除 `dsh-web-app` 外的上游 profile bundle 和 `dsh-web-app` 仍依赖的上游服务包，以及只能经由它们到达的所有包；运行时安装把每个被排除的包名覆盖为 `-`，`prepare:dsh` 拒绝解析出包集合之外的 `@deepseek-ai/dsh` 或 `@deepseek-ai/dsh-*` 包、或未从 `file:` tarball 解析包集合成员的锁文件。
 
 Web 侧的对应命令是 `pnpm run dev:web` 与 `pnpm run start:web`，见[开发指南](../../docs/development.zh.md)。Workspace 开发使用 Electron RunAsNode 运行当前 CLI 与私有 Desktop Host 包，插件管理和恢复使用 `$DSH_HOME/profiles/desktop`，与一次性工作区运行时分离。Host 在开发与打包构建中都使用 runtime 模块解析，不创建官方包的 fallback 链接；开发者安装的包（包括链接）保留原生优先级。需要验证 Electron RunAsNode、内置 pnpm、内置 dsh 资源、插件安装和修复时，应运行未封装安装器的应用目录。
 

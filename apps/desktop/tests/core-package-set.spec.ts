@@ -1,18 +1,22 @@
 import { createHash } from 'node:crypto'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  DESKTOP_OMITTED_PACKAGES,
   DESKTOP_PACKAGES_DIR,
   DESKTOP_PACKAGE_SET_FILE,
   desktopCorePackageOverrides,
   desktopDshPackageSpec,
+  desktopOmittedPackageOverrides,
   parseDesktopCorePackageSet,
   verifyDesktopCoreLockfile,
   verifyDesktopCorePackageSet,
   type DesktopCorePackageRecord,
 } from '../src/core-package-set.ts'
+import { DESKTOP_HOST_PROTOCOL_VERSION } from '../src/host-protocol.ts'
+import { createRuntimeProjectMetadata } from '../src/project-manager.ts'
 
 const roots: string[] = []
 
@@ -99,5 +103,37 @@ describe('desktop core package set', () => {
         packageSet,
       )
     }).toThrow(/outside the local package set/u)
+  })
+
+  it('overrides each omitted package to -, and refuses a package set that contains one', () => {
+    const { root } = packageSetProject()
+    const packageSet = verifyDesktopCorePackageSet(root, '1.2.3')
+    expect(() => desktopOmittedPackageOverrides(packageSet, ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless']))
+      .toThrow(/contains omitted package\(s\) @deepseek-ai\/dsh-base$/u)
+    expect(desktopOmittedPackageOverrides(packageSet, ['@deepseek-ai/dsh-headless', '@deepseek-ai/dsh-sdk-app'])).toEqual({
+      '@deepseek-ai/dsh-headless': '-',
+      '@deepseek-ai/dsh-sdk-app': '-',
+    })
+  })
+
+  it('writes the runtime project with the omitted packages overridden to - and absent from its dependencies', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-desktop-runtime-project-'))
+    roots.push(root)
+    mkdirSync(join(root, DESKTOP_PACKAGES_DIR))
+    const files = [['@deepseek-ai/dsh', 'dsh.tgz'], ['@deepseek-ai/dsh-desktop-host', 'host.tgz']] as const
+    const records = files.map(([name, file]) => {
+      const body = Buffer.from(file)
+      writeFileSync(join(root, DESKTOP_PACKAGES_DIR, file), body)
+      return record(name, file, body)
+    })
+    writeFileSync(join(root, DESKTOP_PACKAGE_SET_FILE), JSON.stringify({ schemaVersion: 1, packages: records }))
+    createRuntimeProjectMetadata(root, {
+      schemaVersion: 1, version: '1.2.3', hostProtocolVersion: DESKTOP_HOST_PROTOCOL_VERSION, nodeVersion: '24.17.0', pnpmVersion: '11.28.5',
+    }, DESKTOP_OMITTED_PACKAGES)
+    const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as { dependencies: Record<string, string> }
+    expect(Object.keys(manifest.dependencies)).toEqual(['@deepseek-ai/dsh', '@deepseek-ai/dsh-desktop-host'])
+    const workspace = readFileSync(join(root, 'pnpm-workspace.yaml'), 'utf8')
+    expect(workspace).toContain('  "@deepseek-ai/dsh": "file:./desktop-packages/dsh.tgz"\n')
+    for (const name of DESKTOP_OMITTED_PACKAGES) expect(workspace).toContain(`  ${JSON.stringify(name)}: "-"\n`)
   })
 })

@@ -19,6 +19,24 @@ export const DESKTOP_HOST_RUNTIME_FILES = [
   'lib/cli.js',
 ] as const
 
+/**
+ * Workspace packages cut from the Desktop package set: upstream's profile bundles, which only the npm CLI composes, and
+ * the upstream service packages that `dsh-web-app` still depends on. The package set leaves out each of them and every
+ * package reachable only through them, and the runtime install overrides each to `-`, so pnpm drops the dependency edges
+ * that `@deepseek-ai/dsh` and `dsh-web-app` still declare.
+ */
+export const DESKTOP_OMITTED_PACKAGES: readonly string[] = [
+  '@deepseek-ai/dsh-acp-app',
+  '@deepseek-ai/dsh-api-account-controller',
+  '@deepseek-ai/dsh-base',
+  '@deepseek-ai/dsh-client-product-analytics',
+  '@deepseek-ai/dsh-client-ui-settings-account',
+  '@deepseek-ai/dsh-headless',
+  '@deepseek-ai/dsh-host-product-telemetry-otel',
+  '@deepseek-ai/dsh-sdk-app',
+  '@deepseek-ai/dsh-sdk-minimal',
+]
+
 /** One immutable npm tarball in the Desktop core package set. */
 export interface DesktopCorePackageRecord {
   readonly name: string
@@ -113,6 +131,22 @@ export function desktopCorePackageSpec(record: DesktopCorePackageRecord): string
 /** Return the exact pnpm override map that keeps every core package off registries. */
 export function desktopCorePackageOverrides(packageSet: DesktopCorePackageSet): Record<string, string> {
   return Object.fromEntries(packageSet.packages.map(record => [record.name, desktopCorePackageSpec(record)]))
+}
+
+/**
+ * Return the pnpm overrides that remove every dependency edge to an omitted package.
+ * @param packageSet - Verified local core package set.
+ * @param omitted - Package names the package set was selected without; none may be in the set.
+ * @returns A `-` override for each omitted name.
+ */
+export function desktopOmittedPackageOverrides(
+  packageSet: DesktopCorePackageSet,
+  omitted: readonly string[],
+): Record<string, string> {
+  const shipped = new Set(packageSet.packages.map(record => record.name))
+  const present = omitted.filter(name => shipped.has(name))
+  if (present.length > 0) throw new Error(`desktop package set: contains omitted package(s) ${present.join(', ')}`)
+  return Object.fromEntries(omitted.map(name => [name, '-']))
 }
 
 /** Return the local direct dependency spec for the dsh package. */

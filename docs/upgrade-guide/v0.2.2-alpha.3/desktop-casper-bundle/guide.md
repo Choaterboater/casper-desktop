@@ -17,7 +17,7 @@ The bundle also changes three defaults on Desktop:
 
 - No web search provider is set, and `web_search` is not offered to the model until a search provider resolves (`web` row, `offerUnresolvedSearch: false`). `web_fetch` is unchanged.
 - No default model is set (`agent-default-model` has an empty provider and model). The model picker shows "Select model", and a Standard Session's first prompt fails until a model is picked.
-- The plugin manager also hides `@deepseek-ai/dsh-casper-desktop`, `dsh-base`, `dsh-web-app` and the other upstream profile bundles, so neither the Plugins page nor the `plugin_manager` tool can switch them on. The registry settings from [casper-wire-identity](../casper-wire-identity/guide.md) now come from this bundle.
+- The plugin manager also hides `@deepseek-ai/dsh-casper-desktop` and `dsh-web-app`, so neither the Plugins page nor the `plugin_manager` tool can switch them on. Desktop does not install `dsh-base` or the other upstream profile bundles at all. The registry settings from [casper-wire-identity](../casper-wire-identity/guide.md) now come from this bundle.
 
 ## Migration
 
