@@ -5,29 +5,9 @@ import { WebContentsView, session, shell, type Session, type View, type WebFrame
 import { mergePlatformCookies, platformClientHeaders, type PlatformSession } from '@deepseek-ai/dsh-deepseek-account'
 import { desktopClientMetadata } from './client-metadata.ts'
 
-import { PLATFORM_IPC, type PlatformLocale } from './platform-ipc.ts'
+import { PLATFORM_IPC, type PlatformBounds, type PlatformLocale } from './platform-ipc.ts'
 
-export { PLATFORM_IPC } from './platform-ipc.ts'
-
-/** Bounds in desktop content coordinates, supplied by the owned application renderer. */
-export interface PlatformBounds { x: number; y: number; width: number; height: number }
-
-/**
- * Decode the renderer rectangle before allocating a native view.
- * @param value - IPC payload.
- * @returns finite, nonnegative integer coordinates.
- */
-export function platformBounds(value: unknown): PlatformBounds {
-  if (typeof value !== 'object' || value === null) throw new Error('Invalid Platform bounds')
-  const row = value as Record<string, unknown>
-  const result: PlatformBounds = { x: 0, y: 0, width: 0, height: 0 }
-  for (const key of ['x', 'y', 'width', 'height'] as const) {
-    const n = row[key]
-    if (typeof n !== 'number' || !Number.isFinite(n) || n < 0 || n > 100_000) throw new Error('Invalid Platform bounds')
-    result[key] = Math.round(n)
-  }
-  return result
-}
+export { PLATFORM_IPC, platformBounds, type PlatformBounds } from './platform-ipc.ts'
 
 type PlatformOwner = Pick<EventEmitter, 'on' | 'removeListener'> & {
   webContents: Pick<EventEmitter, 'on' | 'removeListener'>

@@ -399,17 +399,16 @@ vi.mock('../src/update-coordinator.ts', () => ({ DesktopUpdateCoordinator: class
   readonly install = harness.updateInstall
   readonly dispose = vi.fn()
 } }))
-vi.mock('../src/platform-view.ts', async importOriginal => ({
-  ...await importOriginal<typeof import('../src/platform-view.ts')>(),
-  DesktopPlatformView: class {
-    notifyLocaleChanged() {}
-    setSession() {}
-    setBounds() {}
-    close() {}
-    closeAndWait(): Promise<void> { return harness.platformCloseAndWait() }
-    dispose(): Promise<void> { return harness.platformDispose() }
-  },
-}))
+vi.mock('../src/platform-surface.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/platform-surface.ts')>()
+  return {
+    ...actual,
+    CasperPlatformSurface: class extends actual.CasperPlatformSurface {
+      override closeAndWait(): Promise<void> { return harness.platformCloseAndWait() }
+      override dispose(): Promise<void> { return harness.platformDispose() }
+    },
+  }
+})
 vi.mock('../src/welcome-backend.ts', () => ({
   connectDesktopWelcome: (...args: unknown[]) => {
     harness.connectWelcome(...args)

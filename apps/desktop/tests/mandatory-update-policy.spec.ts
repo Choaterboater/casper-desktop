@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AccountClientMetadata } from '@deepseek-ai/dsh-deepseek-account/types'
+import { desktopPlatformClientHeaders } from '../src/client-headers.ts'
 import { DesktopMandatoryUpdatePolicy, desktopPolicyPage, resolveDesktopPolicyConfig, type DesktopPolicyState } from '../src/mandatory-update-policy.ts'
 
 const identity = { platform: 'win32', arch: 'x64', channel: 'nightly', bundledDshVersion: '0.1.5-rc.1' } as const
@@ -16,7 +17,7 @@ function fixture(authentication: 'anonymous' | 'feishu-test' = 'anonymous',
   const request = vi.fn<typeof fetch>().mockResolvedValue(Response.json(clear))
   const publish = vi.fn<(state: DesktopPolicyState) => void>()
   const policy = new DesktopMandatoryUpdatePolicy(resolveDesktopPolicyConfig({ ...deployment, authentication, ...(authentication === 'feishu-test' ? { allowedAuthOrigins: ['https://login.example.com'] } : {}) })!,
-    identity, publish, request, clientSource)
+    identity, publish, request, clientSource, desktopPlatformClientHeaders)
   instances.push(policy)
   return { policy, request, publish }
 }
@@ -82,7 +83,7 @@ describe('mandatory update policy', () => {
     const old = Promise.withResolvers<Response>()
     const request = vi.fn<typeof fetch>().mockReturnValueOnce(old.promise).mockResolvedValue(Response.json(clear))
     const policy = new DesktopMandatoryUpdatePolicy(resolveDesktopPolicyConfig(deployment)!,
-      { ...identity, get channel() { return channel } }, () => {}, request, () => client)
+      { ...identity, get channel() { return channel } }, () => {}, request, () => client, desktopPlatformClientHeaders)
     instances.push(policy)
     const first = policy.check('launch')
     channel = 'stable'
