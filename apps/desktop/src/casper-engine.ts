@@ -1,8 +1,10 @@
 /**
  * Where the Casper engine the app ships lives inside the runtime resources,
- * and the Host environment entries that hand it to the casper-agent row.
+ * the Host environment entries that hand it to the casper-agent row, and the
+ * engine version the build recorded.
  */
 
+import { readFileSync } from 'node:fs'
 import { join, posix, win32 } from 'node:path'
 
 /** Files and folders of the bundled engine under one runtime resource directory. */
@@ -53,4 +55,21 @@ export function casperEngineEnvironment(runtime: string, platform: NodeJS.Platfo
     DSH_DESKTOP_CASPER_ENGINE: layout.engine,
     DSH_DESKTOP_CASPER_TOOL_PATH: [layout.nodeBin, layout.tools].join((platform === 'win32' ? win32 : posix).delimiter),
   }
+}
+
+/**
+ * The version of the engine the app ships, as the build recorded it in
+ * `runtime/versions.json` (`casper.version`) beside the engine.
+ * @param runtime - the runtime resource directory.
+ * @returns the version, such as `0.4.15`.
+ * @throws Error when the file cannot be read, is not JSON, or records no version.
+ */
+export function readBundledCasperVersion(runtime: string): string {
+  const path = join(runtime, 'versions.json')
+  const recorded = JSON.parse(readFileSync(path, 'utf8')) as { casper?: { version?: unknown } } | null
+  const version = recorded?.casper?.version
+  if (typeof version !== 'string' || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u.test(version)) {
+    throw new Error(`casper desktop: ${path} records no Casper engine version`)
+  }
+  return version
 }

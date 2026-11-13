@@ -27,7 +27,7 @@ import {
   type MenuItemConstructorOptions,
 } from 'electron'
 import { resolveDesktopPaths } from './paths.ts'
-import { casperEngineEnvironment } from './casper-engine.ts'
+import { casperEngineEnvironment, readBundledCasperVersion } from './casper-engine.ts'
 import { DesktopProjectManager } from './project-manager.ts'
 import { DesktopHostFatalError, DesktopHostProcess, DesktopHostUncleanExitError } from './host-process.ts'
 import { PLATFORM_IPC, platformBounds } from './platform-ipc.ts'
@@ -384,6 +384,7 @@ async function main(): Promise<void> {
     : join(process.resourcesPath, 'runtime', 'primary-runtime')
   // The bundled Casper engine sits beside the primary runtime; in development, in the target's build runtime folder.
   const casperEngine = casperEngineEnvironment(dirname(primaryRuntime), process.platform)
+  const casperEngineVersion = readBundledCasperVersion(dirname(primaryRuntime))
   const activeProject = paths.profile
   const manager = new DesktopProjectManager(paths, resources)
   // Dock and Finder launches inherit only launchd's environment; every Host shares one login-shell read.
@@ -468,7 +469,8 @@ async function main(): Promise<void> {
   // chrome and its content never mix languages.
   const showAbout = async (): Promise<void> => {
     await ordinaryMessageBox({ type: 'info', title: locale.messages.aboutMenu, message: locale.messages.aboutProduct,
-      detail: formatDesktopMessage(locale.messages.aboutVersion, { version: app.getVersion() }),
+      detail: `${formatDesktopMessage(locale.messages.aboutVersion, { version: app.getVersion() })}\n${
+        formatDesktopMessage(locale.messages.aboutEngineVersion, { version: casperEngineVersion })}`,
       buttons: [locale.messages.updateAcknowledge], cancelId: 0 })
   }
   const commandManager = new DesktopCommandManager({
@@ -1139,15 +1141,19 @@ async function main(): Promise<void> {
 
   const applicationIconPath = development ? join(app.getAppPath(), 'resources', 'icon-windows.png')
     : join(process.resourcesPath, 'icon.png')
-  app.setAboutPanelOptions({
-    applicationName: 'Casper',
-    applicationVersion: app.getVersion(),
-    // The release has no separate build number; omit Electron's bundle version.
-    version: '',
-    // Publisher and the upstream credit the MIT licence asks this fork to keep visible.
-    copyright: 'Choaterboater · built on DeepSeek Harness (MIT)',
-    iconPath: applicationIconPath,
-  })
+  // The macOS About panel; its engine line follows the menu's language.
+  const applyAboutPanel = (): void => {
+    app.setAboutPanelOptions({
+      applicationName: 'Casper',
+      applicationVersion: app.getVersion(),
+      // The release has no separate build number; omit Electron's bundle version.
+      version: '',
+      credits: formatDesktopMessage(currentDesktopLocale().messages.aboutEngineVersion, { version: casperEngineVersion }),
+      // Publisher and the upstream credit the MIT licence asks this fork to keep visible.
+      copyright: 'Choaterboater · built on DeepSeek Harness (MIT)',
+      iconPath: applicationIconPath,
+    })
+  }
   // A custom application menu replaces Electron's default menu, so macOS needs
   // its standard menus and application hide commands declared explicitly.
   // Keep app.name stable: Electron derives its default userData directory from it.
@@ -1192,6 +1198,7 @@ async function main(): Promise<void> {
     devToolsF12Shortcut,
   ]
   const refreshApplicationMenu = (): void => {
+    applyAboutPanel()
     Menu.setApplicationMenu(Menu.buildFromTemplate(process.platform === 'win32'
       ? windowsDevToolsShortcuts : [{
         label: darwin ? app.name : currentDesktopLocale().messages.application,
