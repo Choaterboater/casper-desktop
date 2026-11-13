@@ -5,8 +5,6 @@ description: "Image read requests require a complete attachment reference and no
 
 # Image read requests carry the complete attachment reference
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 In 0.2.1-rc.3, `session/attachment` accepted `{ sessionId, attachmentId }` and searched the requested Session's history for the complete image reference. It now requires `{ sessionId, attachment: ref }`, where `ref` is an `ImageAttachmentRef` containing `attachmentId`, `mediaType`, `bytes`, `width`, and `height`. The Client's `session.readAttachment()` also takes the complete reference instead of an ID.

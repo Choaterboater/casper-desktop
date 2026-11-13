@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-working-directory
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Change one Session’s working directory while existing processes retain theirs. The selected directory survives replay and appears in user context. A missing directory restores the original project when it remains available.

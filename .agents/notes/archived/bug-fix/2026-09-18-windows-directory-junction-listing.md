@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-18-windows-directory-junction-listing.zh.md)
-
 ## Problem
 
 Windows profile directories such as `Documents\My Music` are directory junctions: reparse points that `lstat` reports as symlinks rather than directories. The `list` endpoint gated on `lstat` before resolving, so it refused every final link with `workspace-file/not-directory`, while its own listing reported those same children as `directory` because `listDir` resolves each child. The file tree therefore listed the junctions and refused to open them, and the Sidebar reported `My Music`, `My Pictures`, and `My Videos` as not a directory.

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-20-workspace-tree-state-per-pane.zh.md)
-
 ## Problem
 
 Reading several workspace files needs a tree beside their previews without losing expansion, loaded levels, width, scroll, or keyboard position on every tab switch. The dock mounts only the selected tab's body, so a component instance cannot own the state shared by a pane's file tabs.

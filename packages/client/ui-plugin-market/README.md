@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-client-ui-plugin-market
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Discover is the second tab of the **Plugins** page, after **Installed**. It lists the bundles that plugin indexes offer; users manage index sources, switch between indexes, search, filter by category and label, sort, open an entry's page, and install an entry after confirming it. Entry pages show each entry's long description as Markdown with images. The Host [`pluginMarket`](../../boot/plugin-market/README.md) service fetches and validates indexes; this package only presents them.

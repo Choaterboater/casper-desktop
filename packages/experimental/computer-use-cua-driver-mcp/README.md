@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Let the model operate the local desktop through an already installed Cua Driver. Mount this package with the computer-use service to expose the driver's own tool descriptions, arguments, and results through MCP. Installation and desktop permissions remain with Cua Driver, and no driver activates by default. The provider reserves computer use until its connection and tools finish closing; callers coordinate concurrent Sessions themselves.

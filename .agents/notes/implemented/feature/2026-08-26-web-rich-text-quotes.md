@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-08-26-web-rich-text-quotes.zh.md)
-
 ## Problem
 
 Selected transcript excerpts need atomic editing and reload-safe drafts without depending on the availability of their source messages.

@@ -5,8 +5,6 @@ kind: "package-bundle"
 
 # @deepseek-ai/dsh-experimental-liveshare
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Share a Session with colleagues through the normal DSH browser interface. The owner chooses viewing or bounded writing, and independently allows forking; the owner host enforces those choices. Attachment upload follows sharing itself: a Session the viewer can see accepts files. This opt-in bundle adds owner sign-in, sharing controls, the outgoing gateway, and the viewer surfaces of the owner's own Web page. The default Web profile excludes it. The separately deployed Liveshare server authenticates viewers and transports their requests; its OAuth, database, routing, and deployment implementation are not part of this package.

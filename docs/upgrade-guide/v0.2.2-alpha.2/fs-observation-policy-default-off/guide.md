@@ -5,8 +5,6 @@ description: "The fs-observation-policy row ships disabled, so write, edit, and 
 
 # Filesystem mutations no longer require a prior read by default
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 In 0.2.2-alpha.2, `dsh-base` mounted `@deepseek-ai/dsh-fs-observation-policy`, so in every base-backed profile `write` refused to overwrite a file the model had not read, `edit` refused an unread or externally changed file, and the model's guidance named the policy. The `fs-observation-policy` row now ships `disabled: true`: `write` overwrites, `edit` replaces literal text, and the new `apply_patch` applies hunks on context match alone, each unconditionally. The `write` and `edit` guidance still asks for a prior read but no longer cites the policy. Review capture, sandbox confinement, and `fs/observed` events are unchanged.

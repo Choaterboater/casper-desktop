@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-14-composer-selection-keyboard.zh.md)
-
 ## Problem
 
 Two selection surfaces inside the composer hold focus while they are open, and both left Tab to the browser.

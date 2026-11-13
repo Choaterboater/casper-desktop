@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-user-questions
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Use `ctx.userQuestions` when a tool or permission flow needs a structured answer from the user. `ask()` waits for that answer; `askTimed()` may release the agent to continue independent work while the question remains answerable in the Session.

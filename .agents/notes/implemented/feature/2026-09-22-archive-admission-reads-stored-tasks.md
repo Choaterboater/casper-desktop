@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-22-archive-admission-reads-stored-tasks.zh.md)
-
 ## Problem
 
 Archive admission asks every provider what still runs for a Session before the archive is written, and a stop-archive then asks those providers to end it ([archiving a Session with running work](2026-09-21-archive-stops-running-session-work.md)). The Schedule provider answered from its owned runtime's fold of the live Session log, so only a Session with a live Agent reported the `schedule` family, and the stop deleted through the management `delete` path.

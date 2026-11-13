@@ -1,7 +1,5 @@
 # Remote and API rules
 
-English | [中文](remote-and-api.zh.md)
-
 Rules for the `packages/api` layer and the remote methods it exposes. [api-gateway.md](../api-gateway.md) describes the call model itself. Each section below states the requirement, how a reviewer judges it, what it does not cover, which exception applies and who approves it, and a correct and a wrong example.
 
 ## A new remote capability gets its own service

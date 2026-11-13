@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-27-oxlint-contract-spawn-case-budgets.zh.md)
-
 ## Problem
 
 Twelve of the fourteen cases in [`scripts/oxlint-contract.spec.ts`](../../../../scripts/oxlint-contract.spec.ts) spawn a real child process: `runOxlint` starts the oxlint CLI, and `runRepositoryOxlint` boots [`scripts/run-oxlint.ts`](../../../../scripts/run-oxlint.ts) under tsx, which runs oxlint and, after `--fix`, runs it once more. The root `vitest.config.ts` sets no `testTimeout`, so a case without its own budget inherits Vitest's 5000 ms default; the coverage lanes raise it through `DSH_COVERAGE_TEST_TIMEOUT_MS=90000` and the Windows native lane passes `--testTimeout 90000`, while the `unit tests (darwin parity, macos-latest)` job in `sandbox.yml` and a developer's `pnpm run test` run plain. Seven cases (five `it` declarations, one of them a three-way `it.each`) carried the explicit `90_000` that #3115 aligned the contended Windows spawn budgets to; the other seven ran on the default, and five of those spawn. Two runner classes exposed it: the self-hosted Windows pool, where process creation spikes to several seconds (#2581), and the hosted macos-latest runner of Sandbox run 36332053320, which ran the whole file 2.2× slower than the passing run 36320394290 and timed out `prints only the final diagnostics when a fix retry still fails` at 6309 ms, a case that took 1122 ms on the passing run. `Test timed out in 5000ms` names neither a contract violation nor the spawn that overran.

@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-mcp-manager
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 `dsh-mcp-manager` manages a live fleet of MCP servers from two sources: entries in `config.servers` on its profile entry (also editable through Settings), and entries that installed plugins register for their own lifetime. The manager mounts one `dsh-mcp-client` instance per enabled entry, adding, rebuilding, disabling, and removing instances live as either source changes. `ctx.mcpManager` aggregates every server's connection status, `restart` recovers a server whose reconnect budget ran out, `probe` tests an entry without touching the live instances, and `watch` streams the server list to Remote clients. `${credential:REF}` templates keep secrets out of entries; mcp-client handles credential rotation inside each instance.

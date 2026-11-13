@@ -5,8 +5,6 @@ kind: "package-bundle"
 
 # @deepseek-ai/dsh-casper-desktop
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 The Casper desktop bundle holds the desktop app's profile layers: copies of upstream's [`dsh-base`](../../bundle/base/README.md) and [`dsh-web-app`](../../bundle/web-app/README.md) patch files with the upstream service rows taken out, followed by a hand-written Casper layer. The desktop app composes only from this bundle; on launch it replaces `dsh-base` and `dsh-web-app` in an existing desktop profile with it. The bundle ships with the dsh installation, and the plugin manager leaves it out of both plugin lists.

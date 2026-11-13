@@ -5,8 +5,6 @@ description: "Explicit installation, peer dependencies, and configuration for op
 
 # Explicit installation and composition for optional capabilities
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 The CLI and Python runtime omit the hook bridges from their installation dependencies, and the CLI omits the webhook pair. Base and the full Web presets omit dormant Ralph rows, and base omits its dormant badge row. A patch that only enables a removed row does not insert its plugin. Default active behavior, plugin registration names, tool names, and recorded Session event names remain unchanged.

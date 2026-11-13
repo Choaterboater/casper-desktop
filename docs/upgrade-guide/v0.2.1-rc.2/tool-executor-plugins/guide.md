@@ -5,8 +5,6 @@ description: "Tool execution modes move from dsh-tools configuration into explic
 
 # Mount a tool executor
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 `@deepseek-ai/dsh-tools` keeps tool registration and executor selection, but rejects the removed `mode` and `maxParallelSubCalls` configuration fields at load time. Native and PTC execution require `@deepseek-ai/dsh-tool-executor-native` or `@deepseek-ai/dsh-tool-executor-ptc`. Shipped profiles mount an executor; custom compositions must add one. The existing `dsh-agent-tool-presentation` selector remains supported but is deprecated. Enabled `tool-executor-native` and `tool-executor-ptc` rows are required at startup; invalid executor configuration now stops startup. Web, headless, and SDK no longer read `DSH_TOOLS_MODE`; all inherit native execution from base.

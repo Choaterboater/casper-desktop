@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-29-reused-blank-runs-requested-preset.zh.md)
-
 ## Problem
 
 Web New Session, Workspace navigation, and startup restoration reused a blank Session by naming it in `session.create`. The Host resumed that Session under the preset its log recorded, so a new conversation inherited the preset the blank had been created or switched under. When that preset was no longer declared, such as a removed or renamed definition or a legacy `$DSH_HOME/.agent-presets/<id>/` directory that nothing reads any more, every New Session in that Workspace and every startup restoration of that draft failed with `agent-preset/not-found` although the default preset was valid (issue #2566). A blank created under an earlier default silently kept that default. The client retried only `session/writer-held`, so the stale blank stayed first in line.

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-17-unified-subagent-activations.zh.md)
-
 ## Problem
 
 Local one-shot execution and continuable residency separately owned child creation, cancellation, structured capture, results, and cleanup. Foreground and Job-backed tool paths added more ownership paths. Workflow code still needed to await a result, while external backends needed one process execution without acquiring a multi-turn protocol.

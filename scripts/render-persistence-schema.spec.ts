@@ -74,13 +74,13 @@ describe('persistence schema catalog', () => {
   it('renders historical source paths and nested headings within their reference section', () => {
     const current = fixture()
     const inventory = { ...current, types: current.types.map(type => ({ ...type, sources: type.sources.map(source => source.replace(/:\d+$/u, '')) })) }
-    const definitions = renderPersistenceSchemaDefinitions(inventory, 'en', () => undefined, 3)
+    const definitions = renderPersistenceSchemaDefinitions(inventory, () => undefined, 3)
     expect(definitions).toContain('Sources: `packages/core/example/src/types.ts`')
     expect(definitions).not.toContain('types.ts:8')
     expect(definitions).not.toContain('(../packages/')
     expect(definitions).toContain('### Resolved persistence types')
     expect(definitions).toContain('#### `ErrorInfo`')
-    const index = renderPersistenceSchemaIndex(inventory, 'en', ['[Historical schema](v0.schema.json)'], 3)
+    const index = renderPersistenceSchemaIndex(inventory, ['[Historical schema](v0.schema.json)'], 3)
     expect(index).toContain('[Historical schema](v0.schema.json)')
     expect(index).toContain('### Persistence type fingerprints')
     expect(index).not.toContain('(persistence-schema.json)')
@@ -133,7 +133,7 @@ function producerFixture(kinds: readonly string[], events: readonly string[]): P
 }
 
 function currentDefinitions(inventory: PersistenceSchemaInventory): string {
-  return renderPersistenceSchemaDefinitions(inventory, 'en', undefined, 2, 'current')
+  return renderPersistenceSchemaDefinitions(inventory, undefined, 2, 'current')
 }
 
 function assertLinkedOnce(markdown: string): void {
@@ -322,7 +322,6 @@ describe('current persistence schema anchors', () => {
     const saved = JSON.stringify(inventory)
     expect(currentDefinitions(inventory)).toContain('Source compatibility: `source` — `session-source-attribution` v1; `session.user-message.source`; `kind`; `preserve`.')
     expect(currentDefinitions(inventory)).toContain('Attribution-only additions: `build-context`.')
-    expect(renderPersistenceSchemaDefinitions(inventory, 'zh', undefined, 2, 'current')).toContain('仅表示归属的新增 kind：`build-context`.')
     expect(renderPersistenceSchemaDefinitions(inventory)).not.toContain('Source compatibility:')
     expect(JSON.stringify(inventory)).toBe(saved)
   })
@@ -341,9 +340,9 @@ describe('current persistence schema anchors', () => {
       '| Property | Presence | Type |', '|---|---|---|',
       '| `next` | optional | [`Recursive`](#persistence-type-recursive) |', '',
     ].join('\n')
-    const index = renderPersistenceSchemaIndex(inventory, 'en', ['Frozen reference.'], 3)
-    expect(index + '\n' + renderPersistenceSchemaDefinitions(inventory, 'en', () => undefined, 3)).toBe(expected)
-    expect(renderPersistenceSchemaIndex(inventory, 'en', ['Frozen reference.'], 3, 'historical') + '\n'
-      + renderPersistenceSchemaDefinitions(inventory, 'en', () => undefined, 3, 'historical')).toBe(expected)
+    const index = renderPersistenceSchemaIndex(inventory, ['Frozen reference.'], 3)
+    expect(index + '\n' + renderPersistenceSchemaDefinitions(inventory, () => undefined, 3)).toBe(expected)
+    expect(renderPersistenceSchemaIndex(inventory, ['Frozen reference.'], 3, 'historical') + '\n'
+      + renderPersistenceSchemaDefinitions(inventory, () => undefined, 3, 'historical')).toBe(expected)
   })
 })

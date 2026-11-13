@@ -5,8 +5,6 @@ kind: "package-bundle"
 
 # @deepseek-ai/dsh-experimental-plugin-market-bundle
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 This optional bundle mounts custom plugin indexes: the Host [`pluginMarket`](../../boot/plugin-market/README.md) service, which reads the plugin indexes the user adds, and the Web [Discover tab](../../client/ui-plugin-market/README.md) of the Plugins page. Shipped profiles leave it disabled.

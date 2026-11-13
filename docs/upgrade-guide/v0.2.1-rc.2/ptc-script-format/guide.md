@@ -5,8 +5,6 @@ description: "PTC programFormat includes Script syntax, and consumers read retai
 
 # Handle Script programs and explicit state retention
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 The published `@deepseek-ai/dsh-ptc-runtime` service widens `PtcRuntime.programFormat` from `'function-body' | 'repl'` to include `'script'`. External consumers that exhaustively match the old union must handle the new value. `retainsState` reports whether a provider preserves memory for a `stateOwner`; its base implementation returns `false`, so custom retained providers must override it.

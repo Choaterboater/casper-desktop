@@ -5,8 +5,6 @@ description: "Custom TerminalBlock consumers must provide localized accessible n
 
 # Terminal command labels
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 `TerminalBlockLabels` from `@deepseek-ai/dsh-client-ui-primitives` requires a `commandLine(line: number): string` formatter. Previously, callers supplied no accessible name for command lines. Each horizontally overflowing line now uses this name for its keyboard-focusable group; lines that fit, including wrapped lines, add no Tab stop. This affects custom UI plugins that render `TerminalBlock`.

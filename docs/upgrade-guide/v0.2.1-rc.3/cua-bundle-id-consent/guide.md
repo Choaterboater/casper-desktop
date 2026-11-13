@@ -5,8 +5,6 @@ description: macOS Computer Use grants use bundle identifiers and require renewe
 
 # macOS Computer Use application identity
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 Application grants use the case-sensitive native bundle identifier. Versions and copies at different paths share permission and revocation, regardless of signing. Applications without a bundle identifier use their canonical executable path and can also receive always-allow grants. Restarting or replacing the executable at that path retains consent; moving it requires renewed consent. A valid running bundle identifier does not require an executable path. Grant records can omit executablePath, and the permission page then shows the name without a path tooltip or icon. Existing records remain readable; older versions that require this field cannot read new pathless records. The profile storage location and conversation scopes are unchanged.

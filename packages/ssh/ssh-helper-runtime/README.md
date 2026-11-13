@@ -5,8 +5,6 @@ kind: "package-library"
 
 # @deepseek-ai/dsh-ssh-helper-runtime
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Run the SSH helper on a remote machine without installing Node or npm packages. Each archive includes the executable, its native resources and integrity metadata. The private carrier supports managed processes, terminals, sandboxing and an embedded PTC worker through the existing SSH providers. Project commands still use the remote machine’s own development tools.
@@ -33,7 +31,7 @@ This private workspace produces release archives; it is not a profile plugin or 
 pnpm exec tsx scripts/build-exe-for-ssh-helper.ts
 ```
 
-The builder requires Node 24, a C/C++ compiler and the development headers from that Node installation. Linux additionally needs `musl-gcc`; its node-pty addon must meet the glibc baseline. The [native workflow](../../../.github/upstream-workflows/build-exe-for-ssh-helper.yml) prepares the compatible addon before packaging. `--target` selects one native target, `--skip-build` reuses prepared JS/native outputs, and `--dry-run` validates the target and dependency declarations without building.
+The builder requires Node 24, a C/C++ compiler and the development headers from that Node installation. Linux additionally needs `musl-gcc`; its node-pty addon must meet the glibc baseline. Prepare that compatible addon before packaging. `--target` selects one native target, `--skip-build` reuses prepared JS/native outputs, and `--dry-run` validates the target and dependency declarations without building.
 
 | Target | Native archive | Checked deployment baseline |
 |---|---|---|
@@ -52,7 +50,7 @@ The [artifact verifier](../../../scripts/verify-ssh-helper-artifact.ts) accepts 
 
 The [OpenSSH verifier](../../../scripts/verify-ssh-helper-ssh.ts) accepts a Linux `--archive`. It creates a temporary glibc 2.28 SSH server with no Node installation, mounts only the release and a disposable public key, and exercises the production connection. Its portability lane makes no kernel-confinement claim; the native host lane owns that check. Test identities, host keys, ports and workspaces are private to the run.
 
-Ordinary PR and master CI run source and build-script checks without building SSH executables. For changes to helper startup, native dependencies or packaging, manually run the [native workflow](../../../.github/upstream-workflows/build-exe-for-ssh-helper.yml) before merging; it accepts selected targets and defaults to all four. `CI master` also exposes the manual `ssh-helper` suite. [Release (SSH helper)](../../../.github/upstream-workflows/publish-ssh-helper.yml) defaults to `publish=false`: it builds all four targets from the selected ref and validates complete same-commit evidence from clean builds. With `publish=true`, it requires the matching `dsh-v<version>` tag and attaches the tested archives and `SHA256SUMS` to that GitHub release; a missing release is created as a draft. Native validation remains mandatory before publication. Deployment-target inspection alone does not establish execution on the oldest macOS version.
+CI runs source and build-script checks without building SSH executables. For changes to helper startup, native dependencies or packaging, build the helper locally with the builder above before merging. Deployment-target inspection alone does not establish execution on the oldest macOS version.
 
 -----
 

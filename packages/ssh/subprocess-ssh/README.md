@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-subprocess-ssh
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 `dsh-subprocess-ssh` implements `ctx.subprocess` using the shared SSH helper. Executable lookup, ordinary processes, fd 7 control traffic and terminal sessions run beside the SSH filesystem. Remote native process owners govern termination and quiescence; consumers continue to own command semantics, output limits and execution deadlines.

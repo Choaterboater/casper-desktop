@@ -1,7 +1,5 @@
 # Publish the Web UI behind a reverse proxy
 
-English | [中文](public-deployments.zh.md)
-
 `dsh --profile web` serves the GUI on a loopback port, so a browser on another machine cannot reach it, and the process knows nothing about the address you do use. A reverse proxy in front of it owns that external leg — the public host name, TLS, and the path prefix it strips before forwarding to the listener — and `--public-url` tells DSH which address browsers use:
 
 ```sh

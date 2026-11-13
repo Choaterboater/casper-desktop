@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-19-windows-acl-mandatory-integrity-confinement.zh.md)
-
 ## Problem
 
 The [restricted-token rung](2026-08-08-windows-acl-restricted-token-sandbox.md) confines writes by intersecting the requested access mask with restricting SIDs. That intersection covers only the access check against the object's OWN security descriptor: Windows also authorizes a write or a delete from the PARENT directory's `FILE_DELETE_CHILD` right, which no restricting SID has to co-sign. `cmd /c del` and `[System.IO.File]::Delete` — anything reaching `DeleteFileW` — therefore deleted files outside the workspace in BOTH confined modes (issue #4581), while plain writes from the same child were denied.

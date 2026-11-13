@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-08-05-durable-web-schedule.zh.md)
-
 The [Host-owned scheduled messages decision](../architecture/2026-09-16-host-schedule-storage.md) owns task storage, timer activation, dispatch, delivery records, and the task catalog. This note owns the two timing decisions that survive it — the explicit absolute-time boundary and bounded fixed-rate arithmetic — and the queue-admission boundary they share.
 
 ## Problem

@@ -5,8 +5,6 @@ description: "Custom title routes require registered adapters and reasoning effo
 
 # Prepare custom title routes
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 Model-backed session titles prepare their requests through `ctx.llm.prepareCall()`. Compositions that serve title routes only through `llm/stream` middleware must also register an adapter. Custom adapters must list selectable reasoning efforts from least to greatest, rather than in arbitrary display order. Title policy selects the first entry through a configuration function. Existing concrete `prepareCall()` inputs remain valid.

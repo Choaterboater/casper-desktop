@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-18-session-list-summary-projections.zh.md)
-
 ## Problem
 
 A Session-list row carries every registered client view. Four of those views are never rendered by a row: the whole-log turn outline, the whole-log conversation figures, the current todo list, and the host-wide image limits. The outline grows with the Session's log, so a list payload scales with corpus size and log length even though no row shows it. Omitting values from the list needs a rule that keeps the wire and client types honest: a summary consumer must not obtain an omitted key, a value that is omitted must still reach an opened Session, and the owning packages must not drift from whatever declaration drives the omission.

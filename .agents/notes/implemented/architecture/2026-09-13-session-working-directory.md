@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-13-session-working-directory.zh.md)
-
 ## Problem
 
 A fixed Session creation directory cannot represent a task that changes checkout during its conversation. Independent tools resolving paths from different sources can read and write different projects, while changing the process directory also affects unrelated Sessions. Putting mutable directory information in the system prompt changes the reusable prompt prefix.

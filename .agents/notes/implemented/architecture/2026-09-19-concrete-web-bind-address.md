@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-19-concrete-web-bind-address.zh.md)
-
 ## Problem
 
 The Web listener accepted `127.0.0.1` or `0.0.0.0`. A wildcard bind exposed every interface of the machine, so the bundle sampled the LAN IPv4 addresses at bind time into a `webRuntime` service and appended them to `trustedHosts`, granting authorities for interfaces the operator never named and mixing inferred reachability into configured trust. A container or workstation that should expose exactly one address had no way to say so, IPv6 addresses were not accepted at all, and a browser dialing the exposed address sent it as `Host` only to be refused unless the sampled list happened to contain it.

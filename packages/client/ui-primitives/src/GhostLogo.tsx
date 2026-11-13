@@ -6,7 +6,7 @@ export const GHOST_LOGO_VIEWBOX = { width: 24, height: 24 }
 /** The single-colour ghost silhouette with its eyes cut out, for marks drawn in `currentColor` such as the wordmark. */
 export const GHOST_LOGO_PATH = 'M3 11.1a9 9 0 0 1 18 0v10.8l-2.25-1.8-2.25 1.8-2.25-1.8-2.25 1.8-2.25-1.8-2.25 1.8-2.25-1.8-2.25 1.8zM7.275 10.65a1.575 2.025 0 1 0 3.15 0 1.575 2.025 0 1 0-3.15 0zM13.575 10.65a1.575 2.025 0 1 0 3.15 0 1.575 2.025 0 1 0-3.15 0z'
 
-/* The website ghost (website/public/favicon.svg), drawn in its own colours so it reads on light and dark surfaces. */
+/* The Casper ghost (apps/web/public/favicon.svg), drawn in its own colours so it reads on light and dark surfaces. */
 const INK = { outline: '#0f766e', body: '#f4f7fb', eyes: '#1b2430', shine: '#fff', cheeks: '#5eead4' }
 const BODY_PATH = 'M12 30a20 20 0 0 1 40 0v24l-5-4-5 4-5-4-5 4-5-4-5 4-5-4-5 4z'
 /* The skirt with its points swapped; it keeps BODY_PATH's commands and number count, so `d` morphs between them. */

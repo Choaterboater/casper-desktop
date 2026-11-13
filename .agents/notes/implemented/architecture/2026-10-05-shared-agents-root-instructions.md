@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-05-shared-agents-root-instructions.zh.md)
-
 ## Problem
 
 DSH loads one user-global instruction file, `$DSH_HOME/AGENTS.md`. People who run several agent tools keep the instructions they share across those tools in the shared agent configuration root (`~/.agents/AGENTS.md`, or `$DSH_AGENTS_HOME`) that `dsh-skill-filesystem` already scans for skills. Those instructions reached DSH only when the person copied or symlinked them into the harness home, which duplicates one source of truth into DSH-owned data and leaves no way to tell which copy a session loaded.

@@ -5,8 +5,6 @@ description: "Tool presentation accepts native or ptc; the mixed both mode is re
 
 # Select native or PTC tool presentation
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 The `mode` fields of `@deepseek-ai/dsh-tools` and `@deepseek-ai/dsh-agent-tool-presentation` accept only `native` or `ptc`. The `both` value is rejected. This also affects `DSH_TOOLS_MODE=both`, which supplies the tools configuration through the shipped profile patches.

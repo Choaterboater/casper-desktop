@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-client-ui-action-cards
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Users see an optional action card below a completed answer: its title, a brief that folds when long, and the controls of the experiment that proposed it. In the process area, the proposal shows as one row with the card title and whether the call was accepted; a refused call expands to its reason. A card whose experiment provides no controls in this browser offers only Not now. Showing, expanding and folding cards make no model request.

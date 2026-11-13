@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-11
 
-English | [中文](2026-09-10-local-office-preview.zh.md)
-
 ## Problem
 
 Office Open XML files are ZIP archives, so text fallback cannot provide a useful preview. Document conversion must stay local without taking focus or adding document content to a model conversation. Engine success alone cannot prove that the input has the claimed format or that a PDF was produced.

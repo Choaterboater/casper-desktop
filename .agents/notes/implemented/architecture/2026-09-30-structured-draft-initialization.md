@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-30-structured-draft-initialization.zh.md)
-
 ## Problem
 
 New-task entry points need to place unsent content in the composer. A draft contains not only text but also file, folder, and Session references the user has selected. Saving only their text projection loses the chips' source, target, and presentation fields when the input object is disposed. Filling the composer after mounting also cannot guarantee that the first input-model read contains the complete document.

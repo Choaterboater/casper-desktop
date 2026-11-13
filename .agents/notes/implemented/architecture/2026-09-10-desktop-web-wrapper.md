@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-10-desktop-web-wrapper.zh.md)
-
 Desktop uses Electron as its Node runtime under the [current runtime reference](../../../../apps/desktop/README.md); other decisions in this note remain applicable.
 
 ## Problem

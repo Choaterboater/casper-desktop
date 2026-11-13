@@ -5,8 +5,6 @@ description: "The pi-ai Azure provider route is renamed from azure-openai-respon
 
 # Azure provider route rename
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 The installed pi-ai catalog identifies the Azure provider as `azure` instead of `azure-openai-responses`. The `azure` route includes both Responses and Chat Completions models. The Responses API identifier remains `azure-openai-responses`, and the `AZURE_OPENAI_*` environment variables keep their names. Configurations and model selections that use the old provider key no longer resolve the Azure catalog.

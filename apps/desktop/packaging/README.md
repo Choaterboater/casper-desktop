@@ -1,10 +1,8 @@
 ---
-description: "Build Desktop installers locally or through Windows or macOS Actions, choose deployment and signing mode, and retrieve artifacts and diagnostics. This guide keeps build operations separate from publishing and installed-application qualification. Platform signing details and shared-runner risks must be checked before using hardware credentials."
+description: "Build Desktop installers locally, choose deployment and signing mode, and retrieve artifacts and diagnostics. This guide keeps build operations separate from publishing and installed-application qualification. Platform signing details and shared-runner risks must be checked before using hardware credentials."
 ---
 
 # Desktop packaging
-
-English | [中文](README.zh.md)
 
 ## Summary
 
@@ -15,8 +13,6 @@ Build Desktop installers locally or through Windows or macOS Actions, choose dep
 - [Choose a build path](#choose-a-build)
 - [Release versions](#release-versions)
 - [Configuration and local builds](#configuration-and-local-builds)
-- [Windows Actions packaging](#windows-actions)
-- [macOS self-hosted packaging](#macos-actions)
 - [Unsigned Windows test installer](#unsigned-windows-test-installer)
 - [Local macOS DMG without release signing](#local-macos-dmg-without-release-signing)
 - [macOS release signing and diagnostics](#macos-release-signing)
@@ -102,48 +98,6 @@ The macOS arm64 command requires Apple Silicon. The macOS x64 command runs on In
 Both release and local unsigned macOS DMGs use LZMA compression (`dmg.format: 'ULMO'`) in [the electron-builder configuration](../scripts/electron-builder-config.mjs). A [build-time patch](../../../patches/app-builder-lib@26.17.0.patch) adds this format to the pinned builder's validation and TypeScript declarations.
 
 Each target owns its packed package inputs, prepared runtime, package set, dsh tree, pnpm preparation state, unpacked application, update metadata, and final artifacts under `apps/desktop/.desktop-build/targets/<target>/`. The Electron archive cache remains shared under `.desktop-build/downloads` because every archive name includes its version, platform, and architecture and is verified before extraction. A target build never consumes another target's mutable preparation state.
-
-<a id="windows-actions"></a>
-
-## Windows Actions packaging
-
-For supervised runner startup and recovery, follow [Windows runner machine setup](../windows-signing/README.md#machine-setup).
-
-The `Package Desktop · Windows · x64` [manual workflow](../../../.github/upstream-workflows/windows-package.yml) selects the dedicated Windows x64 runner label `dsh-win-package-trial` and the machine preset `test` or `production`. Choose `signed` (default) or `unsigned`; signed mode uses the existing EV token preflight, signature cache and failure interlock. It does not publish or upload a release. `build_version` defaults to `auto`, using the CI identifier in [Release versions](#release-versions); an explicit value may be the checkout's product version or an extended build version such as `0.2.1-alpha.1.20261009.1` for product `0.2.1-alpha.1`. The version prefix must match the selected checkout; validation errors show its current example. Manifests remain unchanged.
-
-Select the workflow in Actions, choose the source branch, preset, signing mode and version, then click Run workflow. Before merging input changes, test the pushed branch with `gh workflow run windows-package.yml --ref <branch> -f preset=test -f signing=unsigned -f build_version=auto`; verify the web form after merging. There is no push or PR trigger. Logs and successful EXEs are retained for 14 days. Inspect the retained logs and installer before relying on packaging; installation is separate. Before checkout, Node removes the runner-owned source directory without following dependency junctions; the workflow validates its location and rejects linked ancestors. Never point it at a development checkout. Runs share one concurrency group without cancelling an active build; only one run remains pending, and a newer dispatch replaces it. Diagnostics upload requires a successful clean checkout. Machine settings stay outside the checkout and are never uploaded as artifacts.
-
-Open the completed run in Actions and download its Artifacts. `windows-x64-signed-<version>-<run_id>-<run_attempt>` and `windows-x64-unsigned-<version>-<run_id>-<run_attempt>` contain the corresponding EXE; `windows-package-logs-<run_id>-<run_attempt>` contains packaging diagnostics. The upload steps are `Retain verified signed installer`, `Retain verified unsigned installer`, and `Retain packaging diagnostics`; their step durations and timestamped logs show upload time. These artifacts are not a Release or download-site publication.
-
-For cache measurements, `cache_namespace` selects a retained subdirectory for both dependency stores and upstream downloads; leave it empty for normal shared caches. Use a new name for a cold sample and repeat that name for warm samples. Names contain 1–64 lowercase letters, digits or hyphens, start with a letter or digit, and cannot be Windows device names. This does not reset the separate signature cache or OS file cache; report those states and Job start-to-completion time alongside phase timings and artifact size. Before dependency installation, the workflow records the Node version, available CPU parallelism, logical CPU count, and total/free memory.
-
-The dependency-install and packaging steps normalize their own shell to normal CPU, I/O and memory priority before launching children. The priority helper is copied from the exact workflow commit into a run-specific temporary directory, independently of the selected product source. A missing helper stops CI setup; unavailable priority adjustment emits a warning and marks scheduling unsuitable for performance comparison, but does not stop packaging. This does not modify the runner task or other processes. Version, preset and retained-artifact adapters remain tied to product source and its formats.
-
-Installer uploads store the already-compressed release files without ZIP recompression; this preserves installer bytes and signatures. Diagnostic uploads retain their ordinary compression.
-
-<a id="macos-actions"></a>
-
-## macOS self-hosted packaging
-
-The [Apple Silicon workflow](../../../.github/upstream-workflows/macos-package.yml) and [Intel workflow](../../../.github/upstream-workflows/macos-intel-package.yml) produce separate arm64 and x64 packages on the Apple Silicon runner labeled `dsh-mac-package-trial`. Both share one concurrency group. The Intel workflow checks Rosetta execution before dependency installation; its selected source must include the target-aware macOS CI adapter. Both select `test` or `production` and use the existing signing, notarization and packaged-runtime checks. When the selected source's dsh ships the Computer Use bundle, each workflow builds, notarizes and stages the helper for both architectures with `scripts/cua-helper/package.ts` and `stage.ts` after the configuration check, the steps npm publication uses; `skip_notarization` does not skip the helper's notarization. A source that predates helper packaging only emits a warning, and Computer Use cannot prepare its helper in that package. Successful DMG/ZIP files and diagnostic logs are retained for 14 days without publishing a release. Installer uploads disable redundant ZIP compression. The operator must verify a complete Actions run and installation on the target architecture before release qualification. The `compression_level` dropdown defaults to `3` and also offers `7`; it overrides the machine preset for this run and affects only ZIP and automatic-update downloads, not DMG.
-
-All three platform forms put source, environment, update channel, version mode, manual version, test release ID and compression level first, with matching defaults. macOS notarization and Windows signing and cache measurement options follow these common fields.
-
-Run `node apps/desktop/scripts/setup-macos-packaging.mjs "$HOME/dsh-ci"` to prepare private `runner/`, `packaging/{presets,secrets,certificates}` and `cache/macos-signatures` directories without overwriting existing files; append `--check` to inspect them. Fill the [preset](../config/macos-packaging/test.env.example) and [signing](../config/macos-packaging/macos-signing.env.example) templates outside the checkout. Set secret and certificate files to mode `0600`. `DSH_PACKAGING_CONFIG_DIR` selects the absolute `packaging` directory and `DSH_PACKAGING_PRESET` selects its preset; missing files fail without falling back to `.env.macos`. Signed and preparation-only Mac builds read `secrets/macos-signing.env`; relative credential paths resolve beside that file. Public presets reject signing credentials, and signing files cannot override public settings. Local unsigned Mac builds retain their configuration-free behavior.
-
-Run `bash apps/desktop/scripts/start-macos-packaging-runner.sh "$HOME/dsh-ci/runner" "$HOME/dsh-ci/packaging" <absolute-node-24-bin-directory> --check` to check the host tools and configuration files. The script selects the active Xcode and its macOS SDK together and compiles a small linker probe. After registration, omit `--check` to run in the foreground with a cleared inherited environment and prevent idle sleep while the runner is alive. Stop it with Ctrl-C before installing the service below. The runner owns its `_work` checkout, separate from daily development. The account can read its signing files, so run only trusted code. The existing notarization proxy restoration rules apply; after forced termination, inspect retained recovery records before another build. New setup templates set `DSH_DESKTOP_MACOS_SIGNATURE_CACHE_DIR` to the absolute `cache/macos-signatures` directory outside checkout. For existing installations, rerun setup and add that field to each preset; existing files are preserved. This retains signatures across clean checkouts; cache verification and limits are described under [macOS signing](#macos-release-signing).
-
-ZIP compression uses the same configured level with or without notarization; the App is assembled once, then DMG and ZIP are built separately so the ZIP setting does not change DMG compression. The `skip_notarization` workflow option defaults to `false`; the equivalent CLI flag is `--skip-notarization`. It retains Developer ID signing, DMG signature verification and packaged-runtime verification, but omits Apple notarization and stapling and does not require Apple notarization credentials. DMG/ZIP filenames carry `-unnotarized`, are stored under `.desktop-build/targets/<target>/unnotarized-artifacts/`, and are uploaded with an `unnotarized-debug` label. These artifacts are for internal debugging only: Gatekeeper may block downloaded copies, and they are not qualified for distribution or update publishing. No release completion record is written. The flag rejects unsigned, Windows and preparation-only builds.
-
-Install the user service from the checkout as the same account that registered the runner, without `sudo`:
-
-```sh
-bash apps/desktop/scripts/macos-runner-service.sh install "$HOME/dsh-ci/runner" "$HOME/dsh-ci/packaging" /opt/homebrew/opt/node@24/bin
-bash apps/desktop/scripts/macos-runner-service.sh start "$HOME/dsh-ci/runner"
-bash apps/desktop/scripts/macos-runner-service.sh status "$HOME/dsh-ci/runner"
-```
-
-The installer copies its startup script into `runner/dsh-service`, sets the service PATH to Node 24 plus system tools, and uses GitHub's `svc.sh` and `runsvc.sh`. The LaunchAgent survives SSH disconnection, but requires that account's desktop login after reboot and stops on desktop logout. FileVault disk unlock remains an operator step; this does not provide unattended boot. Logs are `runner/dsh-service/stdout.log` and `stderr.log`; verify `Connected to GitHub` and `Listening for Jobs`. To update installed startup code or tool paths, wait until the runner is idle, run `stop`, then `uninstall`, and repeat installation. Neither action unregisters the runner or removes packaging credentials. Uninstall retains `runner/dsh-service` (including logs) and the explicit `.path`; reinstall replaces the startup snapshot and PATH.
 
 <a id="unsigned-windows-test-installer"></a>
 

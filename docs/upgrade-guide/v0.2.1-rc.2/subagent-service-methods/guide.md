@@ -5,8 +5,6 @@ description: "The subagent service removes drainChildren, listChildren, and list
 
 # Subagent service method removal
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 `ctx.subagents` removes `drainChildren(parent, childIds)`, `listChildren(parentSessionId, signal?)`, and `list()`. This affects plugins that release resident children by id, read direct-child catalogs through the service, or enumerate registered provider names.

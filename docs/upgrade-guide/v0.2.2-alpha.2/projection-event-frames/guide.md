@@ -5,8 +5,6 @@ description: "Live Session projection frames list every key one committed event 
 
 # Projection frames list every key one event changed
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 Live `projection` frames on the `session/control` stream and change frames on the `session/observeProjections` stream carried one projection key each: `{ type: 'projection', sessionId, key, value, seq }`. An event that changed several keys produced several frames with the same `seq`. Each frame now carries every key one committed event changed: `{ type: 'projection', sessionId, seq, changes }` on `session/control`, and the same fields without `sessionId` on `session/observeProjections`. `changes` holds one `{ key, val }` entry per changed key, without duplicate keys, where `val` is the key's new value. A key absent from `changes` is unchanged. The exported types `SessionProjectionUpdate`, `SessionProjectionChange`, `SessionControlFrame`, and `SessionProjectionFrame` of `@deepseek-ai/dsh-api-session-controller` follow the new fields.

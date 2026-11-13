@@ -30,7 +30,7 @@ Rank candidates by observed user latency, CPU/allocations, retained memory, occu
 
 ## Build realistic synthetic benchmarks first
 
-Follow [benchmarks/AGENTS.md](../../../benchmarks/AGENTS.md) and the [performance-gate decision](../../notes/implemented/testing/2026-09-04-session-open-performance-gate.md). Extend the existing required lane rather than creating competing calibration or reporting infrastructure. Package-local diagnostics remain beside their owner; cross-package required cases live under the measured user path in `benchmarks/`.
+This repository keeps no shared benchmark suite: measurement lives in package-local `.perf.ts` diagnostics beside their owner. Run the owning diagnostic before and after the change and report the numbers in the PR.
 
 If the user authorizes local corpus inspection, extract only aggregate workload characteristics. Never copy prompts, outputs, paths, identities, IDs, credentials, recordings, or recognizable snippets into fixtures, logs, screenshots, PRs, or artifacts. Generate fixed inputs from reviewed constants; no benchmark depends on the user’s home, ambient repository, network service, or private data.
 

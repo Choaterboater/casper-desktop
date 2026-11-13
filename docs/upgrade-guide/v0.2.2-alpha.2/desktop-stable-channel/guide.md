@@ -5,8 +5,6 @@ description: "The Desktop stable update channel is named stable instead of lates
 
 # Desktop stable channel name
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 Desktop packages, update feeds, and channel configuration use `stable` instead of `latest`. The `nightly` channel is unchanged. The old channel value is rejected; there is no alias. Fixed website downloads named `dsh-latest-*` are unchanged.

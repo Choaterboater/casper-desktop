@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-14-sidebar-layout-provider-recovery.zh.md)
-
 ## Problem
 
 Reloading the browser loses open files, pane placement and selection. Recovering retained terminals by opening new tabs cannot reproduce that arrangement and can reopen a collapsed sidebar.

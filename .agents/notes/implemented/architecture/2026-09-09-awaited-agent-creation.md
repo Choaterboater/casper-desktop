@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-09-awaited-agent-creation.zh.md)
-
 ## Problem
 
 Agent-specific plugins can install tools asynchronously, and external SessionStart hooks can produce context asynchronously. A creator must know that these contributions have finished before the Agent's first model request.

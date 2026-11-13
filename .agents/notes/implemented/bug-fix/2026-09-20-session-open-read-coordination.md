@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-20-session-open-read-coordination.zh.md)
-
 ## Problem
 
 Opening a historical Session can make `session.follow`, composer catalog prewarming, and RPCs with Agent parameters access the same cold log concurrently. `skills/list` requests a complete observation itself; `commands/list`, `goals/get`, `fileReferences/list`, and `sessionReferenceResolver/candidates` can initiate resume through the Agent lookup during parameter resolution. Auxiliary requests that do not wait for the history opening snapshot compete with the main conversation for reading, parsing, and projection computation instead of reusing completed results.

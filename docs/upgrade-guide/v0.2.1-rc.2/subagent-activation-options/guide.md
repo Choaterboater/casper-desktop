@@ -5,8 +5,6 @@ description: "SubagentActivationSpec accepts task options directly instead of a 
 
 # Subagent activation options
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 Plugin code calling `ctx.subagents.startActivation()` must pass `prompt`, `parent`, and optional execution settings directly on `SubagentActivationSpec`. The nested `request` field is removed. Type names, provider requests, cancellation, and result delivery are unchanged.

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-08-31-mcp-manager-plugin.zh.md)
-
 ## Problem
 
 One MCP server was one `dsh-mcp-client` row in `cordis.yml`. That is right for composition-pinned servers and wrong for the product goal of managing servers from a Web surface: adding, editing, testing, enabling, disabling, deleting, and recovering servers at runtime, with connection status visible per server. The client plugin exposed no status beyond log lines, activation inherited an unbounded SDK startup wait, and there was no way to test a configuration without mounting it. A survey of six peer agent products (Claude Code, Codex, OpenCode, Kimi Code, DeepSeek-Reasonix, Pi) converged on the same shape: a config registry, a management facade, and a connection-state machine with a status-to-action mapping, secrets never round-tripping to the surface.

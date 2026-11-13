@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-15-narrow-pi-ai-runtime-imports.zh.md)
-
 ## Problem
 
 The base bundle mounts `dsh-llm-pi-ai` with no configured routes so the Models settings page can offer pi-ai providers. Importing pi-ai's aggregate entry point for model helpers also evaluates its exported TypeBox namespace, adding hundreds of modules to every application startup even when all Sessions use `dsh-llm-deepseek`.

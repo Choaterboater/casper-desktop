@@ -5,8 +5,6 @@ description: "Subagent persona and toolFilter configuration is replaced by Agent
 
 # Configure subagent composition through presets
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 `dsh-tool-subagent` rejects `persona` and `toolFilter` configuration. New `SubagentStartRequest` values and provider capabilities no longer expose either field. In-process spawn selects a preset through `agentPreset`; its persona and tools come from that preset's plugins. Fork inherits the parent's preset and cannot independently change persona or restrict tools. Model and reasoning-effort options are unchanged.

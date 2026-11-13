@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-03-jobs-seam-consolidation.zh.md)
-
 ## Problem
 
 The job seam had grown by accretion. Producers declared their output twice — a consuming `readOutput` hook the model read and an optional `record: true` ring observers read — and the registry kept two vocabularies for one job (`JobSnapshot` for the model, `SessionJob` on the session control stream, `JobWireChunk` on the observation wire). Three listener families (`onJobDone`, `onJobsChanged`, `onOutput`) delivered overlapping facts with different owner filters, and the registry itself tracked `reported`, a bit that only the model-facing tool could interpret. Review of the merged design called the interface layer the weakest part: a reader could not tell which of `read`, `readRecord`, `JobStart`, `RecordingJob`, and `updateDetail` was the contract and which was an accident of history.

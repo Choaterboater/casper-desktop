@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-fs-local
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Use `dsh-fs-local` to read, list, watch, write, edit, patch, delete, and move files on the host. Relative paths use a configurable base; absolute paths and parent traversal remain unrestricted. Aliases share one identity. Optional guards reject stale versions, and text publication preserves permissions. Moves can also apply hunks and report a published destination separately from source removal. Use `fs-sandbox` when mutations need confinement.

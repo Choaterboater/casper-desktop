@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-09-reasoning-content-slot-factory.zh.md)
-
 ## Problem
 
 Reasoning bodies need to let third parties replace or wrap their presentation while reusing the official Markdown renderer, localized labels, and compact typography. An optional renderer parameter that makes the host choose between direct rendering and a chain fallback leaves the default body outside the registration system and forces plugins to maintain another Markdown call.

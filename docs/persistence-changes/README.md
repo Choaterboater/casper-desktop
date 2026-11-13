@@ -4,8 +4,6 @@ description: "Review and maintain recorded Session persistence-type changes, the
 
 # Persistence-type change records
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Use this reference to inspect an acknowledged Session persistence-type change and its predecessor. Each record binds a compatibility decision to exact generated schemas. Local checks compare the current source with the recorded history using only files in the checkout. Start with the [review cookbook](../cookbook/reviewing-persistence-type-changes.md) when changing a persisted type.
@@ -30,20 +28,18 @@ The generated [catalog](../persistence-catalog.md) provides readable declaration
 
 Each `.schema.json` file stores one node table keyed by the first 16 hexadecimal digits of each node's subgraph digest, with one root, type, or node per line. Roots and types locate their graphs through their own digests, so a type change rewrites only the changed nodes, their ancestors, and the affected digests. Generators own the exact text; verifiers reject any other layout.
 
-Each dated record has four sibling files:
+Each dated record has two sibling files:
 
 | File | Owner |
 |---|---|
 | `YYYY-MM-DD-slug.md` | English acknowledgement with `kind: persistence-change`, one machine declaration, compatibility reasoning, and verification evidence |
-| `YYYY-MM-DD-slug.zh.md` | Chinese counterpart with the identical machine declaration |
-| `YYYY-MM-DD-slug.i18n.yaml` | Generated bilingual consistency record |
 | `YYYY-MM-DD-slug.schema.json` | Generated complete after schemas for the affected roots that remain present |
 
 `finalized/vN.json` records the complete root classifications/digests of an accepted compatibility baseline and semantic hashes of its accepted records. The [finalization record](../session-format-status.md#finalization-record) requires its checkpoint. Current V4 schemas may evolve compatibly; the checkpoint protects accepted machine declarations and after schemas even after the writer advances, while excluding prose, aliases, and source locations from record hashes.
 
 A maintainer captures an agreed format with [`createPersistenceFinalizationCheckpoint`](../../scripts/persistence-finalization.ts), writes a new version-named checkpoint without replacing an earlier one, and advances the paired `latestFinalizedVersion`. The helper requires current schemas to match complete acknowledged history. Run the ordinary verifier before committing.
 
-The [record template](../../.agents/skills/dsh-doc/templates/persistence-change.md) defines the authored format. Record creation accepts a bilingual prose input and generates the machine declaration, snapshots, catalog pair, and consistency records. The verifier reads the machine declaration once from the English file and checks the Chinese declaration for equality. A declaration names each affected root, its predecessor record, its after digest, and its compatibility decision. A new root has no predecessor; a deletion has no after schema and retains an explicit tombstone.
+The [record template](../../.agents/skills/dsh-doc/templates/persistence-change.md) defines the authored format. Record creation accepts a prose input and generates the machine declaration, snapshots, and both catalogs. The verifier reads the machine declaration from the record. A declaration names each affected root, its predecessor record, its after digest, and its compatibility decision. A new root has no predecessor; a deletion has no after schema and retains an explicit tombstone.
 
 <a id="compatibility-rules"></a>
 ## Compatibility rules

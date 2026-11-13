@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-10-background-shell-command-display.zh.md)
-
 ## Problem
 
 An explicit background Shell call already carries its complete command and working directory at Start, but the Tool card shows generic argument JSON rather than the ordinary Shell command area. The original call returns a launch acknowledgement; the background result arrives through a separate completion notice or `job_output` call. Those messages do not directly carry the original Bash callId, so the acknowledgement cannot establish execution completion, and the original call's state cannot represent the job's live state.

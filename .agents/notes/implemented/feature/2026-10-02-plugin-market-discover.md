@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-02-plugin-market-discover.zh.md)
-
 ## Problem
 
 The [plugin market index format](2026-10-02-plugin-market-index-format.md) lets a market publish installable bundles in one document, but DSH needs a reader that fetches indexes safely, a place where users choose index sources and browse entries, and a path from an entry to the existing installation flow. No official market exists, so DSH cannot ship a default source; the sources are user data.

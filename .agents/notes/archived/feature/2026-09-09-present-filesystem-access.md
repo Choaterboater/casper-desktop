@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-09-present-filesystem-access.zh.md)
-
 ## Problem
 
 Generated files commonly live outside the workspace, especially in `/tmp`. Workspace containment rejects files that the Session filesystem and Sidebar already allow. A provider process path may also name a remote file rather than a file on the serving Host.

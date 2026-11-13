@@ -5,8 +5,6 @@ kind: "package-library"
 
 # @deepseek-ai/dsh-sdk-client
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 `dsh-sdk-client` lets TypeScript programs drive a complete Casper runtime over stdio JSON-RPC. Use `run()` for ordinary text, supported slash commands, and image content blocks, and `onNotification` to observe its notifications. `HarnessClient` provides direct protocol access. Callers may provide `dshBin`; otherwise the client resolves the same-version `@deepseek-ai/dsh` executable. The client owns the subprocess, reports typed failures, and reaps it on `close()` or `await using`.

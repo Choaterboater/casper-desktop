@@ -3,8 +3,6 @@ description: "Detailed business rules for Chat process grouping and activity sum
 ---
 # Chat conversation node rules
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 A Turn shows an answer and lets the reader inspect the work behind it. Start with the complete example below, then read the folding and display rules to understand what is visible. The later sections define exact group boundaries, every tool-name category, counting, and live-detail selection.

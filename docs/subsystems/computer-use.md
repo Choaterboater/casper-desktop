@@ -1,7 +1,5 @@
 # Computer use
 
-English | [中文](computer-use.zh.md)
-
 Computer use lets a model observe and operate the local desktop through a configured provider. The shared DSH capability is called **computer use**; **Cua Driver** names the upstream implementation.
 
 [Computer Use](../../packages/experimental/cua-bundle/README.md) provides an optional experimental switch for macOS CUA permission setup.

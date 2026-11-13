@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-05-pr-artifact-typechecks.zh.md)
-
 ## Problem
 
 PR jobs need the same compiled packages for benchmarks, compatibility, packaging, and runtime checks. Building the repository-wide test and script programs in every artifact job repeats expensive diagnostics. In the allowed #3661 baseline, benchmark build preparation takes about 304 seconds before 432 seconds of serial measurements. A cold macOS arm64 Host compiler profile on Node 24.19.0 takes 84.01 seconds, including 55.92 seconds in the aggregate program; its 282 emitted projects take 24.33 seconds combined. Increasing concurrency consumes more shared-runner resources.

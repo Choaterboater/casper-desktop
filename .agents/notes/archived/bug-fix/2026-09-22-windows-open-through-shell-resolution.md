@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-22-windows-open-through-shell-resolution.zh.md)
-
 ## Problem
 
 The Windows desktop client's settings sheet offers **Open configuration file**, which prepares the active profile's `cordis.patch.yml` and hands the path to the native text-document opener (issue #4428). On the reporting machine the gesture opened nothing and reported nothing. The opener ran `powershell.exe -NoProfile -Command "Invoke-Item -LiteralPath '<path>'"`, so an association resolved inside the host process decided the outcome, and `Invoke-Item` exits 0 when that resolution finds no application.

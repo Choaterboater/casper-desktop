@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-29-cua-dev-signing-identity.zh.md)
-
 ## Problem
 
 Source checkouts compile `DSH Computer Use.app` with an ad-hoc signature. macOS stores Accessibility and Screen Recording grants for a bundle identifier with the designated requirement of the granted code, and an ad-hoc requirement is the code hash. Every changed build and every other worktree therefore needs new grants, and these builds shared the release helper's bundle identifier and replaced its grant entry.

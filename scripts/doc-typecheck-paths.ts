@@ -7,7 +7,7 @@ import { lt, valid } from 'semver'
  * @returns Whether the guide predates the current upgrade-guide directory.
  */
 export function isFrozenUpgradeGuidePath(file: string, currentVersion: string): boolean {
-  const version = /^docs\/upgrade-guide\/v([^/]+)\/[^/]+\/guide(?:\.zh)?\.md$/.exec(file)?.[1]
+  const version = /^docs\/upgrade-guide\/v([^/]+)\/[^/]+\/guide\.md$/.exec(file)?.[1]
   return version !== undefined && valid(version) !== null && lt(version, currentVersion)
 }
 

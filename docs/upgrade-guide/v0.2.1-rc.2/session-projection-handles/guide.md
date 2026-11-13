@@ -4,8 +4,6 @@ description: "Session projection registration resolves asynchronously to a retai
 ---
 # Session projection registration handles
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 `@deepseek-ai/dsh-session-projection` changes `SessionProjectionRegistry.register(definition)` from a synchronous disposer to `Promise<ProjectionHandle<S>>`. The definition installs synchronously; awaiting the result yields a handle with `stateOf(session)` and `dispose()`, and registration errors reject it. The runtime value is a callable thenable, not a native Promise: calling it still releases the registration, but that call is deprecated. `typeof registration` is `"function"` and `registration instanceof Promise` is false, so code that branches on those checks or treats functions as callbacks is affected; Vitest's `.rejects` calls it instead of observing the rejection.

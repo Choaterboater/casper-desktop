@@ -1,4 +1,4 @@
-/** Casper identity: publisher, upstream credit, website ghost, installer names, and the copied checks staying off. */
+/** Casper identity: publisher, upstream credit, ghost, installer names, and the copied checks staying off. */
 
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
@@ -9,11 +9,11 @@ import { REBRAND_RULES, runRebrand } from './casper/rebrand.ts'
 const root = resolve(import.meta.dirname, '..')
 const read = (path: string): string => readFileSync(resolve(root, path), 'utf8')
 
-/** The full-colour website ghost body (64-unit grid) used by tiles and favicons. */
+/** The full-colour Casper ghost body (64-unit grid) used by tiles and favicons. */
 const GHOST = 'M12 30a20 20 0 0 1 40 0v24'
 /** The one-colour ghost silhouette (24-unit grid) used by small marks and wordmarks. */
 const GHOST_MARK = 'M3 11.1a9 9 0 0 1 18 0v10.8'
-/** The lopsided first Casper ghost, replaced by the website ghost. */
+/** The lopsided first Casper ghost, replaced by the current ghost. */
 const OLD_GHOST = 'M12 2C7.9 2 5 5.1 5 9.2V21'
 /** sha256 of the upstream installer and running-status bitmaps, which still drew the old logo. */
 const UPSTREAM_WHALE_SHA256: Readonly<Record<string, string>> = {
@@ -50,16 +50,7 @@ describe('Casper identity', () => {
     }
   })
 
-  it('shows the Casper ghost instead of the whale on the website', () => {
-    for (const path of ['website/public/favicon.svg', 'website/public/wordmark.svg']) {
-      expect(read(path), path).not.toMatch(WHALE)
-    }
-    expect(read('website/public/favicon.svg')).toContain(GHOST)
-    expect(read('website/public/wordmark.svg')).toContain(GHOST_MARK)
-    expect(read('website/public/wordmark.svg')).toContain('fill="currentColor"')
-  })
-
-  it('draws the website ghost in every icon source and none of the older marks', () => {
+  it('draws the Casper ghost in every icon source and none of the older marks', () => {
     const colour = ['apps/desktop/resources/icon.svg', 'apps/desktop/resources/icon-macos.svg', 'apps/desktop/resources/icon-windows.svg', 'apps/web/public/favicon.svg', 'apps/web/public/favicon-dark.svg', 'packages/client/ui-primitives/src/GhostLogo.tsx']
     const mono = ['packages/client/ui-primitives/src/GhostLogo.tsx', 'apps/desktop/renderer/assets/welcome-brand.svg']
     for (const path of colour) expect(read(path), path).toContain(GHOST)

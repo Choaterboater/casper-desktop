@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-19-sdk-native-user-questions.zh.md)
-
 ## Problem
 
 The SDK can expose the shared `ask_user_question` tool without a Web GUI, but an out-of-process host cannot answer the native user-questions event through the SDK. Publishing the tool alone leaves calls without an answerer. The SDK must carry the interaction while the application chooses its user interface or simulated-user policy.

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-15-authenticated-browser-host-preferences.zh.md)
-
 ## Problem
 
 [Persist Web user preferences through Host settings](../../archived/bug-fix/2026-08-06-host-backed-web-preferences.md) chose the preference store by page locality, so a non-loopback page kept Appearance, Language, busy-Enter, and the welcome acknowledgement in a process-local copy. A trusted remote host, and a deployment published behind the configured public URL, therefore lost every choice on reload even though Connection authenticates the complete settings API. The second mode also split the shared runtime: theme, locale, the settings shell, the Models page, and the welcome notice each rendered a durable row that could never persist for a remote page.

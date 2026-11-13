@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-client-ui-schedule
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 The Automation tasks page and right Sidebar task tab use the same editor for task rules, saved delivery records, deletion, and conversation navigation. Manual creation and target selection use the Host Schedule service; conversation cards, header clocks, and Session row marks retain their existing locations.

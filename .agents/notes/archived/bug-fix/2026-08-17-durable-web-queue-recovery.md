@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-08-17-durable-web-queue-recovery.zh.md)
-
 ## Problem
 
 Inbox acceptance records normalized `agent/inbox/spliced` events, but the Web queue used a separate mux baseline built by enumerating live Agents. After a Host process restart, a persisted ordinary Session remained cold until an operation needed its Agent, so the live-only baseline omitted accepted pending messages that were still present in the durable log.

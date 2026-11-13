@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-24-fixed-rate-floor-one-minute.zh.md)
-
 ## Problem
 
 `every_seconds` refused every interval below 300 seconds, and the Web client restated that bound as its own per-unit floors of 1 hour, 5 minutes, or 300 seconds. The same product already offered a `cron` selector whose finest granularity is one minute, so two selectors that both describe a repeating cadence disagreed about the shortest one a person could ask for: a reminder that repeats every minute was expressible as `cron` and rejected as `every_seconds`. The floor also made a shipped default Web surface awkward to try, because the first repeating reminder anyone creates cannot come back in under five minutes.

@@ -5,8 +5,6 @@ description: "Session working directories replace built-in cwd configuration, an
 
 # Migrate working-directory configuration and tool presentation
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 The next release removes the loop's built-in `{{cwd}}` prompt variable and the `cwd` configuration key from `@deepseek-ai/dsh-subagent-acp` and `@deepseek-ai/dsh-subagent-dsh-sdk`. Custom prompt templates that retain an unresolved `{{cwd}}` fail before a model request. A Session's current execution directory is supplied as required user context and is persisted separately from its original `Session.header.cwd`.

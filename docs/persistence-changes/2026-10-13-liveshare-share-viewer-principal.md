@@ -5,8 +5,6 @@ kind: persistence-change
 
 # 2026-10-13-liveshare-share-viewer-principal
 
-English | [中文](2026-10-13-liveshare-share-viewer-principal.zh.md)
-
 ## Summary
 
 Adds the LiveShare share-viewer principal, including the Relay-asserted display name when available, to the user-rpc message source of prompts a share reader submits.

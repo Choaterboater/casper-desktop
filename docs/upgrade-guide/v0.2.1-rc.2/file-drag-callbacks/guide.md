@@ -5,8 +5,6 @@ description: "Custom image factories and Markdown image delegates must supply fi
 
 # Supply file preparation callbacks to image views
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 The published `conversation.images.content` Factory now requires a `fileDrag` inject member, and `MarkdownDelegate.fileImages` requires the same callbacks. `ChatViewInjected` also gains `fileDrag`. Custom registrations that construct these values must update before compilation succeeds. The shipped Web and Desktop compositions provide `@deepseek-ai/dsh-client-ui-file-drag`; custom compositions must provide the service and its feedback slot. Existing image label fields are unchanged.

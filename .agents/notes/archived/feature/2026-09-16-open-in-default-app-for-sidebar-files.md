@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-16-open-in-default-app-for-sidebar-files.zh.md)
-
 ## Problem
 
 Opening a file in its Host default application or showing it in the file manager existed only on the delivery cards, through routes and a fetch controller private to `ui-deliverables` and addressed by Session, declaration-event sequence, and file index. The right Sidebar's document preview offered no native handoff: a video, an archive, an office document, a file the reader rejected as non-text, or an oversized file dead-ended on an explanation, with Retry as the only control even where a second read could not help (issue #3932). Those files have no delivery event to address, so the existing plumbing could not serve a second surface. A first implementation (PR #4120, by Yifffan) added a new `ui-open-locally` package with its own Host routes and moved the delivery cards onto it; product review asked instead that file opening live in the existing open-in-app feature and accepted an intermediate state for this iteration.

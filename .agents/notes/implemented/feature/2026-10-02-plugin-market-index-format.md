@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-02-plugin-market-index-format.zh.md)
-
 ## Problem
 
 DSH installs third-party bundles only from a spec the user already knows: an npm name, a Git URL, a tarball, or a local path. Nothing lets a user browse installable bundles. No official market exists, and one may be added later, so a market mechanism must work with indexes that third parties publish.

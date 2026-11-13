@@ -5,8 +5,6 @@ kind: "package-group"
 
 # util/ — shared utilities
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 The `util/` group gives capability packages shared mechanical primitives instead of duplicate implementations. It covers atomic writes, branded ids, deques, lossless JSON values, UUIDs, Harness-home paths, launch environments, outbound proxy policy, native commands, output retention, time-zone, instant, and span vocabulary, and timeout handling. Every root entry here is a library: it registers no product service or event, and the consuming capability retains the business semantics. The exception is `official-bundles`: instead of a mechanical primitive, it holds the installation's and the plugin manager's official package lists as data their consumers apply.

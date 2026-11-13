@@ -2,8 +2,6 @@
 
 Status: proposed
 
-English | [中文](2026-09-19-trim-session-query-convenience-api.zh.md)
-
 ## Problem
 
 [`SessionQueryEngine`](../../../../packages/session-query/session-query/src/index.ts) maintains `readSession`, `readTitle`, `readTitleSnapshot`, and `listEvents` without executing first-party product callers. Exact-name and call-site searches find internal delegation, tests, and generated discovery metadata. Current consumers use retained observations, batch titles, surface reads, and traces. The generated catalog exposes these methods to plugin authors but does not execute the advertised operations.

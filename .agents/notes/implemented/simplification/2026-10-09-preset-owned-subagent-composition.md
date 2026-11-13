@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-09-preset-owned-subagent-composition.zh.md)
-
 ## Problem
 
 Agent Presets already compose persona and tool plugins. Independent child persona and tool-filter inputs create a second place to configure that composition. The shipped consumers of child filtering are the six schedule deny lists in the spawn and fork rows of the standard, PTC, and Cordis presets; reminder executors already refuse delegated callers.

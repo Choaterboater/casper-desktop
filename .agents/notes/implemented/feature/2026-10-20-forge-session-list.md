@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-20-forge-session-list.zh.md)
-
 ## Problem
 
 The [forge panel](2026-10-09-forge-panel.md) named a Session's branch in a chip beside the Session title. The header's action row does not shrink, so a long branch overlapped other header entries such as the background task label. Finding which Sessions work in their own worktrees, and which of their change requests need attention, also meant opening each Session's tab. The Session list offers seats for row icons and a hover card section, `sidebar.session.row.trailing` and `sidebar.session.row.hover`, whose occupants must not load or bind Sessions. A row needs two kinds of fact: what the Session log records, which is the worktree the panel created and entered and the change requests the Session binds, and what only polling knows, which is each change request's state and checks.

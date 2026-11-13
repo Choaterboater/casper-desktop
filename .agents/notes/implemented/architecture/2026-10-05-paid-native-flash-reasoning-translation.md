@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-05-paid-native-flash-reasoning-translation.zh.md)
-
 ## Problem
 
 Readers may choose model-based translation in exchange for additional charges. Reusing their conversation request would inherit its history and generation controls, while routing through an arbitrary configured model would conceal the translation's billing and receiver choices.

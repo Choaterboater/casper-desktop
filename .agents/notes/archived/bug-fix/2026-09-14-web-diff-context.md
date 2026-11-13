@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-14-web-diff-context.zh.md)
-
 ## Problem
 
 Filesystem result metadata carries before/after fragments that include unchanged context. Treating each complete fragment as removed or added mislabels shared lines and inflates both card and collapsed-row totals.

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-20-ptc-script-evaluation-and-retention.zh.md)
-
 ## Problem
 
 Program syntax and memory lifetime answer different questions. A consumer may need Script declarations and completion values while requiring either a fresh environment or retained references. Inferring memory lifetime from REPL syntax prevents that choice.

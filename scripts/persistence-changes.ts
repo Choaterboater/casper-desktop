@@ -15,7 +15,6 @@ import type {
 } from './persistence-schema-model.ts'
 import { extractPersistenceSchema } from './persistence-schema.ts'
 import { persistenceCatalogArtifacts } from './gen-persistence-catalog.ts'
-import { renderPersistencePair } from './persistence-artifacts.ts'
 import { loadPersistenceFinalization } from './persistence-finalization.ts'
 import type { PersistenceArtifact } from './persistence-artifacts.ts'
 
@@ -37,7 +36,7 @@ export interface PersistenceChange {
   readonly decision: PersistenceDecision
 }
 
-/** A document's machine record, independent of its translated prose. */
+/** A document's machine record, independent of its authored prose. */
 export interface PersistenceChangeRecord {
   readonly schemaVersion: 1
   readonly id: string
@@ -81,17 +80,11 @@ const CHANGE_DESCRIPTIONS = {
 /** Stable structural classification independent of diagnostic prose. */
 export type PersistenceTypeChangeKind = keyof typeof CHANGE_DESCRIPTIONS
 
-/** Author-supplied paragraphs used to complete one language of a change record. */
+/** Author-supplied paragraphs that complete a change record; the CLI supplies no compatibility or validation claims. */
 export interface PersistenceChangeProse {
   readonly summary: string
   readonly compatibility: string
   readonly verification: string
-}
-
-/** Explicit bilingual prose; the CLI supplies no compatibility or validation claims. */
-export interface PersistenceChangeProsePair {
-  readonly en: PersistenceChangeProse
-  readonly zh: PersistenceChangeProse
 }
 
 interface ReportedChange extends PersistenceTypeChange {
@@ -659,7 +652,7 @@ function readPersistenceEntries(root: string, allowIncompleteId?: string): Persi
   const directory = join(root, HISTORY_DIRECTORY)
   if (!existsSync(directory)) throw new Error('persistence history is missing; use pnpm run persistence-changes --baseline ID for explicit initialization')
   const files = readdirSync(directory).sort()
-  const documents = files.filter(file => file.endsWith('.md') && !file.endsWith('.zh.md') && file !== 'README.md' && file !== 'AGENTS.md')
+  const documents = files.filter(file => file.endsWith('.md') && file !== 'README.md' && file !== 'AGENTS.md')
   const snapshots = new Set(files.filter(file => file.endsWith('.schema.json')))
   const entries = documents.map((filename) => {
     const source = readFileSync(join(directory, filename), 'utf8').replaceAll('\r\n', '\n')
@@ -668,13 +661,6 @@ function readPersistenceEntries(root: string, allowIncompleteId?: string): Persi
     const snapshotName = `${change.id}.schema.json`
     if (!snapshots.delete(snapshotName)) throw new Error(`${filename}: missing schema snapshot ${snapshotName}`)
     const snapshot = parsePersistenceSnapshot(readFileSync(join(directory, snapshotName), 'utf8').replaceAll('\r\n', '\n'))
-    const translatedName = `${change.id}.zh.md`
-    if (!files.includes(translatedName)) throw new Error(`${filename}: missing Chinese counterpart`)
-    const translated = readFileSync(join(directory, translatedName), 'utf8').replaceAll('\r\n', '\n')
-    const englishBlock = source.match(/^```yaml persistence-change[^\S\n]*\n([\s\S]*?)^```[^\S\n]*$/mu)?.[1]
-    const chineseBlocks = [...translated.matchAll(/^```yaml persistence-change[^\S\n]*\n([\s\S]*?)^```[^\S\n]*$/gmu)]
-    if (chineseBlocks.length !== 1 || chineseBlocks[0]?.[1] !== englishBlock) throw new Error(`${filename}: bilingual machine records differ`)
-    if (!allowIncomplete && (translated.includes(EXPLANATION_PLACEHOLDER) || translated.includes(EVIDENCE_PLACEHOLDER))) throw new Error(`${translatedName}: complete compatibility and verification prose`)
     return { record: change, snapshot }
   })
   if (snapshots.size !== 0) throw new Error(`unreferenced persistence schema snapshot: ${[...snapshots].join(', ')}`)
@@ -749,46 +735,39 @@ function machineBlock(change: PersistenceChangeRecord): string {
     ...change.changes.flatMap(item => [`  - root: ${JSON.stringify(item.root)}`, `    previous: ${item.previous === null ? 'null' : JSON.stringify(item.previous)}`, `    after: ${item.after === null ? 'null' : JSON.stringify(item.after)}`, `    decision: ${item.decision}`]), '```'].join('\n')
 }
 
-function scaffold(change: PersistenceChangeRecord, chinese: boolean, prose?: PersistenceChangeProse): string {
-  const summary = chinese ? '概述' : 'Summary'
-  const compatibility = chinese ? '兼容性' : 'Compatibility'
-  const verification = chinese ? '验证' : 'Verification'
-  return ['---', `description: ${JSON.stringify(chinese ? '记录持久化类型更改及其兼容性确认。' : 'Records a persistence type transition and its compatibility acknowledgement.')}`, 'kind: persistence-change', '---', '',
-    `# ${change.id}`, '', chinese ? `[English](${change.id}.md) | 中文` : `English | [中文](${change.id}.zh.md)`, '',
-    `## ${summary}`, '', prose?.summary ?? EXPLANATION_PLACEHOLDER, '', '## ' + (chinese ? '目录' : 'Table of Contents'), '',
-    `- [${chinese ? '声明' : 'Declaration'}](#declaration)`, `- [${compatibility}](#compatibility)`, `- [${verification}](#verification)`, `- [${chinese ? '开发备注' : 'Dev Note'}](#dev-note)`, '',
-    '<a id="declaration"></a>', `## ${chinese ? '声明' : 'Declaration'}`, '', machineBlock(change), '',
-    '<a id="compatibility"></a>', `## ${compatibility}`, '', prose?.compatibility ?? EXPLANATION_PLACEHOLDER, '',
-    '<a id="verification"></a>', `## ${verification}`, '', prose?.verification ?? EVIDENCE_PLACEHOLDER, '', '<a id="dev-note"></a>', `## ${chinese ? '开发备注' : 'Dev Note'}`, '', chinese ? '无。' : 'None.', ''].join('\n')
+function scaffold(change: PersistenceChangeRecord, prose?: PersistenceChangeProse): string {
+  return ['---', 'description: "Records a persistence type transition and its compatibility acknowledgement."', 'kind: persistence-change', '---', '',
+    `# ${change.id}`, '',
+    '## Summary', '', prose?.summary ?? EXPLANATION_PLACEHOLDER, '', '## Table of Contents', '',
+    '- [Declaration](#declaration)', '- [Compatibility](#compatibility)', '- [Verification](#verification)', '- [Dev Note](#dev-note)', '',
+    '<a id="declaration"></a>', '## Declaration', '', machineBlock(change), '',
+    '<a id="compatibility"></a>', '## Compatibility', '', prose?.compatibility ?? EXPLANATION_PLACEHOLDER, '',
+    '<a id="verification"></a>', '## Verification', '', prose?.verification ?? EVIDENCE_PLACEHOLDER, '', '<a id="dev-note"></a>', '## Dev Note', '', 'None.', ''].join('\n')
 }
 
 /** Parse explicit authored prose without supplying compatibility or validation claims.
  * @param value - decoded JSON supplied through --prose.
- * @returns complete English and Chinese section text.
+ * @returns complete summary, compatibility, and verification section text.
  */
-export function parsePersistenceProse(value: unknown): PersistenceChangeProsePair {
-  const pair = record(value, 'persistence prose')
-  keys(pair, ['en', 'zh'], 'persistence prose')
-  for (const locale of ['en', 'zh']) {
-    const sections = record(pair[locale], `persistence prose ${locale}`)
-    keys(sections, ['summary', 'compatibility', 'verification'], `persistence prose ${locale}`)
-    for (const [name, value] of Object.entries(sections)) {
-      const text = textValue(value, `${locale}.${name}`)
-      if (text.trim().length === 0 || text.includes(EXPLANATION_PLACEHOLDER) || text.includes(EVIDENCE_PLACEHOLDER)) {
-        throw new Error(`${locale}.${name} requires authored prose without scaffold placeholders`)
-      }
+export function parsePersistenceProse(value: unknown): PersistenceChangeProse {
+  const sections = record(value, 'persistence prose')
+  keys(sections, ['summary', 'compatibility', 'verification'], 'persistence prose')
+  const section = (name: keyof PersistenceChangeProse): string => {
+    const text = textValue(sections[name], name)
+    if (text.trim().length === 0 || text.includes(EXPLANATION_PLACEHOLDER) || text.includes(EVIDENCE_PLACEHOLDER)) {
+      throw new Error(`${name} requires authored prose without scaffold placeholders`)
     }
+    return text
   }
-  return pair as unknown as PersistenceChangeProsePair
+  return { summary: section('summary'), compatibility: section('compatibility'), verification: section('verification') }
 }
 
-function updateDocument(source: string, change: PersistenceChangeRecord, chinese: boolean, prose?: PersistenceChangeProse): string {
+function updateDocument(source: string, change: PersistenceChangeRecord, prose?: PersistenceChangeProse): string {
   source = source.replace(/^```yaml persistence-change[^\S\n]*\n[\s\S]*?^```[^\S\n]*$/mu, machineBlock(change))
   if (prose === undefined) return source
-  const headings = chinese ? ['概述', '兼容性', '验证'] : ['Summary', 'Compatibility', 'Verification']
-  for (const [index, text] of [prose.summary, prose.compatibility, prose.verification].entries()) {
+  for (const [title, text] of [['Summary', prose.summary], ['Compatibility', prose.compatibility], ['Verification', prose.verification]] as const) {
     const lines = source.split('\n')
-    const heading = `## ${headings[index]}`
+    const heading = `## ${title}`
     const start = lines.indexOf(heading)
     if (start < 0 || lines.lastIndexOf(heading) !== start) throw new Error(`--prose requires one ${heading} section in the existing record`)
     let end = lines.findIndex((line, lineIndex) => lineIndex > start && /^##? /u.test(line))
@@ -868,17 +847,11 @@ function executeCommand(
   })) }
   const snapshot: PersistenceSchemaInventory = { formatVersion: current.formatVersion, roots, types: [] }
   validatePersistenceHistory([...prior, { record: change, snapshot }])
-  const document = (chinese: boolean): string => {
-    const supplied = chinese ? prose?.zh : prose?.en
-    return existing === undefined ? scaffold(change, chinese, supplied)
-      : updateDocument(readFileSync(join(directory, `${id}${chinese ? '.zh' : ''}.md`), 'utf8'), change, chinese, supplied)
-  }
-  const english = document(false)
-  const chinese = document(true)
-  parseDocument(english, `${id}.md`, prose === undefined && existing === undefined)
-  parseDocument(chinese, `${id}.md`, prose === undefined && existing === undefined)
-  const recordFiles = [
-    ...renderPersistencePair(root, `${HISTORY_DIRECTORY}/${id}.md`, english, chinese),
+  const document = existing === undefined ? scaffold(change, prose)
+    : updateDocument(readFileSync(join(directory, `${id}.md`), 'utf8'), change, prose)
+  parseDocument(document, `${id}.md`, prose === undefined && existing === undefined)
+  const recordFiles: PersistenceArtifact[] = [
+    { path: `${HISTORY_DIRECTORY}/${id}.md`, content: document },
     { path: `${HISTORY_DIRECTORY}/${id}.schema.json`, content: encodePersistenceSnapshot(snapshot) },
   ]
   if (!update && recordFiles.some(file => existsSync(join(root, file.path)))) throw new Error(`${id}: acknowledgement file already exists`)
@@ -886,11 +859,11 @@ function executeCommand(
   for (const file of outputs) mkdirSync(resolve(root, file.path, '..'), { recursive: true })
   for (const file of outputs) writeFileSync(resolve(root, file.path), file.content, { flag: recordFiles.includes(file) && !update ? 'wx' : 'w' })
   const completion = baseline
-    ? 'Complete both record documents and refresh their translation pairing.'
+    ? 'Complete the record document prose.'
     : `Complete the compatibility and verification prose with --update ${id} --decision ${decision} --prose FILE.`
   const message = existing === undefined && prose === undefined
-    ? `Created ${HISTORY_DIRECTORY}/${id}.md and paired schema files. ${completion}`
-    : `${update ? 'Updated' : 'Created'} ${HISTORY_DIRECTORY}/${id}.md; schema artifacts and bilingual pairing are current.`
+    ? `Created ${HISTORY_DIRECTORY}/${id}.md and its schema snapshot. ${completion}`
+    : `${update ? 'Updated' : 'Created'} ${HISTORY_DIRECTORY}/${id}.md; schema artifacts are current.`
   return { schemaVersion: 1, ok: true, operation, recordId: id, message,
     changes: differences,
     roots: rootTransitions(history, current), files: outputs.map(file => file.path) }

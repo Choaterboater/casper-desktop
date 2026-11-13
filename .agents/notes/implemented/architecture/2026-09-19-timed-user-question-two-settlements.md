@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-19-timed-user-question-two-settlements.zh.md)
-
 ## Problem
 
 A question can block an agent even when useful work does not depend on the answer. Releasing the tool call after a wait must not discard the question: the user may answer after the agent has continued or after reopening the Session. A pending result is neither a skipped answer nor permission to proceed with work that requires approval.

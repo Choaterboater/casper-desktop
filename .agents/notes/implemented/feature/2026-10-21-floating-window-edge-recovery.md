@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-21-floating-window-edge-recovery.zh.md)
-
 ## Problem
 
 The dock kit's floating panels are the client's floating windows. `FloatLayer` and the retained `DockLayout` renderer draw them in viewport coordinates through one shared gesture hook, `useFloatGestures`, and the right Sidebar embeds them, so the same panels run in the Web client and inside the Desktop window. Their drag followed the pointer one to one with only a top floor (`--dsh-dockkit-float-top`, which keeps the header below the Windows caption). A panel could therefore be dragged past the left, right or bottom edge until its header was out of reach; a viewport that shrank left a panel outside it; and the creation cascade could place a new panel outside a small viewport. The required behavior is that a panel pushed past an edge visibly resists, and on release is pulled back inside with spring physics instead of being stopped by a wall or left outside.

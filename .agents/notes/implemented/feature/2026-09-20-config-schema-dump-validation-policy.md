@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-20-config-schema-dump-validation-policy.zh.md)
-
 ## Problem
 
 `dsh --profile <name> --dump-config-schema` projects native Schemastery Config declarations into JSON Schema without mounting plugins. Native validation mutates its input, evaluates `!!js` expressions, and runs transform callbacks; a static document cannot reproduce all of that. Three choices were contested in review and would be reopened without a record: what `complete` and the exit code mean when part of the projection is approximate, which rows the collector inspects, and how the projection treats native behavior it cannot model.

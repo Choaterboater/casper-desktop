@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-28-forge-git-session-permissions.zh.md)
-
 ## Problem
 
 The [Forge panel](../feature/2026-10-09-forge-panel.md) forces read-only confinement even when a Session grants full access. On hosts without a usable sandbox, its checkout and local changes remain unavailable while the Session's shell works. Background queries also reach repository-configured executable helpers through working-tree comparisons.

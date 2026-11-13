@@ -5,8 +5,6 @@ description: "New Session reuses a blank Session in the Workspace again instead 
 
 # New Session returns to its blank Session
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 In 0.2.1-rc.2, New Session in Web and Desktop, and `uiWorkspace.startSession(workspaceId)` without options, created a fresh Session and Agent on every call ([earlier guide](../../v0.2.1-alpha.1/new-session-generations/guide.md)). The blank Session it left behind is hidden from the Session tree, so its unsent draft could no longer be reached.

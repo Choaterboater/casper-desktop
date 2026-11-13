@@ -5,8 +5,6 @@ kind: "package-bundle"
 
 # @deepseek-ai/dsh-cua-bundle
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Enable macOS Computer Use from Plugins for existing and new PTC sessions. Windows support is in development. This bundle remains in `experimental` until that support is complete, then moves to the `computer-use` group. It ships with DSH switched off and appears in the Experimental plugins list on macOS Hosts; disabled profiles prepare no native components and register neither CUA tools nor their model guidance.

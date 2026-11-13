@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-client-ui-creation-recommendations
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Users see one creation proposal below the completed answer. Short plans appear in full; longer ones fold after about two lines and expand on request. A dropdown offers Right sidebar, Session tab, Global page, or Write your own. The cost notice opens until dismissed; this browser remembers the choice across sessions. The information button reopens it. Only Create starts background work; chatting can continue. Progress appears in the header. An installed page offers only Undo, which removes the plugin; the removed card offers Restore, which reinstalls it.

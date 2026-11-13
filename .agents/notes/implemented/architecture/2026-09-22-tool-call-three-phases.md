@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-22-tool-call-three-phases.zh.md)
-
 ## Problem
 
 The model often provides a tool name and call ID while it is still generating arguments, but `tool/call` arrives only after the entire Assistant stream ends. When one response contains several calls, an earlier call waits for later calls even after its own arguments are complete. File content is part of the arguments to `write`, so this delay can last several seconds.

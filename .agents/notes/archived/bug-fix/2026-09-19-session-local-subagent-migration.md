@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-19-session-local-subagent-migration.zh.md)
-
 ## Problem
 
 Opening a historical parent requires discovery facts from its direct children. A child's corrupt body or invalid descriptor, or an unreadable header elsewhere in the root, could reject the parent's V4 preparation and hide otherwise readable history.

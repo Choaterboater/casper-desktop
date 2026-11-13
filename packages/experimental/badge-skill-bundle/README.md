@@ -5,8 +5,6 @@ kind: "package-bundle"
 
 # @deepseek-ai/dsh-experimental-badge-skill-bundle
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Let Agents whose presets load skills add a “powered by dsh” badge to documents, pull requests, and other outputs. The shared provider adds no model tool. It ships switched off in Web and Desktop. Select it in Plugins to enable it.

@@ -5,8 +5,6 @@ kind: "package-group"
 
 # settings/ — plugin configuration forms
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Edit live plugin configuration through forms derived from each plugin’s Config schema. The active profile patch stores edits, and Loader applies them. Plugins read their own volatile references.

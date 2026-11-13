@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-15-client-session-references.zh.md)
-
 ## Problem
 
 The Session catalog, live Client objects, views, and asynchronous operations have different lifetimes. Catalog membership does not establish ongoing use. A borrowed binding cannot protect asynchronous work or distinguish successive Client generations with the same Session id. A global current Session makes independently bound components act on another view's Session.

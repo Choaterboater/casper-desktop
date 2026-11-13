@@ -5,8 +5,6 @@ kind: persistence-change
 
 # 2026-10-05-working-directory-attribution
 
-English | [中文](2026-10-05-working-directory-attribution.zh.md)
-
 ## Summary
 
 Adds producer-owned working-directory notice attribution.

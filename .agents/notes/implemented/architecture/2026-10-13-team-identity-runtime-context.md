@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-13-team-identity-runtime-context.zh.md)
-
 ## Problem
 
 A teammate identity embedded in its initial task depends on ordinary history retention. Compaction can remove it, and an ordinary fork from that teammate can retain the old role even though the fork is an independent Lead. Identity must reflect the current subagent tree while keeping shared system instructions uniform.

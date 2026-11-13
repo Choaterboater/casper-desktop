@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-browser-use
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 A deployment can enable one browser-use provider at a time. Loading another provider fails with the registered provider name. Each provider supplies its own tools and owns browser sessions. This package adds no model-visible tools or browser operations.

@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-09-plugin-management-in-the-web-sidebar.zh.md)
-
 ## Problem
 
 Installed packages belong to the running profile, while Settings is a modal over a Session. The management page needs room for package details and installation output. The layout's [global main panels](2026-09-08-global-main-panels.md) provide that lifetime and space.

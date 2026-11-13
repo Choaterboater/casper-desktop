@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-19-cua-profile-consent-storage.zh.md)
-
 ## Problem
 
 Application grants stored as plugin configuration make each authorization change depend on configuration reconciliation. Process-local conversation decisions also disappear when the same conversation resumes after a restart. A shared in-memory storage handle cannot observe another process revoking permission.

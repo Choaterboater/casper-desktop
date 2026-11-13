@@ -5,8 +5,6 @@ description: The existing SDK profile includes native desktop tools and model co
 
 # SDK desktop tools and context
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 The existing `sdk` profile now includes `present`, `ask_user_question`, schedule tools, file-reference guidance and time context. It does not start a Web server. Native tool execution remains the default; select PTC through an [executor overlay](../tool-executor-plugins/guide.md). `sdk-minimal` is unchanged.

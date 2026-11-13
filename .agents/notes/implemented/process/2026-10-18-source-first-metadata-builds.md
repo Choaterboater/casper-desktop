@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-18-source-first-metadata-builds.zh.md)
-
 ## Problem
 
 A Host package can consume generated Remote declarations without becoming a Client package. Generating metadata during Host bundling forces the build to identify those consumers, delay their compilation, and propagate that delay to their callers. TypeScript project references already describe the package dependencies; maintaining another source-import graph duplicates ordering work.

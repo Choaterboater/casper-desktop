@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-18-agent-teams-single-bundle.zh.md)
-
 ## Problem
 
 Separate Agent Teams and Agent Teams Web switches require users to discover that tools and their browser controls need both selections. The package split exposes composition details in the plugin page without helping users choose a different Team capability.

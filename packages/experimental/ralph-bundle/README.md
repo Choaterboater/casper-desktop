@@ -5,8 +5,6 @@ kind: "package-bundle"
 
 # @deepseek-ai/dsh-experimental-ralph-bundle
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Add the experimental Ralph tool to every Agent as a global tool for human-requested repeated work with fresh child agents. It ships switched off in Web and Desktop and is hidden from the default plugin lists.

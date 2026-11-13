@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-action-cards
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 An experiment can offer one optional action below an answer, such as creating a page, without adding a tool of its own. The model loads the experiment's skill, then calls `propose_action`; the card appears after the turn ends, and nothing runs until the user acts on it. Each choice is recorded and reported to the model on its next request. The tool costs nothing until a card skill loads in the conversation.

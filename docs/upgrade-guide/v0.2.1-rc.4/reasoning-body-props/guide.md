@@ -5,8 +5,6 @@ description: "Reasoning Body Slot text carries display-ready content, with origi
 
 # Reasoning Body Slot text fields
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 Contributions to `conversation.chat.reasoning.body` receive the model output in the new `rawText` field. The existing `text` field supplies Chat's prepared display text instead of the original output. `running` is unchanged. This affects custom reasoning renderers and translation wrappers.

@@ -5,8 +5,6 @@ description: "Agent Teams defaults off for new Sessions and uses a saved per-Ses
 
 # Select Agent Teams per Session
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 Agent Teams ships with base-backed profiles; new Sessions default to off. The Plugins page has no separate Agent Teams switch. The root Session’s selection controls task tools and Team guidance throughout its subagent tree. The model and reasoning menu offers **Use Agent Teams**, and the root conversation’s Subagent header control opens members above shared tasks in one panel while enabled. Child conversations retain navigation without a shared task board.

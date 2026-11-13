@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-experimental-client-ui-forge
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 This optional package shows a Session's created or pushed change requests and their changes, and starts new Sessions in their own Git worktrees. The Host `forgePanel` Remote inspects the checkout using the Session's permissions, checks code host sign-in, streams [bound change requests](../forge-session/README.md) with their polled status for one Session or for the Session list, reads diffs, and creates a requested worktree while the first message waits in the Session's inbox. The Client adds a sidebar tab, a changes view, header entries, a New Session option, a creation card, Session list icons, and toasts.

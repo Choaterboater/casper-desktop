@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-05-product-package-classification.zh.md)
-
 ## Problem
 
 An installation dependency can remain dormant indefinitely. Its presence in the dependency graph does not establish that a shipped profile, runtime import, or optional capability uses it. Conversely, an embedding SDK or a deployment-configured provider can have a maintained product role without appearing in the default GUI.

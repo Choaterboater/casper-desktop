@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-08-23-installed-python-wheel-black-box-ci.zh.md)
-
 ## Problem
 
 The Python SDK unit suite drives fake peers, while the packaged-runtime workflow can run the source SDK against a newly built executable before either Python distribution exists. Its clean virtual environment exercises only the default and MCP cases, and required pull-request CI builds only Linux x64. A source checkout, editable install, mismatched SDK/runtime pair, broken native wheel, platform-specific closure, or real-provider integration can therefore escape the evidence that blocks a merge.
@@ -30,7 +28,7 @@ Fork and Dependabot pull requests never receive the repository secret. Their nat
 
 ### Required targets
 
-The pull-request `python-runtime` job in CI Python calls the reusable builder for Linux x64 and Windows x64; master pushes select Linux arm64 and both macOS architectures under the [master-only platform policy](../../../../.github/upstream-workflows/ci-master.yml). Its aggregate result is a dependency of CI Python's required verdict, `python checks passed`, so a failed, cancelled, or missing native carrier blocks the required verdict. The [sdk-runtime README](../../../../python/sdk-runtime/README.md) owns the Windows target and its PowerShell-specific minimal snapshot.
+The pull-request `python-runtime` job in CI Python calls the reusable builder for Linux x64 and Windows x64; master pushes select Linux arm64 and both macOS architectures under the master-only platform policy (`.github/upstream-workflows/ci-master.yml`). Its aggregate result is a dependency of CI Python's required verdict, `python checks passed`, so a failed, cancelled, or missing native carrier blocks the required verdict. The [sdk-runtime README](../../../../python/sdk-runtime/README.md) owns the Windows target and its PowerShell-specific minimal snapshot.
 
 ## Existing decisions and supersession
 

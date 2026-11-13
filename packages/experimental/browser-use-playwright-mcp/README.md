@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-experimental-browser-use-playwright-mcp
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Use Playwright MCP to inspect pages and operate Chromium through its upstream tools. The provider initializes a Session's MCP connection before creation or resume completes and retains it across turns. Launch a separate browser, attach one Session to an existing browser with its current tabs and login state, or connect each Session to the user's own Google Chrome through the Playwright Extension. This published experimental package activates only when explicitly mounted.

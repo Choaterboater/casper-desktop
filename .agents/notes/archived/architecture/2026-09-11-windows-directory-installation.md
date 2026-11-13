@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-11-windows-directory-installation.zh.md)
-
 ## Problem
 
 The Desktop distribution contains thousands of small files. Extracting to the temporary directory, copying every file to the installation, and deleting the temporary tree repeats filesystem work. A 616,701,792-byte, 11,735-file payload took 101.235, 79.203, and 114.391 seconds through those three phases on Windows; copying accounted for 70.296, 56.688, and 85.281 seconds. These component measurements exclude old-version removal, registration, startup, and cache clearing.

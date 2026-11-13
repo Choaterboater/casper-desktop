@@ -5,8 +5,6 @@ description: "Stored credentials now precede environment fallbacks when the stor
 
 # A stored key takes precedence over an exported variable
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 Earlier releases used an exported environment variable before the `refs` entry with the same name in `$DSH_HOME/.credentials.yaml` (`~/.dsh/.credentials.yaml` by default). This applied to `DEEPSEEK_API_KEY=… dsh`, a shell profile export, a CI secret, and a container `-e` value. While the name was exported, the Models page could not save a key for it.

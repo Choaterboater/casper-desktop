@@ -5,8 +5,6 @@ description: "The bundle lists and profile templates move from @deepseek-ai/dsh-
 
 # Import bundle lists from `@deepseek-ai/dsh-official-bundles`
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 `@deepseek-ai/dsh-app-boot` no longer exports `PROFILE_TEMPLATES`, `ProfileTemplate`, `DEFAULT_PROFILE_BUNDLES`, `OPTIONAL_BUNDLES`, `ON_DEMAND_BUNDLES`, `OFFICIAL_ON_DEMAND_CATALOG`, or `OfficialBundleCatalogEntry`. The new published package `@deepseek-ai/dsh-official-bundles` exports them with unchanged values and types. Code that imports any of these names from `@deepseek-ai/dsh-app-boot` fails to compile or load. The `dsh` launcher, profiles, and bundle selection behave as before.

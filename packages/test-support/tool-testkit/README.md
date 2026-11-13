@@ -5,8 +5,6 @@ kind: "package-library"
 
 # @deepseek-ai/dsh-tool-testkit
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Use this package to define content-producing test tools and exercise tool execution without running an Agent turn. Tests and benchmarks import its helpers as a development dependency. Callers own the Cordis context, plugin composition, and teardown.

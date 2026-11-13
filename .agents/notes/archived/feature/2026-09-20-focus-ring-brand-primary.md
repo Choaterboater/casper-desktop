@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-20-focus-ring-brand-primary.zh.md)
-
 ## Problem
 
 Different explicit focus colours and browser-default outlines do not provide a consistent keyboard-focus cue. Browser defaults can also depend on the operating-system accent.

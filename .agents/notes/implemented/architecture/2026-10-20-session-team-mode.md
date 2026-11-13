@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-20-session-team-mode.zh.md)
-
 ## Problem
 
 A plugin-level Team switch requires users to change the shared profile before choosing collaboration for one conversation. It can disable another Session’s capability and leaves a second control beside the Session selection. Ordinary tasks still need their existing tool catalog, and disabling collaboration must not discard task history or children.

@@ -4,8 +4,6 @@ description: "The HTTP fetch provider no longer rejects non-public destinations,
 ---
 # `web_fetch` reaches private destinations
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 `@deepseek-ai/dsh-web-fetch-http` used to resolve each hostname, reject any loopback, private, link-local, or reserved answer with `WEB_BLOCKED_URL`, and pin the connection to the validated addresses. It now sends every request through the installed proxy policy and the system resolver, so `web_fetch` reaches loopback, private-network, and cloud metadata hosts. Fetches behind TUN-mode proxies with fake-IP DNS work without configuration.

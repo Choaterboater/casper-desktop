@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-17-web-feature-routes-and-route-gate.zh.md)
-
 ## Problem
 
 [Web app-owned routes are document-relative](2026-09-14-web-document-relative-app-routes.md) makes the shell, its plugin bundles, and its streams reach one listener under any mount. Routes owned by feature packages still addressed the origin root: `/open-in-app/...`, the deliverables `present.*` and `changes.*` routes, the session-log export download, the upload worker's `/api/session/uploadFileBinary` post, and the `/api/file` route behind local markdown image paths. Under a prefix-stripping proxy each of those requests missed. Nothing stopped a new browser-face reference from binding the bundle to one mount again.

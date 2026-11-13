@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-20-spawn-agent-preset-selection.zh.md)
-
 ## Problem
 
 Spawned agents need reusable combinations of persona, tools, and skills without replacing the [implicit parent-preset join](../../archived/bug-fix/2026-08-10-child-agents-join-their-parent-preset.md). Restoration must distinguish an independent selection from historical child logs without changing the Session format or fork behavior.

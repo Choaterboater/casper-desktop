@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Run the blocking Windows gates (workspace build, production site) with real
-# win-x64 Node.js under Wine — the same script the master-only `windows` job
-# in ci-master.yml executes and the optional local gate `pnpm run check:windows-wine`
+# Run the blocking Windows workspace build gate with real win-x64 Node.js
+# under Wine — the script the optional local gate `pnpm run check:windows-wine`
 # wraps. Owning rationale and fidelity limits:
 # .agents/notes/implemented/process/2026-08-08-native-windows-pull-request-ci.md
 #
@@ -225,30 +224,21 @@ wine_node() {
 cd "$scratch/tree"
 tsc_js='node_modules/typescript/bin/tsc'
 tsdown_js='node_modules/tsdown/dist/run.mjs'
-vitepress_js='node_modules/vitepress/bin/vitepress.js'
-[ -f "$vitepress_js" ] || vitepress_js='website/node_modules/vitepress/bin/vitepress.js'
-for entry in "$tsc_js" "$tsdown_js" "$vitepress_js"; do
+for entry in "$tsc_js" "$tsdown_js"; do
   [ -f "$entry" ] || { echo "wine-windows-gates: expected entrypoint missing after hoisted install: $entry" >&2; exit 1; }
 done
-# VitePress links vue into the site's node_modules at build time; Wine cannot
-# CREATE Windows symlinks (ENOTSUP) but follows pre-existing Unix ones.
-if [ -d node_modules/vue ] && [ ! -e website/node_modules/vue ]; then
-  mkdir -p website/node_modules
-  ln -s ../../node_modules/vue website/node_modules/vue
-fi
 
 wine_node "$scratch/logs/smoke.log" -p "'smoke: ' + process.platform + ' ' + process.arch + ' ' + process.version"
 cat "$scratch/logs/smoke.log"
 grep -q '^smoke: win32 x64' "$scratch/logs/smoke.log" || { echo 'wine-windows-gates: Windows Node smoke did not report win32 x64' >&2; exit 1; }
 
-# ---- the two blocking surfaces, concurrently ------------------------------
+# ---- the blocking workspace build ------------------------------------------
 # The build mirrors the root build:lib:host and build:lib:client scripts:
 # generate metadata, compile the Host package projects, type-check the Host
 # aggregate program, bundle the Host face, bundle apps/desktop from the Host
 # lib/ outputs, then compile and bundle the Client face. Each face compiles
 # package references separately from its aggregate program, matching the
 # supported build and releasing the reference graph before aggregate checking.
-# Both statuses are captured so one failure cannot hide the other's result.
 build_gate() {
   wine_node "$scratch/logs/host-typert.log" --import tsx/esm scripts/generate-typert.ts || return $?
   wine_node "$scratch/logs/host-references.log" --import tsx/esm scripts/compile-referenced-projects.ts host || return $?
@@ -259,18 +249,10 @@ build_gate() {
   wine_node "$scratch/logs/client-tsc.log" --max-old-space-size=8192 "$tsc_js" -p tsconfig.client.json --pretty false || return $?
   wine_node "$scratch/logs/client-tsdown.log" "$tsdown_js" --env.DSH_BUILD_FACE client
 }
-site_gate() {
-  cd website
-  wine_node "$scratch/logs/site.log" "../$vitepress_js" build .
-}
 
 start=$SECONDS
-build_gate & build_pid=$!
-site_gate & site_pid=$!
 build_status=0
-wait "$build_pid" || build_status=$?
-site_status=0
-wait "$site_pid" || site_status=$?
+build_gate || build_status=$?
 elapsed=$((SECONDS - start))
 
 report() {
@@ -291,6 +273,4 @@ report 'build (Typert, Host tsc/tsdown, desktop tsdown, Client tsc/tsdown)' "$bu
   "$scratch/logs/client-references.log" \
   "$scratch/logs/client-tsc.log" \
   "$scratch/logs/client-tsdown.log"
-report 'production site (vitepress build)' "$site_status" "$scratch/logs/site.log"
-if (( build_status != 0 )); then exit "$build_status"; fi
-exit "$site_status"
+exit "$build_status"

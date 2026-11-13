@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-tool-agent-team
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 This package lets every agent in a subagent tree create, claim, and complete shared tasks. It adds four task schemas and shared-board guidance. Ordinary subagent controls own discovery, messaging, interruption, and inbox waiting. The base bundle loads the service and tools; new Sessions default to Team mode off.

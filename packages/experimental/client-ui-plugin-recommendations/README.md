@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-client-ui-plugin-recommendations
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Users see one plugin recommendation below the completed answer, with the plugin's current title and description in the interface language. The title and description form one target that highlights on hover; clicking it opens that plugin's details in Plugins without enabling it or changing the current Session. Enable and Not now remain separate choices. Decisions and the details link remain available after reconnecting.

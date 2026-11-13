@@ -2,8 +2,6 @@
 
 Status: proposed
 
-English | [中文](2026-09-14-composer-model-and-draft-editor.zh.md)
-
 ## Problem
 
 One Client needs to edit the same Session's draft and pending attachments in multiple views. A Lexical editor binds only one DOM root; multiple presentation locations need multiple editor instances, but must not own unrelated drafts or upload tasks, or make the Session Controller understand carets, composition, or DOM state.

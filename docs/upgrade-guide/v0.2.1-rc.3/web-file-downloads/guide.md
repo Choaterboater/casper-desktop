@@ -5,8 +5,6 @@ description: "Custom file-action menus must offer save-as only on Desktop and br
 
 # File downloads on Web
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 The Web file-action service no longer offers save-as through a browser file picker. `canSaveAs` is always false on Web, and `save(source, 'saveAs')` rejects before reading the source. Built-in Web file and image menus offer Download and omit Save as. Desktop still offers both actions; successful saves return the absolute destination `path` instead of an opaque file ID.

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-22-subagent-tool-owned-communication.zh.md)
-
 ## Problem
 
 The continuation manager inspected a Symbol on the standard messaging tool before adding tool instructions and parent addressing to the initial task. This coupled orchestration to one tool implementation and made result-delivery guidance depend on tool installation. A published internal entry point carried both that marker and a host prompt adapter used only by tests.

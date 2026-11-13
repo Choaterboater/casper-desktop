@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-15-node-24-runtime-floor.zh.md)
-
 ## Problem
 
 The root `engines.node` range promises that the installed workspace supports each admitted runtime. Its minimum must cover both the runtime APIs DSH uses and the declared requirements of installed dependencies. Otherwise strict installation can reject a supported version before DSH starts.

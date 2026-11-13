@@ -27,7 +27,7 @@ const ALL_KINDS = ['dependencies', 'devDependencies', 'optionalDependencies', 'p
 
 /**
  * Workspace areas that never reach a user: repository tooling and gates (the
- * root manifest), test infrastructure, the documentation site, and the native
+ * root manifest), test infrastructure, and the native
  * launcher's build workspace. A runtime
  * declaration by anything outside these areas is a disclosure-relevant
  * runtime dependency because any plugin package can be mounted from a user's
@@ -37,7 +37,6 @@ const DEV_ONLY_AREAS = [
   'package.json',
   'packages/test-support/',
   'packages/test-support/client-runtime/',
-  'website/',
   'native/',
 ] as const
 

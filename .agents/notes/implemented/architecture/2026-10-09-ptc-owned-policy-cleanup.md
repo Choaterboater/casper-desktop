@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-09-ptc-owned-policy-cleanup.zh.md)
-
 ## Problem
 
 Stopping a retained Node process and its nested tools can take longer than recording a new file policy. Making permission setters await that cleanup spreads PTC lifecycle requirements into unrelated callers, including Webhook Session creation, and adds cancellation windows to those callers.

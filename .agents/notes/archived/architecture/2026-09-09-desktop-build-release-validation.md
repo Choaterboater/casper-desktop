@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-09-desktop-build-release-validation.zh.md)
-
 ## Problem
 
 The shell and runtime descriptor ship together. Comparing their release facts on every launch repeats packaging checks without proving that installed executable bytes match the descriptor.

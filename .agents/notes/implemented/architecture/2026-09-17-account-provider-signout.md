@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-17-account-provider-signout.zh.md)
-
 ## Problem
 
 Selecting credentials from login state changes the billing identity of an existing provider route. Sign-out also needs to stop account-dependent work without classifying requests from settings that may have changed while a request or tool is still running.

@@ -5,8 +5,6 @@ kind: "package-bundle"
 
 # @deepseek-ai/dsh-personalized-recommendations
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Get an optional card below an answer for two kinds of need: a page or small tool you want to keep, and a built-in plugin that provides a capability you ask about. Nothing is built or enabled until you click Create or Enable on the card. Enable Personalized recommendations on the Web or Desktop Plugins page; shipped profiles leave it disabled. Its page lists both features and their card rows, each with its own switch.

@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-07-08-self-referential-cordis-toolset.zh.md)
-
 ## Problem
 
 Runtime API discovery must describe the APIs a plugin can actually call. Process-local generated definitions also need registration validation and complete effect disposal; isolating JavaScript globals alone does not constrain the authority of injected services.

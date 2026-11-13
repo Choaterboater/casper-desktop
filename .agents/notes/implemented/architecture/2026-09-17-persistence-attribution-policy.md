@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-17-persistence-attribution-policy.zh.md)
-
 ## Problem
 
 A producer-owned message source appears transitively in several persisted event types. A new attribution kind changes their union fingerprints even when existing readers preserve its fields without the producer. Request-only prompts need no durable identity, but constructing them as Session messages adds unnecessary source alternatives to that union.

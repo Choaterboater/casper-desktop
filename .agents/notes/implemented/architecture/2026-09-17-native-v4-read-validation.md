@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-17-native-v4-read-validation.zh.md)
-
 ## Problem
 
 Tool-role results cannot be checked through the released V3 user-role representation without projecting away current fields. Replacing that validation view requires a native reader to retain the earlier lifecycle, retired-syntax, and system-message checks. The representation change and its mandatory admission therefore belong together.

@@ -2,19 +2,17 @@
 
 Status: implemented
 
-English | [中文](2026-10-07-memory-limited-benchmarks.zh.md)
-
 ## Problem
 
 Benchmarks run on hosted runners with 16 GB of memory and on developer machines with more. Neither shows how DSH behaves on a machine with 4 GB or 8 GB available, where the Host, Chromium, and page cache share one memory budget.
 
 ## Decision
 
-[run-memory-pressure-bench.ts](../../../../scripts/run-memory-pressure-bench.ts) builds the benchmark artifacts unconfined, then reruns a fixed list of existing benchmark files inside a cgroup v2 whose `memory.max` is 4 or 8 GiB and whose `memory.swap.max` is zero. The files keep their own workloads and budgets; the scenario fails when a case misses its normal budget or the cgroup kills a process.
+`run-memory-pressure-bench.ts` builds the benchmark artifacts unconfined, then reruns a fixed list of existing benchmark files inside a cgroup v2 whose `memory.max` is 4 or 8 GiB and whose `memory.swap.max` is zero. The files keep their own workloads and budgets; the scenario fails when a case misses its normal budget or the cgroup kills a process.
 
 ### Cases
 
-The list holds the files with the largest measured resident memory or the long-history UI path: [session-corpus](../../../../benchmarks/session-corpus/README.md) (list of 3,000 Sessions, content search over 1,000, fork), its projection-list file, [session-open](2026-09-04-session-open-performance-gate.md) (127,400-event Session), and [long-session-browser](../../../../benchmarks/long-session-browser/README.md) (Chromium and its Host). Terminal, fold, reconnect, and continuation files measure small in-process workloads and stay out.
+The list holds the files with the largest measured resident memory or the long-history UI path: `session-corpus` (list of 3,000 Sessions, content search over 1,000, fork), its projection-list file, [session-open](2026-09-04-session-open-performance-gate.md) (127,400-event Session), and `long-session-browser` (Chromium and its Host). Terminal, fold, reconnect, and continuation files measure small in-process workloads and stay out.
 
 ### Limit and endpoint
 

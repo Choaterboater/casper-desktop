@@ -5,8 +5,6 @@ kind: "package-library"
 
 # @deepseek-ai/dsh-util-file-drag
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Callers can export files with the same safe filename in Web and Desktop. MIME data fills missing suffixes without limiting accepted file types. The library also declares native byte and authorized-resource requests; it holds no files or application state.

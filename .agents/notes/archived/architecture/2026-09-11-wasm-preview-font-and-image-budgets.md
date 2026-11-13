@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-11
 
-English | [中文](2026-09-11-wasm-preview-font-and-image-budgets.zh.md)
-
 ## Problem
 
 Office conversion repeats font metadata parsing across documents and font matching within one document. Image-heavy documents also spend substantial PDF export time resampling images above preview resolution. These costs need separate controls because font reuse does not reduce image decoding or resampling.

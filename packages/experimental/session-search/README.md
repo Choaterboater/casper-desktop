@@ -5,8 +5,6 @@ kind: "package-bundle"
 
 # @deepseek-ai/dsh-experimental-session-search
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Give every Agent five experimental read-only global tools to search earlier sessions. The content index opens on the first search and is shared by all Agents. The bundle ships switched off in Web and Desktop and is hidden from the default plugin lists.

@@ -1,25 +1,25 @@
 ---
 name: Bug
-about: 记录现有预期行为的失效
+about: Something in the Casper desktop app no longer works as expected
 type: Bug
 ---
 
 ## Summary
 
-<!-- 简要说明发生了什么错误，以及受影响的用户或场景。 -->
+<!-- What went wrong, and who or what it affects. -->
 
 ## Reproduction
 
-<!-- 列出能稳定触发问题的最小步骤、输入或代码。 -->
+<!-- The smallest steps, inputs or code that trigger it every time. -->
 
 ## Current behavior
 
-<!-- 说明实际结果，并附上必要的错误信息、日志或截图。 -->
+<!-- What happens, with any error message, log or screenshot. -->
 
 ## Expected behavior
 
-<!-- 说明正确结果。 -->
+<!-- What should happen. -->
 
 ## Environment
 
-<!-- 说明相关版本、平台、配置或运行条件。 -->
+<!-- App version, macOS or Windows version, Casper CLI version, and any relevant settings. Report Casper CLI bugs in the Casper repository instead. -->

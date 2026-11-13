@@ -5,8 +5,6 @@ description: "Generated worktree names replace the worktree- prefix and full UUI
 
 # Update consumers of generated worktree names
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 In v0.2.1-rc.3, omitting `name` from `create_worktree` or `ctx.worktrees.create` generates `worktree-<UUID>` by default. The next release generates `dsh-<first eight UUID digits from the Session id>-<four random hexadecimal digits>`, such as `dsh-6b1f02c4-9a3e`. A Session id without a UUID gets `dsh-<eight random hexadecimal digits>`.

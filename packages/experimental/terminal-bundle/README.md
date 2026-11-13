@@ -5,8 +5,6 @@ kind: "package-bundle"
 
 # @deepseek-ai/dsh-experimental-terminal-bundle
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Add six experimental global terminal tools to every Agent. The bundle owns an isolated terminal registry with the platform shell backend; terminals remain Agent-owned. It ships switched off in Web and Desktop and is omitted from the Plugins bundle lists and detail pages.

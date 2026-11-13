@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-07-public-web-deployments.zh.md)
-
 ## Problem
 
 A forwarding gateway can expose the Web GUI beneath a shared HTTP(S) origin and strip its path prefix before forwarding, so one process answers loopback `/` and an external mount at once — a mount the listener cannot know and an origin only the operator knows. A proxied request carries that external authority in `Host`, which the browser-trust fence refuses until the deployment declares it.

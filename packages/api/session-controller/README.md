@@ -4,8 +4,6 @@ kind: "package-reference"
 ---
 # Session Controller
 
-English | [中文](README.zh.md)
-
 Desktop analytics follows the [product collection policy](../../client/product-analytics/README.md), including its launch-time switch. Web usage is excluded.
 
 ## Summary

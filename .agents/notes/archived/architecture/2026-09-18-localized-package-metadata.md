@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-18-localized-package-metadata.zh.md)
-
 ## Problem
 
 Plugin Manager needs readable titles and descriptions for installed bundles and individual plugins, including disabled plugins. One npm package can export several plugins with different purposes; a package-level introduction cannot describe each one. Registering introductions only during activation also leaves disabled or failed plugins without display text.

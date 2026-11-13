@@ -7,8 +7,6 @@ Superseded: the roster this note put on the session control stream (`jobsBySessi
 
 Update: the output phase this note deferred now ships as the per-job observation record on `ctx.jobs` — see [jobs absorb the record](../architecture/2026-09-01-jobs-absorb-activity-record.md).
 
-English | [中文](2026-08-08-web-background-job-display.zh.md)
-
 ## Problem
 
 `ctx.jobs` already runs every long-lived piece of work the harness starts in the background — `bash`, `pwsh`, `pty-send`, and one-shot background subagents — but its only reader was the model. [`dsh-tool-jobs`](../../../../packages/jobs/tool-jobs/README.md) exposes `job_list`, `job_output`, and `job_kill`, and nothing else observed the registry.

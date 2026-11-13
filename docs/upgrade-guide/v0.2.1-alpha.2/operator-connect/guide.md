@@ -5,8 +5,6 @@ description: "Non-page Clients default to no forwarded interactions and use raw 
 
 # Select interaction participation for non-page clients
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 Non-page Connection installations default to `interactions: 'none'`. They do not open `$events`, and `$on()` and the generation-recovery helper `$stream()` are unavailable in that mode. Generated unary and raw stream methods remain usable. Browser authentication, existing browser Cookies, the shared Peer, and recovery behavior are unchanged; browsers need no reauthentication.

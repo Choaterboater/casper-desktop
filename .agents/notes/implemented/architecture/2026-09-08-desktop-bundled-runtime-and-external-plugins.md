@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-08-desktop-bundled-runtime-and-external-plugins.zh.md)
-
 Plugin management and native recovery follow the [shared Web wrapper decision](2026-09-10-desktop-web-wrapper.md).
 
 Desktop uses Electron as its Node runtime under the [current runtime reference](../../../../apps/desktop/README.md); other decisions in this note remain applicable.

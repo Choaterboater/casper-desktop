@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-18-volatile-config-references.zh.md)
-
 ## Problem
 
 Replacing an entire plugin to change a value also disposes its services and effects. Separate settings subscriptions require each consumer to implement another source of live configuration.

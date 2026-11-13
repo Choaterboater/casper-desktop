@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-11-04-sidebar-browser-agent-control.zh.md)
-
 ## Problem
 
 Agent-facing tools need to read and operate the Desktop Sidebar Browser tabs of their own Session. The [Desktop Browser decision](2026-09-20-desktop-browser-webview.md) requires an authenticated, target-scoped broker for automation instead of access to every application target. No single process holds every fact that scoping needs: the Host knows which Session a tool call belongs to but holds no Electron objects, the main process owns guests but does not know Sessions, and only the renderer knows which Sidebar tabs belong to which Session.

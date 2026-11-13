@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-21-session-history-stream-and-snapshot.zh.md)
-
 ## Problem
 
 A point read, an event subscription, and a Web conversation opening have different lifetimes. Combining them inside one history controller makes passive observation perform unnecessary reads and gives each aggregate its own acquisition logic. Reading before subscribing also creates a gap that requires another read to repair. The APIs need independent operations that can compose without losing events or duplicating ownership.

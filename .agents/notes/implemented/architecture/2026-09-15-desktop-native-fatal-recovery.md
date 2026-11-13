@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-15-desktop-native-fatal-recovery.zh.md)
-
 ## Problem
 
 A recovery document depends on the renderer and preload whose failure can prevent application startup. Multiple reports from one failed startup can also obscure the original diagnostic and interrupt recovery.

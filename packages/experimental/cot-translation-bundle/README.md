@@ -5,8 +5,6 @@ kind: "package-bundle"
 
 # @deepseek-ai/dsh-experimental-cot-translation-bundle
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Translate expanded reasoning into the interface language or another chosen language. Enable Reasoning translation on the Web or Desktop Plugins page; shipped profiles leave it disabled. Bing is the default provider, and Google is available in the bundle settings. Original reasoning remains available and stays unchanged in the Session and model input.

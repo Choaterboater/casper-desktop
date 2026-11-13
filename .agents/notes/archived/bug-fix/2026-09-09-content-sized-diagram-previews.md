@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-10
 
-English | [中文](2026-09-09-content-sized-diagram-previews.zh.md)
-
 ## Problem
 
 Short Graphviz and SVG images leave large empty regions when displayed inside 400px frames. A 59px Graphviz diagram occupies a 400px preview even though its rendered dimensions are already available to the browser.

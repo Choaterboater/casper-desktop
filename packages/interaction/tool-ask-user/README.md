@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-tool-ask-user
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 `ask_user_question` asks the user for confirmation, a choice, or missing information. It waits for an answer by default. With `mode: timed`, a deadline can release the model to continue independent work while the question stays answerable; `timeout: -1` waits indefinitely. A live child agent cannot call the tool. Callers provide the answer UI.

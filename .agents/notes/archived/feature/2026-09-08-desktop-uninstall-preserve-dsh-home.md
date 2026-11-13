@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-08-desktop-uninstall-preserve-dsh-home.zh.md)
-
 ## Problem
 
 Desktop and CLI share conversations, credentials, settings and plugins in the Harness home. Electron keeps browser storage and caches under `%APPDATA%`, and the updater keeps downloaded installers under `%LOCALAPPDATA%`; the upstream NSIS template leaves both behind unless a command-line flag is passed. Users who uninstall expect the application to leave no residue, while users who reinstall expect their conversations back.

@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-11-turn-changed-files-card.zh.md)
-
 ## Problem
 
 After a turn, users want to see which files the model changed and by how much. The Web turn tail listed only the paths of successful `write`, `edit`, and `str_replace_editor` calls, without line counts, and missed every file a shell command changed; the per-call diff cards in the message flow answered the question one call at a time.

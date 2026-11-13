@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-22-unbounded-completion-wakes-by-default.zh.md)
-
 ## Problem
 
 The [idle-owner wake decision](2026-08-11-background-job-completion-wakes-an-idle-owner.md) shipped `maxConsecutiveWakes` with a default of 3: an idle owner could be woken three times by job completions before further notices degraded to injection, and only a claimed user message refilled the budget. The counter was per owner and shared by every job kind — background `bash`/`pwsh`/PTY commands and one-shot `subagent_*` children.

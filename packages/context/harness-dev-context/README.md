@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-harness-dev-context
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 `dsh-harness-dev-context` tells an agent running behind the Casper Web GUI where the harness implementation checkout lives, how the GUI relates to "this page", and which URL serves it. The system prompt carries only value-free guidance; the current checkout path and GUI URL arrive as runtime context, so starting the process from another checkout, port, or installation never rewrites a Session's logged system prompt. Sessions whose prompt still embeds those values from earlier releases keep that text verbatim.

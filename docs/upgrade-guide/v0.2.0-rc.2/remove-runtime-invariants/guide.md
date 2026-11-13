@@ -5,8 +5,6 @@ description: "The runtime invariant registry package and every package's `./inva
 
 # Runtime invariant plugins are removed
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 In v0.2.0-rc.2, `@deepseek-ai/dsh-invariants` provided the `ctx.invariants` service, and workspace packages such as `@deepseek-ai/dsh-session`, `@deepseek-ai/dsh-agent`, `@deepseek-ai/dsh-scope`, and `@deepseek-ai/dsh-agent-loop` published `./invariant` companion plugins that registered checks with it. The `sdk-minimal` profile mounted five of these rows with ids `invariants`, `session-invariant`, `agent-invariant`, `scope-invariant`, and `agent-loop-invariant`.

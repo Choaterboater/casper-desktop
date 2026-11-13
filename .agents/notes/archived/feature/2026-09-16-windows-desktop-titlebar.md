@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-16-windows-desktop-titlebar.zh.md)
-
 ## Problem
 
 Windows needs a compact caption that keeps sidebar navigation available when the sidebar is hidden or files fill the content area. A separate Application/Edit menu consumes another row and can show a different language from the application. The shared client must preserve ordinary Web and macOS presentation.

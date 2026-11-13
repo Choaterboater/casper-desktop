@@ -8,13 +8,6 @@
   },
   {
     "rule": "host",
-    "file": "packages/boot/plugin-manager/README.zh.md",
-    "match": "registry.npmmirror.com",
-    "count": 1,
-    "step": "3c"
-  },
-  {
-    "rule": "host",
     "file": "packages/boot/plugin-manager/src/registry.ts",
     "match": "registry.npmmirror.com",
     "count": 1,
@@ -36,13 +29,6 @@
   },
   {
     "rule": "host",
-    "file": "packages/client/ui-plugin-manager/README.zh.md",
-    "match": "registry.npmmirror.com",
-    "count": 1,
-    "step": "3c"
-  },
-  {
-    "rule": "host",
     "file": "packages/client/ui-plugin-manager/src/client/presentation.ts",
     "match": "registry.npmmirror.com",
     "count": 1,
@@ -58,13 +44,6 @@
   {
     "rule": "host",
     "file": "packages/client/ui-settings-models/README.md",
-    "match": "api.deepseek.com",
-    "count": 1,
-    "step": "3c"
-  },
-  {
-    "rule": "host",
-    "file": "packages/client/ui-settings-models/README.zh.md",
     "match": "api.deepseek.com",
     "count": 1,
     "step": "3c"

@@ -5,8 +5,6 @@ kind: "package-library"
 
 # dsh-plugin-detail
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Library without state for plugin detail documents, the long Markdown description a plugin's page shows. It owns the order in which a package's document is chosen, the language fallback, image destinations beside a document, and two read-only file sources: a local package directory and a published npm version on public file CDNs. [`plugin-manager`](../../boot/plugin-manager/README.md#bundle-detail-documents) reads profile bundles with it, and [`plugin-market`](../../boot/plugin-market/README.md#plugin-detail-documents) reads market entries with it and adds repository sources.

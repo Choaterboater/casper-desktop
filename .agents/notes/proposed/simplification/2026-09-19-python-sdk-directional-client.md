@@ -2,8 +2,6 @@
 
 Status: proposed
 
-English | [中文](2026-09-19-python-sdk-directional-client.zh.md)
-
 ## Problem
 
 The [Python client](../../../../python/sdk/src/deepseek_harness/client.py) keeps an incoming-request queue, close-time wake-up, and `next_request`, `respond`, `respond_error`, and `notify` methods. The [SDK server](../../../../packages/sdk/server/src/server.ts) receives requests and emits notifications; it declares no server-originated request or client-notification handler. Searches across Python sources, examples, and runtime profiles found the reverse direction only in client implementation and [synthetic client tests](../../../../python/sdk/tests/test_client.py). The exported `IncomingRequest` model consequently has no supported runtime producer.

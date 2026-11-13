@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-09-forge-panel.zh.md)
-
 ## Problem
 
 [Session change request bindings](2026-10-09-session-change-request-bindings.md) give each Session a list of change requests, but nothing shows it. A user who asks the agent to open change requests needs their checks, reviews, and mergeability without leaving the conversation, and wants a new Session's edits and commits kept out of the current checkout. Git must run where the Session's commands run, which can be a remote or confined execution world; inspection must not change the repository, and a worktree must exist before the model's first action.

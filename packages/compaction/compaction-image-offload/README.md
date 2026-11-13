@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-compaction-image-offload
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Image-heavy conversations continue when older images exceed a model route's budget. The plugin permanently replaces those images with text naming each attachment and its available read-only path, then retries without spending the provider retry budget. Later requests retain that choice across route changes, resume, and replay. Token accounting follows the logged selections, and provider cache reuse ends at the first changed message.

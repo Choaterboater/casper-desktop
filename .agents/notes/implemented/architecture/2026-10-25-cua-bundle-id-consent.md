@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-25-cua-bundle-id-consent.zh.md)
-
 ## Problem
 
 Users who install multiple versions of one application want one permission decision for that software. Executable paths split those decisions, and signing checks exclude unsigned development applications from saved access.

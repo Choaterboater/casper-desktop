@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-09-producer-owned-message-sources.zh.md)
-
 ## Problem
 
 Released V3 plugin attribution uses the shared wrapper `{ kind: 'plugin', plugin: '<producer>' }` plus the producer's context-form fields, so consumers had to treat one synthetic kind specially instead of switching on the producer identity. Once tool results became first-class tool-role messages and the current generation moved to V4, the format layer also had to keep reading released V3 files whose rows still carry the wrapper.

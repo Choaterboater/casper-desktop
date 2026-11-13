@@ -5,8 +5,6 @@ kind: persistence-change
 
 # 2026-09-16-session-format-v4
 
-English | [中文](2026-09-16-session-format-v4.zh.md)
-
 ## Summary
 
 Advances the declared SessionHeader.version from 3 to 4 for the finalized V4 writer, records first-class tool-role results and producer-owned sources, and adds the forked variant to turn/end.reason. Adds developer-role Session changes with name-only tool additions bound to historical request headers, tool removals, and deferred-loading schema markers.

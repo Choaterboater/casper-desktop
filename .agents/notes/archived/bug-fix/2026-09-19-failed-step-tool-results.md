@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-19-failed-step-tool-results.zh.md)
-
 ## Problem
 
 A committed assistant message can request tools whose scheduler fails before all results are recorded. Closing the step and turn with those calls unanswered makes later model requests invalid for providers that require paired tool calls and results. An error turn is already closed, so crash-tail repair cannot recover it on resume.

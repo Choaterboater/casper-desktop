@@ -5,8 +5,6 @@ description: "DeepSeek web search and fetch take their endpoint from the DeepSee
 
 # DeepSeek web search and fetch follow the DeepSeek model route
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 Previously, the DeepSeek Search API and Fetch API (`web-deepseek-api`) sent their credential to one shared `baseURL` (default `https://api.deepseek.com/v1/tools`): the account token when the Session's latest model request used the `deepseek-account` route and the user was signed in, otherwise the key under `apiKeyEnv` (default `DEEPSEEK_API_KEY`) or a literal `apiKey`. Now each capability follows the same route rule but takes the endpoint from the route: on `deepseek-account` the account token goes to the account route's origin with `/v1/tools`; otherwise, including a signed-out account conversation, the key under the `apiKeyEnv` of the `deepseek-official` route goes to that route's origin with `/v1/tools`, so `DEEPSEEK_BASE_URL` now moves Search and Fetch too. Without a `deepseek-official` route, `DEEPSEEK_API_KEY` goes to `https://api.deepseek.com/v1/tools`; a mounted route whose settings do not resolve fails the operation instead. The `baseURL`, `apiKeyEnv`, and `apiKey` fields are removed; stored values load without error and are ignored. Setting either `searchBaseURL` or `searchApiKeyEnv` (`fetchBaseURL` or `fetchApiKeyEnv` for Fetch) pins that capability to its own endpoint (default `https://api.deepseek.com/v1/tools`) and key (default `DEEPSEEK_API_KEY`) and never sends the account token. These fields are YAML-only. Users without those YAML fields, without `DEEPSEEK_BASE_URL`, and without a custom model base URL see no change.

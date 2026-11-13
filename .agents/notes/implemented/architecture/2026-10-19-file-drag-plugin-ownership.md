@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-19-file-drag-plugin-ownership.zh.md)
-
 ## Problem
 
 Image dragging spans conversation images, sidebar previews, and composer drop targets. Original files must survive source unmount during a drag, and failures must remain visible after the originating panel closes. An application-root image provider puts feature state in layout and makes independent image entries depend on an undeclared React ancestor.

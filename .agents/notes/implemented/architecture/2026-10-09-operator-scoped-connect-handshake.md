@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-09-operator-scoped-connect-handshake.zh.md)
-
 ## Problem
 
 Automatically subscribing automation clients to forwarded events lets method-only callers receive and answer human interactions. CLI and MCP callers need independent participation and cleanup without changing browser authentication or assigning per-browser identities.

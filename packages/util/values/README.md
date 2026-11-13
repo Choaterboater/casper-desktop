@@ -5,8 +5,6 @@ kind: "package-library"
 
 # @deepseek-ai/dsh-util-values
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Callers can validate lossless JSON, read streamed arguments, detach a JSON snapshot, freeze a published value, compare JSON-compatible data, or terminate an unreachable branch without importing a capability package. Each streamed call uses its own `PartialArguments` reader; `PartialArguments.EMPTY` is a shared sealed view with no fields.

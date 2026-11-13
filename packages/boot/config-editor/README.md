@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-config-editor
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Save plugin configuration in the active profile’s patch and apply it immediately. Writes validate the complete candidate before touching disk and serialize with profile changes and HMR. Invalid values and higher-layer overrides leave the file unchanged.

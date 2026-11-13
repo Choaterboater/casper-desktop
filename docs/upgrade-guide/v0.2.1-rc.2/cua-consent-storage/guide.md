@@ -5,8 +5,6 @@ description: "Computer Use application consent moves from profile configuration 
 
 # Computer Use consent storage
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 Computer Use stores application consent through `storageDomain`. With the default JSON backend, each canonical profile directory has its own `$DSH_HOME/storages/cua_permissions_<sha256>.json`. “Allow for this session” now follows the conversation ID across DSH restart and Computer Use disablement. It does not authorize another conversation. Unverifiable applications still require a matching native process identity; restarting that application may require new consent.

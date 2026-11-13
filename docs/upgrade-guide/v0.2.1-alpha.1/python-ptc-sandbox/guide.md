@@ -5,8 +5,6 @@ description: "Python PTC compositions require sandbox services, and direct Pytho
 
 # Python PTC applies the shared file sandbox
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 `@deepseek-ai/dsh-experimental-ptc-runtime-python` requires `sandbox` and `sandboxPolicy`. Previously, direct Python file operations ran without confinement and the provider rejected explicit `sandboxPolicy` inputs. It now applies the shared policy to each program and reports confinement in `PtcRunResult.sandbox`. A restricted run fails with `sandbox-unavailable` when confinement cannot be established.

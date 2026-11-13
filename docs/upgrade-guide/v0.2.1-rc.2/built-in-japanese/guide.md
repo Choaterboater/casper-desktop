@@ -5,8 +5,6 @@ description: "Built-in language registrations conflict with third-party language
 
 # Built-in languages replace duplicate language packs
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 The locale plugin registers `ja`, `es`, `fr`, `de`, `ru`, and `pt`, with dictionaries for `common`, `settings.locale`, and the built-in UI plugins. Third-party language packs using these ids now fail with an already-registered language or dictionary error, including packs based on the earlier Japanese or French README examples.

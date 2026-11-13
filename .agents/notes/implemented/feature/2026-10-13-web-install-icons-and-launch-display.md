@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-13-web-install-icons-and-launch-display.zh.md)
-
 ## Problem
 
 A launcher masks the icon it puts on the home screen and chooses that icon itself. The install manifest advertised the whale favicon: an SVG mark drawn edge to edge on a transparent canvas, with no tile and no background of its own. Handed to a mask, the mark loses its fins and fills the tile at the wrong proportion. iOS reads no manifest icon at all and had no `apple-touch-icon` to fall back on, so an installed web app showed a generic tile. The manifest also requested `display: "fullscreen"`, which removes both system bars on Android and leaves a chat surface with no clock, battery, or navigation.

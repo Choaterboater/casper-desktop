@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-30-session-list-host-fairness.zh.md)
-
 ## Problem
 
 Large cached projection states can monopolize the Host while a Session list is assembled. Yielding after every row avoids that batch stall but adds thousands of event-loop round trips when a list contains many cheap rows. Row count alone is not a useful scheduling budget.
@@ -16,7 +14,7 @@ Every row remains synchronous. Live rows precede queued cold rows before the sta
 
 ## Measurement and calibration
 
-The [production-entry benchmark](../../../../benchmarks/session-corpus/projection-list.bench.ts) measures the real Session Controller, query engine, persistence, projection registry/cache and storage domain. Persisted fixtures use `generationLogPath`, `toHeaderLine` and `compressZstdFrame` from the persistence owner. All content is deterministic generated data. Setup and explicit GC are outside timing; complete results and JSON remain reachable during memory sampling.
+The production-entry benchmark (`benchmarks/session-corpus/projection-list.bench.ts`) measures the real Session Controller, query engine, persistence, projection registry/cache and storage domain. Persisted fixtures use `generationLogPath`, `toHeaderLine` and `compressZstdFrame` from the persistence owner. All content is deterministic generated data. Setup and explicit GC are outside timing; complete results and JSON remain reachable during memory sampling.
 
 | Workload | Sessions | State observations | Request records | State JSON |
 |---|---:|---:|---:|---:|

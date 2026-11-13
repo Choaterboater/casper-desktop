@@ -5,8 +5,6 @@ description: "Headless compositions that disable the command-line provider must 
 
 # Configure policy when replacing headless startup
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 The headless bundle reads `--add-dir` through `headlessStartup` before activating its sandbox policy. An overlay that disables `headless-startup` must also remove that dependency from `sandbox-policy`. Otherwise the policy and its dependent tools remain pending. Ordinary `dsh headless` invocations need no configuration change.

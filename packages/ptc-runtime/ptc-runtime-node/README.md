@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-ptc-runtime-node
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Execute model-written TypeScript with host-provided async functions. The default `per-call` mode runs async function bodies in fresh Node processes; `vm-script` supports top-level await and optionally retains a context per Agent with `scriptPersistence`. Opt-in `persistent-in-memory` retains a REPL per Agent. All modes apply the selected file sandbox policy and return captured logs, lossless JSON, or structured failures. Elapsed deadlines, output bounds and a V8 heap limit constrain execution. Cancellation and one-shot completion clean up the managed process range; unavailable confinement fails execution.

@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-03-semantic-issue-templates-and-policy.zh.md)
-
 ## Problem
 
 Issue and pull-request templates mixed intake questions with review evidence and hid their complete contents in `details` elements. Unused frontmatter and separate Idea and Research templates added choices without changing how the repository planned the work.

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-24-scheduled-message-framing.zh.md)
-
 ## Problem
 
 Due reminders reach their target Session as user-role messages with producer kind `schedule`. Before this decision, both renderers opened that message with an instruction about how to treat its payload: one-shot delivery asked the model to present `reminder_prompt_json` as untrusted reminder content and not as new user instructions, and recurring batch delivery asked the same for every `reminder_prompt` in `reminders_json`. The message therefore asserted that its own content was untrusted instead of naming where it came from.

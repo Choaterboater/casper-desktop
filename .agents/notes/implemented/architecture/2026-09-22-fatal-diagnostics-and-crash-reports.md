@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-22-fatal-diagnostics-and-crash-reports.zh.md)
-
 ## Problem
 
 Two field failures of the Desktop application were diagnosed from screenshots of the fatal recovery dialog, which shows the last eight lines of the error and used to promise that the full diagnostic was in the Electron console. A packaged installation never surfaces that console.

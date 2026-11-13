@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-15-bounded-office-conversion.zh.md)
-
 ## Problem
 
 Office preview and explicit document inspection can request the same conversion. A completed-result cache alone leaves source reads, queued payloads, and concurrent readers unbounded. Speculation can also occupy capacity needed by a user, and canceling one consumer must not destroy another consumer's conversion.

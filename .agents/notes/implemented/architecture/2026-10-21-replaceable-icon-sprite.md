@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-21-replaceable-icon-sprite.zh.md)
-
 ## Problem
 
 Long-term skin customization needs themes to replace icons, not only colors. Product icons were React components that drew inline SVG paths, so a theme registered through `ctx.theme` could recolor them through `currentColor` but could not change their artwork. About 150 Client files import these components.

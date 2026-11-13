@@ -5,8 +5,6 @@ description: "Standalone native CUA compositions must explicitly select global t
 
 # CUA defaults to PTC session scopes
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 The native CUA provider defaults `agentPreset` to `ptc`. It registers tools for existing and new PTC Agents, including when a saved application-grants configuration omits the new field. Custom compositions without an Agent preset registry no longer receive global CUA tools by default.

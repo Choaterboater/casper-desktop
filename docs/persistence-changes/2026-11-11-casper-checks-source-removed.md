@@ -5,8 +5,6 @@ kind: persistence-change
 
 # 2026-11-11-casper-checks-source-removed
 
-English | [中文](2026-11-11-casper-checks-source-removed.zh.md)
-
 ## Summary
 
 Removes the casper-checks message source kind together with the switched-off casper-checks plugin that declared it, keeping the Session format version unchanged.

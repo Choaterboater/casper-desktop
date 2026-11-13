@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-client-ui-settings-agent-loop
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Open **Plugins** in the sidebar and select **Agent loop** in the Official group to set how many parallel-safe tool calls one step may run at once. The page stages what is typed and writes it only on save, marks a value the user overrode, and offers to reset it to the deployment's default. The page exists while the Host serves the `agent-loop` namespace.

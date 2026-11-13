@@ -2,7 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-24-bounded-session-log-upload.zh.md)
 ## Problem
 
 Without a watermark of the current Session format generation, a request carries the whole canonical log: the first request after upload becomes enabled, the first request after a format migration, and the first request of a fork all do. A long log can exceed the V8 string limit of 2^29 − 24 UTF-16 code units on 64-bit hosts. The adapter's merged `JSON.stringify` then throws `RangeError`, the adapter reports `TRANSPORT`, the default retry policy repeats the same serialization, and no request reaches the 2xx that would advance the watermark, so every model request in that Session fails. Below the limit, one request can still carry hundreds of MiB: on Node v24.17.0 and macOS arm64, a 269 MiB first upload of a 96,341-event Session waited 34 s for its 2xx.

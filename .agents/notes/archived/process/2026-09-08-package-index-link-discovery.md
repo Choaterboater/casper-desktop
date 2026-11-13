@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-08-package-index-link-discovery.zh.md)
-
 ## Problem
 
 In `verify-md-links`, nested group and package globs cannot match `packages/README.md` or its Chinese counterpart. A broken link in either index escapes validation unless the check also discovers those sources.

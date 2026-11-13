@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-22-series-start-unchanged-prompt-prefix.zh.md)
-
 ## Problem
 
 On an in-history route, a prompt change is appended as a later `system/message`, so node 0 stays stale while the latest surviving node carries the rendering. A surface replacement (compaction, tool-result prune, image offload) starts a new request series. Re-baselining node 0 at a series start while the rendering already matched that latest node emptied the later node and wrote the identical text into node 0. The wire request then differed at its first message, so the provider prefix cache missed from the first token although no prompt text changed.

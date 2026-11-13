@@ -23,7 +23,7 @@ Write fixed section headings and labels, such as **Interface changes**, **Behavi
 ### Motivation
 
 - State the problem in one sentence.
-- Reference at least one same-repository Issue: use `Fixes #N`, `Closes #N`, or `Resolves #N` when the PR resolves it, and `Refs #N` when it only gives context. PR numbers do not count as Issue references, and neither do references inside HTML comments, code fences, or inline code. [Issue management](../../../.github/issue-management/README.md) owns the exact rules and the Priority matching.
+- Reference at least one same-repository Issue: use `Fixes #N`, `Closes #N`, or `Resolves #N` when the PR resolves it, and `Refs #N` when it only gives context. PR numbers do not count as Issue references, and neither do references inside HTML comments, code fences, or inline code.
 
 ### Changes
 
@@ -42,7 +42,7 @@ Testing starts with the test design, followed by the test entries.
 | Behavior change | A behavior matrix of scenario × behavior before × behavior after × covering test, showing which scenarios failed or differed before the change |
 | Performance change | Before and after values per stage or scenario, with the measurement conditions: machine, run count, and how the value is taken |
 | Refactoring or migration without behavior change | How the unchanged behavior is shown: byte-for-byte comparison, unchanged snapshots, or old-versus-new comparison tests |
-| Documentation only | How the content is checked: links, bilingual pairing, example compilation, or similar |
+| Documentation only | How the content is checked: links, example compilation, or similar |
 
 When the PR mixes change types, give one form for each type present. Items that Changes lists as None need no test design.
 
@@ -61,7 +61,6 @@ Write each disclosure in the section it concerns, usually Changes, after a bold 
 | Changing the behavior an existing test describes | Why the behavior changed | The Tests describe behavior rule in [root AGENTS.md](../../../AGENTS.md) |
 | Raising a ceiling in `scripts/doc-budgets.manifest.json` | Each raised ceiling with its old and new value, and why the words are necessary | [Wordcount budgets](../../../docs/AGENTS.md#wordcount-budgets) |
 | Changing product-user-visible GUI behavior | An embedded demonstration GIF, with the disclosures that record-browser-gif requires beside the embed; for each GUI change without a GIF, a statement that none is embedded and why | [record-browser-gif](../record-browser-gif/SKILL.md#every-gui-pull-request-includes-a-gif) |
-| Using a translation term the terminology list lacks | The source of the rendering, or a proposed rendering under pending terms | [Translation rules](../../../docs/i18n/translation-rules.md) |
 
 ## AI Usage
 

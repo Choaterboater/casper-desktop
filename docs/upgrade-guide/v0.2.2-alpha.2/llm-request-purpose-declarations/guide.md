@@ -5,8 +5,6 @@ description: "Auxiliary LLM request purposes require producer-owned type declara
 
 # Declare auxiliary LLM request purposes
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 `GenerateOptions.purpose` derives from the declaration-mergeable `LlmRequestPurposeMap` exported by `@deepseek-ai/dsh-llm/types`. The shared package no longer declares `compaction` or `session-title`. Plugins that construct auxiliary requests must load the producer's declarations or declare their own purpose. Existing runtime purpose strings keep their meaning.

@@ -5,8 +5,6 @@ description: "Source-built Computer Use helpers use a separate development bundl
 
 # Source-built Computer Use helper identity
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 Source checkouts previously built `DSH Computer Use.app` with the release bundle identifier `com.deepseek.harness.computer-use` and an ad-hoc signature. They now build `DSH Computer Use Dev.app` with bundle identifier `com.deepseek.harness.computer-use.dev`. Accessibility and Screen Recording grants for the old entry do not apply to it. Desktop and npm installations are unchanged. Source builds still default to ad-hoc signing; developers generate and maintain fixed identities outside DSH home and select them through configuration.

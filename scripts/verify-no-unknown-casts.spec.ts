@@ -28,7 +28,7 @@ function fixture(): string {
   const root = mkdtempSync(join(tmpdir(), 'dsh-unknown-casts-'))
   roots.push(root)
   git(root, 'init', '--quiet')
-  for (const area of ['packages', 'apps', 'scripts', 'website']) {
+  for (const area of ['packages', 'apps', 'scripts']) {
     write(root, `${area}/seed.ts`, 'export {}\n')
   }
   write(root, baselinePath, '{}\n')
@@ -209,11 +209,11 @@ describe('unknown assertion source discovery', () => {
       'packages/example/src/input.ts',
       'apps/example/input.tsx',
       'scripts/input.mts',
-      'website/input.cts',
+      'packages/example/src/input.cts',
       'packages/example/tests/input.js',
       'apps/example/input.jsx',
       'scripts/input.mjs',
-      'website/input.cjs',
+      'apps/example/input.cjs',
       'config.ts',
     ]
     for (const file of files) write(root, file, assertion)
@@ -236,7 +236,7 @@ describe('unknown assertion source discovery', () => {
     expect(verifyNoUnknownCasts(root)).toBe(0)
   })
 
-  it.each(['packages', 'apps', 'scripts', 'website'])('rejects discovery missing %s', (area) => {
+  it.each(['packages', 'apps', 'scripts'])('rejects discovery missing %s', (area) => {
     const root = fixture()
     unlinkSync(join(root, `${area}/seed.ts`))
     expect(() => verifyNoUnknownCasts(root)).toThrow(`source discovery omitted ${area}/`)
@@ -244,7 +244,7 @@ describe('unknown assertion source discovery', () => {
 
   it('rejects an empty source corpus', () => {
     const root = fixture()
-    for (const area of ['packages', 'apps', 'scripts', 'website']) unlinkSync(join(root, `${area}/seed.ts`))
+    for (const area of ['packages', 'apps', 'scripts']) unlinkSync(join(root, `${area}/seed.ts`))
     expect(() => verifyNoUnknownCasts(root)).toThrow(/source discovery omitted/u)
   })
 

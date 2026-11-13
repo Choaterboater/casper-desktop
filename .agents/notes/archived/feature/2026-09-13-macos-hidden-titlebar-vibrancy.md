@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-13-macos-hidden-titlebar-vibrancy.zh.md)
-
 ## Problem
 
 The desktop app drew the stock macOS titlebar: an opaque bar above the web UI that repeats chrome the page already has, spends vertical space, and keeps the sidebar from reaching the window's top edge. The window looked like a browser tab rather than a macOS application, and no mechanism existed for platform-specific presentation — every pixel was identical on macOS, Windows, and the plain web.

@@ -2,19 +2,17 @@
 
 Status: implemented
 
-English | [中文](2026-09-28-session-corpus-performance.zh.md)
-
 ## Problem
 
 Existing gates measure one long Session: [opening it](2026-09-04-session-open-performance-gate.md) or [continuing it](2026-09-06-backend-continuation-performance.md). Listing, content search, and fork scale with the whole corpus or with the source Session's length, and no gate covered a user with many long Sessions. A corpus of uniform small Sessions would understate the work, because real corpora are heavy-tailed.
 
 ## Decision
 
-The [session-corpus benchmark](../../../../benchmarks/session-corpus/session-corpus.bench.ts) measures three Web Host endpoints over synthetic current-generation Zstandard corpora. No product implementation changes.
+The session-corpus benchmark (`benchmarks/session-corpus/session-corpus.bench.ts`) measures three Web Host endpoints over synthetic current-generation Zstandard corpora. No product implementation changes.
 
 ### Workload
 
-On 2026-09-28, one developer's local DSH home held 1,650 Sessions in 88 project directories. Aggregate counts were extracted from the newest generation of each Session; no content, identity, or path left that machine. [corpus-shape.ts](../../../../benchmarks/session-corpus/corpus-shape.ts) records 22 upper-quantile anchors for three dimensions: logical events (compact delta rows expanded), decompressed bytes, and turns.
+On 2026-09-28, one developer's local DSH home held 1,650 Sessions in 88 project directories. Aggregate counts were extracted from the newest generation of each Session; no content, identity, or path left that machine. `corpus-shape.ts` records 22 upper-quantile anchors for three dimensions: logical events (compact delta rows expanded), decompressed bytes, and turns.
 
 | Quantile | Events | Logical bytes | Turns |
 |---|---:|---:|---:|

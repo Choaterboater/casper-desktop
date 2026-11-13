@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-16-sidebar-browser.zh.md)
-
 ## Problem
 
 The right Sidebar can preview addressed workspace files, but it has no independent surface for visiting a Web page. Opening a page outside the application loses the Sidebar's split, float, and tab lifecycle. Treating an arbitrary page like Document Preview content also obscures a different trust model: a Web page controls a live browsing context, while a document renderer receives bytes selected for one preview.

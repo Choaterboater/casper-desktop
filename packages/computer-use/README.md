@@ -5,8 +5,6 @@ kind: "package-group"
 
 # packages/computer-use
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Computer-use providers let models observe and operate a desktop. This group contains the shared registry that prevents multiple providers from being enabled in one composition. DSH's [CUA implementation](../experimental/cua/README.md), platform providers, and opt-in bundle currently live in `experimental`, alongside the Cua Driver adapters. The CUA package documents the platform requirements for promotion to this group.

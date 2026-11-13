@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-06-11-dev-invariants-over-deep-readonly.zh.md)
-
 ## Problem
 
 The session log needs immutable ownership of each stored fact. Making that protection an optional development plugin would leave production history vulnerable; expressing it through TypeScript readonly types would not create a runtime boundary.

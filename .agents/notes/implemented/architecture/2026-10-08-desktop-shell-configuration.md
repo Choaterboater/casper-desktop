@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-08-desktop-shell-configuration.zh.md)
-
 ## Problem
 
 Desktop updates and native recovery can run before the Host starts or while it is unavailable. Depending on Host configuration prevents these functions from resolving their preferences when needed. A shared settings page does not identify which process owns each preference.

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-29-team-task-only-projection.zh.md)
-
 ## Problem
 
 The Team projection retained historical member, message, and delivery collections after subagent discovery and messaging replaced their runtime consumers. Its retired lifecycle and mailbox validators could still fail the current task board, while checkpoints retained message bodies with no current reader.

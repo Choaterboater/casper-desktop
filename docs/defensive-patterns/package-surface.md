@@ -1,7 +1,5 @@
 # Package surface rules
 
-English | [中文](package-surface.zh.md)
-
 Rules for what a package exports, how it is built, and how it declares dependencies. [development.md](../development.md#typescript-project-layout) describes the layout itself; [packages/AGENTS.md](../../packages/AGENTS.md) carries the standing orders.
 
 ## A plugin package exports what the Loader loads

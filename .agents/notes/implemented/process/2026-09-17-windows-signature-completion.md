@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-17-windows-signature-completion.zh.md)
-
 ## Problem
 
 A combined SignTool command reports timestamp failure as signing failure. Retrying it repeats hardware access, while treating every timestamp error as an uncertain private-key outcome requires administrator recovery. Public timestamp-only requests can fail independently of the token.

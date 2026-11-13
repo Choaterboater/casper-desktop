@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-10-approval-review-workflow-identity.zh.md)
-
 ## Problem
 
 GitHub can populate a workflow run's `name` with its expanded `run-name`. The approval review workflow includes the pull-request number in that title, so comparing `workflow_run.name` with the static workflow name rejects valid review events before refreshing the approval status.

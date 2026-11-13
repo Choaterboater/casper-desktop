@@ -2,8 +2,6 @@
 
 Status: proposed
 
-English | [中文](2026-09-20-unified-typert-remote-metadata.zh.md)
-
 ## Problem
 
 CLI help, argument parsing, and MCP tool discovery need local method descriptions, named-input parsers, tool JSON Schemas, and result metadata before connecting to a controlled Host. Browser, Node, and independent consumers also need typed invocations. Tool consumers need stricter input-object validation without changing ordinary Host dispatch. These requirements do not imply runtime TypeScript analysis, Host Service activation, or another business schema maintained by each consumer.

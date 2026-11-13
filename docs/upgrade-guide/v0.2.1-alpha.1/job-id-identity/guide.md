@@ -5,8 +5,6 @@ description: "JobId now identifies one background execution across registry life
 
 # Background job ids identify one execution
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 The job registry returns `<kind>-<short-uuid>` instead of `<kind>-N`; the suffix is 16 lowercase UUID hex characters. The same `JobId` appears in live controls, `job/registered`, and `job/settled`; lifecycle records no longer carry `executionId`. The identifier remains owner-authorized. Existing Session histories remain unchanged and do not resume their jobs.

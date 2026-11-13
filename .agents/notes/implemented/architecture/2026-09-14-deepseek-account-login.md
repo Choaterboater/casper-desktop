@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-14-deepseek-account-login.zh.md)
-
 Sign-in captures the initiating UI's client metadata per attempt so browser authorization follows the Desktop or Settings language without depending on the Platform default.
 
 ## Problem

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-29-explicit-session-history-preparation.zh.md)
-
 ## Problem
 
 Expanding a subagent catalog or forking from the sidebar can trigger an old Session's format migration.

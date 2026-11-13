@@ -5,8 +5,6 @@ description: "Desktop font-size shortcuts reserve key combinations previously av
 
 # Desktop font-size shortcuts reserve custom key combinations
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 Desktop reserves `Cmd`/`Ctrl` + `=` (including `Shift` + `=` for `+`) and `Cmd`/`Ctrl` + `-` to adjust text, code, and terminal font sizes together. Use `Cmd` on macOS and `Ctrl` on Windows and Linux. Custom bindings using these combinations, including overlapping two-key chords, remain saved but no longer execute. Web shortcut behavior is unchanged.

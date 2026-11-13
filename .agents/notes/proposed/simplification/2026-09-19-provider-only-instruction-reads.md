@@ -2,8 +2,6 @@
 
 Status: proposed
 
-English | [中文](2026-09-19-provider-only-instruction-reads.zh.md)
-
 ## Problem
 
 [Instruction discovery](../../../../packages/context/agent-instructions/src/files.ts) maintains provider and direct-Node paths for metadata probes, root-marker discovery, and bounded reads. `nodeStatFile`, `nodeTextChunks`, and optional provider/target fields support the latter. The exported `discoverBaselineInstructionFiles` wrapper selects it; `loadBaselineInstructions` permits it when callers omit a provider.

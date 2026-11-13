@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-16-steering-batch-start-in-definition-state.zh.md)
-
 ## Problem
 
 Chat keeps a 44px slot, the height of the running status row, above the first steering row of each claim that lands after the running Turn's process output, so admitting steering swaps the status and the bubble without moving the bubble ([conversation-nodes README](../../../../packages/client/ui-chat/src/client/conversation-nodes/README.md)). Deciding that a steering row starts such a batch needs two facts its own `user/message` event does not carry: whether it is the first human message of its `next-step` claim, and whether the same Turn already has durable visible output before it, which places the row after the Turn's process control. The answer must hold for live appends, replay, and loading earlier history, and must not scan the event window or the Chat Nodes.

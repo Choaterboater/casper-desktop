@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-16-desktop-cos-upload-transport.zh.md)
-
 ## Problem
 
 Release objects were uploaded with the AWS S3 client pointed at the Tencent COS endpoint. That client's default checksum configuration can send a streamed request trailer under `Content-Encoding: aws-chunked`, a marker S3 removes before storing but the compatibility path can retain as object metadata. A user-visible application download failed with an HTTP/2 `RST_STREAM` immediately after response headers while an adjacent download on the same connection completed, and objects reported to carry the marker failed segmented downloads. Neither observation identifies an exclusive cause, but the upload transport is the part this repository owns, and a CDN serving metadata no origin request produced is a defect worth removing before chasing it further.

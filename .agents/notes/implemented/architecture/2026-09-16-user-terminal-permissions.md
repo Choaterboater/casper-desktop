@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-16-user-terminal-permissions.zh.md)
-
 ## Problem
 
 Users need to run commands themselves while keeping the Agent restricted. Sharing the Agent's sandbox mode forces a user to widen Agent access for manual work, and retaining an interactive shell prevents later mode changes because its process confinement cannot follow a new Session setting.

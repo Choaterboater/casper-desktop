@@ -5,8 +5,6 @@ description: "Custom Client compositions must provide the context-menu and file-
 
 # Context menu services in custom Client compositions
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 GUI plugins now inject `contextMenus` to open shared object menus. The open-in-app plugin also injects `fileActions`, `sidebarRight`, `sidebarRightTabs`, and `remote.workspaceFiles`. Custom compositions that mount these GUI plugins without the new services cannot activate them. The shipped Web application bundle includes the providers; existing Session and tab menu Slot names remain available.

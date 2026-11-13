@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-13-partitioned-coverage-location-canonicalization.zh.md)
-
 ## Problem
 
 The coverage gate reported [packages/util/home-paths/src/index.ts](../../../../packages/util/home-paths/src/index.ts) at 96.96% statements with one uncovered statement at `48:22`, while branches, functions, and lines stayed at 100% and the same tests reported the file at 100% in an unpartitioned run. Line 48 holds one statement, so the merged report counted a second, unhit statement the source does not contain. The branch that exposed the failure only added a jsdom suite that loads a node-tested module; it did not touch that module or its package.

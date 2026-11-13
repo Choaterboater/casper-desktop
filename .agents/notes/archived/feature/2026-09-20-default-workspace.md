@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-20-default-workspace.zh.md)
-
 ## Problem
 
 A new installation requires a directory choice before the user can send a first message. Removing that prerequisite must preserve the Session's fixed working directory and must not treat hidden or archived history as a new installation.

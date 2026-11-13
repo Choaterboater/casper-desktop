@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-21-archive-stops-running-session-work.zh.md)
-
 ## Problem
 
 Archiving was a pure visibility write: `WorkspaceRegistry.archiveSession` added the id to the registry-global archive set and nothing else. A Session archived in the middle of a turn kept running out of sight — the agent, its tool subprocess, and its model requests continued to completion — and the archived row deliberately shows no status dot, so nothing told the user an agent was still spending tokens. A background subagent, an owned job, or a due reminder could likewise keep working or start a new turn in a hidden Session. The Web surface never disposes an Agent, so the exposure lasted until the Host process exited.

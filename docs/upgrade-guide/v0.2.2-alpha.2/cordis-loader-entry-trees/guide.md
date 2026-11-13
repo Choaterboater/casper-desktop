@@ -5,8 +5,6 @@ description: "Loader entry trees report mutations through commit(change), and In
 
 # Loader entry tree reports and Include persistence
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 `@deepseek-ai/cordis-plugin-loader` follows Loader 1.0.0-rc.8, and `@deepseek-ai/cordis-plugin-include` follows Include 1.1.1. This affects `cordis.yml` and patch files, code that subclasses `EntryTree`, and code that calls `applyEntryPatches` or relies on Include writes.

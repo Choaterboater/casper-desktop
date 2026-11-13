@@ -5,8 +5,6 @@ description: "Session model choices are fixed at step preparation, and projectio
 
 # Session model selection applies at the next step
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 ACP model and reasoning changes take effect at the next model step, including a tool continuation in the current turn. Previously, ACP pinned the selection for the complete prompt turn. A prepared step and its retries retain their captured selection. Image admission checks the route selected when admission begins; a later option change can select a different route before the step starts.

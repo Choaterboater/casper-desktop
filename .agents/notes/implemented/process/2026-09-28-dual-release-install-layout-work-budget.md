@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-28-dual-release-install-layout-work-budget.zh.md)
-
 ## Problem
 
 The `Dependency layout` lane packs two incompatible synthetic DSH releases into a temporary consumer, runs one real npm resolution over them, and asserts the physical placement npm chose. It decided pass or fail with `TIMEOUT_MS = 300_000` on the npm child process. That deadline measures the runner, not the graph: the same graph resolves in 137-205 s on an idle developer host and in 288.59 s on the CI runner, 4% below the deadline, while the placement assertion reported no error. The diagnostic named only elapsed time, so a slow runner and a graph that had grown were indistinguishable.

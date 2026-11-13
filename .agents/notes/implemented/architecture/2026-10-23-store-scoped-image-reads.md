@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-23-store-scoped-image-reads.zh.md)
-
 ## Problem
 
 Historical image loading read the requesting Session and searched its event content for every uncached attachment. The search established that the Session referenced the image; it did not locate the bytes, whose storage path already follows from the content-addressed ID. This added work proportional to history length to each image read. The reported loading delay also involved uploads; this finding alone does not identify all of that delay.

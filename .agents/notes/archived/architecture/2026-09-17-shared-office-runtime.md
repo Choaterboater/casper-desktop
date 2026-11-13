@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-17-shared-office-runtime.zh.md)
-
 ## Problem
 
 SDK deployments need the same Office authoring libraries as Desktop while keeping interpreter payloads in read-only container image layers. A Desktop-owned query and builder require downstream carriers to duplicate dependency locks and path conventions.

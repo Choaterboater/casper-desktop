@@ -2,8 +2,6 @@
 
 Status: proposed
 
-English | [中文](2026-10-03-pi-extensions-bridge.zh.md)
-
 ## Problem
 
 Pi 1.0.0 extensions are in-process TypeScript factories `(pi: ExtensionAPI) => void`. A factory subscribes to about forty lifecycle, context, tool, and provider events, registers model tools, slash commands, model providers, and MCP servers, and talks to the user through `ctx.ui` ([extensions guide](https://github.com/earendil-works/pi/blob/v1.0.0/packages/coding-agent/docs/extensions.md), [API types](https://github.com/earendil-works/pi/blob/v1.0.0/packages/coding-agent/src/core/extensions/types.ts)). The API is published and widely used: about 11,000 npm packages carried the `pi-package` keyword in October 2026.

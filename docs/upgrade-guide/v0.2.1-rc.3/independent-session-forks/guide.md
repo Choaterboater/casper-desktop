@@ -5,8 +5,6 @@ description: "Ordinary Session forks stop recording their source relationship an
 
 # Ordinary forks are independent Sessions
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 Ordinary forks copy the selected history and continue independently. They omit `SessionHeader.parentSession` and the Client's `parentSessionId`; no replacement source field is written. Subagents, including fork-backend subagents, retain their direct creator. Existing logs retain their recorded metadata.

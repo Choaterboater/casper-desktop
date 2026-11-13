@@ -5,8 +5,6 @@ Archived: 2026-09-30
 
 Update: the `reported` bit and `onJobDone` this note relies on left the registry with the [jobs seam consolidation](../architecture/2026-09-03-jobs-seam-consolidation.md): `dsh-tool-jobs` now keeps the delivery ledger (a wait or an accepted `job_kill` claims the task) and skips teardown settlements by their `settled` cause, so the wake-or-inject decision below stands while the mechanism it names is the tool's ledger, not a registry flag.
 
-English | [中文](2026-08-11-background-job-completion-wakes-an-idle-owner.zh.md)
-
 ## Problem
 
 `tool-jobs` promised the model "You are notified in-session when a task finishes — do not busy-poll or sleep on one." The promise held only while the model was still working. Completion delivered through `agent.inject()`, which appends to the next-step inbox without reserving a driver, so a task settling after its turn closed left the notice parked until something unrelated woke the agent. The common shape is exactly the one that breaks: the model starts a long command, tells the user it started it, ends its turn, and the command finishes into an inbox nobody will claim. The prompt told the model not to poll, and then nothing arrived.

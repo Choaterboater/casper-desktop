@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-14-registry-bundle-updates.zh.md)
-
 ## Problem
 
 Third-party bundles installed from a registry had no update path. The plugin page offered **Update** only for Official bundles, whose target is the running DSH version, so a person learned of a newer third-party release outside DSH and replaced it by uninstalling and installing again. With HMR an install over an installed package is refused, and a manual removal followed by a failed installation leaves the plugin uninstalled.

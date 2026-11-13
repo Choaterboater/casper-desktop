@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-client-ui-open-in-app
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 This package provides the browser surface of the open-in-app feature. A Session-header split button opens the current session's workspace directory (the summary's `cwd`) in the remembered application, and its chevron lists every catalog application the host probed as installed; availability, icons, and launches come from the host routes of [`dsh-host-open-in-app`](../../host/open-in-app/README.md), so mount the two packages together. In the right Sidebar's document preview, an "Open" split button and an empty-state button open the previewed file in its default application or show its location, through the Session Remote. A host without the capability renders none of these controls.

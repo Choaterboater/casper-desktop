@@ -1,7 +1,5 @@
 # Plugin market index generator
 
-English | [中文](README.zh.md)
-
 A reference generator for [plugin market index](../../.agents/notes/implemented/feature/2026-10-02-plugin-market-index-format.md) files. It reads a plain list of npm package names and Git repository URLs and writes one `index.json` that the DSH **Discover** page can show without further requests. It is a standalone Node program, not a Cordis application, and it never installs or runs the code of the packages it describes.
 
 ## Usage

@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-experimental-speech-to-text-sensevoice
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 This provider recognizes speech with SenseVoiceSmall ONNX and Silero VAD on the Host CPU. The platform-specific sherpa-onnx Node package includes ONNX Runtime; users need no Python, compiler or model conversion. Activation checks cached resources without loading models or downloading assets.

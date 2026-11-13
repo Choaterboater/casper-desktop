@@ -2,8 +2,6 @@
 
 Status: proposed
 
-English | [中文](2026-09-19-config-only-hmr.zh.md)
-
 ## Problem
 
 [DSH HMR](../../../../packages/boot/hmr/src/index.ts) owns both serialized profile configuration refresh and running JavaScript module replacement. Module replacement adds Node-loader internals, dependency traversal, cache backup, old/new plugin fibers, rollback, module watches, and import-error formatting. The [base composition](../../../../packages/bundle/base/cordis.patch.yml) uses `root: []`; other shipped profiles disable or omit HMR. The default product requires configuration refresh, while source replacement serves an explicit custom-profile opt-in.

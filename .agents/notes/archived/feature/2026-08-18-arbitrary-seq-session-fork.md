@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-08-18-arbitrary-seq-session-fork.zh.md)
-
 ## Problem
 
 A branch may need the history before a tool result arrives, including a historical position in a parent that has since completed. Restricting forks to completed turns prevents that choice. Reusing crash-recovery result wording would falsely imply that the parent was interrupted.

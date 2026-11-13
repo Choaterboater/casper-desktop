@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-10-15
 
-English | [中文](2026-09-26-team-direct-inbox.zh.md)
-
 ## Problem
 
 A second Team outbox duplicates Agent inbox ownership with separate identities, acknowledgements, persistence checkpoints, and retry ordering. Callers need an explicit admission result while the continuation owner already provides target locking, lifecycle authorization, and cold recovery.

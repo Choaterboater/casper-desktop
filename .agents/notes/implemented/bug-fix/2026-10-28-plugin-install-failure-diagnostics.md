@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-28-plugin-install-failure-diagnostics.zh.md)
-
 ## Problem
 
 A failed plugin installation could show the generic sentence "Something went wrong during the install; the details say what" while its expanded details showed only "No output". The dialog rendered the live install-log stream and the failure kind, and the two Host diagnostics that explain such a failure never entered that stream. A pnpm run that printed nothing had its diagnostic (`result.shortMessage`, or `pnpm failed` as the fallback) written to the complete log and the returned result but never streamed, so the dialog's terminal stayed empty. The GitHub connection check that stops an installation before pnpm runs kept its captured output only in `packageResult.output`. The Client also ignored the settled result's `packageResult.logPath` and `stage`, so a failure with recorded diagnostics offered no path to the complete log and could not say that a finished installation failed while the bundle was being activated.

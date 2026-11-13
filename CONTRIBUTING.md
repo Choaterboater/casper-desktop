@@ -1,7 +1,5 @@
 # Contributing
 
-English | [中文](CONTRIBUTING.zh.md)
-
 Thank you for your interest in contributing to Casper! Casper is a fork of DeepSeek Harness; changes to the harness itself belong upstream at [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness), and the rest of this guide is the upstream project's.
 
 We deeply believe in the power of open source communities, and that belief has shaped this project from the very beginning.

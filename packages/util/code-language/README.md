@@ -5,8 +5,6 @@ kind: "package-library"
 
 # dsh-util-code-language
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 The repository's one file-extension to syntax-highlighting language table, shared by the Client's document Code preview and diff review, and by the Host read tool's persisted `lang` hint. `languageForPath` maps a path to a canonical grammar id case-insensitively; `CODE_HIGHLIGHT_EXTENSIONS` lists every suffix a preview registry can claim. `readLangHintForPath` projects the read card's short ids over the same table, so a suffix a recorded session already holds keeps its persisted value and every other suffix takes its language's short name. The package is browser-safe, stateless, and leaves tokenization to the Client highlighter.

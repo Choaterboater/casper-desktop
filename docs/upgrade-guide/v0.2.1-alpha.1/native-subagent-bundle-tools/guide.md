@@ -5,8 +5,6 @@ description: "Claude Code and Codex bundles add global delegation tools while re
 
 # Native subagent bundles include global tools
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 `@deepseek-ai/dsh-subagent-claude-code` and `@deepseek-ai/dsh-subagent-codex` keep their package names, bundle selections, provider row IDs, configuration, and native authentication. A selected bundle now also registers its delegation tool as a Host global tool, visible to every preset including minimal; previously the bundle registered only its provider. Live Agents see the tool from their next request after the bundle is enabled, and lose it after the bundle is switched off.

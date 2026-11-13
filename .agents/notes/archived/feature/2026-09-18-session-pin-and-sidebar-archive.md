@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-18-session-pin-and-sidebar-archive.zh.md)
-
 ## Problem
 
 The sidebar session list had no way to keep important sessions at the top, and archived sessions could only be reached through a settings page (`ui-settings-unarchive-sessions`) far from the list they came from. Users archived a session and then lost sight of it.

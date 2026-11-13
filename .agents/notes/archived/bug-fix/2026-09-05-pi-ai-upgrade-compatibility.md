@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-05-pi-ai-upgrade-compatibility.zh.md)
-
 ## Problem
 
 The pi-ai adapter classifies upstream compatibility fields explicitly and persists only replay metadata needed by later requests. An SDK upgrade can add fields to either set without changing the Harness provider-neutral API. Unclassified configuration fields fail compilation; omitted replay metadata can silently change subsequent provider requests.

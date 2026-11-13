@@ -4,8 +4,6 @@ kind: "package-reference"
 ---
 # Job Controller
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 `@deepseek-ai/dsh-api-job-controller` owns the Host `ctx.jobController` service and the generated Client `ctx.remote.job` namespace. Its two Remote streams are projections of `ctx.jobs`: `job.list` mirrors the jobs one session can see as whole-set frames, and `job.follow` delivers one job's retained output from an absolute byte offset; its one command, `job.kill`, stops a job on a human's behalf. The Client half installs `ctx.jobs`, the reference-counted service whose rosters and accumulated views the session-header job list renders and whose `kill` its stop control calls. Neither stream touches the model's consuming cursor or its completion notices, and a human kill is not the model's own.

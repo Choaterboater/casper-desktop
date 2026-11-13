@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-14-plugin-entry-customization.zh.md)
-
 ## Problem
 
 The `release/dsh-0.2.1` Web app shows plugin entries in three regions: the left sidebar's panel buttons (`sidebar.panellist`), the Conversation header's View tabs (`conversation.view`), and the right sidebar guide's tool cards (guide entries from the right-sidebar tab registry). Each region shows every entry in registration order, so users cannot hide entries they rarely use, and every installed plugin makes the regions more crowded. Users also cannot browse more plugins or start creating a plugin from these positions.

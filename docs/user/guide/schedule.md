@@ -1,7 +1,5 @@
 # Schedule reminders
 
-English | [中文](schedule.zh.md)
-
 ## Summary
 
 Ask the model in a conversation to create, list, view, edit, pause, resume, or delete reminders. Each reminder repeats by its rule and delivers its instruction to an existing conversation, to one new conversation, or to a new conversation at every occurrence. The Automation tasks page lists every reminder of the Host and can create, edit, run, pause, resume, and delete one. Delivered one-shot tasks remain available until you explicitly delete them.

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-16-tree-wide-agent-communication.zh.md)
-
 ## Problem
 
 A Team shares one task board across the root's entire subagent tree. Restricting discovery and messages to adjacent relatives forces deeper members to relay work through parents despite sharing tasks.

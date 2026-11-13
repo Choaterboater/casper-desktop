@@ -5,8 +5,6 @@ kind: "package-group"
 
 # ssh/ — POSIX remote execution providers
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 This family runs files, ordinary processes, terminals and sandbox enforcement on one POSIX SSH host while the Harness stays local. A shared OpenSSH connection and installed helper support the existing filesystem, subprocess and sandbox interfaces. Use it in headless or custom profiles whose consumers honor provider-owned paths.

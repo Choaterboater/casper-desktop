@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-05-persistent-machine-translation.zh.md)
-
 ## Problem
 
 Readers need a saved translation when they reopen reasoning or restart the application. A disclosure-only cache repeats external requests, can change an already displayed result and can incur repeated model charges. Storing only model inputs leaves successful translations unavailable after restart.

@@ -1,6 +1,6 @@
 # Template: persistence-change
 
-Use this template for `docs/persistence-changes/YYYY-MM-DD-slug.md` and its Chinese sibling. The folder README is an index, not a record. A record acknowledges only mechanically detected persistence-type changes. Its generated JSON sibling retains complete after schemas so verification needs no Git baseline.
+Use this template for `docs/persistence-changes/YYYY-MM-DD-slug.md`. The folder README is an index, not a record. A record acknowledges only mechanically detected persistence-type changes. Its generated JSON sibling retains complete after schemas so verification needs no Git baseline.
 
 ## Frontmatter
 
@@ -13,12 +13,10 @@ kind: persistence-change
 
 ## Skeleton
 
-The generator fills the machine declaration, schema companion, and consistency records. Structural changes outside the established same-version cases require an explicit compatibility decision. Supply `--prose` JSON with `en` and `zh` objects, each containing authored `summary`, `compatibility`, and `verification` strings. Use Compatibility to explain both reader directions and Verification to record executed checks. The [cookbook](../../../../docs/cookbook/reviewing-persistence-type-changes.md) shows the operation. Use the actual generated root names, record ids, and digests in the following fields.
+The generator fills the machine declaration and schema companion. Structural changes outside the established same-version cases require an explicit compatibility decision. Supply `--prose` JSON with authored `summary`, `compatibility`, and `verification` strings. Use Compatibility to explain both reader directions and Verification to record executed checks. The [cookbook](../../../../docs/cookbook/reviewing-persistence-type-changes.md) shows the operation. Use the actual generated root names, record ids, and digests in the following fields.
 
 ````markdown
 # Persistence change: <specific persisted change>
-
-English | [中文](YYYY-MM-DD-slug.zh.md)
 
 ## Summary
 
@@ -63,7 +61,7 @@ None.
 
 ## Rules
 
-- Keep exactly one `yaml persistence-change` block. The English and Chinese blocks are byte-identical; the verifier parses the English record once and checks its counterpart.
+- Keep exactly one `yaml persistence-change` block; the verifier parses it.
 - The filename stem and `id` agree. A root's `previous` identifies its predecessor record; `null` introduces a root. Its `after` matches the generated companion schema digest; `null` records deletion.
 - One initial `baseline: true` record covers the complete inventory. Routine changes use `baseline: false` and preserve accepted predecessors. A version-bump record carries its own increasing `SessionHeader.version` transition.
 - Structural differences alone do not infer a bump. A same-version change requiring review needs explicit `--decision same-version`; a changed header version infers `version-bump`. An explicit decision cannot waive the required header increase. The command supplies no source changes or validation claims.

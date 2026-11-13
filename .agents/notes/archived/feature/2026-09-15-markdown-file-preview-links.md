@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-15-markdown-file-preview-links.zh.md)
-
 ## Problem
 
 Assistant explanations link to existing source files that the turn does not modify or deliver. Restricting clickable references to produced-file mentions prevents readers from opening those sources beside the answer.

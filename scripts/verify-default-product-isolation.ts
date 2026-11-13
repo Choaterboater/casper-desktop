@@ -302,7 +302,7 @@ export function verifyDefaultProductIsolation(root: string): ProductIsolationRes
     for (const tree of manifest.dsh?.configTrees ?? []) {
       const treePath = resolve(pkg.directory, tree.path)
       const files = existsSync(treePath) && statSync(treePath).isDirectory()
-        ? globSync('**/*.{yml,yaml}', { cwd: treePath, exclude: ['**/*.i18n.yaml', '**/preset.yml'] }) : []
+        ? globSync('**/*.{yml,yaml}', { cwd: treePath, exclude: ['**/preset.yml'] }) : []
       if (files.length === 0) failures.push(`${display(treePath)}: declared config tree has no composition files`)
       for (const path of files) scanConfig(resolve(treePath, path))
     }

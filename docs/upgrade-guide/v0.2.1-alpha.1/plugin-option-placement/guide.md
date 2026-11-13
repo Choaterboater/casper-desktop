@@ -5,8 +5,6 @@ description: "dsh plugin reads --profile only before the forwarded pnpm argument
 
 # `dsh plugin` option placement
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 `dsh plugin` reads `--profile` only before the forwarded pnpm arguments, which start at the first token it does not recognize, and it has its own help. Previously it accepted `--profile <name>` anywhere on the command line, had no help of its own, and forwarded `-h` and `--help` to pnpm from any position.

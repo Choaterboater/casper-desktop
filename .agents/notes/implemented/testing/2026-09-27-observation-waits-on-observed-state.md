@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-27-observation-waits-on-observed-state.zh.md)
-
 ## Problem
 
 Two self-hosted Windows lane cases observed state through a wall-clock window instead of the state they assert on.

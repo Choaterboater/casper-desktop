@@ -17,14 +17,7 @@ import {
   graphNodeId as nodeId,
   type PackageGraphNode,
 } from './package-graph.ts'
-import { rewriteTranslationLinkLocales } from './translation-links.ts'
-import {
-  generatedRegions,
-  parseTranslationPairingManifest,
-  renderGeneratedRegion,
-  spliceGeneratedRegion,
-  translationPairSourcePredicate,
-} from './translation-pairing.ts'
+import { renderGeneratedRegion } from './generated-region.ts'
 import { TypeScriptProject } from './ts-project.ts'
 
 const root = resolve(import.meta.dirname, '..')
@@ -1796,29 +1789,7 @@ function renderDocs(): GraphDoc[] {
     { rel: 'docs/tool-execution-pipeline.md', content: renderToolPipeline() },
   ]
   docs.unshift({ rel: 'docs/graph-atlas.md', content: renderIndex(docs) })
-  const events = docs.find(doc => doc.rel === 'docs/event-producer-consumer.md')
-  if (events !== undefined) docs.push(spliceChineseRegions(events))
   return docs
-}
-
-/**
- * Splice a generated page's regions into its authored Chinese counterpart,
- * localizing paired-document links; the surrounding Chinese prose stays authored.
- */
-function spliceChineseRegions(doc: GraphDoc): GraphDoc {
-  const rel = doc.rel.replace(/\.md$/, '.zh.md')
-  const context = {
-    repoRoot: root,
-    sourcePath: rel,
-    isTranslationPairSource: translationPairSourcePredicate(parseTranslationPairingManifest(
-      readFileSync(resolve(root, 'scripts/translation-pairing.manifest.json'), 'utf8'),
-    )),
-  }
-  let content = readFileSync(resolve(root, rel), 'utf8')
-  for (const region of generatedRegions(doc.content)) {
-    content = spliceGeneratedRegion(content, rewriteTranslationLinkLocales(region.text, context).content)
-  }
-  return { rel, content }
 }
 
 function renderIndex(docs: GraphDoc[]): string {

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-21-when-access.zh.md)
-
 ## Problem
 
 Client plugins need to switch their own registrations on and off with the current Peer's access: sidebar entries, main panels, overlays, and data streams. The existing Client access surface covers only rendering:

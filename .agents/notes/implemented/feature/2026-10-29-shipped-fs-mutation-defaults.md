@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-29-shipped-fs-mutation-defaults.zh.md)
-
 ## Problem
 
 [Apply patch file editing](2026-09-28-apply-patch-file-editing.md) shipped `apply_patch` opt-in and kept `dsh-fs-observation-policy` mounted, so every base-backed profile refused `write`, `edit`, and `apply_patch` on a file the model had not read or that had changed since the read. Benchmark runs of the shipped compositions with the tool enabled and with the policy disabled were compared against the baseline, and the shipped defaults were decided from those results in discussion between the maintainers.

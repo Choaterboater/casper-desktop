@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-19-v3-incomplete-child-catalog-evidence.zh.md)
-
 ## Problem
 
 A valid V3 child log can have no own descriptor, an unsupported descriptor version, or multiple descriptors. Its header still establishes its identity and parent relationship. Requiring one supported descriptor to migrate the parent makes unavailable discovery fields prevent access to otherwise readable history.

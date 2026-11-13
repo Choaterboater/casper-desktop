@@ -5,8 +5,6 @@ Archived: 2026-09-30
 
 Update: the [jobs seam consolidation](../architecture/2026-09-03-jobs-seam-consolidation.md) owns the output ring, the cursors, and the pull sources every registered command feeds.
 
-English | [中文](2026-08-26-shell-execute-projection-and-jobs-at-start.zh.md)
-
 ## Problem
 
 A bash command that outran its foreground timeout was killed, discarding the work — the single most common way a long build or install failed under the agent. Fixing that inside the old seam was structurally awkward: `ctx.shell` had two execution methods, `run()` (deadline fused in, promise-only, no handle to keep) and `start()` (handle, no deadline), so "keep this already-running foreground command" had no expression — the deadline owner could only kill, and the caller had nothing to re-register with `ctx.jobs`. The two methods had also drifted: different stdout budgets, a documented "start ignores timeoutMs" wart, and sync-vs-async spawn-failure behavior that differed per path.

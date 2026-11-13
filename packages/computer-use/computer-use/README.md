@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-computer-use
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 A deployment can enable one computer-use provider at a time. Loading another provider fails with the registered provider name. Both DSH's native CUA and the Cua Driver adapters use this registry. Each provider supplies its own tools and desktop operations. This package adds no model-visible tools and does not coordinate concurrent Sessions.

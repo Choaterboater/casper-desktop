@@ -2,8 +2,6 @@
 
 Status: proposed
 
-English | [中文](2026-10-18-borrow-auto-review-inputs.zh.md)
-
 ## Problem
 
 [`snapshotAutoReview()`](../../../../packages/experimental/auto-review/src/index.ts) reads frozen Session history, request headers, and tool arguments, but also copies `session.surface.nodes` and freezes its private result. Its only caller, `classifyRisk()`, immediately serializes that result without an intervening await or publication.

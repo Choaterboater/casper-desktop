@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-21-conversation-build-groups.zh.md)
-
 ## Problem
 
 Chat needs expandable groups for continuous process content while keeping replies, user input, and Turn controls independent. Compact, Detailed, and Expanded must share grouping results; changing modes must not rebuild React instances by removing group containers, moving member parents, or changing keys.

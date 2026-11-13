@@ -5,8 +5,6 @@ kind: "package-library"
 
 # @deepseek-ai/dsh-session-format-v3-to-v4
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Restore supported released V3 Sessions as V4 without rewriting their stored generation. This page specifies the edge's transformations, preservation, prerequisites, and refusal, then separates native V4 admission. The conversion lifts tool results, renames message sources, closes evidenced interrupted turns, and appends missing parent catalog facts. Persistence owns file reads and successor publication; this library owns conversion and target rules.

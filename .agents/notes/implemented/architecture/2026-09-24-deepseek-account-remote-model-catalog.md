@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-24-deepseek-account-remote-model-catalog.zh.md)
-
 ## Problem
 
 The account route's catalog was deployment configuration: a build advertised the models it shipped with, a new model reached users only through a release, and nothing kept an older build from requesting a model it cannot drive. The account service publishes per-account model metadata at `GET /models`, and that listing can name models an older build does not understand.

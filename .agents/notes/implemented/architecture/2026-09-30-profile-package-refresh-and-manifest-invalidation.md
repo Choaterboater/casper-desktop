@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-30-profile-package-refresh-and-manifest-invalidation.zh.md)
-
 ## Problem
 
 Two pieces of Host state did not follow changes while the process ran:

@@ -5,8 +5,6 @@ kind: "package-group"
 
 # casper/ — Casper agent and Sidebar browser
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 The casper group adds Casper to the desktop app. Sessions on the Casper preset run the Casper agent instead of the app's own agent loop. The Sidebar browser tools let the agent see and drive the browser tabs beside a conversation; their Client half runs each operation in the desktop app.

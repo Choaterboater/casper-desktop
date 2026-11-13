@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-06-client-assembly-test-line.zh.md)
-
 ## Problem
 
 Browser feature specs each hand-build their bench: a bare Cordis context, stand-ins for `locale`, `connection`, and `remote`, and slot declarations the real declarer would have made. Their assertions therefore describe the bench, not the product: a plugin that adds a settings section, a declarer that reloads through the Loader, or a Connection that reconnects is invisible to them, and every bench repeats the same forty lines with small drift.

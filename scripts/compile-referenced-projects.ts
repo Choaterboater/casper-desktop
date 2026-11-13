@@ -10,7 +10,6 @@ import { parseArgs } from 'node:util'
 import ts from 'typescript'
 import { pnpmCommand } from './release/process.ts'
 
-type CompilationMode = 'checked' | 'benchmark-emit'
 
 /** Identifier of one package-library build step. */
 export type LibraryStepId = 'host-src' | 'host-bundle' | 'host-typert' | 'desktop-bundle' | 'client-src' | 'client-bundle'
@@ -47,14 +46,12 @@ export function runPnpmCommand(root: string, args: readonly string[]): void {
  * Resolve the Node arguments that compile one aggregate's project references with the serial TypeScript builder.
  * @param root - Repository root containing the aggregate tsconfig.
  * @param face - Independent compiler face whose package projects are emitted.
- * @param mode - Check package types by default; benchmark emission defers diagnostics to required full builds.
  * @returns Arguments for `process.execPath`, including an 8 GiB old-space heap limit for the Host face.
  * @throws If the aggregate configuration is invalid, has no references, or can emit files.
  */
 export function referencedProjectsCompilerArgs(
   root: string,
   face: 'host' | 'client',
-  mode: CompilationMode = 'checked',
 ): string[] {
   const configPath = resolve(root, `tsconfig.${face}.json`)
   const config = ts.getParsedCommandLineOfConfigFile(configPath, {}, {
@@ -80,7 +77,6 @@ export function referencedProjectsCompilerArgs(
     ...hostHeapArgs(face),
     fileURLToPath(import.meta.resolve('typescript/bin/tsc')),
     '-b',
-    ...mode === 'benchmark-emit' ? ['--noCheck'] : [],
     // Relative arguments keep the complete workspace graph below Windows' command-line limit.
     ...references.map(reference => relative(root, reference.path)),
   ]
@@ -116,29 +112,26 @@ function hostHeapArgs(face: 'host' | 'client'): string[] {
  * Compile one aggregate's project references with the serial TypeScript builder.
  * @param root - Repository root containing the aggregate tsconfig.
  * @param face - Independent compiler face whose package projects are emitted.
- * @param mode - Check package types by default; benchmark emission defers diagnostics to required full builds.
  * @throws If the aggregate emits files, its configuration is invalid, or package compilation fails.
  */
 export function compileReferencedProjects(
   root: string,
   face: 'host' | 'client',
-  mode: CompilationMode = 'checked',
 ): void {
-  runStep(root, compilerStep(root, face, mode, []))
+  runStep(root, compilerStep(root, face, []))
 }
 
 function compilerStep(
   root: string,
   face: 'host' | 'client',
-  mode: CompilationMode,
   needs: readonly LibraryStepId[],
 ): LibraryStep {
   return {
     id: face === 'host' ? 'host-src' : 'client-src',
     label: `${face} compiler`,
-    displayCommand: `tsc -b${mode === 'benchmark-emit' ? ' --noCheck' : ''} <tsconfig.${face}.json references>`,
+    displayCommand: `tsc -b <tsconfig.${face}.json references>`,
     command: process.execPath,
-    args: referencedProjectsCompilerArgs(root, face, mode),
+    args: referencedProjectsCompilerArgs(root, face),
     needs,
   }
 }
@@ -170,21 +163,20 @@ function pnpmStep(id: LibraryStepId, label: string, args: readonly string[], nee
  * rewrite shared lib/types files consumed by those bundles.
  * @param root - Repository root containing the compiler and bundle configurations.
  * @param faces - `host` lists Typert generation, Host compilation, and bundling; `all` adds Desktop and Client.
- * @param mode - Check package types by default; benchmark emission defers diagnostics to required full builds.
  * @returns Steps with explicit compiler and bundle dependencies.
  * @throws If an aggregate configuration is invalid.
  */
-export function libraryBuildSteps(root: string, faces: 'host' | 'all', mode: CompilationMode = 'checked'): LibraryStep[] {
+export function libraryBuildSteps(root: string, faces: 'host' | 'all'): LibraryStep[] {
   const host: LibraryStep[] = [
     typertStep(),
-    compilerStep(root, 'host', mode, ['host-typert']),
+    compilerStep(root, 'host', ['host-typert']),
     pnpmStep('host-bundle', 'Host bundle', ['exec', 'tsdown', '--config-loader', 'native', '--env.DSH_BUILD_FACE', 'host'], ['host-src']),
   ]
   if (faces === 'host') return host
   return [
     ...host,
     pnpmStep('desktop-bundle', 'Desktop bundle', ['--filter', '@deepseek-ai/dsh-desktop', 'run', 'bundle'], ['host-bundle']),
-    compilerStep(root, 'client', mode, ['desktop-bundle']),
+    compilerStep(root, 'client', ['desktop-bundle']),
     pnpmStep('client-bundle', 'Client bundle', ['exec', 'tsdown', '--config-loader', 'native', '--env.DSH_BUILD_FACE', 'client'], ['client-src']),
   ]
 }
@@ -199,9 +191,9 @@ export function libraryBuildSteps(root: string, faces: 'host' | 'all', mode: Com
  * @throws If an aggregate configuration is invalid.
  */
 export function contractSteps(root: string, faces: 'host' | 'all'): LibraryStep[] {
-  const host = [typertStep(), compilerStep(root, 'host', 'checked', ['host-typert'])]
+  const host = [typertStep(), compilerStep(root, 'host', ['host-typert'])]
   if (faces === 'host') return host
-  return [...host, compilerStep(root, 'client', 'checked', ['host-src'])]
+  return [...host, compilerStep(root, 'client', ['host-src'])]
 }
 
 function runStep(root: string, step: LibraryStep): void {
@@ -229,11 +221,10 @@ function stepFailure(step: LibraryStep, exit: number | NodeJS.Signals | null): E
  * Emit package libraries serially in Host, Desktop, then Client dependency order.
  * @param root - Repository root containing the compiler and bundle configurations.
  * @param hostOnly - Stop after Typert generation, Host compilation, and bundling.
- * @param mode - Check package types by default; benchmark emission defers diagnostics to required full builds.
  * @throws If any compiler or bundler fails.
  */
-export function buildLibraryArtifacts(root: string, hostOnly: boolean, mode: CompilationMode = 'checked'): void {
-  for (const step of libraryBuildSteps(root, hostOnly ? 'host' : 'all', mode)) runStep(root, step)
+export function buildLibraryArtifacts(root: string, hostOnly: boolean): void {
+  for (const step of libraryBuildSteps(root, hostOnly ? 'host' : 'all')) runStep(root, step)
 }
 
 /**

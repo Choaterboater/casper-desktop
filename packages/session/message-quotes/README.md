@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-message-quotes
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 `dsh-message-quotes` registers quotation controls and transcript rendering on the Client. Messages retain ordinary Markdown text without quote metadata or content indexes.

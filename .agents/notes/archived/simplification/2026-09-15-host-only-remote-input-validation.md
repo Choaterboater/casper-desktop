@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-15-host-only-remote-input-validation.zh.md)
-
 ## Problem
 
 Generated Client Remote methods expose TypeScript signatures and forward calls through Connection to a Host Gateway that already checks exact argument fields, executes each strict input codec, and verifies JSON data before lookup or business invocation. Executing the corresponding schema for every Client argument duplicates this validation, materializes otherwise lazy Zod schemas in the Client, and gives invalid JavaScript calls a different failure path depending on which side rejects them first.

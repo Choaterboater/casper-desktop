@@ -5,8 +5,6 @@ description: "Managed subagent activations replace foreground and Job-backed del
 
 # Migrate delegation to managed subagent activations
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 `@deepseek-ai/dsh-tool-subagent` removes `backgroundMode`, `enableRunInBackground`, and the model argument `run_in_background`. Every delegation now returns `{ kind: 'activation', subagentId }` after accepting the child, and the runtime delivers its final answer in a parent completion notice. Foreground results and `{ kind: 'background', jobId }` results are removed; subagents are no longer collected or stopped through `job_output` or `job_kill`.

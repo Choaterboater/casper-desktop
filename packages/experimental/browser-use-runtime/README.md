@@ -5,8 +5,6 @@ kind: "package-library"
 
 # @deepseek-ai/dsh-experimental-browser-use-runtime
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Browser providers use this library to reuse a browser across one Session's turns and close its resources when that Session's runtime is disposed. Operations for one Session run in order, while isolated Sessions can proceed independently. Attachment mode reserves one external browser for a single Session. The library also connects provider-owned MCP servers and discovers their tools before the Session's first model request.

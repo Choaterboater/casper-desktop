@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-25-session-log-otel-byte-limits.zh.md)
-
 ## Problem
 
 Session logs contain nested JSON and large tool results. The product collector accepts named records with string content and limits request size; count-only SDK batching cannot bound bytes after UTF-8 encoding and JSON escaping.

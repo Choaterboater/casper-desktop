@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-17-developer-session-changes.zh.md)
-
 ## Problem
 
 Dynamic tool changes need durable, ordered records before providers can preserve the cached conversation prefix while changing available tools. Encoding these changes as free-form reminders would lose their structured tool identity and couple session state to prompt wording.

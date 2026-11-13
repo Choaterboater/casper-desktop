@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-11-desktop-mandatory-update-client.zh.md)
-
 ## Problem
 
 A local business server does not deliver remote minimum-version policy. The Desktop shell must independently learn that an update is required, block subsequent interaction without interrupting existing tasks, and retain a recovery path when policy queries or updater preparation fail.

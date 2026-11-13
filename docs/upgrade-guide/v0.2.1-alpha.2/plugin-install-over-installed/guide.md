@@ -5,8 +5,6 @@ description: "With HMR, installing a package that is already installed fails wit
 
 # Installing over an installed plugin package is refused with HMR
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 In a profile that runs HMR, which the shipped profiles do, `pluginManager.installBundle(spec)` used to run pnpm over a package the profile already depends on and report `restart-required` while the previous version kept running. It now fails before pnpm runs, with `application: 'failed'` and `error.code: 'already-installed'`, and changes no profile file, when the spec names an installed package: a registry name with or without a version, a local directory, or the git or tarball spec the dependency was saved with. Repeating an installation of the same spec fails the same way instead of reporting `changed: false`.

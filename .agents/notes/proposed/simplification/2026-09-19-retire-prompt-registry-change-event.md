@@ -2,8 +2,6 @@
 
 Status: proposed
 
-English | [中文](2026-09-19-retire-prompt-registry-change-event.zh.md)
-
 ## Problem
 
 [`SystemPrompt`](../../../../packages/core/system-prompt/src/index.ts) emits `system-prompt/change` when providers register or dispose. Repository searches find no executing product listener, but generated Host discovery advertises the event. Tests maintain notification counts and rollback after listener exceptions. This is a public extension with maintenance obligations, even without a first-party subscriber.

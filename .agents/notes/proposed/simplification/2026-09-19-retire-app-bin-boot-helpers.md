@@ -2,8 +2,6 @@
 
 Status: proposed
 
-English | [中文](2026-09-19-retire-app-bin-boot-helpers.zh.md)
-
 ## Problem
 
 [App boot](../../../../packages/boot/app-boot/src/index.ts) exports `resolveConfigPath`, including a basename-specific replay substitution, and `loadEnv`, which reads one optional `.env`. The supported [CLI launcher](../../../../apps/cli/src/bin.ts) uses `loadLayeredEnv`; [profile boot](../../../../apps/cli/src/profile-boot.ts) supplies an absolute path directly. Neither production path calls the older helpers.

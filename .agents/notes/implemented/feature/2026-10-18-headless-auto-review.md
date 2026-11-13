@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-18-headless-auto-review.zh.md)
-
 ## Problem
 
 Headless, SDK, and ACP admit tasks with `source.kind: 'user'`. Auto must recognize those tasks as instructions without requiring a browser RPC identity. The message role alone is insufficient: injected context also uses the user role but names its own source.

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-08-desktop-welcome-window-material.zh.md)
-
 ## Problem
 
 The desktop welcome design blurs the desktop behind its entire window. Chromium backdrop filters only sample content inside the renderer. Credential setup also needs an explicit startup owner so a native skip is not followed by a second Web dialog.

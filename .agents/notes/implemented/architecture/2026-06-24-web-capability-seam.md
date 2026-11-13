@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-06-24-web-capability-seam.zh.md)
-
 ## Problem
 
 The harness needs model-facing web tools without binding the model contract to one vendor's API shape. Search is the immediate pressure point: search APIs return deliberately different formats (Exa returns a flat `results[]` of `{title, url, highlights, publishedDate}`, Perplexity returns a generated answer plus citations, and the DeepSeek Search API returns a flat `results[]` with snippets and summaries), and the normalized web contract must accept each of them without mirroring one vendor. The seam was designed against the Exa and Perplexity formats; neither provider ships, and a plugin can register one. Fetch is a separate operation: an anonymous public HTTP(S) fetch backend has transport, security, redirect, decoding, and size-limit concerns that are not the same as provider-backed search.

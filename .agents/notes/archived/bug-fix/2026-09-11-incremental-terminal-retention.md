@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-11-incremental-terminal-retention.zh.md)
-
 ## Problem
 
 Persistent terminal output passes through scrollback and unread-send byte limits on every PTY callback. Rebuilding the entire retained string to enforce those limits makes callback cost grow with retained output. A 4 MiB scrollback window makes this repeated work substantial even when each incoming chunk is small.

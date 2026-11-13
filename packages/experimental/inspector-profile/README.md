@@ -5,8 +5,6 @@ kind: "package-bundle"
 
 # @deepseek-ai/dsh-experimental-inspector-profile
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Enable this optional bundle to inspect Session data in the Sidebar, open NodeJS inspector in the bottom panel, and add the Statistics conversation tab. It enables both inspectors, the Statistics view, and Host fetch capture; the bundle itself is off by default in Plugin Manager.

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-20-sidebar-retained-tab-layout.zh.md)
-
 ## Problem
 
 Restoring Session-specific tab records and URLs does not preserve a live browsing context. Unmounting a body or changing its DOM ancestors during tab, pane or Session transitions disconnects its page. Electron 44's `WebViewElement.disconnectedCallback` detaches and resets its guest, so preserving a React key or caching an element reference cannot compensate for disconnected ancestors. Content size, clipping and overlap must also follow the actual parent layout.

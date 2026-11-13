@@ -5,8 +5,6 @@ description: "pi-ai routes now offload the oldest history images once a request 
 
 # pi-ai request image count
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 `llm-pi-ai` previously bounded request images only by `maxRequestImageBytes`, so every retained image was resent until that byte bound was reached. Each provider route now also has `maxRequestImages` (default 50) and `imageOffloadCountQuantum` (default 10). When a request carries more retained images than `maxRequestImages`, `dsh-compaction-image-offload` replaces the oldest `imageOffloadCountQuantum` images with placeholder text and retries. The omission is recorded in the Session and does not revert. This affects Sessions with more than 50 images on any pi-ai route, including providers that accept more images per request.

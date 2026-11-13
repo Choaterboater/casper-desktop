@@ -5,8 +5,6 @@ description: "Custom primary-runtime payloads require relocatable Python interpr
 
 # Custom Python runtime aliases must target a sibling interpreter
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 On macOS and Linux, `DSH_PRIMARY_RUNTIME` previously accepted interpreter links that resolved outside their payload or through other links. Payload validation now requires each linked `dependencies/python/bin/python` or `python3` to point directly to the regular sibling interpreter named for `runtime.json`'s Python major and minor version, such as `python3.12`. Regular command files remain supported, including those distributed in Python wheels. Windows is unchanged.

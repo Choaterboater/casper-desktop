@@ -5,8 +5,6 @@ description: "Subagent user controls address only the target Session, rename the
 
 # Subagent user controls address the target Session
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 Browser and custom Remote callers send subagent prompts without `parentSessionId` or `mode`. `subagents/interruptByParent(childSessionId, parentSessionId, mode)` is replaced by `subagents/interruptByUser(childSessionId)`. Creation ancestry, history addresses, completion recipients, and persisted Session data are unchanged.

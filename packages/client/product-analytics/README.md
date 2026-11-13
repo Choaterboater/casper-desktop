@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-client-product-analytics
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Desktop reports selected interactions through the existing OTel product exporter by default, without a user-facing control. Ordinary Web clients never submit these events, and missing login identity is omitted.
