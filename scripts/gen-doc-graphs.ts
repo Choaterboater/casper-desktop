@@ -657,6 +657,13 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Eagerly mounts YAML-declared preset revisions, binds Agents and cold readers to scoped contributions, and retains retired revisions until their last user releases them.',
   },
   {
+    key: 'casperEngine',
+    pkg: 'casper-agent',
+    title: 'Casper engine version Remote',
+    mode: 'service',
+    note: 'Finds the Casper engine new Sessions start, bundled or installed, runs it with `--version` in Casper\'s environment, and reports the version for General Settings.',
+  },
+  {
     key: 'commands',
     pkg: 'commands',
     title: 'Human command registry',

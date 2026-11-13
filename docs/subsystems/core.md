@@ -891,6 +891,23 @@ Types: [Session](session.md)
 
 Source: [`packages/core/agent/src/index.ts`](../../packages/core/agent/src/index.ts)
 
+<a id="ctxcasperengine--casperengineservice"></a>
+
+### `ctx.casperEngine` — `CasperEngineService`
+
+The `casperEngine` Remote namespace over the plugin's config and the subprocess service.
+
+```ts cordis-catalog
+/**
+ * Report which engine new Sessions start and its version; see {@link probeCasperEngine}.
+ * @param signal - the caller's cancellation.
+ * @returns which engine runs and its version.
+ */
+@Remote async describe(signal: AbortSignal): Promise<CasperEngineInfo>
+```
+
+Source: [`packages/casper/casper-agent/src/engine-version.ts`](../../packages/casper/casper-agent/src/engine-version.ts)
+
 <a id="agent-events"></a>
 
 ### `agent/*` events

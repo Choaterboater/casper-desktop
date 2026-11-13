@@ -8,8 +8,11 @@ import type { QuestionAnswer, QuestionCardSnapshot } from '@deepseek-ai/dsh-clie
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { ARM_DELAY_MS, BOX_DIFF_MAX_LINES, CasperBoxCard, detailWithoutDiff, selectCasperBox, type CasperBox, type CasperBoxCardProps } from '../src/client/CasperBoxCard.tsx'
 import { diffLines } from '../src/box.ts'
-import { apply, inject } from '../src/client/index.ts'
+import { applyCasperClient, inject } from '../src/client/apply.ts'
 import { de, en, es, fr, ja, NS, pt, ru, zh } from '../src/client/locales.ts'
+
+/** The Client face with a fake `casperEngine` contribution; these specs leave the `remote` scope unserved. */
+const apply = (ctx: object) => { applyCasperClient({ inject: () => {}, ...ctx } as never, { package: '@deepseek-ai/dsh-casper-agent', descriptors: [] }) }
 
 const SESSION = 's1' as SessionId
 
@@ -122,7 +125,7 @@ describe('selectCasperBox', () => {
     const effect = vi.fn((run: () => unknown) => run())
     const uiConversation = { events: { register: vi.fn(() => () => {}) }, views: { register: vi.fn(() => () => {}) } }
     const locale = { register: vi.fn(() => () => {}), bind: vi.fn(() => vi.fn()) }
-    apply({ slots, effect, locale, uiConversation } as never)
+    apply({ slots, effect, locale, uiConversation })
     expect(inject).toEqual(['slots', 'locale', 'uiConversation', 'sessions'])
     expect(locale.register).toHaveBeenCalledWith(NS, { zh, en, ja, es, fr, de, ru, pt })
     for (const dictionary of [zh, ja, es, fr, de, ru, pt]) expect(dictionary['box.details']).not.toBe(en['box.details'])

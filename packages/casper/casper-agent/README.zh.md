@@ -66,6 +66,8 @@ kind: "package-reference"
 
 无法运行的轮次在 `turn/end` 上以错误结束：自带的 `engine` 缺失或不是可执行文件时为 `CASPER_ENGINE_MISSING`，`useInstalledCasper` 开启且找不到命令时为 `CASPER_NOT_FOUND`，Casper 未能启动时为 `CASPER_START_FAILED`，轮次中途退出时为 `CASPER_EXITED`，提示中没有 Casper 能读取的内容时为 `CASPER_EMPTY_PROMPT`：没有文本、图片或文件，或只有无法发送的图片和文件（不会向 Casper 发送任何内容），达到 Casper 的轮次上限时为 `CASPER_TURN_LIMIT`，Casper 拒绝所选模型或推理等级时为 `CASPER_MODEL_UNAVAILABLE`（不发送提示），Casper 未接受仅可查看或工作区内修改时为 `CASPER_ACCESS_NOT_APPLIED`（不发送提示，或停止正在运行的提示），[提及的会话](#session-mentions)无法发送时为某个 `SESSION_REFERENCE_*` 代码（不启动 Casper），收到错误回复时为 `CASPER_RPC_<code>`。会话仍可使用；下一条提示会再次启动 Casper。`CASPER_TEXT_ONLY` 已不再产生，只出现在早期版本保存的轮次中。
 
+设置 → 通用显示新会话启动的引擎及其版本：`Casper 引擎：0.4.15，随应用提供`，`useInstalledCasper` 开启时则为`安装在这台电脑上`。每次打开该页面时，插件像一轮那样找到引擎，并在 Casper 的环境中以 `--version` 运行它，时限为 `startTimeoutMs`；Remote 方法为 `casperEngine.describe`。找不到引擎时以 `casper-engine/missing` 失败，引擎失败、超时或未打印版本时以 `casper-engine/unreadable` 失败；此时该行显示引擎缺失或版本未知。
+
 <a id="understand-the-implementation"></a>
 ## 理解实现
 
@@ -84,7 +86,9 @@ kind: "package-reference"
 | [`src/box.ts`](src/box.ts) | 审批框的问题 id、标题与卡片上限，由两半共用 |
 | [`src/receipt.ts`](src/receipt.ts) | 从 ACP `_meta` 读取 Casper 的回执与一次响应的 token，由两半共用 |
 | [`src/conversation.ts`](src/conversation.ts) | `plugin:casper-agent/conversation` 记录，以及对提示回复 `_meta` 中 Casper 标记的检查 |
-| [`src/client/index.ts`](src/client/index.ts) | 客户端一半：把 Casper 的审批卡片注册为对话输入框链的第一项，把回执卡片注册到已完成一轮的尾部，把回执卡片注册为 `casper_receipt` 的工具视图，把检查视图注册在轨迹视图之后，并把模式标签注册在输入框的模式控件之后 |
+| [`src/client/index.ts`](src/client/index.ts) | 客户端入口：把生成的 `casperEngine` 贡献交给 [`src/client/apply.ts`](src/client/apply.ts)，后者把 Casper 的审批卡片注册为对话输入框链的第一项，把回执卡片注册到已完成一轮的尾部，把回执卡片注册为 `casper_receipt` 的工具视图，把检查视图注册在轨迹视图之后，把模式标签注册在输入框的模式控件之后，并注册 Casper 引擎行 |
+| [`src/engine-version.ts`](src/engine-version.ts) | `casperEngine` Remote 命名空间：找到新会话启动的引擎并读取其 `--version`，结果与失败代码位于 [`src/engine-types.ts`](src/engine-types.ts) |
+| [`src/client/EngineVersionRow.tsx`](src/client/EngineVersionRow.tsx) | 通用设置中的 Casper 引擎行，由 [`src/client/engine-mount.ts`](src/client/engine-mount.ts) 与其命名空间一起挂载，文案位于 [`src/client/engine-locales.ts`](src/client/engine-locales.ts) |
 | [`src/client/receipt-turn.ts`](src/client/receipt-turn.ts) | 在 Chat 目标上认领 `casper_receipt` 调用及其结果，使其不属于任何步骤，并把回执发布到它所在的一轮 |
 | [`src/client/check-calls.ts`](src/client/check-calls.ts) | 在 Chat 目标上认领每个 `casper_check` 调用及其结果，使 Casper 在回答之后运行的检查不改变回答作为该轮最后一行的位置，该轮仍可从回答处分支；并在 `casper-checks` 目标上列出这些检查 |
 | [`src/client/ChecksView.tsx`](src/client/ChecksView.tsx) | Chat 与轨迹旁的检查视图：按轮列出会话中的检查，每项带结论、输出与查看调用链接 |

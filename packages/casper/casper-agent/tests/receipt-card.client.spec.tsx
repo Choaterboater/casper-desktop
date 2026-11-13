@@ -1,10 +1,13 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { apply } from '../src/client/index.ts'
+import { applyCasperClient } from '../src/client/apply.ts'
 import { de, en, es, fr, ja, NS, pt, ru, zh } from '../src/client/locales.ts'
 import { ReceiptRow, receiptPath, usageLines, type ReceiptRowProps } from '../src/client/ReceiptRow.tsx'
 import type { CasperReceipt } from '../src/receipt.ts'
+
+/** The Client face with a fake `casperEngine` contribution; these specs leave the `remote` scope unserved. */
+const apply = (ctx: object) => { applyCasperClient({ inject: () => {}, ...ctx } as never, { package: '@deepseek-ai/dsh-casper-agent', descriptors: [] }) }
 
 afterEach(cleanup)
 
@@ -127,7 +130,7 @@ describe('ReceiptRow', () => {
     const slots = { inject: vi.fn((_name: string, mount: () => () => void) => mount()), register }
     const locale = { register: vi.fn(() => () => {}), bind: vi.fn(() => vi.fn()) }
     const uiConversation = { events: { register: vi.fn(() => () => {}) }, views: { register: vi.fn(() => () => {}) } }
-    apply({ slots, effect: (run: () => unknown) => run(), locale, uiConversation } as never)
+    apply({ slots, effect: (run: () => unknown) => run(), locale, uiConversation })
     expect(locale.register).toHaveBeenCalledWith(NS, { zh, en, ja, es, fr, de, ru, pt })
     expect(register.mock.calls.map(([options, component]) => [options, component])).toContainEqual([{ name: 'tool.call.toolview', key: 'casper_receipt', locale: NS }, ReceiptRow])
     for (const dictionary of [zh, ja, es, fr, de, ru, pt]) expect(Object.keys(dictionary)).toEqual(Object.keys(en))

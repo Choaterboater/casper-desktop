@@ -73,6 +73,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   agentDefaultModel: 'core.md',
   agentPresets: 'core.md',
   agents: 'core.md',
+  casperEngine: 'core.md',
   approval: 'approval.md',
   officeToPdf: 'office-to-pdf.md',
   attachments: 'attachment.md',
@@ -996,6 +997,7 @@ export const FOUNDATION_TYPE_NAMES: ReadonlySet<string> = new Set([
 export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
   SidebarBrowserToolRequest: 'the agent-to-Sidebar browser command is owned by packages/casper/tool-sidebar-browser/README.md and src/types.ts',
   SidebarBrowserToolResponse: 'the Sidebar browser command result is owned by packages/casper/tool-sidebar-browser/README.md and src/types.ts',
+  CasperEngineInfo: 'the Casper engine report is owned by packages/casper/casper-agent/README.md and src/engine-types.ts',
   ActionCardDecision: 'packages/experimental/action-cards/README.md',
   ActionCardKind: 'packages/experimental/action-cards/README.md',
   ActionCardResult: 'packages/experimental/action-cards/README.md',

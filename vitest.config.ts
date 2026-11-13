@@ -376,6 +376,9 @@ export default defineConfig({
         // source tests cover mountProductAnalytics and mountAccount.
         'packages/client/product-analytics/src/client/index.ts',
         'packages/api/account-controller/src/client/index.ts',
+        // The casper-agent Client entry imports its generated `casperEngine` contribution, which exists only in lib;
+        // source tests cover applyCasperClient and mountCasperEngine.
+        'packages/casper/casper-agent/src/client/index.ts',
         // The forge panel entry imports its generated Remote contribution, which exists only in lib;
         // forge-panel.e2e.ts exercises the built entry, while source tests cover mountForgePanel.
         'packages/experimental/client-ui-forge/src/client/index.ts',

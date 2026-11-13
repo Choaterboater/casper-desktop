@@ -19,6 +19,7 @@ import { casperAccessProjectionDefinition } from './access-projection.ts'
 import { openCommandCache } from './commands.ts'
 import { Config } from './config.ts'
 import { checkToolPath } from './connection.ts'
+import { CasperEngineService } from './engine-version.ts'
 import { CasperAgentFactory } from './factory.ts'
 import { resolveCasperEngine } from './lookup.ts'
 import { openModelsCache } from './models-cache.ts'
@@ -35,6 +36,8 @@ export type { CasperFactoryDependencies } from './factory.ts'
 export { CasperCommandCache, casperCommandId, casperCommands, casperCommandsDomain, openCommandCache } from './commands.ts'
 export type { CasperCommand } from './commands.ts'
 export { CasperConnection, CasperError, casperArgv, casperEnv } from './connection.ts'
+export { CasperEngineService, parseCasperVersion, probeCasperEngine } from './engine-version.ts'
+export type { CasperEngineInfo, CasperEngineKind } from './engine-version.ts'
 export { CasperModel } from './model.ts'
 export { effortState, reportOf, valueOf, withCurrent } from './models.ts'
 export { CasperModelsCache, casperModelsDomain, openModelsCache } from './models-cache.ts'
@@ -56,7 +59,7 @@ export const name = 'casper-agent'
 export const inject = ['agents', 'sessions', 'sessionProjections', 'sessionPersistence', 'subprocess', 'storageDomain', 'tools']
 
 /**
- * Register the Casper factory route.
+ * Register the Casper factory route and the `casperEngine` Remote namespace.
  * @param ctx - plugin context.
  * @param config - validated plugin config.
  * @returns resolution once the route is registered.
@@ -90,4 +93,6 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     await models.close()
   }, 'casperAgent.factory()')
   ctx.effect(() => ctx.agents.route(casperRoute(config.presets, factory)), 'casperAgent.route()')
+  // The `casperEngine` Remote namespace: General Settings asks which engine new Sessions start.
+  new CasperEngineService(ctx, config)
 }

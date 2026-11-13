@@ -38,6 +38,7 @@
     { "path": "../../boot/app-boot" },
     { "path": "../../skill/skill" },
     { "path": "../../core/tools" },
+    { "path": "../../typert/protocol" },
     { "path": "../../util/code-language" }
   ]
 }
