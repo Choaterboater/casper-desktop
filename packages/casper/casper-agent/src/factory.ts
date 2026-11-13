@@ -328,6 +328,7 @@ export class CasperAgentFactory implements AgentFactory {
           abort.signal.throwIfAborted()
           ready = true
           agent.publishCommands()
+          agent.prewarm()
           return { agent, dispose }
         } catch (error: unknown) {
           // A failed initialization keeps queued input for the next owner.

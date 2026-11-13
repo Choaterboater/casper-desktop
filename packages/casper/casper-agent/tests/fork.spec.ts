@@ -125,6 +125,18 @@ describe('Forking a Casper Session', { timeout: 60_000 }, () => {
     expect(fake.calls('session/load')).toEqual([])
   })
 
+  it('starts no Casper early for a fork, whose first prompt copies the source\'s conversation', async () => {
+    const { fake, host } = await setup({ prompts: MARKED, fork: true, forkSessionId: 'copy-1' }, { prewarm: true })
+    const { source } = await twoTurns(host)
+    const fork = await forkOf(host, fake, source, 'casper-fork', turnEndEvents(source)[0])
+    await new Promise((resolve) => { setTimeout(resolve, 300) })
+    expect(fake.pids()).toHaveLength(1)
+    await run(fork, 'go on')
+    expect(fake.calls('session/fork')).toHaveLength(1)
+    expect(fake.calls('session/new')).toHaveLength(1)
+    expect(host.record('casper-fork')).toEqual({ acpSessionId: 'copy-1', cwd: fake.cwd })
+  })
+
   it('a fork after a turn Casper failed during copies up to the turn before and says once that Casper may not have that request', async () => {
     const { fake, host } = await setup({ prompts: [[{ text: 'one\n' }, { mark: 'm1' }], [{ fail: 'runtime failed' }], [{ text: 'fork\n' }, { mark: 'f1' }], [{ mark: 'f2' }]], fork: true })
     const source = (await host.create('casper-failed')).agent

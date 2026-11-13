@@ -59,6 +59,7 @@ kind: "package-reference"
 | `modePill` | `true` | 把 [Casper 自己选择的访问模式](#access-control)作为一个标签显示在权限控件旁边；`false` 时不记录，并清除已显示的标签 |
 | `liveOutput` | `true` | 在 Casper 命令运行时，于[后台任务面板](#jobs-panel)中显示其最新的几行；在该任务上点停止会停止整个请求。`false` 时命令只在其卡片中显示最终输出 |
 | `idleExitMs` | `900000` | 空闲多久后询问 Casper 能否[关闭](#process-lifetime-and-resume)其进程（15 分钟）；`0` 时保留进程直到会话关闭 |
+| `prewarm` | `true` | 没有 Casper 对话的会话一打开就启动 Casper，使其第一条提示无需等待[启动](#process-lifetime-and-resume)；未使用的进程在 `idleExitMs` 后关闭。`false` 时在第一条提示时启动 Casper |
 
 子进程不会收到 `DEEPSEEK_*` 或 `DSH_*` 名称，也不会收到 `env` 未列出的凭据类名称。它总会收到 `CASPER_NO_UPDATE_CHECK=1`，`env` 无法更改此值，因为引擎更新随应用一起提供。唯一的例外是应用 profile：应用带 profile 运行时，Casper 会收到 `DSH_PROFILE` 与 `DSH_PROFILE_DIR`，使它构建的 bundle 能指明要安装到的 profile。
 
@@ -209,7 +210,9 @@ Casper 在 `session/new` 与 `session/load` 的回复中发送它的选项，并
 <a id="process-lifetime-and-resume"></a>
 ### 进程生命周期与恢复
 
-Casper 在会话的第一条提示时启动，因此缺少命令不会妨碍打开会话。`session/new` 之后，对话 id 会在发送提示前存入 sidecar。之后的进程用 `session/load` 重新打开它，并丢弃回放的更新，因为会话已经保存了历史；只有 Casper 的“没有已保存对话”回复（`-32002`，消息中含不区分大小写的 "no saved conversation"）会开启新对话，且该轮以一行说明开头，即使该轮随后什么也没有发送。Casper 只在第一次回复后保存对话，因此进程在此之前就停止的对话会以这种方式重新开始。其他加载失败会结束该轮并保留记录。只有当会话的项目文件夹仍是存入记录时的文件夹时，才会使用该记录：文件夹已改变的会话会开启新的 Casper 对话，且该轮没有说明这一点的行。释放时关闭 stdin，等待 `exitGraceMs`，然后终止进程，符合桌面端 10 秒的 Host 退出时限。恢复会像 agent-loop 一样修复中断的轮次，且不启动进程。
+Casper 在会话的第一条提示时启动（开启 `prewarm` 时更早，见下文），缺少命令也不会妨碍打开会话。`session/new` 之后，对话 id 会在发送提示前存入 sidecar。之后的进程用 `session/load` 重新打开它，并丢弃回放的更新，因为会话已经保存了历史；只有 Casper 的“没有已保存对话”回复（`-32002`，消息中含不区分大小写的 "no saved conversation"）会开启新对话，且该轮以一行说明开头，即使该轮随后什么也没有发送。Casper 只在第一次回复后保存对话，因此进程在此之前就停止的对话会以这种方式重新开始。其他加载失败会结束该轮并保留记录。只有当会话的项目文件夹仍是存入记录时的文件夹时，才会使用该记录：文件夹已改变的会话会开启新的 Casper 对话，且该轮没有说明这一点的行。释放时关闭 stdin，等待 `exitGraceMs`，然后终止进程，符合桌面端 10 秒的 Host 退出时限。恢复会像 agent-loop 一样修复中断的轮次，且不启动进程。
+
+开启 `prewarm` 时，没有 Casper 对话的会话（分叉除外）一打开就启动 Casper，因此其第一条提示无需等待启动；启动期间发送的提示会等待它完成。Casper 只在某个提示得到回复后才保存对话，因此由第一条提示把提前得到的 `session/new` id 存入 sidecar；在此之前关闭的进程（闲置满 `idleExitMs`，或因服务器变更）不会留下记录：下一条提示开始新对话，且不会出现新对话的那一行。提前启动失败只记入日志，不算一轮；第一条提示会再次启动 Casper，并报告它自己的失败。关闭会话会停止正在进行的启动，并等待其进程退出。
 
 每次提示回复还会在会话日志中留下一条 `plugin:casper-agent/conversation` 记录（见[轮次与事件](#turns-and-events)）：该轮发往哪个 Casper 对话，以及 Casper 为其回复在该对话中停下的位置给出的标记。它的用途是让[分叉](#forks)能在该轮处截断 Casper 对话；重新打开仍使用 sidecar。它是插件记录，因此没有此包的应用构建会保留并跳过它，仍能打开会话。无法写入的记录会记为一条警告，该轮照常结束。
 
