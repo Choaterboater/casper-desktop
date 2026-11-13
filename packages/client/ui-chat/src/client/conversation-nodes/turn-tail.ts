@@ -60,6 +60,16 @@ function hasText(data: AssistantChatData): data is FinalAssistantChatData {
     && data.blocks.some(block => block.kind === 'text' && block.text.trim() !== '')
 }
 
+/**
+ * Whether a message adds no row of its own: its tool calls count through their own events, so a Definition that
+ * claims a call on the Chat target keeps the call out of the turn's last row.
+ * @param data - a finalized Assistant message.
+ * @returns true when every block is a tool call.
+ */
+function holdsOnlyCalls(data: AssistantChatData): boolean {
+  return data.blocks.length > 0 && data.blocks.every(block => block.kind === 'tool-call')
+}
+
 function tailData(context: ConversationNodeContext<TurnTailState>): TurnTailChatData | null {
   const end = context.state === undefined
     ? context.matches.find(match => match.event.type === 'turn/end')
@@ -74,7 +84,7 @@ function tailData(context: ConversationNodeContext<TurnTailState>): TurnTailChat
     .filter((candidate): candidate is Readonly<FinalAssistantChatData> => candidate.finalNode !== undefined)
     .sort((left, right) => left.finalNode.seq - right.finalNode.seq)
   const closing = finalized.findLast(hasText) ?? null
-  let latestTranscriptSeq = finalized.at(-1)?.finalNode.seq
+  let latestTranscriptSeq = finalized.findLast(candidate => !holdsOnlyCalls(candidate))?.finalNode.seq
   for (const match of context.matches) {
     const event = match.event
     const candidate = event.type === 'tool/call'
