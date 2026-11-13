@@ -18,7 +18,9 @@ import { checkAccessModes } from './access.ts'
 import { casperAccessProjectionDefinition } from './access-projection.ts'
 import { openCommandCache } from './commands.ts'
 import { Config } from './config.ts'
+import { checkToolPath } from './connection.ts'
 import { CasperAgentFactory } from './factory.ts'
+import { resolveCasperEngine } from './lookup.ts'
 import { openModelsCache } from './models-cache.ts'
 import { casperRoute } from './route.ts'
 import { openSidecar } from './sidecar.ts'
@@ -61,6 +63,8 @@ export const inject = ['agents', 'sessions', 'sessionProjections', 'sessionPersi
  */
 export async function apply(ctx: Context, config: Config): Promise<void> {
   checkAccessModes(config.accessModes)
+  resolveCasperEngine(config)
+  checkToolPath(config.toolPath)
   // Clients read a Casper Session's badge from agentModels; modelSelection stays registered for the readers that fold it.
   await ctx.sessionProjections.register(modelSelectionProjectionDefinition)
   const agentModels = await ctx.sessionProjections.register(agentModelsProjectionDefinition)

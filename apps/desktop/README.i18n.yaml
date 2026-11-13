@@ -27,8 +27,11 @@
   en: 3724c53da4f7647b
   zh: 76ae549d43c99bb4
 /casper-desktop-app/key-technical-decisions/bundled-workspace-dependencies:
-  en: 3368ff9b955ada69
-  zh: e9209ef6ad4fd305
+  en: af4b36a4cb05039a
+  zh: 7d4227059b977b6e
+/casper-desktop-app/key-technical-decisions/bundled-casper-engine:
+  en: 2e829cf122edc455
+  zh: c026a13534cefac5
 /casper-desktop-app/bundled-command-runtime:
   en: 372297005b57a08b
   zh: 074a635ac17e4362

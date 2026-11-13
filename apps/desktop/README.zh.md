@@ -127,6 +127,12 @@ Desktop/SDK 共享运行时构建器在复制或签名产物前，裁剪 NumPy �
 
 Welcome 加载共享 Toast 的配色和阴影变量，挂载在 body 下的通知使用系统字体。
 
+<a id="bundled-casper-engine"></a>
+
+### 内置 Casper 引擎
+
+Desktop 自带其 Casper 会话运行的 Casper 引擎，因此 Casper 会话不需要电脑上有 `casper`、bun 或 Homebrew。[`casper-engine.lock.json`](scripts/casper-engine.lock.json) 为每个目标固定一个 Casper 发布与一个 uv 发布及其 SHA-256 摘要；`prepare:runtime` 通过主运行时按哈希寻址的下载缓存获取它们，还会核对发布中 `SHA256SUMS` 里该 Casper 资源的那一行，并把它们的版本与摘要写入 `runtime/versions.json`。引擎为 `runtime/casper/casper`（Windows 上为 `casper.exe`）；`runtime/casper/tools` 中有 `uv`、`uvx`，以及 `npx` 与 `npm` 启动器，它们用主运行时的 `node` 运行主运行时所固定 Node 归档中的 npm。外壳把 `DSH_DESKTOP_CASPER_ENGINE` 与 `DSH_DESKTOP_CASPER_TOOL_PATH` 交给 Host（[`src/casper-engine.ts`](src/casper-engine.ts)），[`casper-agent` 条目](../../packages/casper/casper-agent/README.zh.md)运行该引擎，把主运行时的 `node` 文件夹与工具文件夹放在 Casper 的 PATH 末尾，并设置 `CASPER_NO_UPDATE_CHECK=1`。其 `useInstalledCasper` 开关（默认关闭）改为运行电脑上安装的 Casper。在签名的 macOS 构建中，`prepare:dsh` 用 [`casper-entitlements.plist`](scripts/casper-entitlements.plist)（JIT、未签名可执行内存、不做库验证）为引擎签名，uv 与 uvx 不带权限签名，electron-builder 保留 `runtime/casper` 的签名；签名的 Windows 构建随应用其余部分一起为这三个 `.exe` 文件签名。打包后的冒烟检查在一个空的主目录上运行 `casper --version`、`uv --version`、`npx --version`，以及 ACP 的 `initialize` 与 `session/new`，其 PATH 只含系统文件夹与应用的工具文件夹。
+
 <a id="bundled-command-runtime"></a>
 
 ## 内置命令运行时

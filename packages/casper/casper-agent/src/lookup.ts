@@ -1,17 +1,75 @@
 /**
- * Finding the Casper executable. The configured lookup runs first; on Windows,
- * when it finds nothing for the default name, the folders Casper's installer
- * and bun use are tried too, since the app's PATH may predate the install.
+ * Finding the Casper executable. By default it is the engine the app ships
+ * (`engine`); with `useInstalledCasper` on, the configured lookup runs, and on
+ * Windows, when it finds nothing for the default name, the folders Casper's
+ * installer and bun use are tried too, since the app's PATH may predate the install.
  * @module @deepseek-ai/dsh-casper-agent/lookup
  */
 
-import { win32 } from 'node:path'
+import { isAbsolute, win32 } from 'node:path'
 import { SubprocessExecutableNotFoundError } from '@deepseek-ai/dsh-subprocess'
 import type { SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 import type { Config } from './config.ts'
 
 /** The one lookup this module needs from the subprocess service. */
 export type ExecutableLookup = Pick<SubprocessRuntime, 'resolveExecutable'>
+
+/**
+ * Which Casper a connection starts: `bundled` is the engine the app ships, at an
+ * absolute path; `installed` is the one found from `command` and `env`.
+ */
+export type CasperEngineSpec =
+  | { readonly kind: 'bundled'; readonly executable: string }
+  | { readonly kind: 'installed'; readonly command: string }
+
+/**
+ * Resolve which Casper the config starts. With `useInstalledCasper` off, the
+ * engine path must be absolute; `command` then plays no part.
+ * @param config - the engine path, the switch, and the installed command.
+ * @returns the bundled engine, or the installed command with the switch on.
+ * @throws Error when the switch is off and `engine` is unset or not an absolute path.
+ */
+export function resolveCasperEngine(config: Pick<Config, 'engine' | 'useInstalledCasper' | 'command'>): CasperEngineSpec {
+  if (config.useInstalledCasper) return { kind: 'installed', command: config.command }
+  if (config.engine === undefined || !isAbsolute(config.engine)) {
+    throw new Error(`casper-agent: engine must be the absolute path of the Casper engine the app ships, got ${
+      config.engine === undefined ? 'none' : JSON.stringify(config.engine)}; turn on useInstalledCasper to run the Casper installed on this computer`)
+  }
+  return { kind: 'bundled', executable: config.engine }
+}
+
+/**
+ * Find the executable of a resolved engine: the bundled path is only checked to
+ * be an executable file, and the installed command goes through {@link findCasper}.
+ * @param engine - the resolved engine.
+ * @param lookup - the subprocess service.
+ * @param config - the child environment the lookup uses.
+ * @param signal - aborts the lookup.
+ * @param platform - the host platform.
+ * @param ambient - the app's environment.
+ * @returns the absolute executable path.
+ * @throws SubprocessExecutableNotFoundError when the file or command is not found; any other lookup error unchanged.
+ */
+export async function locateCasper(
+  engine: CasperEngineSpec,
+  lookup: ExecutableLookup,
+  config: Pick<Config, 'env'>,
+  signal: AbortSignal,
+  platform: NodeJS.Platform = process.platform,
+  ambient: NodeJS.ProcessEnv = process.env,
+): Promise<string> {
+  switch (engine.kind) {
+    case 'bundled':
+      return lookup.resolveExecutable(engine.executable, config.env, signal)
+    case 'installed':
+      return findCasper(lookup, { command: engine.command, env: config.env }, signal, platform, ambient)
+    /* v8 ignore next 4 -- the union is closed; this branch keeps a new kind from compiling unhandled. */
+    default: {
+      const unknown: never = engine
+      throw new Error(`casper-agent: unknown engine ${JSON.stringify(unknown)}`)
+    }
+  }
+}
 
 /** A Windows lookup that found no Casper it can start: the folders it tried and any scripts it passed over. */
 export class CasperLookupError extends SubprocessExecutableNotFoundError {

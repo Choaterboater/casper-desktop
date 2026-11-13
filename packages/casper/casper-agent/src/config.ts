@@ -11,7 +11,17 @@ import type { AccessModeId } from './access.ts'
 export interface Config {
   /** Agent presets whose Sessions Casper drives; Sessions on any other preset keep the default factory. */
   presets: string[]
-  /** Casper executable: an absolute path, or a bare name looked up on the child's PATH. */
+  /**
+   * The Casper engine the app ships: an absolute executable path. Required while useInstalledCasper is off, and
+   * checked to be an executable file each time Casper starts.
+   */
+  engine?: string
+  /**
+   * Run the Casper installed on this computer, found from `command` and `env`, instead of `engine`. Off by default,
+   * so the app runs the engine it ships; a change applies to the next Casper process.
+   */
+  useInstalledCasper: boolean
+  /** Casper executable with useInstalledCasper on: an absolute path, or a bare name looked up on the child's PATH. */
   command: string
   /** Arguments that start Casper's ACP server. */
   args: string[]
@@ -21,6 +31,11 @@ export interface Config {
   effort?: string
   /** Child environment entries merged after the subprocess scrub, so a listed key reaches Casper. */
   env: Record<string, string>
+  /**
+   * Folders added at the end of Casper's PATH, after `env.PATH` (or the app's PATH when `env` sets none), so Casper and
+   * the servers it starts find the app's own tools, such as node, npx and uv, only when the computer has none.
+   */
+  toolPath: string[]
   /** Limit for `initialize` plus `session/new`, `session/load` or `session/fork` on a fresh process. */
   startTimeoutMs: number
   /** Wait for the prompt reply after `session/cancel` before the process is killed. */
@@ -122,11 +137,14 @@ export interface Config {
 /** Runtime schema for {@link Config}; the defaults keep teardown inside a 10 s host shutdown window. */
 export const Config: z<Config> = z.object({
   presets: z.array(z.string().min(1)).default(['casper']),
+  engine: z.string().min(1),
+  useInstalledCasper: z.boolean().default(false),
   command: z.string().min(1).default('casper'),
   args: z.array(z.string()).default(['acp']),
   model: z.string().min(1),
   effort: z.string().min(1),
   env: z.dict(z.string()).default({}),
+  toolPath: z.array(z.string().min(1)).default([]),
   startTimeoutMs: z.natural().min(1).default(120_000),
   cancelGraceMs: z.natural().min(1).default(5_000),
   exitGraceMs: z.natural().min(1).default(2_500),

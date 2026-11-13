@@ -127,6 +127,12 @@ The [thin-wrapper decision](../../.agents/notes/implemented/architecture/2026-09
 
 Welcome loads the shared Toast palette and shadow tokens, with system typography for body-mounted notifications.
 
+<a id="bundled-casper-engine"></a>
+
+### Bundled Casper engine
+
+Desktop ships the Casper engine its Casper Sessions run, so a Casper Session needs no `casper`, bun, or Homebrew on the computer. [`casper-engine.lock.json`](scripts/casper-engine.lock.json) pins one Casper release and one uv release with a SHA-256 digest per target; `prepare:runtime` fetches them through the primary runtime's hash-addressed download cache, checks the Casper asset's line in the release's `SHA256SUMS` too, and writes their versions and digests to `runtime/versions.json`. The engine is `runtime/casper/casper` (`casper.exe` on Windows); `runtime/casper/tools` holds `uv`, `uvx`, and `npx` and `npm` launchers that run the npm of the primary runtime's pinned Node archive with the primary runtime's `node`. The shell hands the Host `DSH_DESKTOP_CASPER_ENGINE` and `DSH_DESKTOP_CASPER_TOOL_PATH` ([`src/casper-engine.ts`](src/casper-engine.ts)), and the [`casper-agent` row](../../packages/casper/casper-agent/README.md) runs that engine with the primary runtime's `node` folder and the tools folder at the end of Casper's PATH, and `CASPER_NO_UPDATE_CHECK=1`. Its `useInstalledCasper` switch (off) runs the Casper installed on the computer instead. On signed macOS builds, `prepare:dsh` signs the engine with [`casper-entitlements.plist`](scripts/casper-entitlements.plist) (JIT, unsigned executable memory, no library validation) and uv and uvx with none, and electron-builder leaves `runtime/casper` as signed; signed Windows builds sign the three `.exe` files with the rest of the application. The packaged smoke check runs `casper --version`, `uv --version`, `npx --version`, and an ACP `initialize` plus `session/new` on an empty home whose PATH holds only the system folders and the app's tool folders.
+
 <a id="bundled-command-runtime"></a>
 
 ## Bundled command runtime
