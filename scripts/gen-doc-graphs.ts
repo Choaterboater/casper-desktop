@@ -376,6 +376,13 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Projects the sign-in half of ctx.authorization onto the generated `authorization` Remote namespace: lists flows, streams one attempt\'s notices and prompts, takes each answer by a separate call, cancels and signs out; no method returns a credential.',
   },
   {
+    key: 'casperSignIn',
+    pkg: 'casper-agent',
+    title: 'Casper sign-in Remote controller',
+    mode: 'core',
+    note: 'Signs Casper\'s engine in to its model providers over the generated `casperSignIn` Remote namespace: lists Casper\'s ways and saved sign-ins, streams one sign-in\'s steps, cancels and signs out, each through a short-lived `casper acp` process; Casper keeps the sign-ins in its own login file.',
+  },
+  {
     key: 'credentialsController',
     pkg: 'api-settings-controller',
     title: 'Host credential-surface Remote controller',

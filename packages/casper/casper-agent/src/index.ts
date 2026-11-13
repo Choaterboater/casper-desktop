@@ -24,6 +24,7 @@ import { resolveCasperEngine } from './lookup.ts'
 import { openModelsCache } from './models-cache.ts'
 import { casperRoute } from './route.ts'
 import { openSidecar } from './sidecar.ts'
+import { CasperSignInController } from './sign-in-controller.ts'
 
 export { Config } from './config.ts'
 export { ACCESS_MODE_IDS, ACCESS_MODE_LABELS, accessModeFor, checkAccessModes, DEFAULT_ACCESS_MODES } from './access.ts'
@@ -43,6 +44,9 @@ export type { CasperConnectionHandlers, CasperConnectionOptions, CasperFailureCo
 export { casperRoute } from './route.ts'
 export { casperAgentDomain, CasperSidecar, openSidecar } from './sidecar.ts'
 export type { CasperSessionRecord } from './sidecar.ts'
+export { CasperSignIn } from './sign-in.ts'
+export type { CasperSavedSignIn, CasperSignInFrame, CasperSignInKind, CasperSignInMethod, CasperSignInOptions, CasperSignInState } from './sign-in.ts'
+export { CasperSignInController } from './sign-in-controller.ts'
 
 /** Cordis plugin name. */
 export const name = 'casper-agent'
@@ -56,7 +60,8 @@ export const name = 'casper-agent'
 export const inject = ['agents', 'sessions', 'sessionProjections', 'sessionPersistence', 'subprocess', 'storageDomain', 'tools']
 
 /**
- * Register the Casper factory route.
+ * Register the Casper factory route and the `casperSignIn` Remote namespace, through which the Models settings page
+ * signs Casper in to its model providers.
  * @param ctx - plugin context.
  * @param config - validated plugin config.
  * @returns resolution once the route is registered.
@@ -90,4 +95,5 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     await models.close()
   }, 'casperAgent.factory()')
   ctx.effect(() => ctx.agents.route(casperRoute(config.presets, factory)), 'casperAgent.route()')
+  ctx.plugin(CasperSignInController, config)
 }

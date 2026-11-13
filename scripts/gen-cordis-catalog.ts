@@ -80,6 +80,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   cordisInspect: 'extensions.md',
   authorization: 'credentials.md',
   authorizationController: 'credentials.md',
+  casperSignIn: 'credentials.md',
   deepseekAccount: 'credentials.md',
   credentials: 'credentials.md',
   credentialsController: 'credentials.md',
@@ -988,6 +989,8 @@ export const FOUNDATION_TYPE_NAMES: ReadonlySet<string> = new Set([
 export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
   SidebarBrowserToolRequest: 'the agent-to-Sidebar browser command is owned by packages/casper/tool-sidebar-browser/README.md and src/types.ts',
   SidebarBrowserToolResponse: 'the Sidebar browser command result is owned by packages/casper/tool-sidebar-browser/README.md and src/types.ts',
+  CasperSignInState: "Casper's sign-in ways and saved sign-ins are owned by packages/casper/casper-agent/README.md#casper-sign-ins and src/types.ts",
+  CasperSignInFrame: "Casper's sign-in steps are owned by packages/casper/casper-agent/README.md#casper-sign-ins and src/types.ts",
   ActionCardDecision: 'packages/experimental/action-cards/README.md',
   ActionCardKind: 'packages/experimental/action-cards/README.md',
   ActionCardResult: 'packages/experimental/action-cards/README.md',

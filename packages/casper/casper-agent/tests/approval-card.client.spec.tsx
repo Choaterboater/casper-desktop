@@ -122,7 +122,7 @@ describe('selectCasperBox', () => {
     const effect = vi.fn((run: () => unknown) => run())
     const uiConversation = { events: { register: vi.fn(() => () => {}) }, views: { register: vi.fn(() => () => {}) } }
     const locale = { register: vi.fn(() => () => {}), bind: vi.fn(() => vi.fn()) }
-    apply({ slots, effect, locale, uiConversation } as never)
+    apply({ slots, effect, locale, uiConversation, inject: () => {} } as never)
     expect(inject).toEqual(['slots', 'locale', 'uiConversation', 'sessions'])
     expect(locale.register).toHaveBeenCalledWith(NS, { zh, en, ja, es, fr, de, ru, pt })
     for (const dictionary of [zh, ja, es, fr, de, ru, pt]) expect(dictionary['box.details']).not.toBe(en['box.details'])

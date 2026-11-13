@@ -9,6 +9,7 @@
     "src/access-view.ts",
     "src/box.ts",
     "src/client/CasperBoxCard.tsx",
+    "src/client/CasperSignInCard.tsx",
     "src/client/check-calls.ts",
     "src/client/ChecksView.tsx",
     "src/client/ReceiptRow.tsx",
@@ -16,8 +17,10 @@
     "src/client/locales.ts",
     "src/client/ModePill.tsx",
     "src/client/receipt-turn.ts",
+    "src/client/sign-in-mount.ts",
     "src/css-modules.d.ts",
-    "src/receipt.ts"
+    "src/receipt.ts",
+    "src/types.ts"
   ],
   "references": [
     { "path": "../../../vendor/cordis" },
@@ -28,6 +31,9 @@
     { "path": "../../client/ui-renderer" },
     { "path": "../../client/ui-slots" },
     { "path": "../../client/ui-tool" },
-    { "path": "../../client/ui-user-questions" }
+    { "path": "../../client/ui-user-questions" },
+    { "path": "../../api/remotes/tsconfig.client.json" },
+    { "path": "../../client/ui-settings-models" },
+    { "path": "../../typert/protocol" }
   ]
 }

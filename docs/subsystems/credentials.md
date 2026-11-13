@@ -187,6 +187,42 @@ Types: [AuthorizationEntryView](settings.md) · [AuthorizationEventView](setting
 
 Source: [`packages/api/settings-controller/src/authorization.ts`](../../packages/api/settings-controller/src/authorization.ts)
 
+<a id="ctxcaspersignin--caspersignincontroller"></a>
+
+### `ctx.casperSignIn` — `CasperSignInController`
+
+The `casperSignIn` Remote namespace; see the module comment.
+
+```ts cordis-catalog
+/**
+ * Read the ways Casper signs in and the sign-ins it has saved.
+ * @param signal - call lifetime; aborting ends Casper.
+ * @returns the ways the card can show and the saved sign-ins.
+ * @throws RemoteError `casperSignIn/failed` when Casper cannot start or refuses.
+ */
+@Remote async state(signal: AbortSignal): Promise<CasperSignInState>
+
+/**
+ * Run one sign-in and stream its steps; closing the stream stops it.
+ * @param methodId - one of {@link state}'s method ids.
+ * @param key - the pasted key, for an `api_key` way only.
+ * @param signal - stream lifetime.
+ * @returns the steps, ending with `signed-in` or `failed` unless stopped.
+ */
+@Remote({ mode: 'stream' }) signIn(methodId: string, key: string | undefined, signal: AbortSignal): AsyncIterable<CasperSignInFrame>
+
+/**
+ * Remove the sign-in Casper saved for one provider.
+ * @param provider - the provider, as {@link state} names it.
+ * @param signal - call lifetime; aborting ends Casper.
+ * @returns whether there was a sign-in to remove.
+ * @throws RemoteError `casperSignIn/failed` when Casper cannot start or refuses.
+ */
+@Remote async signOut(provider: string, signal: AbortSignal): Promise<boolean>
+```
+
+Source: [`packages/casper/casper-agent/src/sign-in-controller.ts`](../../packages/casper/casper-agent/src/sign-in-controller.ts)
+
 <a id="ctxcredentials--credentialprovider-abstract-seam"></a>
 
 ### `ctx.credentials` — `CredentialProvider` (abstract seam)

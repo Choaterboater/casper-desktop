@@ -160,11 +160,24 @@
  * `session/new` reply fields; `commands` and `title` follow the reply. A
  * `{ mark }` is logged with its conversation when the prompt replies.
  *
+ * Sign-in as Casper's router answers it (decision 103): the `initialize`
+ * reply lists `authMethods` (default none). `authenticate` (logged with
+ * `_meta.casper.key` replaced by `keyGiven: true`) sends each of `authSteps`
+ * as a `_casper/auth/update` carrying the `methodId`, waits while
+ * `holdAuth` names a file that does not exist yet, and then fails with
+ * -32000 and `authError` when set, fails with -32000 and Casper's stop words
+ * when a `_casper/auth/cancel` arrived, and otherwise saves the method's
+ * provider among the sign-ins and replies `_meta.casper.provider`.
+ * `_casper/auth/status` answers `{ signIns }` (start: `signIns`, default
+ * none; kept in a file beside the script, so a later process names them as
+ * Casper's login file does), and `_casper/auth/logout { provider }` removes that provider and
+ * answers `{ removed }`. Every one of these is logged.
+ *
  * @module @deepseek-ai/dsh-casper-agent/tests/fake-casper-acp
  */
 
 import { randomUUID } from 'node:crypto'
-import { appendFileSync, existsSync, readFileSync } from 'node:fs'
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { Readable, Writable } from 'node:stream'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
@@ -175,6 +188,7 @@ import {
   ndJsonStream,
   RequestError,
   type AgentContext,
+  type AuthMethod,
   type AvailableCommand,
   type CreateElicitationResponse,
   type McpServer,
@@ -332,6 +346,11 @@ interface Script {
   fork?: boolean
   forkError?: { code: number; message: string }
   forkSessionId?: string
+  authMethods?: AuthMethod[]
+  signIns?: { provider: string; type: string }[]
+  authSteps?: Record<string, unknown>[]
+  authError?: string
+  holdAuth?: string
 }
 
 /** The `_casper/idle` reply C17 sends. */
@@ -365,6 +384,19 @@ function savedConversations(): string[] {
 function promptsSoFar(): number {
   return readFileSync(logFile, 'utf8').split('\n').filter(line => line.includes('"method":"session/prompt"')).length
 }
+
+/** Where the sign-ins are kept between processes, as Casper keeps them in its login file. */
+const signInsFile = `${process.env.FAKE_CASPER_SCRIPT ?? ''}.sign-ins.json`
+/** The sign-ins `_casper/auth/status` names, changed by `authenticate` and `_casper/auth/logout`. */
+let signIns: { provider: string; type: string }[] = existsSync(signInsFile)
+  ? JSON.parse(readFileSync(signInsFile, 'utf8')) as { provider: string; type: string }[]
+  : [...script.signIns ?? []]
+function saveSignIns(next: { provider: string; type: string }[]): void {
+  signIns = next
+  writeFileSync(signInsFile, JSON.stringify(next))
+}
+/** Whether a `_casper/auth/cancel` arrived during the running `authenticate`. */
+let authCancelled = false
 
 async function until(file: string): Promise<void> {
   while (!existsSync(file)) await new Promise((resolve) => { setTimeout(resolve, 10) })
@@ -780,7 +812,7 @@ createAcpAgent({ name: 'fake-casper' })
         ...script.steer === true ? { _meta: { casper: { steer: true } } } : {},
       },
       agentInfo: { name: 'casper', title: 'Casper', version: '0.0.0-test' },
-      authMethods: [],
+      authMethods: script.authMethods ?? [],
     }
   })
   .onRequest(methods.agent.session.new, ({ params, client }) => {
@@ -884,6 +916,37 @@ createAcpAgent({ name: 'fake-casper' })
     const reply = replies[Math.min(idleChecks++, replies.length - 1)] ?? { idle: true, running: [] }
     log({ event: 'idle-reply', idle: reply })
     return reply
+  })
+  .onRequest('authenticate', params => params as { methodId: string; _meta?: { casper?: { key?: string } } }, async ({ params, client }) => {
+    const { _meta, ...rest } = params
+    log({ method: 'authenticate', params: { ...rest, keyGiven: _meta?.casper?.key !== undefined } })
+    authCancelled = false
+    for (const step of script.authSteps ?? []) await client.notify('_casper/auth/update', { methodId: params.methodId, ...step })
+    if (script.holdAuth !== undefined) {
+      const hold = script.holdAuth
+      while (!existsSync(hold) && !authCancelled) await new Promise((resolve) => { setTimeout(resolve, 10) })
+    }
+    if (script.authError !== undefined) throw new RequestError(-32000, script.authError)
+    if (authCancelled) throw new RequestError(-32000, 'The sign-in was stopped. Nothing was saved.')
+    type Way = { _meta?: { casper?: { provider?: string; kind?: string } } }
+    const way = (script.authMethods ?? []).find(item => item.id === params.methodId) as Way | undefined
+    const provider = way?._meta?.casper?.provider ?? params.methodId.split(':')[0] ?? ''
+    saveSignIns([...signIns.filter(item => item.provider !== provider), { provider, type: way?._meta?.casper?.kind === 'api_key' ? 'api_key' : 'oauth' }])
+    return { _meta: { casper: { provider } } }
+  })
+  .onNotification('_casper/auth/cancel', params => params as Record<string, never>, () => {
+    log({ method: '_casper/auth/cancel' })
+    authCancelled = true
+  })
+  .onRequest('_casper/auth/status', params => params as Record<string, never>, () => {
+    log({ method: '_casper/auth/status' })
+    return { signIns }
+  })
+  .onRequest('_casper/auth/logout', params => params as { provider: string }, ({ params }) => {
+    log({ method: '_casper/auth/logout', params })
+    const removed = signIns.some(item => item.provider === params.provider)
+    saveSignIns(signIns.filter(item => item.provider !== params.provider))
+    return { removed }
   })
   .onNotification(methods.agent.session.cancel, ({ params }) => {
     log({ method: 'session/cancel', params })
