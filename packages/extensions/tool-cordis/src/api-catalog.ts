@@ -629,6 +629,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'casperEngine',
+    summary: 'The `casperEngine` Remote namespace over the plugin\'s config and the subprocess service.',
+    description: 'The `casperEngine` Remote namespace over the plugin\'s config and the subprocess service.',
+    methods: [
+      {
+        signature: '@Remote async describe(signal: AbortSignal): Promise<CasperEngineInfo>',
+        description: 'Report which engine new Sessions start and its version; see probeCasperEngine.',
+        parameters: [{ name: 'signal', description: 'the caller\'s cancellation.' }],
+        returns: 'which engine runs and its version.',
+      },
+    ],
+  },
+  {
     key: 'claudeCodeMods',
     summary: 'The bridge service: loaded mods, their hooks, and the harness listeners that raise their events.',
     description: 'The bridge service: loaded mods, their hooks, and the harness listeners that raise their events. Mods join through ClaudeCodeMods.add, which defineMod calls when a mod plugin mounts. The Remote methods let a Client draw each session\'s band above the prompt and press its buttons.',
@@ -5899,6 +5912,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ButtonProps',
     declaration: 'export interface ButtonProps {\n    readonly label: string;\n    readonly hotkey?: string | undefined;\n    readonly disabled?: boolean | undefined;\n    readonly onPress?: (() => unknown) | undefined;\n}',
+  },
+  {
+    name: 'CasperEngineInfo',
+    declaration: 'export interface CasperEngineInfo {\n    readonly kind: CasperEngineKind;\n    readonly version: string;\n}',
+  },
+  {
+    name: 'CasperEngineKind',
+    declaration: 'export type CasperEngineKind = \'bundled\' | \'installed\';',
   },
   {
     name: 'ChangeRequestCheck',
