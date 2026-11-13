@@ -132,3 +132,24 @@ it.each(['arm64', 'x64'] as const)('selects %s Node entitlements and keeps helpe
   }
   expect(signMacOSRuntimeCode).toHaveBeenCalledWith(addon, expect.any(String), identity, undefined)
 })
+
+it.skipIf(process.platform === 'win32')('signs the bundled Casper engine with its JIT entitlements, its tools with none, and refuses links', async () => {
+  const path = root()
+  machO(join(path, 'casper'))
+  machO(join(path, 'tools', 'uv'))
+  machO(join(path, 'tools', 'uvx'))
+  writeFileSync(join(path, 'tools', 'npx'), '#!/bin/sh\n')
+  mkdirSync(join(path, 'npm', 'bin'), { recursive: true })
+  writeFileSync(join(path, 'npm', 'bin', 'npx-cli.js'), 'export {}\n')
+  await expect(signMacOSRuntime(path, 'com.example.app', identity, 'arm64', undefined, 'casper')).resolves.toBe(3)
+  const calls = Object.fromEntries(vi.mocked(signMacOSRuntimeCode).mock.calls.map(([file, , , entitlements]) => [file, entitlements]))
+  expect(calls).toEqual({
+    [join(path, 'casper')]: expect.stringMatching(/casper-entitlements\.plist$/u) as string,
+    [join(path, 'tools', 'uv')]: undefined,
+    [join(path, 'tools', 'uvx')]: undefined,
+  })
+  expect(readFileSync(join(import.meta.dirname, '../scripts/casper-entitlements.plist'), 'utf8')).toMatch(
+    /allow-jit<\/key><true\/>.*allow-unsigned-executable-memory<\/key><true\/>.*disable-library-validation<\/key><true\/><\/dict>/u)
+  symlinkSync('uv', join(path, 'tools', 'uv-link'))
+  await expect(signMacOSRuntime(path, 'com.example.app', identity, 'arm64', undefined, 'casper')).rejects.toThrow('unsupported filesystem entry tools/uv-link')
+})

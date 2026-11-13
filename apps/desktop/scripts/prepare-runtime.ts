@@ -13,6 +13,7 @@ import { packagingStep } from './packaging-step.mjs'
 import { preparePrimaryRuntime } from './prepare-primary-runtime.ts'
 import { prepareDesktopCli } from './prepare-cli.ts'
 import { prepareCommandLink } from './prepare-command-link.ts'
+import { prepareCasperEngine } from './prepare-casper-engine.ts'
 
 const BUILD_PATHS = resolveDesktopTargetBuildPaths()
 const RUNTIME_ROOT = BUILD_PATHS.runtime
@@ -50,7 +51,8 @@ function prepareCli({ platform, arch }: DesktopTarget): void {
 
 async function main(): Promise<void> {
   const { values } = parseArgs({ options: { 'defer-primary-runtime-smoke': { type: 'boolean', default: false } } })
-  const target = desktopTargetPlatform(resolveDesktopBuildTarget())
+  const targetName = resolveDesktopBuildTarget()
+  const target = desktopTargetPlatform(targetName)
   rmSync(RUNTIME_ROOT, { recursive: true, force: true })
   mkdirSync(RUNTIME_ROOT, { recursive: true })
   const preparePrimary = () => packagingStep(process.env.DSH_DESKTOP_PACKAGING_RUN_DIR, 'prepare:primary-runtime',
@@ -68,10 +70,15 @@ async function main(): Promise<void> {
   const { pnpm } = await readPrimaryRuntime(join(RUNTIME_ROOT, 'primary-runtime'))
   if (pnpm === undefined) throw new Error('desktop runtime: primary-runtime manifest has no pnpm version')
   await packagingStep(process.env.DSH_DESKTOP_PACKAGING_RUN_DIR, 'prepare:cli', async () => { prepareCli(target) })
+  // The npm the engine's tools run comes from the Node archive the primary runtime already downloaded and checked.
+  const engine = await packagingStep(process.env.DSH_DESKTOP_PACKAGING_RUN_DIR, 'prepare:casper-engine',
+    () => prepareCasperEngine({ target: targetName, runtime: RUNTIME_ROOT, cache: BUILD_PATHS.downloads }))
   writeFileSync(join(RUNTIME_ROOT, 'versions.json'), `${JSON.stringify({
     schemaVersion: 1,
     node: nodeVersion,
     pnpm,
+    casper: engine.casper,
+    uv: engine.uv,
   }, undefined, 2)}\n`)
 }
 

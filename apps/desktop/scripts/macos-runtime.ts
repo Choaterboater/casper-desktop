@@ -26,6 +26,18 @@ function magic(path: string): string {
   } finally { closeSync(descriptor) }
 }
 
+/** Every regular file under the bundled Casper engine's folder; it holds no links. */
+function casperEngineFiles(root: string): string[] {
+  const files: string[] = []
+  for (const entry of readdirSync(root, { recursive: true, withFileTypes: true })) {
+    const path = relative(root, join(entry.parentPath, entry.name)).split(sep).join('/')
+    if (entry.isDirectory()) continue
+    if (!entry.isFile()) throw new Error(`desktop runtime: unsupported filesystem entry ${path}`)
+    files.push(path)
+  }
+  return files.sort()
+}
+
 async function primaryRuntimeFiles(root: string): Promise<string[]> {
   const aliases = await primaryRuntimePythonAliases(root, await readPrimaryRuntime(root))
   const files: string[] = []
@@ -48,15 +60,18 @@ async function primaryRuntimeFiles(root: string): Promise<string[]> {
  * @param expected - Required signing identity.
  * @param arch - Target runtime architecture, independent of the signing host.
  * @param cacheDirectory - Optional content-addressed cache; requires the keychain-owned signing probe.
- * @param kind - Primary payloads admit validated Python aliases; Desktop application runtimes reject every link.
+ * @param kind - Primary payloads admit validated Python aliases; Desktop application runtimes and the bundled Casper
+ *   engine (`runtime/casper`) reject every link. The engine executable gets `casper-entitlements.plist` (JIT,
+ *   unsigned executable memory, and no library validation, as bun's compiled engine needs); its tools get none.
  * @returns Number of signed native files, excluding files inside verified Computer Use helper bundles.
  * @throws When a helper bundle fails verification, or when any signer fails.
  */
 export async function signMacOSRuntime(
   root: string, appId: string, expected: MacOSSigningEnvironment, arch: 'arm64' | 'x64', cacheDirectory?: string,
-  kind: 'desktop' | 'primary' = 'desktop',
+  kind: 'desktop' | 'primary' | 'casper' = 'desktop',
 ): Promise<number> {
-  const inventory = kind === 'primary' ? await primaryRuntimeFiles(root) : inventoryDesktopRuntime(root).map(file => file.path)
+  const inventory = kind === 'primary' ? await primaryRuntimeFiles(root)
+    : kind === 'casper' ? casperEngineFiles(root) : inventoryDesktopRuntime(root).map(file => file.path)
   const bundles = new Set<string>()
   const files: string[] = []
   for (const path of inventory) {
@@ -79,7 +94,9 @@ export async function signMacOSRuntime(
         || /^node_modules\/@deepseek-ai\/libreoffice-kit-darwin-(?:arm64|x64)\/bin\/libreoffice-kit$/u.test(path)
       const entitlementsFile = isNode && arch === 'x64'
         ? 'node-x64-entitlements.plist' : 'jit-entitlements.plist'
-      const entitlements = needsJit ? join(import.meta.dirname, entitlementsFile) : undefined
+      const isCasper = kind === 'casper' && /^casper(?:\.exe)?$/u.test(path)
+      const entitlements = isCasper ? join(import.meta.dirname, 'casper-entitlements.plist')
+        : needsJit ? join(import.meta.dirname, entitlementsFile) : undefined
       const file = join(root, path)
       const thin = ['cefaedfe', 'cffaedfe', 'feedface', 'feedfacf'].includes(magic(file))
       if (cacheDirectory !== undefined && policy !== undefined && thin) {

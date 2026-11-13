@@ -10,8 +10,9 @@ const state = vi.hoisted(() => ({
   root: '',
   target: 'mac-arm64' as 'mac-arm64' | 'mac-x64' | 'win-x64',
   pnpm: '11.7.0' as string | undefined,
-  failure: undefined as 'electron' | 'primary' | 'cli' | undefined,
+  failure: undefined as 'electron' | 'primary' | 'cli' | 'casper' | undefined,
   preparePrimary: vi.fn(),
+  prepareCasper: vi.fn(),
   extractElectron: vi.fn(),
   commandLink: vi.fn(),
 }))
@@ -42,6 +43,13 @@ vi.mock('node:fs', async (importOriginal) => {
 vi.mock('../scripts/prepare-primary-runtime.ts', () => ({
   preparePrimaryRuntime: state.preparePrimary,
 }))
+vi.mock('../scripts/prepare-casper-engine.ts', () => ({
+  prepareCasperEngine: state.prepareCasper,
+}))
+
+const CASPER_VERSIONS = {
+  casper: { version: '0.4.15', sha256: 'a'.repeat(64) }, uv: { version: '0.13.6', sha256: 'b'.repeat(64) },
+}
 
 const originalArgv = process.argv
 beforeEach(() => {
@@ -55,6 +63,10 @@ beforeEach(() => {
   vi.stubEnv('DSH_DESKTOP_PACKAGING_RUN_DIR', undefined)
   state.extractElectron.mockImplementation(async () => {
     if (state.failure === 'electron') throw new Error('Electron extraction failed')
+  })
+  state.prepareCasper.mockImplementation(async () => {
+    if (state.failure === 'casper') throw new Error('casper engine preparation failed')
+    return CASPER_VERSIONS
   })
   state.preparePrimary.mockImplementation(async () => {
     if (state.failure === 'primary') throw new Error('primary preparation failed')
@@ -90,9 +102,10 @@ it.each(['mac-arm64', 'mac-x64', 'win-x64'] as const)('prepares %s with one pnpm
   expect(readFileSync(join(runtime, 'cli', 'command-manager.js'), 'utf8')).toBe('command manager fixture')
   expect(existsSync(join(runtime, 'cli', 'command-path.ps1'))).toBe(true)
   expect(JSON.parse(readFileSync(join(runtime, 'versions.json'), 'utf8'))).toEqual({
-    schemaVersion: 1, node: '24.18.1', pnpm: '11.7.0',
+    schemaVersion: 1, node: '24.18.1', pnpm: '11.7.0', ...CASPER_VERSIONS,
   })
   expect(state.preparePrimary).toHaveBeenCalledWith({ deferSmoke: windows })
+  expect(state.prepareCasper).toHaveBeenCalledWith({ target, runtime, cache: join(state.root, 'downloads') })
   if (windows) expect(state.commandLink).not.toHaveBeenCalled()
   else expect(state.commandLink).toHaveBeenCalledWith(join(runtime, 'cli'), target === 'mac-arm64' ? 'arm64' : 'x64', '12.0')
 })
@@ -101,6 +114,7 @@ it.each([
   ['electron', 'Electron extraction failed'],
   ['primary', 'primary preparation failed'],
   ['cli', 'command manager copy failed'],
+  ['casper', 'casper engine preparation failed'],
 ] as const)('does not publish versions when %s preparation fails', async (failure, error) => {
   state.failure = failure
   const runtime = join(state.root, 'runtime')
