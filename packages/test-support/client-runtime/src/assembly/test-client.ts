@@ -23,12 +23,21 @@ import { allowAllAccessPlugin, staticAccessPlugin } from '../access.ts'
 /** The remote-access row: it mounts its own generated Remote contribution and publishes the access Hooks. */
 const REMOTE_ACCESS_PACKAGE = '@deepseek-ai/dsh-api-remote-access'
 
+/** The account-controller row: its Client face only mounts its own generated `account` contribution. */
+const ACCOUNT_CONTROLLER_PACKAGE = '@deepseek-ai/dsh-api-account-controller'
+
+/** The product-analytics row: it mounts its own generated `productAnalytics` contribution before providing its sender. */
+const PRODUCT_ANALYTICS_PACKAGE = '@deepseek-ai/dsh-client-product-analytics'
+
 /**
  * Rows whose generated Remote contributions exist only in built `lib/`. The
  * tier drops them: `remote.<ns>` proxies stand in for the namespaces and
- * allow-all access Hooks stand in for remote-access.
+ * allow-all access Hooks stand in for remote-access; no stand-in replaces the
+ * product-analytics sender, so `ctx.productAnalytics` stays absent.
  */
-const GENERATED_REMOTE_PACKAGES: readonly string[] = [REMOTES_PACKAGE, REMOTE_ACCESS_PACKAGE]
+const GENERATED_REMOTE_PACKAGES: readonly string[] = [
+  REMOTES_PACKAGE, REMOTE_ACCESS_PACKAGE, ACCOUNT_CONTROLLER_PACKAGE, PRODUCT_ANALYTICS_PACKAGE,
+]
 
 /** Carrier options. */
 export interface TestClientOptions {

@@ -253,20 +253,6 @@
   },
   {
     "rule": "import",
-    "file": "packages/api/remotes/src/client/index.ts",
-    "match": "@deepseek-ai/dsh-api-account-controller",
-    "count": 1,
-    "step": "3a"
-  },
-  {
-    "rule": "import",
-    "file": "packages/api/remotes/src/client/index.ts",
-    "match": "@deepseek-ai/dsh-client-product-analytics",
-    "count": 1,
-    "step": "3a"
-  },
-  {
-    "rule": "import",
     "file": "packages/sdk/server/src/server.ts",
     "match": "@deepseek-ai/dsh-llm-deepseek-api-key",
     "count": 1,

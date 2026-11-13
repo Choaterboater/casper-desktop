@@ -22,6 +22,10 @@
       "types": "./lib/types/types.d.ts",
       "default": "./lib/types/types.js"
     },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
     "./src/*": "./src/*",
     "./package.json": "./package.json",
     "./typert": {
@@ -34,9 +38,22 @@
     },
     "./locale/*.json": "./locale/*.json"
   },
+  "dsh": {
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-api-gateway"
+      ],
+      "platform": "web"
+    }
+  },
+  "scripts": {
+    "bundle": "tsdown",
+    "watch": "tsdown --watch"
+  },
   "files": [
     "locale/*.json",
     "lib/index.js",
+    "lib/client.js",
     "lib/types/**/*.js",
     "lib/types/**/*.d.ts",
     "lib/typert.host.js",
@@ -58,6 +75,7 @@
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-deepseek-account": "workspace:*",
     "@deepseek-ai/dsh-typert-protocol": "workspace:*",
-    "@deepseek-ai/dsh-agent": "workspace:*"
+    "@deepseek-ai/dsh-agent": "workspace:*",
+    "@deepseek-ai/dsh-api-gateway": "workspace:*"
   }
 }

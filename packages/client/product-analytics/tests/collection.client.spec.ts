@@ -1,7 +1,10 @@
 import { Context, Service } from '@deepseek-ai/cordis'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { RemoteStreamOptions } from '@deepseek-ai/dsh-api-gateway/client'
-import * as Analytics from '../src/client/index.ts'
+import type { TypertRemoteContribution } from '@deepseek-ai/dsh-typert-protocol'
+import { inject, mountProductAnalytics } from '../src/client/mount.ts'
+
+const REMOTE: TypertRemoteContribution = { package: '@deepseek-ai/dsh-client-product-analytics', descriptors: [] }
 
 const cleanup: (() => Promise<void>)[] = []
 afterEach(async () => {
@@ -28,19 +31,26 @@ async function setup(enabled = true) {
     },
     dispose: async () => { disposed = true; wake?.() },
   }
+  const unmount = vi.fn(async () => {})
   const remote = {
     productAnalytics: { report, watchPolicy: vi.fn() },
     $stream: (value: RemoteStreamOptions<boolean>) => { options = value; return stream },
+    $mount: vi.fn(async (contribution: TypertRemoteContribution) => {
+      expect(contribution).toBe(REMOTE)
+      return unmount
+    }),
   }
   class TracedRemote extends Service {
     constructor(ctx: Context) { super(ctx, 'remote') }
     $stream = remote.$stream
+    $mount = remote.$mount
   }
   await ctx.plugin(TracedRemote)
   await ctx.plugin({ apply(child: Context) { child.provide('remote.productAnalytics', remote.productAnalytics as never) } })
-  await ctx.plugin(Analytics)
+  const fiber = ctx.plugin({ inject: [...inject], apply: (child: Context) => mountProductAnalytics(child, REMOTE) })
+  await fiber
   if ('dshDesktop' in globalThis) await vi.waitFor(() => { expect(ctx.productAnalytics.enabled).toBe(enabled) })
-  return { ctx, report, options: () => options!,
+  return { ctx, fiber, unmount, report, options: () => options!,
     async fail() { failure = new Error('terminal'); wake?.(); await vi.waitFor(() => { expect(ctx.productAnalytics.enabled).toBe(false) }) },
     async policy(enabled: boolean) {
       values.push(enabled); wake?.()
@@ -118,4 +128,27 @@ it('reports from a consumer without granting it the analytics Remote namespace',
   expect(b.report).toHaveBeenCalledExactlyOnceWith({
     eventName: 'sidebar_menu_click', timestamp: expect.any(Number) as number, attributes: { menu_name: 'plugin' },
   })
+})
+
+it('withdraws the sender before its Remote namespace when the plugin unloads', async () => {
+  const b = await setup()
+  expect(b.ctx.get('productAnalytics')).toBeDefined()
+  await b.fiber.dispose()
+  expect(b.ctx.get('productAnalytics')).toBeUndefined()
+  expect(b.unmount).toHaveBeenCalledOnce()
+})
+
+it('withdraws its Remote namespace when the sender cannot start', async () => {
+  vi.stubGlobal('dshDesktop', {})
+  const ctx = new Context()
+  cleanup.push(() => ctx.fiber.dispose())
+  const unmount = vi.fn(async () => {})
+  ctx.provide('remote', {
+    $mount: async () => unmount,
+    $stream: () => { throw new Error('stream unavailable') },
+  } as never)
+  ctx.provide('remote.productAnalytics', { report: vi.fn(), watchPolicy: vi.fn() } as never)
+  await expect(mountProductAnalytics(ctx, REMOTE)).rejects.toThrow('stream unavailable')
+  expect(ctx.get('productAnalytics')).toBeUndefined()
+  expect(unmount).toHaveBeenCalledOnce()
 })

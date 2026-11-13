@@ -101,6 +101,7 @@
     { "path": "./packages/api/gateway/tsconfig.client.json" },
     { "path": "./packages/api/session-controller/tsconfig.client.json" },
     { "path": "./packages/api/remote-access/tsconfig.client.json" },
+    { "path": "./packages/api/account-controller/tsconfig.client.json" },
     { "path": "./packages/api/workspace-controller/tsconfig.client.json" },
     { "path": "./packages/api/remotes/tsconfig.client.json" },
     { "path": "./packages/extensions/cordis-client-runner" },

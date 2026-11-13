@@ -372,6 +372,10 @@ export default defineConfig({
         // The access entry imports its generated Remote contribution, which exists only in lib;
         // the Web snapshot exercises the built entry, while source tests cover mountAccess.
         'packages/api/remote-access/src/client/index.ts',
+        // These entries import their own generated Remote contributions, which exist only in lib;
+        // source tests cover mountProductAnalytics and mountAccount.
+        'packages/client/product-analytics/src/client/index.ts',
+        'packages/api/account-controller/src/client/index.ts',
         // The forge panel entry imports its generated Remote contribution, which exists only in lib;
         // forge-panel.e2e.ts exercises the built entry, while source tests cover mountForgePanel.
         'packages/experimental/client-ui-forge/src/client/index.ts',
