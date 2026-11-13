@@ -125,7 +125,7 @@ type WebFetchBody =
 
 A provider's `available(): boolean` is a cheap LOCAL check (credential presence, parseable config) and **must not make network calls**. It is an input to execution-time selection, not a health system: `search()`/`fetch()` read it to pick a usable provider, and a selection failure surfaces as the structured `WebError` the caller routes on — which carries the branchable detail (the missing id or ambiguous candidate set) in its code and message. Registration, unlike availability, is observable before an operation runs: `listProviders()` returns every registered search and fetch provider by `id`, optional `title`, and optional localized `description`, and the payload-free `web/providers-changed` event fires after each registration or disposal; availability still shows only when an operation runs.
 
-A search or fetch provider may also implement `ready(llmProvider): Promise<boolean>`, a configuration-only check that must not make network calls: it answers whether an operation made for a model request on that chat route has a credential to send. `searchReady(llmProvider?)` and `fetchReady(llmProvider?)` ask only the provider that `search()` or `fetch()` would select, treat a provider without `ready()` as ready, and answer true when selection fails, because the operation reports that failure as a `WebError`. Readiness is not a selection input; `dsh-tool-web` makes it the activation condition of `web_search` and `web_fetch`, so a model step whose route answers false neither declares nor dispatches the tool. The DeepSeek Search and Fetch API providers use the route to choose between the account token and the API key, as the [web-deepseek-api authentication](../../packages/web/web-deepseek-api/README.md#authentication) section describes.
+A search or fetch provider may also implement `ready(llmProvider): Promise<boolean>`, a configuration-only check that must not make network calls: it answers whether an operation made for a model request on that chat route has a credential to send. `searchReady(llmProvider?)` and `fetchReady(llmProvider?)` ask only the provider that `search()` or `fetch()` would select, treat a provider without `ready()` as ready, and by default answer true when selection fails, because the operation reports that failure as a `WebError`; with `offerUnresolvedSearch: false`, `searchReady` answers false when search selection fails. Readiness is not a selection input; `dsh-tool-web` makes it the activation condition of `web_search` and `web_fetch`, so a model step whose route answers false neither declares nor dispatches the tool. The DeepSeek Search and Fetch API providers use the route to choose between the account token and the API key, as the [web-deepseek-api authentication](../../packages/web/web-deepseek-api/README.md#authentication) section describes.
 
 Selection never depends on registration, config, or HMR order: a capability has an explicit provider id (config `searchProvider`/`fetchProvider`, or the matching env var feeding the same field), or auto-selects when exactly one usable provider is registered; multiple usable providers with no configured id is `WEB_PROVIDER_AMBIGUOUS`, not first-wins. Each operation reads the configured id when it runs, so a saved settings change applies to the next search or fetch without remounting `ctx.web`.
 
@@ -209,9 +209,12 @@ async search(request: WebSearchRequest, signal?: AbortSignal): Promise<WebSearch
  * Whether the provider `search()` would select can authenticate a search made for a
  * model request on the `llmProvider` chat route. Asks only that provider's `ready()`;
  * one without `ready()` counts as ready. Makes no network calls. A selection failure
- * answers true, because `search()` reports that failure as a structured `WebError`.
+ * answers the current `offerUnresolvedSearch` value: true (the default) leaves `search()`
+ * to report that failure as a structured `WebError`, and false withholds search until a
+ * provider resolves.
  * @param llmProvider - the provider route id of the model request, when known.
- * @returns false only when the selected provider reports that it cannot authenticate.
+ * @returns false when the selected provider reports that it cannot authenticate, or when
+ *   selection fails and `offerUnresolvedSearch` is false.
  */
 async searchReady(llmProvider?: string): Promise<boolean>
 

@@ -33,8 +33,11 @@ function fetchResult(marker: string): WebFetchResult {
   return { url: 'https://example.com', statusCode: 200, body: { kind: 'text', content: marker }, truncated: false }
 }
 
+/** Config accepted by {@link mountWeb}. */
+interface MountConfig { searchProvider?: string; fetchProvider?: string; offerUnresolvedSearch?: boolean }
+
 /** Mount a WebRuntime on a fresh root context with the given config. */
-async function mountWeb(config: { searchProvider?: string; fetchProvider?: string } = {}): Promise<{ ctx: Context; web: WebRuntime }> {
+async function mountWeb(config: MountConfig = {}): Promise<{ ctx: Context; web: WebRuntime }> {
   const ctx = new Context()
   await ctx.plugin(WebRuntime, config)
   return { ctx, web: ctx.web }
@@ -275,6 +278,31 @@ describe('WebRuntime search readiness', () => {
     await expect(web.searchReady('deepseek-official')).resolves.toBe(true)
     await expect(web.search({ query: 'q' })).rejects.toBeInstanceOf(WebError)
   })
+
+  it.each([
+    ['nothing is registered', {}, []],
+    ['the configured provider is not registered', { searchProvider: 'missing' }, [readyProvider('other', available, true)]],
+    ['the configured provider is unavailable', { searchProvider: 'down' }, [readyProvider('down', unavailable, true)]],
+    ['several usable providers are registered', {}, [readyProvider('a', available, true), readyProvider('b', available, true)]],
+  ] as const)('answers false when %s and offerUnresolvedSearch is false', async (_label, config, providers) => {
+    const { web } = await mountWeb({ ...config, offerUnresolvedSearch: false })
+    for (const provider of providers) web.registerSearchProvider(provider)
+    await expect(web.searchReady('deepseek-official')).resolves.toBe(false)
+  })
+
+  it.each([true, false])('answers the resolved provider\'s readiness (%s) when offerUnresolvedSearch is false', async (ready) => {
+    const { web } = await mountWeb({ offerUnresolvedSearch: false })
+    const asked: (string | undefined)[] = []
+    web.registerSearchProvider(readyProvider('usable', available, ready, asked))
+    web.registerSearchProvider(makeSearchProvider('plain', unavailable, () => Promise.resolve(searchResult('plain'))))
+    await expect(web.searchReady('deepseek-official')).resolves.toBe(ready)
+    expect(asked).toEqual(['deepseek-official'])
+  })
+
+  it('keeps fetch readiness true on selection failure when offerUnresolvedSearch is false', async () => {
+    const { web } = await mountWeb({ offerUnresolvedSearch: false })
+    await expect(web.fetchReady('deepseek-official')).resolves.toBe(true)
+  })
 })
 
 describe('WebRuntime maxResults enforcement', () => {
@@ -389,6 +417,21 @@ describe('live provider selection', () => {
       expect(Object.is(live.entry.fiber, fiber)).toBe(true)
       await expect(ctx.web.search({ query: 'q' })).resolves.toMatchObject({ content: 'second' })
       await expect(ctx.web.fetch({ url: 'https://example.com' })).resolves.toMatchObject({ body: { content: 'second' } })
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('applies a saved offerUnresolvedSearch value to the next searchReady() without remounting', async () => {
+    const { liveConfig } = await import('../../../settings/settings/tests/live-config.ts')
+    const ctx = new Context()
+    try {
+      const live = await liveConfig(ctx, WebRuntime, {})
+      const fiber = live.fiber
+      await expect(ctx.web.searchReady('deepseek-official')).resolves.toBe(true)
+      await live.update({ offerUnresolvedSearch: false })
+      expect(Object.is(live.entry.fiber, fiber)).toBe(true)
+      await expect(ctx.web.searchReady('deepseek-official')).resolves.toBe(false)
+      await live.update({ offerUnresolvedSearch: true })
+      await expect(ctx.web.searchReady('deepseek-official')).resolves.toBe(true)
     } finally { await ctx.fiber.dispose() }
   })
 })

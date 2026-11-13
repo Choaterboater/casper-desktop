@@ -389,33 +389,20 @@ export function conversationContextKey(kind: string, id: string): string {
   return `${kind.length}:${kind}${id}`
 }
 
-/** Open Settings through the sidebar launcher: the Settings button the shipped Casper profile renders, or the
- * DeepSeek account menu in scenarios that compose `deepseek-account.overlay.yml`.
+/** Open Settings through the sidebar account menu.
  * @param page - browser page with the mounted sidebar.
  * @param locale - current UI language.
  */
 export async function openSettings(page: Page, locale: 'en' | 'zh' | 'ja'): Promise<void> {
-  const accountMenu = page.getByRole('button', {
-    name: { en: 'Account menu', zh: '账号菜单', ja: 'アカウントメニュー' }[locale], exact: true, includeHidden: true,
+  const labels = { en: ['Account menu', 'Settings'], zh: ['账号菜单', '设置'], ja: ['アカウントメニュー', '設定'] } as const
+  const trigger = page.getByRole('button', {
+    name: labels[locale][0], exact: true, includeHidden: true,
   })
-  const trigger = settingsTrigger(page, locale).or(accountMenu)
   await trigger.waitFor({ state: 'attached' })
   await revealNavigationDrawer(page, locale)
   if (!await trigger.isVisible()) {
     await page.getByRole('button', { name: { en: 'Open sidebar', zh: '打开侧边栏', ja: 'サイドバーを開く' }[locale], exact: true }).click()
   }
-  const viaAccountMenu = await trigger.getAttribute('aria-haspopup') === 'menu'
   await trigger.click()
-  if (viaAccountMenu) {
-    await page.getByRole('menuitem', { name: { en: 'Settings', zh: '设置', ja: '設定' }[locale], exact: true }).click()
-  }
-}
-
-/** The sidebar Settings button; the shipped Casper profile disables the DeepSeek account menu that would replace it.
- * @param page - browser page with the mounted sidebar.
- * @param locale - current UI language.
- * @returns a locator that also matches the button while the navigation drawer hides it.
- */
-export function settingsTrigger(page: Page, locale: 'en' | 'zh' | 'ja'): Locator {
-  return page.getByRole('button', { name: { en: 'Settings', zh: '设置', ja: '設定' }[locale], exact: true, includeHidden: true })
+  await page.getByRole('menuitem', { name: labels[locale][1], exact: true }).click()
 }

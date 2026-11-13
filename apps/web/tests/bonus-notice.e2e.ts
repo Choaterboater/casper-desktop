@@ -257,8 +257,7 @@ describe.skipIf(MODE === 'record')('web e2e: bonus notice', () => {
       { mode: 0o600 })
     const overlay = join(root, 'bonus-notice.overlay.yml')
     await writeFile(overlay, (await readFile(OVERLAY_TEMPLATE, 'utf8')).replaceAll('{{origin}}', platform.origin))
-    // The shipped Casper profile disables the DeepSeek account sign-in; this scenario composes it back.
-    scaffold = await launchWebScaffold({ harnessHome: home, extraOverlayPath: [fileURLToPath(new URL('./deepseek-account.overlay.yml', import.meta.url)), overlay] })
+    scaffold = await launchWebScaffold({ harnessHome: home, extraOverlayPath: overlay })
     // Resolve the signed-in identity before opening the renderer. First profile discovery
     // emits another account frame, which would supersede the held startup bonus read.
     expect(await scaffold.ctx.deepseekAccount.getProfile({

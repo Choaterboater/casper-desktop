@@ -24,7 +24,6 @@ const BUNDLE = fileURLToPath(new URL('../../../packages/experimental/cot-transla
 const { version: bundleVersion } = JSON.parse(await readFile(join(BUNDLE, 'package.json'), 'utf8')) as { version: string }
 const FIXTURE = fileURLToPath(new URL('../../../snapshots/web/lifecycle-chrome/session.v4.jsonl', import.meta.url))
 const EXPECTED = fileURLToPath(new URL('./expected/cot-translation-paid', import.meta.url))
-const DEEPSEEK_ACCOUNT_OVERLAY = fileURLToPath(new URL('./deepseek-account.overlay.yml', import.meta.url))
 const MODE = webSnapshotMode()
 const ORIGINAL = 'The user wants me to reply with a single word. Let me comply.'
 const TRANSLATED = '用户要求只回复一个词，我会照做。'
@@ -137,9 +136,7 @@ it.skipIf(MODE === 'record')('reuses saved native Account Flash translations acr
     { id: 'translator', config: { bingEndpoint: `${origin}/unexpected-free`, googleEndpoint: `${origin}/unexpected-free`,
       deepseekTimeoutMs: 120_000 } },
   ]))
-  // The shipped Casper profile disables the DeepSeek account; this scenario composes it back.
-  const scaffold = await launchWebScaffold({
-    profile: { packages: [{ dir: BUNDLE }] }, extraOverlayPath: [DEEPSEEK_ACCOUNT_OVERLAY, overlay],
+  const scaffold = await launchWebScaffold({ profile: { packages: [{ dir: BUNDLE }] }, extraOverlayPath: overlay,
     replayFixture: FIXTURE, compareReplaySession: false })
   resources.scaffold = scaffold
   const account = scaffold.ctx.get('deepseekAccount')

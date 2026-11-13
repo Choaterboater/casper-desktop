@@ -1,5 +1,0 @@
-# Loader overlay for the real-host smoke (`dsh web --patch`): Casper's Web
-# profile disables the native DeepSeek provider, so the keyless smoke re-enables
-# it to route requests to its loopback mock through DEEPSEEK_BASE_URL.
-- id: llm-deepseek
-  disabled: false

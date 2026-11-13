@@ -154,11 +154,7 @@ describe('web e2e: default Search API web search', () => {
     const search = await startSearchServer(searchRequests)
     searchServer = search.server
     scaffold = await launchWebScaffold({
-      // The shipped Casper profile disables the DeepSeek Search API; this scenario composes it back.
-      extraOverlayPath: [
-        fileURLToPath(new URL('./pin-browse-picker.overlay.yml', import.meta.url)),
-        fileURLToPath(new URL('./deepseek-web-search.overlay.yml', import.meta.url)),
-      ],
+      extraOverlayPath: fileURLToPath(new URL('./pin-browse-picker.overlay.yml', import.meta.url)),
       compareReplaySession: true,
       // Own YAML endpoint settings pin Search to the local endpoint and a dedicated key.
       deepSeekWebApi: {

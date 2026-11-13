@@ -348,8 +348,11 @@ async function bootPreview(site: Site, manifest: ImageManifest, browser: Browser
     // surface after the startup chain completes over the tunnel.
     const continueButton = page.getByRole('button', { name: 'Continue' })
     await continueButton.waitFor({ timeout: HERO_TIMEOUT_MS })
-    // Casper ships no DeepSeek sign-in onboarding, so the notice opens the composer directly.
     await continueButton.click()
+    await page.getByRole('button', { name: 'Add API Key', exact: true }).click()
+    const configureLater = page.getByRole('button', { name: 'Configure later' })
+    await configureLater.waitFor({ timeout: 30_000 })
+    await configureLater.click()
     await page.locator('[data-composer-input][data-placeholder="Describe what you want to build, / commands, @ files or sessions"]')
       .waitFor({ timeout: 30_000 })
 

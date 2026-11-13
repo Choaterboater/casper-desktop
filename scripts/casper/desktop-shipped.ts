@@ -22,8 +22,8 @@ import * as yaml from 'js-yaml'
 import ts from 'typescript'
 import type { EntryOptions } from '@deepseek-ai/cordis-plugin-loader'
 import { applyEntryPatches, type PatchOptions } from '@deepseek-ai/cordis-plugin-include'
-import { PROFILE_TEMPLATES } from '@deepseek-ai/dsh-official-bundles'
 import { selectDesktopPackageClosure, type PackedDesktopPackage } from '../../apps/desktop/scripts/prepare-package-set.ts'
+import { CASPER_DESKTOP_BUNDLES } from '../../apps/desktop/src/casper-desktop-profile.ts'
 import { desktopRuntimeFileExclusion } from '../../apps/desktop/scripts/runtime-file-policy.ts'
 import { isCordisGroupEntry, isJsExpr, loadCordisYaml } from '../cordis-yaml.ts'
 import { collectRuntimeLocalSourceSpecifiers, collectRuntimeSourceSpecifiers, packageNameOf } from '../source-parse-uses.ts'
@@ -424,11 +424,9 @@ export function scanDesktopShipped(overlay: ShippedOverlay = new Map()): Shipped
   return { findings: scanner.collector.findings(), packages: scanner.packages, locales: scanner.locales, files: scanner.scanned.size }
 }
 
-/** Compose the desktop profile's bundle layers and report removed service rows that are still present. */
+/** Compose the desktop profile's template bundles and report removed service rows that are present. */
 function scanComposition(scanner: Scanner, workspace: ReadonlyMap<string, WorkspacePackage>): void {
-  const bundles = PROFILE_TEMPLATES.web?.bundles
-  if (bundles === undefined) throw new Error('desktop shipped scan: PROFILE_TEMPLATES has no web profile')
-  const layers: PatchOptions[][] = bundles.map((name) => {
+  const layers: PatchOptions[][] = CASPER_DESKTOP_BUNDLES.map((name) => {
     const pkg = workspace.get(name)
     if (pkg === undefined) throw new Error(`desktop shipped scan: profile bundle ${name} is not a workspace package`)
     const bundle = (pkg.manifest.dsh as { bundle?: { patch?: string | string[] } } | undefined)?.bundle

@@ -20,7 +20,7 @@ const read = (path: string): string => readFileSync(join(REPOSITORY_ROOT, path),
 /** Files a plant changes; each in a different file so every plant yields its own problem. */
 const HOST_PLANT = 'packages/llm/llm/src/index.ts'
 const IMPORT_PLANT = 'packages/casper/casper-agent/src/index.ts'
-const ROW_PLANT = 'packages/bundle/web-app/presets/casper.patch.yml'
+const ROW_PLANT = 'packages/casper/desktop/casper.patch.yml'
 const EXEMPT_HOST_PLANT = 'packages/llm/llm-pi-ai/src/provider-data.generated.ts'
 const CREDIT_FILE = 'apps/desktop/src/main.ts'
 /** The Web bundle's package publishes `dist/`; the gate reads its sources instead. */
@@ -32,7 +32,7 @@ function plantedOverlay(): Map<string, string> {
   const overlay = new Map<string, string>([
     [HOST_PLANT, `${read(HOST_PLANT)}\nexport const PLANTED_ENDPOINT = 'https://api.deepseek.com/v1'\n`],
     [IMPORT_PLANT, `${read(IMPORT_PLANT)}\nimport '@deepseek-ai/dsh-llm-deepseek-api-key'\n`],
-    [ROW_PLANT, `${read(ROW_PLANT)}\n- id: llm-deepseek\n  disabled: false\n`],
+    [ROW_PLANT, `${read(ROW_PLANT)}\n- insert:\n    - id: llm-deepseek\n`],
     [EXEMPT_HOST_PLANT, `${read(EXEMPT_HOST_PLANT)}\nexport const PLANTED_SECOND = 'https://api.deepseek.com/beta'\n`],
     [CREDIT_FILE, read(CREDIT_FILE).replace("copyright: 'Choaterboater · built on DeepSeek Harness (MIT)'", "copyright: 'Choaterboater'")],
     [WEB_SOURCE_PLANT, `${read(WEB_SOURCE_PLANT)}\nexport const PLANTED_WEB = 'https://platform.deepseek.com/'\n`],

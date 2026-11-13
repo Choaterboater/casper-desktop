@@ -1,4 +1,4 @@
-/** Casper's Desktop profile sends nothing to DeepSeek: no usage reporting, Session upload, account or DeepSeek-only services. */
+/** Casper's Desktop profile composes the Casper desktop bundle: no usage reporting, Session upload, account or upstream-hosted services. */
 
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -7,38 +7,61 @@ import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
 import { composeEntries, loadProfileDirectory } from '@deepseek-ai/dsh-app-boot'
 import { OPTIONAL_BUNDLES } from '@deepseek-ai/dsh-official-bundles'
+import { isAgentPresetEntry, isCordisGroupEntry } from '../../../scripts/cordis-yaml.ts'
+import { DESKTOP_REMOVED_ROWS } from '../../../scripts/casper/desktop-policy.ts'
+import { CASPER_DESKTOP_BUNDLE, REPLACED_DESKTOP_BUNDLES } from '../src/casper-desktop-profile.ts'
 import { createPluginProfile } from '../src/project-manager.ts'
 
 type Row = { id?: string; name?: string; disabled?: unknown; config?: Record<string, unknown> }
 
-/** Compose the shipped Desktop profile rows. */
-function desktopRows(): Row[] {
+/** Load a new Desktop profile and compose its rows, with the bundles it lists and the composer's warnings. */
+function desktopProfile(): { bundles: string[]; skipped: string[]; rows: Row[]; warnings: string[] } {
   const home = mkdtempSync(join(tmpdir(), 'dsh-desktop-no-deepseek-'))
   try {
     const profileDir = join(home, 'profiles', 'desktop')
     createPluginProfile(profileDir)
     const installAnchor = fileURLToPath(new URL('../../cli/package.json', import.meta.url))
     const profile = loadProfileDirectory('dsh desktop', profileDir, installAnchor)
-    return composeEntries([...profile.layers.map(layer => layer.patches), profile.patches], () => {})
+    const warnings: string[] = []
+    const rows = composeEntries([...profile.layers.map(layer => layer.patches), profile.patches], message => warnings.push(message))
+    const bundles = profile.layers.map(layer => layer.packageName)
+    return { bundles, skipped: profile.skippedBundles.map(skipped => skipped.packageName), rows, warnings }
   } finally {
     rmSync(home, { recursive: true, force: true })
   }
 }
 
-/** Rows that report usage to, sign in to, or call DeepSeek-hosted services. */
-const DEEPSEEK_ROWS = [
-  'desktop-product-telemetry', 'product-analytics', 'deepseek-account', 'llm-deepseek-account', 'account-controller',
-  'ui-settings-account', 'web-search-deepseek', 'web-deepseek-api', 'session-log-deepseek', 'deepseek-llm-api-extensions',
-  'llm-deepseek', 'plugin-package-inventory-deepseek',
-]
+/** Compose the shipped Desktop profile rows. */
+function desktopRows(): Row[] {
+  return desktopProfile().rows
+}
 
-it('disables every row that reports usage to or calls DeepSeek', () => {
-  const rows = desktopRows()
-  for (const id of DEEPSEEK_ROWS) {
-    const row = rows.find(entry => entry.id === id)
-    expect(row, id).toBeDefined()
-    expect(row?.disabled, id).toBe(true)
-  }
+/** Every row of a composition, inside groups and Agent preset plugin lists included. */
+function allRows(rows: readonly unknown[]): Row[] {
+  return rows.flatMap((row): Row[] => {
+    if (typeof row !== 'object' || row === null) return []
+    const entry = row as Row & Record<string, unknown>
+    const nested = isCordisGroupEntry(entry) ? entry.config : isAgentPresetEntry(entry) ? entry.config.plugins : []
+    return [entry, ...allRows(nested)]
+  })
+}
+
+it('composes only the Casper desktop bundle, with every Casper override matching a row', () => {
+  const profile = desktopProfile()
+  expect(profile.bundles).toEqual([CASPER_DESKTOP_BUNDLE])
+  expect(profile.skipped).toEqual([])
+  expect(profile.warnings).toEqual([])
+})
+
+it('composes none of the rows that report usage to, sign in to, or call DeepSeek-hosted services', () => {
+  const ids = allRows(desktopRows()).map(row => row.id)
+  expect(ids.length).toBeGreaterThan(100)
+  for (const id of Object.keys(DESKTOP_REMOVED_ROWS)) expect(ids, id).not.toContain(id)
+})
+
+it('hides the bundles it replaces and itself, so neither the Plugins page nor the plugin_manager tool can switch them', () => {
+  const hidden = desktopRows().find(entry => entry.id === 'plugin-manager')?.config?.['hiddenBundles']
+  expect(hidden).toEqual(expect.arrayContaining([CASPER_DESKTOP_BUNDLE, ...REPLACED_DESKTOP_BUNDLES]))
 })
 
 it('hides every optional bundle DeepSeek ships, so the Plugins page cannot switch one on', () => {
@@ -82,4 +105,12 @@ it('keeps a non-DeepSeek model provider available', () => {
   const piAi = desktopRows().find(entry => entry.id === 'llm-pi-ai')
   expect(piAi?.name).toBe('@deepseek-ai/dsh-llm-pi-ai')
   expect(piAi?.disabled).not.toBe(true)
+})
+
+it('has no default web search provider and withholds web_search until a search provider resolves', () => {
+  expect(desktopRows().find(entry => entry.id === 'web')?.config).toEqual({ fetchProvider: 'http', offerUnresolvedSearch: false })
+})
+
+it('has no default model until one is picked', () => {
+  expect(desktopRows().find(entry => entry.id === 'agent-default-model')?.config).toEqual({ provider: '', model: '' })
 })
