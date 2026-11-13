@@ -12,11 +12,14 @@ import { processEvidenceDefinition, turnProcessDefinition } from '@deepseek-ai/d
 import { turnTailDefinition } from '@deepseek-ai/dsh-client-ui-chat/src/client/conversation-nodes/turn-tail.ts'
 import { ConversationNodeAssembler, type TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
-import { apply } from '../src/client/index.ts'
+import { applyCasperClient } from '../src/client/apply.ts'
 import { en, NS } from '../src/client/locales.ts'
 import { receiptDefinition } from '../src/client/receipt-turn.ts'
 import { ReceiptTail, type ReceiptTailProps } from '../src/client/ReceiptRow.tsx'
 import { CASPER_RECEIPT, isReceiptCallId, receiptAcpId, type CasperReceipt } from '../src/receipt.ts'
+
+/** The Client face with a fake `casperEngine` contribution; these specs leave the `remote` scope unserved. */
+const apply = (ctx: object) => { applyCasperClient({ inject: () => {}, ...ctx } as never, { package: '@deepseek-ai/dsh-casper-agent', descriptors: [] }) }
 
 afterEach(cleanup)
 
@@ -164,7 +167,7 @@ describe('the receipt at the turn\'s tail', () => {
     const locale = { register: vi.fn(() => () => {}), bind: vi.fn(() => vi.fn()) }
     const events = { register: vi.fn(() => () => {}) }
     const uiConversation = { events, views: { register: vi.fn(() => () => {}) } }
-    apply({ slots, effect: (run: () => unknown) => run(), locale, uiConversation } as never)
+    apply({ slots, effect: (run: () => unknown) => run(), locale, uiConversation })
     expect(events.register).toHaveBeenCalledWith(expect.objectContaining({ kind: 'casper-receipt', target: 'chat' }))
     expect(register.mock.calls.map(([options, component]) => [options, component]))
       .toContainEqual([{ name: 'conversation.chat.turnTail', id: CASPER_RECEIPT, locale: NS }, ReceiptTail])

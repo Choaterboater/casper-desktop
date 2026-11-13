@@ -2,9 +2,12 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CasperOwnAccessView } from '../src/access-view.ts'
-import { apply } from '../src/client/index.ts'
+import { applyCasperClient } from '../src/client/apply.ts'
 import { de, en, es, fr, ja, NS, pt, ru, zh } from '../src/client/locales.ts'
 import { ModePill, type ModePillProps } from '../src/client/ModePill.tsx'
+
+/** The Client face with a fake `casperEngine` contribution; these specs leave the `remote` scope unserved. */
+const apply = (ctx: object) => { applyCasperClient({ inject: () => {}, ...ctx } as never, { package: '@deepseek-ai/dsh-casper-agent', descriptors: [] }) }
 
 afterEach(cleanup)
 
@@ -53,7 +56,7 @@ describe('ModePill', () => {
     const effect = vi.fn((run: () => unknown) => run())
     const uiConversation = { events: { register: vi.fn(() => () => {}) }, views: { register: vi.fn(() => () => {}) } }
     const locale = { register: vi.fn(() => () => {}), bind: vi.fn(() => vi.fn()) }
-    apply({ slots, effect, locale, uiConversation } as never)
+    apply({ slots, effect, locale, uiConversation })
     const entry = register.mock.calls.find(call => call[0].name === 'conversation.input.left')
     expect(entry?.[0]).toEqual({ name: 'conversation.input.left', id: 'casper-mode-pill', locale: NS })
     expect(entry?.[1]).toBe(ModePill)

@@ -17,7 +17,7 @@ import {
   type CasperCheck, type CasperChecksSnapshot,
 } from '../src/client/check-calls.ts'
 import { ChecksView, checksByTurn, type ChecksViewProps } from '../src/client/ChecksView.tsx'
-import { apply } from '../src/client/index.ts'
+import { applyCasperClient } from '../src/client/apply.ts'
 import { en, NS } from '../src/client/locales.ts'
 import { receiptDefinition } from '../src/client/receipt-turn.ts'
 
@@ -246,7 +246,8 @@ describe('the Checks view registration', () => {
     }
     const binding = { sessionId: 's1' }
     const sessions = { binding: vi.fn((id: string) => id === 's1' ? binding : undefined) }
-    apply({ slots, effect: (run: () => unknown) => run(), locale, uiConversation, sessions } as never)
+    applyCasperClient({ inject: () => {}, slots, effect: (run: () => unknown) => run(), locale, uiConversation, sessions } as never,
+      { package: '@deepseek-ai/dsh-casper-agent', descriptors: [] })
     expect(uiConversation.events.register).toHaveBeenCalledWith(expect.objectContaining({ kind: 'casper-check-chat', target: 'chat' }))
     expect(uiConversation.events.register).toHaveBeenCalledWith(expect.objectContaining({ kind: 'casper-check', target: 'casper-checks' }))
     expect(uiConversation.views.register).toHaveBeenCalledWith(checksViewDefinition)

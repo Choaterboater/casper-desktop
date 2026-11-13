@@ -8,26 +8,34 @@
   "files": [
     "src/access-view.ts",
     "src/box.ts",
+    "src/client/apply.ts",
     "src/client/CasperBoxCard.tsx",
     "src/client/check-calls.ts",
     "src/client/ChecksView.tsx",
+    "src/client/engine-locales.ts",
+    "src/client/engine-mount.ts",
+    "src/client/EngineVersionRow.tsx",
     "src/client/ReceiptRow.tsx",
     "src/client/index.ts",
     "src/client/locales.ts",
     "src/client/ModePill.tsx",
     "src/client/receipt-turn.ts",
     "src/css-modules.d.ts",
+    "src/engine-types.ts",
     "src/receipt.ts"
   ],
   "references": [
     { "path": "../../../vendor/cordis" },
+    { "path": "../../api/remotes/tsconfig.client.json" },
     { "path": "../../client/locale/tsconfig.client.json" },
     { "path": "../../client/ui-chat/tsconfig.client.json" },
     { "path": "../../client/ui-conversation/tsconfig.client.json" },
     { "path": "../../client/ui-primitives" },
     { "path": "../../client/ui-renderer" },
+    { "path": "../../client/ui-settings/tsconfig.client.json" },
     { "path": "../../client/ui-slots" },
     { "path": "../../client/ui-tool" },
-    { "path": "../../client/ui-user-questions" }
+    { "path": "../../client/ui-user-questions" },
+    { "path": "../../typert/protocol" }
   ]
 }
