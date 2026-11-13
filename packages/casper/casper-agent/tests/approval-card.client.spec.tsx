@@ -115,19 +115,19 @@ describe('selectCasperBox', () => {
     expect(selectCasperBox(yesOnly)).toBeNull()
   })
 
-  it('registers first in the composer chain with its copy, the Slot registry, the locale and the conversation Definitions injected', () => {
+  it('registers first in the composer chain with its copy, the Slot registry, the locale, the conversation Definitions and the Session bindings injected', () => {
     type Options = { name: string; priority: number; locale: string; select: (owner: { pendingInteraction: unknown }) => unknown }
     const register = vi.fn((_options: Options) => () => {})
     const slots = { inject: vi.fn((_name: string, mount: () => () => void) => mount()), register }
     const effect = vi.fn((run: () => unknown) => run())
-    const uiConversation = { events: { register: vi.fn(() => () => {}) } }
-    const locale = { register: vi.fn(() => () => {}) }
+    const uiConversation = { events: { register: vi.fn(() => () => {}) }, views: { register: vi.fn(() => () => {}) } }
+    const locale = { register: vi.fn(() => () => {}), bind: vi.fn(() => vi.fn()) }
     apply({ slots, effect, locale, uiConversation } as never)
-    expect(inject).toEqual(['slots', 'locale', 'uiConversation'])
+    expect(inject).toEqual(['slots', 'locale', 'uiConversation', 'sessions'])
     expect(locale.register).toHaveBeenCalledWith(NS, { zh, en, ja, es, fr, de, ru, pt })
     for (const dictionary of [zh, ja, es, fr, de, ru, pt]) expect(dictionary['box.details']).not.toBe(en['box.details'])
     expect(slots.inject).toHaveBeenCalledWith('conversation.composer', expect.any(Function))
-    const options = register.mock.calls[0]?.[0]
+    const options = register.mock.calls.find(([candidate]) => candidate.name === 'conversation.composer')?.[0]
     expect(options).toMatchObject({ name: 'conversation.composer', priority: -1, locale: NS })
     const mine = new PendingQuestion(SESSION, [box()], ToolCallId('casper:epoch:casper-approval-3'))
     expect(options?.select({ pendingInteraction: mine })).toBe(mine)

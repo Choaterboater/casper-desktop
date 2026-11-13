@@ -125,8 +125,8 @@ describe('ReceiptRow', () => {
   it('is registered as the casper_receipt tool view with its dictionaries in every language', () => {
     const register = vi.fn((_options: Record<string, unknown>, _component: unknown) => () => {})
     const slots = { inject: vi.fn((_name: string, mount: () => () => void) => mount()), register }
-    const locale = { register: vi.fn(() => () => {}) }
-    const uiConversation = { events: { register: vi.fn(() => () => {}) } }
+    const locale = { register: vi.fn(() => () => {}), bind: vi.fn(() => vi.fn()) }
+    const uiConversation = { events: { register: vi.fn(() => () => {}) }, views: { register: vi.fn(() => () => {}) } }
     apply({ slots, effect: (run: () => unknown) => run(), locale, uiConversation } as never)
     expect(locale.register).toHaveBeenCalledWith(NS, { zh, en, ja, es, fr, de, ru, pt })
     expect(register.mock.calls.map(([options, component]) => [options, component])).toContainEqual([{ name: 'tool.call.toolview', key: 'casper_receipt', locale: NS }, ReceiptRow])

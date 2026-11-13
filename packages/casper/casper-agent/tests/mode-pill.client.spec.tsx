@@ -51,8 +51,8 @@ describe('ModePill', () => {
     const register = vi.fn((_options: Options, _component: unknown) => () => {})
     const slots = { inject: vi.fn((_name: string, mount: () => () => void) => mount()), register }
     const effect = vi.fn((run: () => unknown) => run())
-    const uiConversation = { events: { register: vi.fn(() => () => {}) } }
-    const locale = { register: vi.fn(() => () => {}) }
+    const uiConversation = { events: { register: vi.fn(() => () => {}) }, views: { register: vi.fn(() => () => {}) } }
+    const locale = { register: vi.fn(() => () => {}), bind: vi.fn(() => vi.fn()) }
     apply({ slots, effect, locale, uiConversation } as never)
     const entry = register.mock.calls.find(call => call[0].name === 'conversation.input.left')
     expect(entry?.[0]).toEqual({ name: 'conversation.input.left', id: 'casper-mode-pill', locale: NS })
