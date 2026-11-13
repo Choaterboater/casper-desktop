@@ -49,6 +49,14 @@ it('hides every optional bundle DeepSeek ships, so the Plugins page cannot switc
   expect(hidden).not.toContain('@deepseek-ai/dsh-casper-chrome-bundle')
 })
 
+it('never asks npmmirror: no registry timing probe, no fallback registry for installs, no npmmirror file reads', () => {
+  const rows = desktopRows()
+  const pluginManager = rows.find(entry => entry.id === 'plugin-manager')?.config
+  expect(rows.find(entry => entry.id === 'ui-plugin-manager')?.config).toMatchObject({ registryProbeEnabled: false })
+  expect(pluginManager?.['fallbackRegistries']).toEqual([])
+  expect(pluginManager?.['detailNpmFileSources']).toEqual(['jsdelivr', 'unpkg'])
+})
+
 it('uploads no Session logs unless the user opts in', () => {
   const mode = desktopRows().find(entry => entry.id === 'session-telemetry-otel')?.config?.['mode']
   const source = typeof mode === 'object' && mode !== null && '__jsExpr' in mode ? String(mode.__jsExpr) : String(mode)

@@ -326,6 +326,9 @@
     # Without a profile-backed Host it reports itself unavailable.
     - id: ui-plugin-manager
       name: '@deepseek-ai/dsh-client-ui-plugin-manager'
+      # Casper: no timing probe of the npm registry and its npmmirror copy before installs and README loads.
+      config:
+        registryProbeEnabled: false
 
     # Read-only Plugin list tab in the Settings Plugins section; the built-in
     # bundles the sidebar page leaves out are inspected here.
@@ -674,9 +677,12 @@
   disabled: true
 # Casper does not offer the optional bundles DeepSeek ships: the Plugins page, Settings and the
 # plugin_manager tool leave them out while they are switched off and refuse to switch them on.
-# The dsh-base row has no config, so this one owns it whole.
+# The dsh-base row has no config, so this one owns it whole. A failed install is not retried against the
+# npmmirror registry (fallbackRegistries is empty), and README and image reads use jsdelivr and unpkg only.
 - id: plugin-manager
   config:
+    fallbackRegistries: []
+    detailNpmFileSources: [jsdelivr, unpkg]
     hiddenBundles:
       - '@deepseek-ai/dsh-personalized-recommendations'
       - '@deepseek-ai/dsh-cua-bundle'
