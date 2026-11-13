@@ -71,7 +71,7 @@ describe('desktop upload command', () => {
 })
 
 const productionEnvironment = {
-  DSH_DESKTOP_AUTO_UPDATE_ENV: 'production', DOWNLOAD_PROD_COS_BUCKET: 'fixture-bucket',
+  DSH_DESKTOP_AUTO_UPDATE_ENV: 'production', DOWNLOAD_PROD_ORIGIN: 'https://downloads.example.com', DOWNLOAD_PROD_COS_BUCKET: 'fixture-bucket',
   DOWNLOAD_PROD_COS_SECRET_ID: 'fixture-id', DOWNLOAD_PROD_COS_SECRET_KEY: 'fixture-key', DOWNLOAD_PROD_EO_ZONE_ID: 'zone-fixture',
 }
 
@@ -86,7 +86,7 @@ describe('cache-only submission command', () => {
     expect(uploadDesktopRelease).not.toHaveBeenCalled()
     expect(tagDesktopRelease).not.toHaveBeenCalled()
     expect(purgeDesktopInstaller).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
-      publicUrl: 'https://download.deepseek.com/desktop/dsh-latest-macos-arm64.dmg',
+      publicUrl: 'https://downloads.example.com/desktop/dsh-latest-macos-arm64.dmg',
     }))
   })
 

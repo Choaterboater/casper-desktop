@@ -77,7 +77,7 @@ export function desktopUpdateMetadataFilename(
  * @param platform - Target Node.js platform.
  * @param arch - Target Node.js architecture.
  * @returns Resolved updater configuration.
- * @throws When the test deployment lacks a valid HTTPS origin or a 32-character lowercase hexadecimal release ID.
+ * @throws When the selected deployment lacks a valid HTTPS origin, or the test deployment lacks a 32-character lowercase hexadecimal release ID.
  */
 export function resolveDesktopAutoUpdateConfig(
   env: NodeJS.ProcessEnv,

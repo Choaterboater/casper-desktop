@@ -87,7 +87,7 @@ describe('Windows update publisher', () => {
         DSH_DESKTOP_WINDOWS_SIGNTOOL: signTool,
         DSH_DESKTOP_WINDOWS_KEY_CONTAINER: 'test-container',
         DSH_DESKTOP_WINDOWS_TOKEN_PIN: 'test-pin',
-        DSH_DESKTOP_AUTO_UPDATE_ENV: 'production',
+        DSH_DESKTOP_AUTO_UPDATE_ENV: 'production', DOWNLOAD_PROD_ORIGIN: 'https://downloads.example.com',
       }, 'win32', 'x64')
       expect(config.win.forceCodeSigning).toBe(true)
       expect(config.artifactName).toBe('casper-${version}-${os}-${arch}.${ext}')

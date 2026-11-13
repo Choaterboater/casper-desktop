@@ -59,7 +59,7 @@ function purgeConfig(environment: NodeJS.ProcessEnv, target: DesktopPackageTarge
     return resolveDesktopPurgeConfig(environment, target, publicUrl)
   } catch (error) {
     if (error instanceof DesktopPurgeError) throw error
-    throw new DesktopUploadUsageError('Invalid production purge settings; check DOWNLOAD_PROD_COS_BUCKET, DOWNLOAD_PROD_COS_SECRET_ID, DOWNLOAD_PROD_COS_SECRET_KEY and DOWNLOAD_PROD_EO_ZONE_ID in the target dotenv.')
+    throw new DesktopUploadUsageError('Invalid production purge settings; check DOWNLOAD_PROD_ORIGIN, DOWNLOAD_PROD_COS_BUCKET, DOWNLOAD_PROD_COS_SECRET_ID, DOWNLOAD_PROD_COS_SECRET_KEY and DOWNLOAD_PROD_EO_ZONE_ID in the target dotenv.')
   }
 }
 
