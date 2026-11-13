@@ -28,6 +28,8 @@ account 命名空间提供 getState、getProfile / getBalance、getUnnotifiedBon
 
 `hasRunningAccountTasks` 通过账号模块的判断函数，检查运行中 Agent 最近记录的请求上下文，包括工具和重试阶段。空闲 Agent 及 API key 上下文不计入。移除凭据时，账号提供方独立取消匹配任务。
 
+Client face（`./client`）通过 `ctx.remote.$mount()` 挂载本包生成的 `account` contribution，并在该行卸载时撤回，因此该 namespace 恰在 account-controller 行启用时存在。[`ui-settings-account`](../../client/ui-settings-account/README.zh.md) 等账号界面注入 `remote.account`，只导入其类型声明。
+
 <a id="understand-the-implementation"></a>
 ## 理解实现
 

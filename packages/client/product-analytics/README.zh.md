@@ -65,6 +65,8 @@ Electron 将构建内联的 `DSH_CLIENT_VERSION` 传给 Host；埋点与导出�
 
 展示组件接收回调。共享 Client 服务读取可选的桌面埋点发送器，后者要求同时存在原生 preload 标识和 同步的 Host 采集策略。发送器在被其他插件调用时保留自身的 RPC 上下文。原生操作使用已认证的 Host API，其生成的 Typert 校验器只接受类型中声明的事件字段。Host 在入队前附加缓存的静态环境和当前身份信息，并监听实时压缩事件，不重放会话历史。
 
+Client 入口通过 `ctx.remote.$mount()` 挂载本包生成的 `productAnalytics` contribution，在 `remote.productAnalytics` 可用后提供发送器；卸载时先撤回发送器再撤回 namespace，发送器初始化失败时两者都撤回。
+
 </details>
 
 <a id="model-experience"></a>

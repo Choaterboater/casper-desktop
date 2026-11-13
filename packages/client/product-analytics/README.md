@@ -65,6 +65,8 @@ Direct preset switches report accepted different choices in the mode picker: an 
 
 Presentational components receive callbacks. Shared Client services resolve the optional Desktop analytics sender, which requires both the native preload marker and the synchronized Host policy. The sender retains its own RPC context when called by other plugins. Native actions use the authenticated Host API; its generated Typert validator accepts only the typed event fields. The Host attaches its cached static environment and current identity before queueing. It observes live compaction events without replaying Session history.
 
+The Client entry mounts the package's own generated `productAnalytics` contribution through `ctx.remote.$mount()`, then provides the sender once `remote.productAnalytics` is available; unloading withdraws the sender before the namespace, and a sender setup failure withdraws both.
+
 </details>
 
 <a id="model-experience"></a>

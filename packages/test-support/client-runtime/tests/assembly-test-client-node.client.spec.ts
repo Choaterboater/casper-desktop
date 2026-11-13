@@ -2,7 +2,7 @@
 import type { ClientTransportHooks } from '@deepseek-ai/dsh-client-connection/client'
 import { RemoteMock } from '@deepseek-ai/dsh-remote-mock'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
-import { TestClient, remoteDefaultResponses, webApp } from '../src/assembly/index.ts'
+import { ClientRoster, TestClient, remoteDefaultResponses, webApp } from '../src/assembly/index.ts'
 
 /** The Gateway client and what it injects: the Typert registry and the Connection. */
 const API_ROSTER = webApp.closure(['@deepseek-ai/dsh-api-gateway'])
@@ -10,6 +10,14 @@ const TYPERT_ONLY = webApp.pick(['@deepseek-ai/dsh-typert-registry'])
 /** A row on the Web client's required list, so its failure rejects the boot. */
 const RENDERER_ONLY = webApp.pick(['@deepseek-ai/dsh-client-ui-renderer'])
 const globals = globalThis as { __DSH_TRANSPORT__?: ClientTransportHooks }
+const ACCOUNT_CONTROLLER = '@deepseek-ai/dsh-api-account-controller'
+const PRODUCT_ANALYTICS = '@deepseek-ai/dsh-client-product-analytics'
+/** The api roster plus the self-mounting rows the shipped profile disables, declared as their manifests declare them. */
+const SELF_MOUNTED_ROSTER = ClientRoster.of([
+  ...API_ROSTER.rows,
+  { name: ACCOUNT_CONTROLLER, inject: ['@deepseek-ai/dsh-api-gateway'], immediately: false },
+  { name: PRODUCT_ANALYTICS, inject: ['@deepseek-ai/dsh-api-gateway'], immediately: false },
+])
 
 describe('TestClient (node environment)', () => {
   it('boots the api roster, connects, and flushes without a DOM', async () => {
@@ -88,6 +96,21 @@ describe('TestClient (node environment)', () => {
         .rejects.toThrow(`${name} cannot be provided; the tier replaces its generated Remote mount`)
     },
   )
+
+  it.each([ACCOUNT_CONTROLLER, PRODUCT_ANALYTICS])(
+    'refuses a provide entry for the self-mounting %s row',
+    async (name) => {
+      await expect(TestClient.start({ roster: SELF_MOUNTED_ROSTER, provide: { [name]: { apply() {} } } }, RemoteMock.create()))
+        .rejects.toThrow(`${name} cannot be provided; the tier replaces its generated Remote mount`)
+    },
+  )
+
+  it('drops the self-mounting account and analytics rows and leaves no analytics sender', async () => {
+    const mock = RemoteMock.create().load(remoteDefaultResponses)
+    const client = await TestClient.start({ roster: SELF_MOUNTED_ROSTER }, mock)
+    onTestFinished(() => client.dispose())
+    expect(client.ctx.get('productAnalytics')).toBeUndefined()
+  })
 
   it('drops the remote-access row and answers every access question with true', async () => {
     const mock = RemoteMock.create().load(remoteDefaultResponses)

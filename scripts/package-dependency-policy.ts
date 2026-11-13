@@ -7,6 +7,8 @@ const CLIENT_FACE_INCLUDE: readonly string[] = []
 const CLIENT_FACE_EXCLUDE: readonly string[] = [
   '@deepseek-ai/dsh-api-session-controller',
   '@deepseek-ai/dsh-api-workspace-controller',
+  // Its Client half only mounts the generated `account` namespace; its Host relays stay peers, as before it gained one.
+  '@deepseek-ai/dsh-api-account-controller',
   // Casper: a desktop-only ACP driver with its approval and receipt card in the same package, laid out like Session
   // Controller; its Host relays stay peers, as before it gained a Client half.
   '@deepseek-ai/dsh-casper-agent',

@@ -1,27 +1,7 @@
 {
-  "extends": "../../../tsconfig.base.json",
-  "compilerOptions": {
-    "rootDir": "src",
-    "outDir": "lib/types"
-  },
-  "include": [
-    "src"
-  ],
+  "files": [],
   "references": [
-    {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../credentials/deepseek-account"
-    },
-    {
-      "path": "../../typert/protocol"
-    },
-    {
-      "path": "../../core/agent"
-    }
+    { "path": "./tsconfig.host.json" },
+    { "path": "./tsconfig.client.json" }
   ]
 }

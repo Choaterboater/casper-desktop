@@ -2,11 +2,14 @@
  * Client-face completeness gate for the viewer endpoint classification.
  *
  * This module is compiled by the package's Client face, which pulls the production Remote maps in
- * through the Client assembly. `Extract<keyof TypertRemoteMap, string>` therefore names every endpoint
- * a shipped Client build can call; an endpoint added without a table row fails this declaration.
+ * through the Client assembly and the packages that mount their own namespaces.
+ * `Extract<keyof TypertRemoteMap, string>` therefore names every endpoint a shipped Client build can
+ * call; an endpoint added without a table row fails this declaration.
  * @module @deepseek-ai/dsh-experimental-liveshare/src/client/endpoint-classification
  */
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
+import type {} from '@deepseek-ai/dsh-api-account-controller/remote'
+import type {} from '@deepseek-ai/dsh-client-product-analytics/remote'
 import type {} from '@deepseek-ai/dsh-api-remote-access/remote'
 import type { RemoteEndpoint } from '@deepseek-ai/dsh-api-remote-access/client'
 import type {} from '@deepseek-ai/dsh-cua/remote'

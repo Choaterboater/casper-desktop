@@ -1344,6 +1344,9 @@ importers:
       '@deepseek-ai/dsh-agent':
         specifier: workspace:*
         version: link:../../core/agent
+      '@deepseek-ai/dsh-api-gateway':
+        specifier: workspace:*
+        version: link:../gateway
       '@deepseek-ai/dsh-deepseek-account':
         specifier: workspace:*
         version: link:../../credentials/deepseek-account
@@ -1495,9 +1498,6 @@ importers:
       '@deepseek-ai/dsh-agent-team':
         specifier: workspace:*
         version: link:../../team/agent-team
-      '@deepseek-ai/dsh-api-account-controller':
-        specifier: workspace:*
-        version: link:../account-controller
       '@deepseek-ai/dsh-api-gateway':
         specifier: workspace:*
         version: link:../gateway
@@ -1528,9 +1528,6 @@ importers:
       '@deepseek-ai/dsh-client-file-upload':
         specifier: workspace:*
         version: link:../../client/file-upload
-      '@deepseek-ai/dsh-client-product-analytics':
-        specifier: workspace:*
-        version: link:../../client/product-analytics
       '@deepseek-ai/dsh-client-ui-plugin-manager':
         specifier: workspace:*
         version: link:../../client/ui-plugin-manager
@@ -5939,6 +5936,9 @@ importers:
       '@deepseek-ai/cordis':
         specifier: workspace:~
         version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-api-account-controller':
+        specifier: workspace:*
+        version: link:../../api/account-controller
       '@deepseek-ai/dsh-api-remote-access':
         specifier: workspace:*
         version: link:../../api/remote-access
@@ -10742,6 +10742,9 @@ importers:
       '@deepseek-ai/dsh-agent-loop-testkit':
         specifier: workspace:*
         version: link:../../test-support/agent-loop-testkit
+      '@deepseek-ai/dsh-api-account-controller':
+        specifier: workspace:*
+        version: link:../../api/account-controller
       '@deepseek-ai/dsh-api-gateway':
         specifier: workspace:*
         version: link:../../api/gateway
@@ -10775,6 +10778,9 @@ importers:
       '@deepseek-ai/dsh-client-modules':
         specifier: workspace:*
         version: link:../../client/modules
+      '@deepseek-ai/dsh-client-product-analytics':
+        specifier: workspace:*
+        version: link:../../client/product-analytics
       '@deepseek-ai/dsh-client-resources':
         specifier: workspace:*
         version: link:../../client/resources

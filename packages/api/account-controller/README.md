@@ -28,6 +28,8 @@ Every operation that reaches Platform takes the calling UI's `AccountClientMetad
 
 `hasRunningAccountTasks` checks running Agents through the account-owned predicate over their latest logged request context, including tools and retries. Idle Agents and API-key contexts are excluded. The account provider independently cancels matching tasks when credentials are removed.
 
+The Client face (`./client`) mounts this package's generated `account` contribution through `ctx.remote.$mount()` and withdraws it when the row unloads, so the namespace exists exactly while the account-controller row is enabled. Account screens such as [`ui-settings-account`](../../client/ui-settings-account/README.md) inject `remote.account` and import only its type declarations.
+
 <a id="understand-the-implementation"></a>
 ## Understand the implementation
 
