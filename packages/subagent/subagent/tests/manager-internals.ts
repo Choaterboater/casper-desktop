@@ -47,7 +47,7 @@ export function bindSubagentActivation(
     handle: { agent: child, async dispose() {} },
     outputStart: child.session.seq,
     structured: undefined,
-    failureAt: undefined,
+    failure: undefined,
     poke: Promise.withResolvers(),
     omitClosingText: false,
     delivery: 'caller',

@@ -3,10 +3,11 @@
  */
 
 import type { Agent, AgentHandle } from '@deepseek-ai/dsh-agent'
+import { HarnessError } from '@deepseek-ai/dsh-llm'
 import type { SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import { assertNever } from '@deepseek-ai/dsh-util-values'
 import { finalAssistantOutput } from './assistant-output.ts'
-import { epochStopReason } from './lifecycle.ts'
+import { epochEnding } from './lifecycle.ts'
 import { SubagentError } from './error.ts'
 import type { StructuredAttachment } from './structured.ts'
 import type { SubagentResult, SubagentRun, SubagentRunId } from './types.ts'
@@ -63,6 +64,14 @@ interface ActivationBase {
   accepted: boolean
 }
 
+/** One live local child failure, kept until a later turn ending is committed. */
+export interface LocalFailure {
+  /** The child's Session log offset when the failure was reported. */
+  readonly at: SessionLogOffset
+  /** The `HarnessError` code of the reported error; undefined for an untyped error. */
+  readonly code: string | undefined
+}
+
 /** Resources retained only for the selected execution kind. */
 export type ActivationResource =
   | {
@@ -71,7 +80,7 @@ export type ActivationResource =
     readonly outputStart: SessionLogOffset
     readonly structured: StructuredAttachment | undefined
     /** Latest live failure not superseded by a later committed turn ending. */
-    failureAt: SessionLogOffset | undefined
+    failure: LocalFailure | undefined
     /** Renewed when local settlement must recheck input. */
     poke: PromiseWithResolvers<void>
     /**
@@ -125,36 +134,57 @@ export function requireLocalActivation(activation: Activation): LocalActivation 
  */
 export function observeLocalFailure(activation: LocalActivation, wake: () => void): void {
   const child = activation.handle.agent
-  child.ctx.on('agent/error', ({ agent }) => {
+  child.ctx.on('agent/error', ({ agent, error }) => {
     if (agent !== child) return
-    activation.failureAt = child.session.seq
+    activation.failure = { at: child.session.seq, code: error instanceof HarnessError ? error.code : undefined }
     wake()
   })
   child.ctx.on('session/event', (session, event) => {
     if (session === child.session && event.type === 'turn/end'
-      && activation.failureAt !== undefined && event.seq >= activation.failureAt) {
-      activation.failureAt = undefined
+      && activation.failure !== undefined && event.seq >= activation.failure.at) {
+      activation.failure = undefined
     }
   })
 }
 
 /**
+ * The parent-facing detail for a local child's failure, read from its error code alone: an error message can carry
+ * provider response text or tool input, which {@link SubagentResult.diagnostic} excludes.
+ * @param code - the failure's code; undefined or `UNKNOWN` for an untyped error.
+ * @returns the detail, or undefined when the code names no cause.
+ */
+export function localFailureDiagnostic(code: string | undefined): string | undefined {
+  if (code === undefined || code === 'UNKNOWN') return undefined
+  // The child's route has no adapter: the app has no model provider set up for it.
+  if (code === 'NO_ADAPTER') {
+    return 'It could not run because no model provider is set up for its model. '
+      + 'Ask the user to add a model provider in Settings → Models, then start the subagent again.'
+  }
+  return `Its last turn failed with error code ${code}.`
+}
+
+/**
  * Capture local output and retain failures without a later committed turn ending.
  * @param activation - the settled local execution and any structured result.
- * @returns final output, stop reason, and committed structured value.
+ * @returns final output, stop reason, committed structured value, and the retained failure's diagnostic.
  */
 export function captureLocalResult(activation: LocalActivation): SubagentResult {
   // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
   const events = activation.handle.agent.session.snapshotEvents(activation.outputStart)
   const output = finalAssistantOutput(events) ?? []
-  const stopReason = activation.failureAt === undefined ? epochStopReason(events) : 'error'
+  const { failure } = activation
+  const { stopReason, failureCode } = failure === undefined
+    ? epochEnding(events)
+    : { stopReason: 'error' as const, failureCode: failure.code }
+  const detail = localFailureDiagnostic(failureCode)
+  const diagnostic = detail === undefined ? {} : { diagnostic: detail }
   const structured = activation.structured
   if (structured !== undefined) {
     const captured = structured.captured()
-    if (captured !== undefined) return { output, stopReason, structured: captured.value }
+    if (captured !== undefined) return { output, stopReason, structured: captured.value, ...diagnostic }
     if (stopReason === 'completed') return { output, stopReason: 'error' }
   }
-  return { output, stopReason }
+  return { output, stopReason, ...diagnostic }
 }
 
 /** Serialize each durable child's delivery, release, and disposal. */

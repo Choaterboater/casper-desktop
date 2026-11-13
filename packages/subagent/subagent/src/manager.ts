@@ -253,7 +253,7 @@ export class SubagentManager {
           continue
         }
         const inbox = item.handle.agent.inbox
-        if (item.failureAt === undefined && (inbox.nextTurn.length > 0 || inbox.nextStep.length > 0)) continue
+        if (item.failure === undefined && (inbox.nextTurn.length > 0 || inbox.nextStep.length > 0)) continue
         waits.push(Promise.race([item.result.promise.catch(() => undefined), item.poke.promise]))
       }
       if (waits.length > 0) {
@@ -779,7 +779,7 @@ export class SubagentManager {
         handle,
         outputStart: handle.agent.session.seq,
         structured,
-        failureAt: undefined,
+        failure: undefined,
         poke: Promise.withResolvers<void>(),
         omitClosingText: false,
       }
@@ -940,7 +940,7 @@ export class SubagentManager {
     if (activation.closing !== undefined) return 'closed'
     if (activation.poke !== observation) return 'retry'
     const inbox = activation.handle.agent.inbox
-    if (activation.failureAt === undefined && (inbox.nextTurn.length > 0 || inbox.nextStep.length > 0)) return 'wait'
+    if (activation.failure === undefined && (inbox.nextTurn.length > 0 || inbox.nextStep.length > 0)) return 'wait'
     return 'ready'
   }
 
