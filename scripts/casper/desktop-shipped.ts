@@ -5,7 +5,7 @@
  *
  * What is scanned:
  * - the desktop package set from the packager's own {@link selectDesktopPackageClosure}, for each shipped target;
- * - per workspace package, `package.json`, top-level READMEs, the non-`lib/` `files` globs, and `src/` when `files` ships `lib/`;
+ * - per workspace package, `package.json`, top-level READMEs, the source `files` globs, and `src/` when `files` ships `lib/` or `dist/`;
  * - workspace packages a scanned source imports at runtime without depending on them, which the build inlines;
  * - the Electron app's bundled entries, following their local and workspace imports, and its `renderer/` files;
  * - the installed third-party production closure, minus the files the packager drops (`desktopRuntimeFileExclusion`).
@@ -283,15 +283,21 @@ export function sourceStrings(path: string, source: string): string[] {
   return texts
 }
 
-/** Files one workspace package publishes, as sources: the manifest, READMEs, non-`lib/` `files` globs, and `src/` for `lib/`. */
+/** Build output folders a package publishes; the scan reads the package's `src/` in their place. */
+const BUILD_OUTPUT = /^(?:lib|dist)(?:\/|$)/u
+
+/**
+ * Files one workspace package publishes, as sources: the manifest, READMEs, the `files` globs that name sources, and
+ * `src/` in place of build output (`lib/`, `dist/`). Negated globs only narrow build output, so they are not read.
+ */
 function workspacePackageFiles(scanner: Scanner, pkg: WorkspacePackage): string[] {
   const dir = join(REPOSITORY_ROOT, pkg.dir)
   const files = new Set<string>(['package.json'])
   for (const entry of readdirSync(dir)) if (/^readme/iu.test(entry)) files.add(entry)
   const globs = Array.isArray(pkg.manifest.files) ? pkg.manifest.files.filter(file => typeof file === 'string') : undefined
-  const sources = globs === undefined || globs.some(file => file === 'lib' || file.startsWith('lib/'))
+  const sources = globs === undefined || globs.some(file => BUILD_OUTPUT.test(file))
   for (const pattern of globs ?? []) {
-    if (pattern === 'lib' || pattern.startsWith('lib/')) continue
+    if (BUILD_OUTPUT.test(pattern) || pattern.startsWith('!')) continue
     for (const match of globSync(pattern, { cwd: dir })) {
       const path = join(dir, match)
       if (statSync(path).isDirectory()) for (const nested of walkFiles(path, () => false)) files.add(toPosix(join(match, nested)))
