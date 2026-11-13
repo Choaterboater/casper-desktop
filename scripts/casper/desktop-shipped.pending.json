@@ -253,13 +253,6 @@
   },
   {
     "rule": "import",
-    "file": "packages/api/account-controller/src/index.ts",
-    "match": "@deepseek-ai/dsh-deepseek-account",
-    "count": 1,
-    "step": "3a"
-  },
-  {
-    "rule": "import",
     "file": "packages/api/remotes/src/client/index.ts",
     "match": "@deepseek-ai/dsh-api-account-controller",
     "count": 1,
@@ -274,71 +267,8 @@
   },
   {
     "rule": "import",
-    "file": "packages/credentials/deepseek-account-platform/src/index.ts",
-    "match": "@deepseek-ai/dsh-deepseek-account",
-    "count": 1,
-    "step": "3a"
-  },
-  {
-    "rule": "import",
-    "file": "packages/llm/llm-deepseek-account/src/config.ts",
-    "match": "@deepseek-ai/dsh-llm-deepseek",
-    "count": 1,
-    "step": "3a"
-  },
-  {
-    "rule": "import",
-    "file": "packages/llm/llm-deepseek-account/src/index.ts",
-    "match": "@deepseek-ai/dsh-llm-deepseek",
-    "count": 1,
-    "step": "3a"
-  },
-  {
-    "rule": "import",
-    "file": "packages/llm/llm-deepseek-api-key/src/config.ts",
-    "match": "@deepseek-ai/dsh-llm-deepseek",
-    "count": 1,
-    "step": "3a"
-  },
-  {
-    "rule": "import",
-    "file": "packages/llm/llm-deepseek-api-key/src/index.ts",
-    "match": "@deepseek-ai/dsh-llm-deepseek",
-    "count": 1,
-    "step": "3a"
-  },
-  {
-    "rule": "import",
     "file": "packages/sdk/server/src/server.ts",
     "match": "@deepseek-ai/dsh-llm-deepseek-api-key",
-    "count": 1,
-    "step": "3a"
-  },
-  {
-    "rule": "import",
-    "file": "packages/web/web-deepseek-api/src/index.ts",
-    "match": "@deepseek-ai/dsh-llm-deepseek",
-    "count": 1,
-    "step": "3a"
-  },
-  {
-    "rule": "import",
-    "file": "packages/web/web-deepseek-api/src/index.ts",
-    "match": "@deepseek-ai/dsh-llm-deepseek-account",
-    "count": 1,
-    "step": "3a"
-  },
-  {
-    "rule": "import",
-    "file": "packages/web/web-deepseek-api/src/index.ts",
-    "match": "@deepseek-ai/dsh-llm-deepseek-api-key",
-    "count": 1,
-    "step": "3a"
-  },
-  {
-    "rule": "import",
-    "file": "packages/web/web-search-deepseek/src/index.ts",
-    "match": "@deepseek-ai/dsh-llm-deepseek",
     "count": 1,
     "step": "3a"
   },

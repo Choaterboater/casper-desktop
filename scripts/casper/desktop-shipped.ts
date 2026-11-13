@@ -10,6 +10,8 @@
  * - the Electron app's bundled entries, following their local and workspace imports, and its `renderer/` files;
  * - the installed third-party production closure, minus the files the packager drops (`desktopRuntimeFileExclusion`).
  *
+ * An import of a forbidden package counts only from kept code; a forbidden package's own imports leave with it.
+ *
  * Not seen: tsdown and Vite output and third-party code a build inlines; `scan-packaged-app.ts` covers those on a packaged app.
  * @module scripts/casper/desktop-shipped
  */
@@ -197,7 +199,11 @@ class Scanner {
   readonly locales = new Set<string>()
   readonly scanned = new Set<string>()
 
-  constructor(private readonly overlay: ShippedOverlay) {}
+  /**
+   * @param overlay - Content replacements by repository-relative path.
+   * @param forbiddenDirs - Folders of forbidden workspace packages, each ending in `/`; their own imports leave with them.
+   */
+  constructor(private readonly overlay: ShippedOverlay, private readonly forbiddenDirs: readonly string[]) {}
 
   read(path: string): string {
     return this.overlay.get(path) ?? readFileSync(join(REPOSITORY_ROOT, path), 'latin1')
@@ -224,7 +230,7 @@ class Scanner {
     for (const text of this.screenTexts(path, label)) {
       for (const match of text.matchAll(FORBIDDEN_SCREEN_TEXT)) this.collector.add('text', label, match[0])
     }
-    if (SOURCE_FILE.test(label)) {
+    if (SOURCE_FILE.test(label) && !this.forbiddenDirs.some(dir => label.startsWith(dir))) {
       for (const specifier of collectRuntimeSourceSpecifiers(label, this.readText(path))) {
         const name = packageNameOf(specifier)
         if (name !== undefined && DESKTOP_FORBIDDEN_PACKAGES.includes(name)) this.collector.add('import', label, name)
@@ -324,8 +330,8 @@ function resolveInstalled(fromDir: string, name: string): string | undefined {
  * @returns What the scan saw and found.
  */
 export function scanDesktopShipped(overlay: ShippedOverlay = new Map()): ShippedScan {
-  const scanner = new Scanner(overlay)
   const workspace = readWorkspace()
+  const scanner = new Scanner(overlay, DESKTOP_FORBIDDEN_PACKAGES.map(name => `${workspacePackage(workspace, name).dir}/`))
   const closure = workspaceClosure(workspace)
   for (const name of [...closure].sort()) {
     if (DESKTOP_FORBIDDEN_PACKAGES.includes(name)) scanner.collector.add('package', 'closure', name)
