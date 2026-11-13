@@ -190,13 +190,16 @@ const claudeCodeTestingAliases = {
   'claude-code': fileURLToPath(new URL('./packages/experimental/claude-code-mods/tests/support/claude-code.ts', import.meta.url)),
 }
 
-// The LiveShare client entry statically imports its generated `./remote` contribution, which exists
+// These client entries statically import their package's generated `./remote` contribution, which exists
 // only in built `lib/` output. On a clean checkout Vite resolves that import while transforming the
-// entry, before `vi.mock` can answer it, so the jsdom assembly suites need a resolvable stand-in.
-const liveshareRemoteBuild = fileURLToPath(new URL('./packages/experimental/liveshare/lib/typert.remote-client.js', import.meta.url))
-const generatedRemoteAliases = existsSync(liveshareRemoteBuild) ? {} : {
-  '@deepseek-ai/dsh-experimental-liveshare/remote': fileURLToPath(new URL('./packages/experimental/liveshare/tests/generated-remote-stub.ts', import.meta.url)),
-}
+// entry, before `vi.mock` can answer it, so their jsdom suites need a resolvable stand-in.
+const generatedRemoteStubs = [
+  ['@deepseek-ai/dsh-experimental-liveshare', './packages/experimental/liveshare'],
+  ['@deepseek-ai/dsh-casper-agent', './packages/casper/casper-agent'],
+] as const
+const generatedRemoteAliases = Object.fromEntries(generatedRemoteStubs
+  .filter(([, dir]) => !existsSync(fileURLToPath(new URL(`${dir}/lib/typert.remote-client.js`, import.meta.url))))
+  .map(([name, dir]) => [`${name}/remote`, fileURLToPath(new URL(`${dir}/tests/generated-remote-stub.ts`, import.meta.url))]))
 const testingAliases = { ...claudeCodeTestingAliases, ...generatedRemoteAliases }
 
 export default defineConfig({
