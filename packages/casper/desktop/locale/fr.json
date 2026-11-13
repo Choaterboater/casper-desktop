@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Casper pour ordinateur",
+    "description": "Les couches de profil de l'application de bureau Casper : les lignes du noyau partagé et de l'application Web sans les services amont, suivies de la couche Casper."
+  }
+}

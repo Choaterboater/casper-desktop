@@ -1,0 +1,3 @@
+# The Casper layer of the Casper desktop bundle, applied after the generated upstream layers. Rows here override
+# upstream rows by id, with the profile's own cordis.patch.yml still to come.
+[]

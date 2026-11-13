@@ -150,6 +150,7 @@ flowchart TD
   end
   subgraph group_casper["packages/casper"]
     pkg_casper_agent["casper-agent"]
+    pkg_casper_desktop["casper-desktop"]
     pkg_casper_sidebar_browser["casper-sidebar-browser"]
     pkg_casper_sidebar_browser_client["casper-sidebar-browser-client"]
   end
@@ -1587,6 +1588,7 @@ flowchart TD
 | [`base`](../packages/bundle/base) | `bundle` | — |
 | [`sdk-app`](../packages/bundle/sdk-app) | `bundle` | — |
 | [`sdk-minimal`](../packages/bundle/sdk-minimal) | `bundle` | — |
+| [`casper-desktop`](../packages/casper/desktop) | `casper` | — |
 | [`casper-sidebar-browser-client`](../packages/casper/sidebar-browser-client) | `casper` | — |
 | [`client-file-upload`](../packages/client/file-upload) | `client` | — |
 | [`client-hmr`](../packages/client/hmr) | `client` | — |

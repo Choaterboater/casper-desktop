@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/casper/README.md
 /:
-  en: 4484047d57da8c8c
-  zh: 0440091561f2617d
+  en: 84e3482d89faafb9
+  zh: ff2a0d723b5e46ff
 /casper-casper-agent-and-sidebar-browser:
   en: 612b14f5b2d6c6c9
   zh: 96860f053cd22465
@@ -15,8 +15,8 @@
   en: 1eb35b015a6c423f
   zh: a8a3dceee2c9e943
 /casper-casper-agent-and-sidebar-browser/packages:
-  en: 3f20115f5b3f3ae3
-  zh: 7d5cc5de567c1350
+  en: 22908be954e8c44e
+  zh: 2a75fd4cc864adf4
 /casper-casper-agent-and-sidebar-browser/related-documentation:
   en: 526b1b8c38869d48
   zh: 933f20a9d23ddc5d

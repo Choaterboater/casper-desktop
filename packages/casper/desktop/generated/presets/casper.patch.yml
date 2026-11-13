@@ -1,0 +1,61 @@
+# Generated from packages/bundle/web-app/presets/casper.patch.yml by scripts/casper/desktop-bundle.ts --write; do not edit.
+# Agent preset casper: one `@deepseek-ai/dsh-agent-preset` declaration inserted
+# after the web patch. Sessions on this preset are driven by the Casper agent
+# (`@deepseek-ai/dsh-casper-agent`), so the preset mounts only what renders
+# Casper's work and what the Casper agent serves to Casper as the app's tools:
+# the todo list that shows Casper's plan, the plugin kit (Cordis
+# inspection, the app's skills with the agent-preset skills folder, and
+# plugin_manager on the app's own plugin-manager service), and present, whose
+# deliveries show as file cards in the Casper turn. The subagent rows serve
+# Casper the app's subagent tool and its controls: each child is a Standard
+# agent on agent-loop (agentPreset standard, since this preset has no bash or
+# file tools), not another Casper. The fork subagent is left out: a forked
+# subagent would run on the agent loop over Casper's log. The goal rows bring
+# /goal and the goal tools the Casper agent serves to Casper; the goal
+# service, its round driver and the goal bar are host-plane and apply already.
+# Casper's own checks replace casper-checks, and plugin-market has no service
+# in this deployment.
+# Desktop only, never in a Worker, exactly like the casper-agent row.
+- insert:
+    - id: preset-casper
+      name: '@deepseek-ai/dsh-agent-preset'
+      # Same gate as the casper-agent row that drives this preset's Sessions.
+      disabled: !!js "typeof WorkerGlobalScope !== 'undefined' || ctx.get('profileContext')?.name !== 'desktop'"
+      config:
+        id: casper
+        order: 0
+        name: Casper
+        description: Casper does the work and checks it before it says done.
+        plugins:
+          - id: tool-todo
+            name: '@deepseek-ai/dsh-tool-todo'
+            config:
+              allowParallelInProgress: true
+          - id: tool-cordis
+            name: '@deepseek-ai/dsh-tool-cordis'
+          - id: skill-filesystem
+            name: '@deepseek-ai/dsh-skill-filesystem'
+            config:
+              customSkillDirs:
+                - !!js process.getBuiltinModule('node:path').join(process.getBuiltinModule('node:path').dirname(process.getBuiltinModule('node:module').createRequire(baseUrl).resolve('@deepseek-ai/dsh-agent-preset/package.json')), 'skills')
+          - id: tool-skill
+            name: '@deepseek-ai/dsh-tool-skill'
+          - id: tool-plugin-manager
+            name: '@deepseek-ai/dsh-plugin-manager/tools'
+            disabled: !!js "!ctx.get('profileContext')"
+          - id: present
+            name: '@deepseek-ai/dsh-tool-present'
+          - id: tool-subagent-control
+            name: '@deepseek-ai/dsh-tool-subagent-control'
+          - id: tool-subagent
+            name: '@deepseek-ai/dsh-tool-subagent'
+            config:
+              provider: spawn
+              toolName: subagent
+              agentPreset: standard
+              modelSelection: true
+              modelDiscovery: true
+          - id: command-goal
+            name: '@deepseek-ai/dsh-command-goal'
+          - id: tool-goal
+            name: '@deepseek-ai/dsh-tool-goal'

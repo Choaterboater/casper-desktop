@@ -39,6 +39,7 @@ export const PRODUCT_PACKAGE_POLICY: Readonly<Record<string, ProductPackagePolic
   'packages/client/ui-settings-account': { category: 'optional', reason: 'Account Settings page that a deployment enables on the disabled web-app row.' },
   'packages/client/product-analytics': { category: 'optional', reason: 'Desktop product analytics that a deployment enables on the disabled web-app row.' },
   'packages/host/product-telemetry-otel': { category: 'optional', reason: 'Desktop product telemetry that a deployment enables on the disabled web-app row.' },
+  'packages/casper/desktop': { category: 'optional', reason: 'Casper desktop profile bundle generated from the base and Web layers; no shipped profile template selects it.' },
   'packages/sdk/client': { category: 'sdk', reason: 'Published TypeScript embedding client runs in the consumer process.' },
   'packages/typert/generator': { category: 'build', reason: 'Build-time generation of type metadata.' },
   'packages/test-support/agent-loop-testkit': { category: 'test', reason: 'Published agent-loop test harness.' },

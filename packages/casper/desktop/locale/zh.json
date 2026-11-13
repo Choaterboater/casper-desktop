@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Casper 桌面版",
+    "description": "Casper 桌面应用的配置层：共享核心与 Web 应用的行，去掉上游服务，之后是 Casper 层。"
+  }
+}
