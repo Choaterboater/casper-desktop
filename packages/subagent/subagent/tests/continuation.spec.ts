@@ -18,7 +18,7 @@ import * as SubagentSpawn from '@deepseek-ai/dsh-subagent-spawn-in-process'
 import * as SubagentFork from '@deepseek-ai/dsh-subagent-fork-in-process'
 import * as SubagentControl from '@deepseek-ai/dsh-tool-subagent-control'
 import type { ContentBlock, GenerateOptions, MessageId, StreamChunk } from '@deepseek-ai/dsh-llm'
-import { ToolCallId, createUserMessage, LlmAdapter, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
+import { ToolCallId, createUserMessage, LlmAdapter, LlmError, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { MockAdapter, maxTokensResponse, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 import SubagentRuntime, {
@@ -2182,7 +2182,32 @@ describe('continuable review regressions', () => {
     }, { prepend: true })
     const started = await ctx.subagents.startActivation({ ...startSpec(parent), delivery: 'caller' })
     try {
-      await expect(started.result).resolves.toMatchObject({ stopReason: 'error' })
+      const result = await started.result
+      expect(result.stopReason).toBe('error')
+      expect(result).not.toHaveProperty('diagnostic')
+    } finally {
+      await started.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('reports the code of a retained typed failure that no turn ending recorded', async () => {
+    const { ctx, parent } = await setup([textResponse('child answer')])
+    ctx.on('session/event', (session, event) => {
+      if (session === parent.session || event.type !== 'turn/end') return
+      const child = ctx.agents.get(session.id)!
+      agentEvents(ctx, child).emit('agent/error', {
+        turn: event.data.turn, step: 0, error: new LlmError('provider said: response body', 'NO_ADAPTER'),
+      })
+    }, { prepend: true })
+    const started = await ctx.subagents.startActivation({ ...startSpec(parent), delivery: 'caller' })
+    try {
+      await expect(started.result).resolves.toEqual({
+        stopReason: 'error',
+        output: [{ type: 'text', text: 'child answer' }],
+        diagnostic: 'It could not run because no model provider is set up for its model. '
+          + 'Ask the user to add a model provider in Settings → Models, then start the subagent again.',
+      })
     } finally {
       await started.dispose()
       await ctx.fiber.dispose()
@@ -3142,6 +3167,39 @@ describe('continuable settlement delivery', () => {
     await vi.waitFor(() => { expect(settlementNotices(parent)).toHaveLength(1) })
     expect(settlementNotices(parent)[0]!.text).toBe(
       `Background subagent ${started.childId} declined the task.\nIt left no closing message.`,
+    )
+  })
+
+  it('tells the parent a child on a route with no model provider failed and where to add one', async () => {
+    const { ctx, parent } = await setup([textResponse('parent ack')])
+    // An app with no model provider set up registers no adapter for the child's default route.
+    const started = await ctx.subagents.startActivation({
+      ...startSpec(parent), agentOptions: { provider: 'unconfigured', model: 'default' }, delivery: 'parent',
+    })
+    await waitNoActivation(ctx, started.childId)
+
+    await vi.waitFor(() => { expect(settlementNotices(parent)).toHaveLength(1) })
+    expect(settlementNotices(parent)[0]!.text).toBe(
+      `Background subagent ${started.childId} failed before it finished.\nIt left no closing message.\n`
+      + 'It could not run because no model provider is set up for its model. '
+      + 'Ask the user to add a model provider in Settings → Models, then start the subagent again.',
+    )
+  })
+
+  it('names the error code of a typed child failure without its message', async () => {
+    const { ctx, parent } = await setup([textResponse('parent ack')])
+    ctx.on('agent/pre-step', async ({ agent: subject }, next) => {
+      if (subject === parent) return next()
+      throw new LlmError('provider said: secret-bearing response body', 'AUTH')
+    })
+
+    const started = await ctx.subagents.startActivation({ ...startSpec(parent), delivery: 'parent' })
+    await waitNoActivation(ctx, started.childId)
+
+    await vi.waitFor(() => { expect(settlementNotices(parent)).toHaveLength(1) })
+    expect(settlementNotices(parent)[0]!.text).toBe(
+      `Background subagent ${started.childId} failed before it finished.\nIt left no closing message.\n`
+      + 'Its last turn failed with error code AUTH.',
     )
   })
 

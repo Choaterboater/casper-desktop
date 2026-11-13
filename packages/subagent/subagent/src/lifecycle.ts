@@ -75,34 +75,40 @@ export function createLifecycleEmitter(
  * failure still wins over a cancellation — stopping a child that had already
  * failed does not turn its failure into a cancellation.
  * @param events - this epoch's own event suffix.
- * @returns its terminal stop reason; `completed` only for an epoch that both
- *   closed cleanly and had nothing left to run.
+ * @returns its terminal stop reason, `completed` only for an epoch that both
+ *   closed cleanly and had nothing left to run, and the failure code its
+ *   accounting turn recorded when that turn ended with an error.
  */
-export function epochStopReason(events: readonly SessionEvent[]): SubagentResult['stopReason'] {
+export function epochEnding(events: readonly SessionEvent[]): {
+  stopReason: SubagentResult['stopReason']
+  failureCode: string | undefined
+} {
   const { end, droppedUnrun } = foldConsumedWork(events)
-  switch (end?.data.reason.kind) {
+  const reason = end?.data.reason
+  const ended = (stopReason: SubagentResult['stopReason']) => ({ stopReason, failureCode: undefined })
+  switch (reason?.kind) {
     case 'max-tokens':
-      return 'max-tokens'
+      return ended('max-tokens')
     case 'aborted':
     case 'interrupted':
-      return 'aborted'
+      return ended('aborted')
     case 'error':
-      return 'error'
+      return { stopReason: 'error', failureCode: reason.error.code }
     // A pre-step rejection — a hook deny, a policy plugin — discarded input
     // this epoch had claimed: the work was declined, not done.
     case 'blocked':
-      return 'refusal'
+      return ended('refusal')
     // A clean ending and no accounting turn at all share one rule: the epoch
     // finished what it was given unless a cancelled queue says otherwise.
     case undefined:
     case 'completed':
-      return droppedUnrun ? 'aborted' : 'completed'
+      return ended(droppedUnrun ? 'aborted' : 'completed')
     /* v8 ignore next 4 -- `forked` appears only in constructor seed history, while
      * this function reads an epoch-owned suffix. `TurnEndReason` is merge-extensible,
      * so a backend-added variant cannot be listed; treating an unnameable reason as
      * success would report failed work as completed. */
     default:
-      return 'error'
+      return ended('error')
   }
 }
 
