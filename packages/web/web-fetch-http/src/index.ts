@@ -5,6 +5,7 @@
  * @module @deepseek-ai/dsh-web-fetch-http
  */
 
+import { createRequire } from 'node:module'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-web'
@@ -19,8 +20,11 @@ export {
 } from './provider.ts'
 export type { HttpFetchLimits } from './provider.ts'
 
-/** Default `User-Agent`: an explicit product agent, never a browser disguise. */
-export const DEFAULT_USER_AGENT = 'deepseek-harness/0.0.1 (+https://github.com/deepseek-ai)'
+// `./package.json` is an export of this package; the relative path resolves from both `src/` and the bundled `lib/`.
+const { version } = createRequire(import.meta.url)('../package.json') as { version: string }
+
+/** Default `User-Agent`: Casper desktop's product agent at this package's version, never a browser disguise. */
+export const DEFAULT_USER_AGENT = `casper-desktop/${version} (+https://github.com/Choaterboater/casper-desktop)`
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'web-fetch-http'
