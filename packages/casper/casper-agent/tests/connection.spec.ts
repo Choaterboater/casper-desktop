@@ -1,13 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { chmodSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { delimiter, join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
+import { SubprocessExecutableNotFoundError } from '@deepseek-ai/dsh-subprocess'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import type { AvailableCommand, CreateElicitationRequest, CreateElicitationResponse, SessionConfigOption, SessionNotification } from '@agentclientprotocol/sdk'
 import { randomBytes } from 'node:crypto'
 import { appToolsEntry, rowEntry } from '../src/app-tools.ts'
 import type { AppToolsServer } from '../src/app-tools.ts'
-import { CasperConnection, CasperError, casperArgv, casperEnv, profileEnv } from '../src/connection.ts'
+import { CasperConnection, CasperError, casperArgv, casperEnv, casperNotFound, checkToolPath, profileEnv } from '../src/connection.ts'
 import type { CasperConnectionHandlers, CasperConnectionOptions } from '../src/connection.ts'
 import { Config } from '../src/config.ts'
 import { forwardedServers } from '../src/forward-servers.ts'
@@ -87,9 +88,34 @@ describe('casperArgv and casperEnv', () => {
     expect(profileEnv(undefined)).toEqual({})
   })
 
-  it('removes every ambient DEEPSEEK_ name and keeps configured entries', () => {
-    expect(casperEnv({ PATH: '/x', DEEPSEEK_KEEP: 'chosen' }, { DEEPSEEK_BASE_URL: 'u', deepseek_lower: 'l', HOME: '/home/user' }))
-      .toEqual({ DEEPSEEK_BASE_URL: undefined, deepseek_lower: undefined, PATH: '/x', DEEPSEEK_KEEP: 'chosen' })
+  it('removes every ambient DEEPSEEK_ name, keeps configured entries, and always turns Casper\'s update checks off', () => {
+    expect(casperEnv({ env: { PATH: '/x', DEEPSEEK_KEEP: 'chosen' }, toolPath: [] }, { DEEPSEEK_BASE_URL: 'u', deepseek_lower: 'l', HOME: '/home/user' }))
+      .toEqual({ DEEPSEEK_BASE_URL: undefined, deepseek_lower: undefined, PATH: '/x', DEEPSEEK_KEEP: 'chosen', CASPER_NO_UPDATE_CHECK: '1' })
+    expect(casperEnv({ env: { CASPER_NO_UPDATE_CHECK: '0' }, toolPath: [] }, {})).toEqual({ CASPER_NO_UPDATE_CHECK: '1' })
+  })
+
+  it('puts the tool folders at the end of the configured PATH, or of the app\'s PATH when env sets none', () => {
+    const tools = ['/app/node/bin', '/app/casper/tools']
+    expect(casperEnv({ env: { PATH: '/x' }, toolPath: tools }, { PATH: '/ambient' }).PATH).toBe(['/x', ...tools].join(delimiter))
+    expect(casperEnv({ env: {}, toolPath: tools }, { PATH: '/ambient' }).PATH).toBe(['/ambient', ...tools].join(delimiter))
+    expect(casperEnv({ env: {}, toolPath: tools }, {}).PATH).toBe(tools.join(delimiter))
+    expect(casperEnv({ env: {}, toolPath: [] }, { PATH: '/ambient' })).not.toHaveProperty('PATH')
+  })
+
+  it('accepts only absolute tool folders', () => {
+    expect(() => { checkToolPath([join(process.cwd(), 'tools')]) }).not.toThrow()
+    expect(() => { checkToolPath([join(process.cwd(), 'tools'), 'tools']) }).toThrow('toolPath folders must be absolute, got "tools"')
+  })
+
+  it('reports a missing bundled engine as a damaged app and a missing installed Casper as not installed', () => {
+    const miss = new SubprocessExecutableNotFoundError('gone')
+    const bundled = casperNotFound({ kind: 'bundled', executable: '/app/runtime/casper/casper' }, miss)
+    expect(bundled.code).toBe('CASPER_ENGINE_MISSING')
+    expect(bundled.message).toBe('The Casper engine that ships with the app is missing or cannot run at "/app/runtime/casper/casper". Reinstall the app, or turn on useInstalledCasper to run the Casper installed on this computer.')
+    expect(bundled.cause).toBe(miss)
+    const installed = casperNotFound({ kind: 'installed', command: 'casper' }, miss)
+    expect(installed.code).toBe('CASPER_NOT_FOUND')
+    expect(installed.message).toBe('Casper was not found at "casper". Install Casper, or pick another mode for this session.')
   })
 })
 
@@ -377,6 +403,26 @@ describe('CasperConnection', { timeout: 30_000 }, () => {
     expect(codeOf(failure)).toBe('CASPER_START_FAILED')
     expect(String(failure)).toContain('Login expired')
     expect(fake.calls('session/new')).toEqual([])
+  })
+
+  it('starts the bundled engine with the tool folders last on PATH and update checks off, without looking up command', async () => {
+    const { fake, start } = await setup()
+    const tools = join(fake.root, 'tools')
+    await start({ useInstalledCasper: false, engine: process.execPath, command: 'casper-not-installed-for-test', toolPath: [tools],
+      env: { ...fake.config().env, PATH: '/usr/bin' } })
+    const launch = fake.log().find(entry => entry.event === 'start')
+    expect(launch?.path).toBe(['/usr/bin', tools].join(delimiter))
+    expect(launch?.envNames).toContain('CASPER_NO_UPDATE_CHECK')
+    expect(fake.calls('session/new')).toHaveLength(1)
+  })
+
+  it('reports a bundled engine that is missing or not a file as CASPER_ENGINE_MISSING and starts nothing', async () => {
+    const { fake, start } = await setup()
+    const missing = await start({ useInstalledCasper: false, engine: join(fake.root, 'runtime', 'casper') }).catch((error: unknown) => error)
+    expect(codeOf(missing)).toBe('CASPER_ENGINE_MISSING')
+    expect(String(missing)).toContain(join(fake.root, 'runtime', 'casper'))
+    expect(codeOf(await start({ useInstalledCasper: false, engine: fake.root }).catch((error: unknown) => error))).toBe('CASPER_ENGINE_MISSING')
+    expect(fake.pids()).toEqual([])
   })
 
   it('reports a command that cannot be found or run as not installed', async () => {

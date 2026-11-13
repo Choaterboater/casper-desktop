@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
 import { composeEntries, loadProfileDirectory } from '@deepseek-ai/dsh-app-boot'
 import { createPluginProfile } from '../src/project-manager.ts'
+import { casperEngineEnvironment } from '../src/casper-engine.ts'
 
 type Row = { id?: string; name?: string; disabled?: unknown; config?: Record<string, unknown> }
 
@@ -90,6 +91,20 @@ it('passes Casper bun on PATH and the OpenRouter key, and no DeepSeek variables'
   expect(value['PATH']?.endsWith('/usr/bin')).toBe(true)
   const withoutKey = evaluate(env ?? '', profileCtx('desktop'), {}) as Record<string, string>
   expect(Object.keys(withoutKey)).toEqual(['PATH'])
+})
+
+it('runs the engine the shell hands the Host, with its tool folders, and leaves useInstalledCasper off', () => {
+  const config = desktopRows().find(entry => entry.id === 'casper-agent')?.config
+  expect(config).not.toHaveProperty('useInstalledCasper')
+  const engine = expression(config?.['engine']) ?? ''
+  const toolPath = expression(config?.['toolPath']) ?? ''
+  const environment = casperEngineEnvironment(join('/', 'App', 'runtime'), process.platform)
+  expect(evaluate(engine, profileCtx('desktop'), { env: environment })).toBe(environment.DSH_DESKTOP_CASPER_ENGINE)
+  expect(evaluate(toolPath, profileCtx('desktop'), { env: environment }))
+    .toEqual([join('/', 'App', 'runtime', 'primary-runtime', 'dependencies', 'node', 'bin'), join('/', 'App', 'runtime', 'casper', 'tools')])
+  // Without the shell's variables the engine is unset, which the plugin refuses at load.
+  expect(evaluate(engine, profileCtx('desktop'))).toBeUndefined()
+  expect(evaluate(toolPath, profileCtx('desktop'))).toEqual([])
 })
 
 it('looks Casper up on PATH, then the installer folders, and falls back to the bare name', () => {

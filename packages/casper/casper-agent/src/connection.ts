@@ -4,6 +4,7 @@
  */
 
 import { randomUUID } from 'node:crypto'
+import { delimiter, isAbsolute } from 'node:path'
 import { Readable, Writable } from 'node:stream'
 import {
   client as createAcpClient,
@@ -34,7 +35,8 @@ import type { AppToolsServer } from './app-tools.ts'
 import type { Config } from './config.ts'
 import { conversationMarkOf } from './conversation.ts'
 import type { ForwardedServers } from './forward-servers.ts'
-import { findCasper, lookupDetail } from './lookup.ts'
+import { locateCasper, lookupDetail, resolveCasperEngine } from './lookup.ts'
+import type { CasperEngineSpec } from './lookup.ts'
 
 /** ACP error code Casper uses for an unknown or unloadable session. */
 const ACP_NOT_FOUND = -32002
@@ -75,6 +77,7 @@ export interface PromptReply {
  */
 export type CasperFailureCode =
   | 'CASPER_NOT_FOUND'
+  | 'CASPER_ENGINE_MISSING'
   | 'CASPER_START_FAILED'
   | 'CASPER_EXITED'
   | 'CASPER_EMPTY_PROMPT'
@@ -229,16 +232,50 @@ export function casperArgv(executable: string, config: Pick<Config, 'args' | 'mo
 }
 
 /**
+ * Check the folders Casper's PATH ends with: each must be absolute, since a
+ * relative entry would resolve against whatever folder a command runs in.
+ * @param toolPath - the configured folders.
+ * @throws Error naming the first relative folder.
+ */
+export function checkToolPath(toolPath: readonly string[]): void {
+  const relative = toolPath.find(folder => !isAbsolute(folder))
+  if (relative !== undefined) throw new Error(`casper-agent: toolPath folders must be absolute, got ${JSON.stringify(relative)}`)
+}
+
+/**
  * Build the explicit child environment: every ambient `DEEPSEEK_*` name is
  * removed (the subprocess scrub already drops credential-shaped and `DSH_*`
- * names), then the configured entries are added.
- * @param configured - the configured entries.
+ * names), then the configured entries are added. With `toolPath` set, PATH is
+ * `env.PATH` (or the ambient PATH when `env` sets none) followed by those
+ * folders, so a tool on the computer wins over the app's copy.
+ * `CASPER_NO_UPDATE_CHECK=1` is always set, and `env` cannot change it: the app
+ * owns the engine's updates, so Casper never checks for, notes, or installs one.
+ * @param config - the configured entries and tool folders.
  * @param ambient - the parent environment.
  * @returns the spawn `env` overlay.
  */
-export function casperEnv(configured: Readonly<Record<string, string>>, ambient: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+export function casperEnv(config: Pick<Config, 'env' | 'toolPath'>, ambient: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   const removed = Object.keys(ambient).filter(name => /^DEEPSEEK_/i.test(name)).map(name => [name, undefined] as const)
-  return { ...Object.fromEntries(removed), ...configured }
+  const path = config.toolPath.length === 0
+    ? {}
+    : { PATH: [config.env.PATH ?? ambient.PATH ?? '', ...config.toolPath].filter(folder => folder !== '').join(delimiter) }
+  return { ...Object.fromEntries(removed), ...config.env, ...path, CASPER_NO_UPDATE_CHECK: '1' }
+}
+
+/**
+ * The error for a Casper that was not found: the bundled engine missing from
+ * the app's files, or no installed Casper for `command`.
+ * @param engine - the resolved engine.
+ * @param error - the lookup's not-found error.
+ * @returns `CASPER_ENGINE_MISSING` for the bundled engine, `CASPER_NOT_FOUND` for an installed one.
+ */
+export function casperNotFound(engine: CasperEngineSpec, error: SubprocessExecutableNotFoundError): CasperError {
+  return engine.kind === 'bundled'
+    ? new CasperError('CASPER_ENGINE_MISSING',
+      `The Casper engine that ships with the app is missing or cannot run at "${engine.executable}". Reinstall the app, or turn on useInstalledCasper to run the Casper installed on this computer.`,
+      { cause: error })
+    : new CasperError('CASPER_NOT_FOUND',
+      `Casper was not found at "${engine.command}". Install Casper, or pick another mode for this session.${lookupDetail(error)}`, { cause: error })
 }
 
 /**
@@ -370,8 +407,8 @@ export class CasperConnection {
   }
 
   /**
-   * Find (see {@link findCasper}), spawn, and open Casper. A stored conversation is reopened with
-   * `session/load`; only Casper's "no saved conversation" reply falls back to
+   * Find the engine (see {@link resolveCasperEngine} and {@link locateCasper}), spawn, and open Casper.
+   * A stored conversation is reopened with `session/load`; only Casper's "no saved conversation" reply falls back to
    * `session/new`. With none stored, the fork option's conversation is copied with
    * `session/fork` when Casper offers it; Casper's refusal (-32601, -32002, -32602)
    * falls back to `session/new`. The child is terminated when start fails or is aborted.
@@ -379,20 +416,19 @@ export class CasperConnection {
    * @param stored - the stored Casper conversation id, if any.
    * @param signal - aborts the start.
    * @returns the connection and its conversation.
-   * @throws CasperError `CASPER_NOT_FOUND` when the command cannot be resolved and `CASPER_START_FAILED` otherwise;
+   * @throws CasperError `CASPER_ENGINE_MISSING` when the bundled engine is not an executable file, `CASPER_NOT_FOUND`
+   *   when the installed command cannot be resolved, and `CASPER_START_FAILED` otherwise;
    *   an Error carrying the abort reason as its cause when aborted.
    */
   static async start(options: CasperConnectionOptions, stored: string | undefined, signal: AbortSignal): Promise<CasperStarted> {
     const { config } = options
+    const engine = resolveCasperEngine(config)
     let executable: string
     try {
-      executable = await findCasper(options.subprocess, config, signal)
+      executable = await locateCasper(engine, options.subprocess, config, signal)
     } catch (error: unknown) {
       signal.throwIfAborted()
-      if (error instanceof SubprocessExecutableNotFoundError) {
-        throw new CasperError('CASPER_NOT_FOUND',
-          `Casper was not found at "${config.command}". Install Casper, or pick another mode for this session.${lookupDetail(error)}`, { cause: error })
-      }
+      if (error instanceof SubprocessExecutableNotFoundError) throw casperNotFound(engine, error)
       throw new CasperError('CASPER_START_FAILED', `Casper could not start: ${errorText(error)}`, { cause: error })
     }
     let child: SubprocessHandle
@@ -402,7 +438,7 @@ export class CasperConnection {
         cwd: options.cwd,
         stdio: { stdin: 'pipe', stdout: 'pipe', stderr: { maxBytes: config.stderrTailBytes } },
         graceMs: config.killGraceMs,
-        env: { ...profileEnv(options.profile), ...casperEnv(config.env) },
+        env: { ...profileEnv(options.profile), ...casperEnv(config) },
       })
     } catch (error: unknown) {
       throw new CasperError('CASPER_START_FAILED', `Casper could not start: ${errorText(error)}`, { cause: error })

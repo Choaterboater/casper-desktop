@@ -1,8 +1,9 @@
 /** Finding Casper: the configured lookup first, and on Windows the installer's and bun's folders for the default name. */
 
 import { describe, expect, it } from 'vitest'
+import { join } from 'node:path'
 import { SubprocessExecutableNotFoundError } from '@deepseek-ai/dsh-subprocess'
-import { CasperLookupError, findCasper, isDefaultCasperName, lookupDetail, windowsCasperCandidates } from '../src/lookup.ts'
+import { CasperLookupError, findCasper, isDefaultCasperName, locateCasper, lookupDetail, resolveCasperEngine, windowsCasperCandidates } from '../src/lookup.ts'
 import type { ExecutableLookup } from '../src/lookup.ts'
 
 const INSTALL = 'C:\\Users\\u\\AppData\\Local\\Programs\\casper\\casper.exe'
@@ -156,5 +157,41 @@ describe('lookupDetail', () => {
     expect(lookupDetail(new CasperLookupError(['D:\\bun\\bin'], ['C:\\npm\\casper.cmd']))).toBe(
       ' Looked on PATH and in D:\\bun\\bin. Found C:\\npm\\casper.cmd, which the app cannot start; install casper.exe with Casper\'s Windows installer.',
     )
+  })
+})
+
+describe('resolveCasperEngine', () => {
+  const engine = join(process.cwd(), 'runtime', 'casper', 'casper')
+
+  it('runs the engine the app ships while useInstalledCasper is off, whatever command says', () => {
+    expect(resolveCasperEngine({ engine, useInstalledCasper: false, command: 'casper' })).toEqual({ kind: 'bundled', executable: engine })
+  })
+
+  it('runs the installed command with useInstalledCasper on, with or without an engine', () => {
+    expect(resolveCasperEngine({ engine, useInstalledCasper: true, command: 'casper' })).toEqual({ kind: 'installed', command: 'casper' })
+    expect(resolveCasperEngine({ useInstalledCasper: true, command: '/opt/casper' })).toEqual({ kind: 'installed', command: '/opt/casper' })
+  })
+
+  it('refuses a missing or relative engine while useInstalledCasper is off', () => {
+    expect(() => resolveCasperEngine({ useInstalledCasper: false, command: 'casper' }))
+      .toThrow('casper-agent: engine must be the absolute path of the Casper engine the app ships, got none; turn on useInstalledCasper to run the Casper installed on this computer')
+    expect(() => resolveCasperEngine({ engine: 'runtime/casper', useInstalledCasper: false, command: 'casper' })).toThrow('got "runtime/casper"')
+  })
+})
+
+describe('locateCasper', () => {
+  it('checks only the bundled path, never the installed lookup or the Windows folders', async () => {
+    const engine = 'C:\\Program Files\\Casper\\resources\\runtime\\casper\\casper.exe'
+    const lookup = lookupOf({ [engine]: engine })
+    expect(await locateCasper({ kind: 'bundled', executable: engine }, lookup, { env: {} }, signal, 'win32', AMBIENT)).toBe(engine)
+    expect(lookup.asked).toEqual([engine])
+    await expect(locateCasper({ kind: 'bundled', executable: '/gone' }, lookup, { env: {} }, signal, 'win32', AMBIENT))
+      .rejects.toBeInstanceOf(SubprocessExecutableNotFoundError)
+    expect(lookup.asked).toEqual([engine, '/gone'])
+  })
+
+  it('finds the installed command with the Windows fallback', async () => {
+    const lookup = lookupOf({ [INSTALL]: INSTALL })
+    expect(await locateCasper({ kind: 'installed', command: 'casper.exe' }, lookup, { env: {} }, signal, 'win32', AMBIENT)).toBe(INSTALL)
   })
 })

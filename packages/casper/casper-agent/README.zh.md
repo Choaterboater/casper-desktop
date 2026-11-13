@@ -29,11 +29,14 @@ kind: "package-reference"
 | 字段 | 默认值 | 含义 |
 |---|---|---|
 | `presets` | `['casper']` | 由 Casper 驱动其会话的预设 |
-| `command` | `casper` | Casper 可执行文件；桌面端条目在 PATH、`~/.local/bin`、`~/.bun/bin`、`/opt/homebrew/bin` 与 `/usr/local/bin` 中查找。在 Windows 上，若这样找不到，插件还会在 PATH 上按每个 PATHEXT 后缀尝试 `casper`，然后在 `CASPER_INSTALL_DIR`、`%LOCALAPPDATA%\Programs\casper`（Casper 安装程序的文件夹）与 `%BUN_INSTALL%\bin` 中尝试 `casper.exe`；找到的 `.cmd`、`.bat` 或其他脚本只在错误中列出，不会启动。`command` 设为 `casper` 或 `casper.exe` 以外的值即可关闭此行为 |
+| `engine` | 未设置 | 应用自带的 Casper 引擎的绝对路径；桌面端条目将其设为应用资源中的 `runtime/casper/casper`（Windows 上为 `casper.exe`）。`useInstalledCasper` 关闭时必须设置，否则插件加载失败；每次启动时都会检查它是否为可执行文件 |
+| `useInstalledCasper` | `false` | 运行这台电脑上安装的 Casper（由 `command` 与 `env` 找到），而不是 `engine`。它显示在设置 → 内置插件 → Casper agent 中，修改对下一个 Casper 进程生效 |
+| `command` | `casper` | `useInstalledCasper` 开启时的 Casper 可执行文件；桌面端条目在 PATH、`~/.local/bin`、`~/.bun/bin`、`/opt/homebrew/bin` 与 `/usr/local/bin` 中查找。在 Windows 上，若这样找不到，插件还会在 PATH 上按每个 PATHEXT 后缀尝试 `casper`，然后在 `CASPER_INSTALL_DIR`、`%LOCALAPPDATA%\Programs\casper`（Casper 安装程序的文件夹）与 `%BUN_INSTALL%\bin` 中尝试 `casper.exe`；找到的 `.cmd`、`.bat` 或其他脚本只在错误中列出，不会启动。`command` 设为 `casper` 或 `casper.exe` 以外的值即可关闭此行为 |
 | `args` | `['acp']` | 启动 Casper ACP 服务器的参数 |
 | `model` | 未设置 | 起始模型，以 `--model` 传入；未设置时沿用 Casper 自身的默认值。[模型选择器](#model-picker)可按会话更改 |
 | `effort` | 未设置 | 起始推理等级，以 `--effort` 传入；未设置时沿用 Casper 自身的默认值。模型选择器可按会话更改 |
 | `env` | `{}` | 在子进程清理之后加入的子进程环境；桌面端条目传入以 bun 目录开头的 PATH，并在已设置时传入 `OPENROUTER_API_KEY` |
+| `toolPath` | `[]` | 加在 Casper 的 PATH 末尾（位于 `env.PATH` 或应用的 PATH 之后）的绝对路径文件夹，因此电脑上已有的工具优先；桌面端条目传入应用的 `node` 文件夹，然后是含有 `uv`、`uvx`、`npx` 与 `npm` 的 `runtime/casper/tools`。相对路径的文件夹会使插件加载失败 |
 | `startTimeoutMs` | `120000` | `initialize` 加上 `session/new`、`session/load` 或 `session/fork` 的时限 |
 | `cancelGraceMs` | `5000` | 停止后等待提示回复的时间，超时则结束 Casper |
 | `exitGraceMs` | `2500` | 关闭 stdin 后等待 Casper 退出的时间 |
@@ -57,11 +60,11 @@ kind: "package-reference"
 | `liveOutput` | `true` | 在 Casper 命令运行时，于[后台任务面板](#jobs-panel)中显示其最新的几行；在该任务上点停止会停止整个请求。`false` 时命令只在其卡片中显示最终输出 |
 | `idleExitMs` | `900000` | 空闲多久后询问 Casper 能否[关闭](#process-lifetime-and-resume)其进程（15 分钟）；`0` 时保留进程直到会话关闭 |
 
-子进程不会收到 `DEEPSEEK_*` 或 `DSH_*` 名称，也不会收到 `env` 未列出的凭据类名称。唯一的例外是应用 profile：应用带 profile 运行时，Casper 会收到 `DSH_PROFILE` 与 `DSH_PROFILE_DIR`，使它构建的 bundle 能指明要安装到的 profile。
+子进程不会收到 `DEEPSEEK_*` 或 `DSH_*` 名称，也不会收到 `env` 未列出的凭据类名称。它总会收到 `CASPER_NO_UPDATE_CHECK=1`，`env` 无法更改此值，因为引擎更新随应用一起提供。唯一的例外是应用 profile：应用带 profile 运行时，Casper 会收到 `DSH_PROFILE` 与 `DSH_PROFILE_DIR`，使它构建的 bundle 能指明要安装到的 profile。
 
 会话在 Casper 预设上创建时即成为 Casper 会话。空白会话不能在 Casper 与其他预设之间切换：预设注册表以 `agent-preset/locked` 与 `newSession: true` 拒绝这种切换，模式选择器则改为在所选预设上开启新会话。桌面端重新打开已存储的会话时（从会话列表、为后续消息，或为指向它的定时任务），由其记录的预设所选择的工厂运行它，因此 Casper 会话会在 Casper 中重新打开；未记录预设的会话仍使用 agent-loop。其他会重新打开会话的应用列在[已知限制](#known-limitations-and-deferred-work)中。
 
-无法运行的轮次在 `turn/end` 上以错误结束：找不到命令时为 `CASPER_NOT_FOUND`，Casper 未能启动时为 `CASPER_START_FAILED`，轮次中途退出时为 `CASPER_EXITED`，提示中没有 Casper 能读取的内容时为 `CASPER_EMPTY_PROMPT`：没有文本、图片或文件，或只有无法发送的图片和文件（不会向 Casper 发送任何内容），达到 Casper 的轮次上限时为 `CASPER_TURN_LIMIT`，Casper 拒绝所选模型或推理等级时为 `CASPER_MODEL_UNAVAILABLE`（不发送提示），Casper 未接受仅可查看或工作区内修改时为 `CASPER_ACCESS_NOT_APPLIED`（不发送提示，或停止正在运行的提示），[提及的会话](#session-mentions)无法发送时为某个 `SESSION_REFERENCE_*` 代码（不启动 Casper），收到错误回复时为 `CASPER_RPC_<code>`。会话仍可使用；下一条提示会再次启动 Casper。`CASPER_TEXT_ONLY` 已不再产生，只出现在早期版本保存的轮次中。
+无法运行的轮次在 `turn/end` 上以错误结束：自带的 `engine` 缺失或不是可执行文件时为 `CASPER_ENGINE_MISSING`，`useInstalledCasper` 开启且找不到命令时为 `CASPER_NOT_FOUND`，Casper 未能启动时为 `CASPER_START_FAILED`，轮次中途退出时为 `CASPER_EXITED`，提示中没有 Casper 能读取的内容时为 `CASPER_EMPTY_PROMPT`：没有文本、图片或文件，或只有无法发送的图片和文件（不会向 Casper 发送任何内容），达到 Casper 的轮次上限时为 `CASPER_TURN_LIMIT`，Casper 拒绝所选模型或推理等级时为 `CASPER_MODEL_UNAVAILABLE`（不发送提示），Casper 未接受仅可查看或工作区内修改时为 `CASPER_ACCESS_NOT_APPLIED`（不发送提示，或停止正在运行的提示），[提及的会话](#session-mentions)无法发送时为某个 `SESSION_REFERENCE_*` 代码（不启动 Casper），收到错误回复时为 `CASPER_RPC_<code>`。会话仍可使用；下一条提示会再次启动 Casper。`CASPER_TEXT_ONLY` 已不再产生，只出现在早期版本保存的轮次中。
 
 <a id="understand-the-implementation"></a>
 ## 理解实现
@@ -69,7 +72,7 @@ kind: "package-reference"
 | 文件 | 作用 |
 |---|---|
 | [`src/index.ts`](src/index.ts) | 插件入口：注册投影（其中包括 `casperAccess`）、打开 sidecar，并注册工厂路由 |
-| [`src/lookup.ts`](src/lookup.ts) | 查找 Casper 可执行文件，并在 Windows 上回退到安装程序与 bun 的文件夹 |
+| [`src/lookup.ts`](src/lookup.ts) | 选择自带引擎；`useInstalledCasper` 开启时查找已安装的 Casper，并在 Windows 上回退到安装程序与 bun 的文件夹 |
 | [`src/route.ts`](src/route.ts) | 选择配置预设上的根会话；委派的子会话仍使用 agent-loop |
 | [`src/factory.ts`](src/factory.ts) | 按 agent-loop 的发布顺序创建与恢复 Agent，用继承的日志创建分叉并从中找到分叉点，并在卸载时并行销毁所有 Agent |
 | [`src/agent.ts`](src/agent.ts) | `CasperAgent`：收件箱、阶段、每轮一条提示、把引导消息发给正在运行的提示、取消与进程重启 |

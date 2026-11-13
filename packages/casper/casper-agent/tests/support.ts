@@ -147,9 +147,12 @@ export function fakeCasper(script: FakeScript = { prompts: [] }): FakeCasper {
     pids: () => [...new Set(log().filter(entry => entry.event === 'start').map(entry => entry.pid))],
     config: overrides => ({
       presets: ['casper'],
+      // The stand-in runs as the installed Casper; tests of the bundled engine set engine and turn this off.
+      useInstalledCasper: true,
       command: process.execPath,
       args: [FAKE_CASPER, 'acp'],
       env: { FAKE_CASPER_SCRIPT: scriptFile, FAKE_CASPER_LOG: logFile },
+      toolPath: [],
       startTimeoutMs: 20_000,
       cancelGraceMs: 2_000,
       exitGraceMs: 2_000,

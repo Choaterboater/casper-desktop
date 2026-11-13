@@ -95,7 +95,7 @@ export function inheritedConversation(
 
 /** Failure codes of a turn that ended before its prompt reached Casper, so Casper's conversation did not move. */
 const BEFORE_PROMPT: ReadonlySet<string> = new Set([
-  'CASPER_NOT_FOUND', 'CASPER_START_FAILED', 'CASPER_EMPTY_PROMPT', 'CASPER_MODEL_UNAVAILABLE', 'CASPER_NO_ACCESS_MODES',
+  'CASPER_NOT_FOUND', 'CASPER_ENGINE_MISSING', 'CASPER_START_FAILED', 'CASPER_EMPTY_PROMPT', 'CASPER_MODEL_UNAVAILABLE', 'CASPER_NO_ACCESS_MODES',
 ])
 
 /** A forked Session's fork point: the inherited conversation, and whether Casper's copy may miss the last request. */

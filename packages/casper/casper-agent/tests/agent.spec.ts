@@ -619,6 +619,26 @@ describe('CasperAgent', { timeout: 60_000 }, () => {
     expect(agent.status).toBe('idle')
   })
 
+  it('ends the turn with CASPER_ENGINE_MISSING when the bundled engine is gone and stays usable', async () => {
+    const { fake, host } = await setup({ prompts: [] }, { useInstalledCasper: false, engine: '/nonexistent/runtime/casper/casper' })
+    const { agent } = await host.create('casper-engine-missing')
+    await run(agent, 'one')
+    await run(agent, 'two')
+    expect(turnEnds(agent)).toMatchObject([
+      { kind: 'error', error: { code: 'CASPER_ENGINE_MISSING', message: expect.stringContaining('Reinstall the app') as string } },
+      { kind: 'error', error: { code: 'CASPER_ENGINE_MISSING' } },
+    ])
+    expect(agent.status).toBe('idle')
+    expect(fake.pids()).toEqual([])
+  })
+
+  it('refuses to load without an engine while useInstalledCasper is off, or with a relative tool folder', async () => {
+    const fake = fakeCasper({ prompts: [] })
+    cleanups.push(() => { fake.remove() })
+    await expect(boot(fake, { useInstalledCasper: false })).rejects.toThrow('engine must be the absolute path')
+    await expect(boot(fake, { toolPath: ['tools'] })).rejects.toThrow('toolPath folders must be absolute')
+  })
+
   it('refuses an empty prompt without starting Casper', async () => {
     const { fake, host } = await setup({ prompts: [] })
     const { agent } = await host.create('casper-blank')
