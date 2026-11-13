@@ -32,15 +32,15 @@ export interface AppIdentity {
 }
 
 /**
- * The harness's own identity: the default every adapter sends. Deployments
+ * Casper desktop's own identity: the default every adapter sends. Deployments
  * that need a white-label identity pass their own {@link AppIdentity} to
  * {@link attributionHeaders} — omission falls back to this default; nothing
  * can suppress attribution entirely.
  */
 export const APP_IDENTITY: AppIdentity = {
-  product: 'deepseek-harness',
+  product: 'casper-desktop',
   version,
-  url: 'https://github.com/deepseek-ai/deepseek-harness',
+  url: 'https://github.com/Choaterboater/casper-desktop',
 }
 
 /**

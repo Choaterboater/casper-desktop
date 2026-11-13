@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
+import { createRequire } from 'node:module'
 import { AddressInfo } from 'node:net'
 import { Context } from '@deepseek-ai/cordis'
 import WebRuntime from '@deepseek-ai/dsh-web'
@@ -15,6 +16,8 @@ import {
   validateFetchUrl,
   WEB_FETCH_MAX_URL_LENGTH,
 } from '../src/policy.ts'
+
+const manifest = createRequire(import.meta.url)('../package.json') as { version: string }
 
 const limits: HttpFetchLimits = {
   maxResponseBytes: 5_000_000,
@@ -125,6 +128,12 @@ describe('HttpFetchProvider success', () => {
     handler = (req, res) => { seen = req.headers['user-agent']; res.writeHead(200, { 'content-type': 'text/plain' }); res.end('ok') }
     await provider().fetch({ url: base })
     expect(seen).toBe('test-agent/1.0')
+  })
+
+  it('defaults the user agent to Casper desktop at the package version', () => {
+    expect(fetchPlugin.Config({}).userAgent).toBe(
+      `casper-desktop/${manifest.version} (+https://github.com/Choaterboater/casper-desktop)`,
+    )
   })
 
   it('returns a non-2xx response as a result, not an error', async () => {
