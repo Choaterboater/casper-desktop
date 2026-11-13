@@ -1,0 +1,1612 @@
+[
+  {
+    "rule": "host",
+    "file": "packages/boot/plugin-manager/README.md",
+    "match": "registry.npmmirror.com",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "host",
+    "file": "packages/boot/plugin-manager/README.zh.md",
+    "match": "registry.npmmirror.com",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "host",
+    "file": "packages/boot/plugin-manager/src/registry.ts",
+    "match": "registry.npmmirror.com",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "host",
+    "file": "packages/boot/plugin-market/src/index.ts",
+    "match": "registry.npmmirror.com",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "host",
+    "file": "packages/client/ui-plugin-manager/README.md",
+    "match": "registry.npmmirror.com",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "host",
+    "file": "packages/client/ui-plugin-manager/README.zh.md",
+    "match": "registry.npmmirror.com",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "host",
+    "file": "packages/client/ui-plugin-manager/src/client/presentation.ts",
+    "match": "registry.npmmirror.com",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "host",
+    "file": "packages/client/ui-plugin-manager/src/index.ts",
+    "match": "registry.npmmirror.com",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "host",
+    "file": "packages/client/ui-settings-models/README.md",
+    "match": "api.deepseek.com",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "host",
+    "file": "packages/client/ui-settings-models/README.zh.md",
+    "match": "api.deepseek.com",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "host",
+    "file": "packages/client/ui-settings-models/src/client/locales.ts",
+    "match": "api.deepseek.com",
+    "count": 8,
+    "step": "3c"
+  },
+  {
+    "rule": "host",
+    "file": "packages/client/ui-settings-web-search/src/client/locales.ts",
+    "match": "api-docs.deepseek.com",
+    "count": 8,
+    "step": "3c"
+  },
+  {
+    "rule": "host",
+    "file": "packages/credentials/deepseek-account-platform/README.md",
+    "match": "api.deepseek.com",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "host",
+    "file": "packages/credentials/deepseek-account-platform/README.zh.md",
+    "match": "api.deepseek.com",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "host",
+    "file": "packages/credentials/deepseek-account-platform/src/index.ts",
+    "match": "api.deepseek.com",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "host",
+    "file": "packages/credentials/deepseek-account-platform/src/index.ts",
+    "match": "platform.deepseek.com",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "host",
+    "file": "packages/host/product-telemetry-otel/README.md",
+    "match": "dsh-otel-collector.deepseeksvc.com",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "host",
+    "file": "packages/host/product-telemetry-otel/README.zh.md",
+    "match": "dsh-otel-collector.deepseeksvc.com",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "host",
+    "file": "packages/host/product-telemetry-otel/src/index.ts",
+    "match": "dsh-otel-collector.deepseeksvc.com",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "host",
+    "file": "packages/llm/llm-deepseek-account/README.md",
+    "match": "api.deepseek.com",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "host",
+    "file": "packages/llm/llm-deepseek-account/README.zh.md",
+    "match": "api.deepseek.com",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "host",
+    "file": "packages/llm/llm-deepseek-api-key/README.md",
+    "match": "api.deepseek.com",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "host",
+    "file": "packages/llm/llm-deepseek-api-key/README.zh.md",
+    "match": "api.deepseek.com",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "host",
+    "file": "packages/llm/llm-deepseek/README.md",
+    "match": "api.deepseek.com",
+    "count": 3,
+    "step": "3a"
+  },
+  {
+    "rule": "host",
+    "file": "packages/llm/llm-deepseek/README.zh.md",
+    "match": "api.deepseek.com",
+    "count": 3,
+    "step": "3a"
+  },
+  {
+    "rule": "host",
+    "file": "packages/llm/llm-deepseek/src/config.ts",
+    "match": "api.deepseek.com",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "host",
+    "file": "packages/llm/llm-deepseek/src/image-tokens.ts",
+    "match": "api-docs.deepseek.com",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "host",
+    "file": "packages/util/plugin-detail/src/files.ts",
+    "match": "registry.npmmirror.com",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "host",
+    "file": "packages/web/web-deepseek-api/README.md",
+    "match": "api.deepseek.com",
+    "count": 5,
+    "step": "3a"
+  },
+  {
+    "rule": "host",
+    "file": "packages/web/web-deepseek-api/README.zh.md",
+    "match": "api.deepseek.com",
+    "count": 5,
+    "step": "3a"
+  },
+  {
+    "rule": "host",
+    "file": "packages/web/web-deepseek-api/src/search.ts",
+    "match": "api.deepseek.com",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "host",
+    "file": "packages/web/web-search-deepseek/README.md",
+    "match": "api.deepseek.com",
+    "count": 3,
+    "step": "3a"
+  },
+  {
+    "rule": "host",
+    "file": "packages/web/web-search-deepseek/README.zh.md",
+    "match": "api.deepseek.com",
+    "count": 3,
+    "step": "3a"
+  },
+  {
+    "rule": "host",
+    "file": "packages/web/web-search-deepseek/src/provider.ts",
+    "match": "api.deepseek.com",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "import",
+    "file": "apps/desktop/src/mandatory-update-policy.ts",
+    "match": "@deepseek-ai/dsh-deepseek-account",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "import",
+    "file": "apps/desktop/src/platform-view.ts",
+    "match": "@deepseek-ai/dsh-deepseek-account",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "import",
+    "file": "packages/api/account-controller/src/index.ts",
+    "match": "@deepseek-ai/dsh-deepseek-account",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "import",
+    "file": "packages/api/remotes/src/client/index.ts",
+    "match": "@deepseek-ai/dsh-api-account-controller",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "import",
+    "file": "packages/api/remotes/src/client/index.ts",
+    "match": "@deepseek-ai/dsh-client-product-analytics",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "import",
+    "file": "packages/credentials/deepseek-account-platform/src/index.ts",
+    "match": "@deepseek-ai/dsh-deepseek-account",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "import",
+    "file": "packages/llm/llm-deepseek-account/src/config.ts",
+    "match": "@deepseek-ai/dsh-llm-deepseek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "import",
+    "file": "packages/llm/llm-deepseek-account/src/index.ts",
+    "match": "@deepseek-ai/dsh-llm-deepseek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "import",
+    "file": "packages/llm/llm-deepseek-api-key/src/config.ts",
+    "match": "@deepseek-ai/dsh-llm-deepseek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "import",
+    "file": "packages/llm/llm-deepseek-api-key/src/index.ts",
+    "match": "@deepseek-ai/dsh-llm-deepseek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "import",
+    "file": "packages/sdk/server/src/server.ts",
+    "match": "@deepseek-ai/dsh-llm-deepseek-api-key",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "import",
+    "file": "packages/web/web-deepseek-api/src/index.ts",
+    "match": "@deepseek-ai/dsh-llm-deepseek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "import",
+    "file": "packages/web/web-deepseek-api/src/index.ts",
+    "match": "@deepseek-ai/dsh-llm-deepseek-account",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "import",
+    "file": "packages/web/web-deepseek-api/src/index.ts",
+    "match": "@deepseek-ai/dsh-llm-deepseek-api-key",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "import",
+    "file": "packages/web/web-search-deepseek/src/index.ts",
+    "match": "@deepseek-ai/dsh-llm-deepseek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "package",
+    "file": "closure",
+    "match": "@deepseek-ai/dsh-api-account-controller",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "package",
+    "file": "closure",
+    "match": "@deepseek-ai/dsh-client-product-analytics",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "package",
+    "file": "closure",
+    "match": "@deepseek-ai/dsh-client-ui-settings-account",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "package",
+    "file": "closure",
+    "match": "@deepseek-ai/dsh-deepseek-account",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "package",
+    "file": "closure",
+    "match": "@deepseek-ai/dsh-deepseek-account-platform",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "package",
+    "file": "closure",
+    "match": "@deepseek-ai/dsh-deepseek-llm-api-extensions",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "package",
+    "file": "closure",
+    "match": "@deepseek-ai/dsh-host-product-telemetry-otel",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "package",
+    "file": "closure",
+    "match": "@deepseek-ai/dsh-llm-deepseek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "package",
+    "file": "closure",
+    "match": "@deepseek-ai/dsh-llm-deepseek-account",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "package",
+    "file": "closure",
+    "match": "@deepseek-ai/dsh-llm-deepseek-api-key",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "package",
+    "file": "closure",
+    "match": "@deepseek-ai/dsh-plugin-package-inventory-deepseek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "package",
+    "file": "closure",
+    "match": "@deepseek-ai/dsh-session-log-deepseek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "package",
+    "file": "closure",
+    "match": "@deepseek-ai/dsh-web-deepseek-api",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "package",
+    "file": "closure",
+    "match": "@deepseek-ai/dsh-web-search-deepseek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "row",
+    "file": "composition",
+    "match": "account-controller disabled",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "row",
+    "file": "composition",
+    "match": "deepseek-account disabled",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "row",
+    "file": "composition",
+    "match": "deepseek-llm-api-extensions disabled",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "row",
+    "file": "composition",
+    "match": "desktop-product-telemetry disabled",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "row",
+    "file": "composition",
+    "match": "llm-deepseek disabled",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "row",
+    "file": "composition",
+    "match": "llm-deepseek-account disabled",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "row",
+    "file": "composition",
+    "match": "plugin-package-inventory-deepseek disabled",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "row",
+    "file": "composition",
+    "match": "product-analytics disabled",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "row",
+    "file": "composition",
+    "match": "session-log-deepseek disabled",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "row",
+    "file": "composition",
+    "match": "ui-settings-account disabled",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "row",
+    "file": "composition",
+    "match": "web-deepseek-api disabled",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "row",
+    "file": "composition",
+    "match": "web-search-deepseek disabled",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "apps/desktop/src/locale.ts",
+    "match": "DeepSeek",
+    "count": 8,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "apps/desktop/src/welcome-backend.ts",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/bundle/sdk-minimal/package.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/casper/casper-agent/package.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-brand-official/locale/de.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-brand-official/locale/es.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-brand-official/locale/fr.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-brand-official/locale/ja.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-brand-official/locale/pt.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-brand-official/locale/ru.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-brand-official/locale/zh.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-chat/src/client/conversation-nodes/turn-error.ts",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-chat/src/client/locale.ts",
+    "match": "DeepSeek",
+    "count": 16,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-chat/src/client/locale.ts",
+    "match": "深度求索",
+    "count": 2,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-model-selection/src/client/locales.ts",
+    "match": "DeepSeek",
+    "count": 8,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-account/locale/de.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-account/locale/es.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-account/locale/fr.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-account/locale/ja.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-account/locale/pt.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-account/locale/ru.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-account/locale/zh.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-account/package.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-account/src/client/locales.ts",
+    "match": "DeepSeek",
+    "count": 24,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-models/src/client/CustomProviderCard.tsx",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-models/src/client/DeepSeekOnboardingDialog.tsx",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-models/src/client/index.ts",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-models/src/client/locales.ts",
+    "match": "DeepSeek",
+    "count": 16,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-models/src/client/ModelInputTypes.tsx",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-models/src/client/ModelListEditor.tsx",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-models/src/client/ModelReasoningEfforts.tsx",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-models/src/client/ModelRow.tsx",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-models/src/client/ProviderEditor.tsx",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-models/src/client/useModelRows.ts",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-session-log/locale/de.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-session-log/locale/es.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-session-log/locale/fr.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-session-log/locale/ja.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-session-log/locale/pt.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-session-log/locale/ru.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-session-log/locale/zh.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-session-log/package.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-session-log/src/client/locales.ts",
+    "match": "DeepSeek",
+    "count": 8,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-web-search/locale/de.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-web-search/locale/es.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-web-search/locale/fr.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-web-search/locale/ja.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-web-search/locale/pt.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-web-search/locale/ru.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-web-search/locale/zh.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-web-search/package.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-web-search/src/client/locales.ts",
+    "match": "DeepSeek",
+    "count": 28,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/client/ui-settings-web-search/src/client/WebSearchCard.tsx",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/credentials/deepseek-account-platform/locale/de.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/credentials/deepseek-account-platform/locale/es.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/credentials/deepseek-account-platform/locale/fr.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/credentials/deepseek-account-platform/locale/ja.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/credentials/deepseek-account-platform/locale/pt.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/credentials/deepseek-account-platform/locale/ru.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/credentials/deepseek-account-platform/locale/zh.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/credentials/deepseek-account-platform/package.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/credentials/deepseek-account-platform/src/index.ts",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/experimental/client-ui-cot-translation/src/client/locales.ts",
+    "match": "DeepSeek",
+    "count": 32,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/extensions/cordis-client-runner/src/client/slot-catalog.ts",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/extensions/tool-cordis/src/api-catalog.ts",
+    "match": "DeepSeek",
+    "count": 29,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/deepseek-llm-api-extensions/locale/de.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/deepseek-llm-api-extensions/locale/es.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/deepseek-llm-api-extensions/locale/fr.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/deepseek-llm-api-extensions/locale/ja.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/deepseek-llm-api-extensions/locale/pt.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/deepseek-llm-api-extensions/locale/ru.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/deepseek-llm-api-extensions/locale/zh.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/deepseek-llm-api-extensions/package.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/deepseek-llm-api-extensions/src/index.ts",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-deepseek-account/locale/de.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-deepseek-account/locale/es.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-deepseek-account/locale/fr.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-deepseek-account/locale/ja.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-deepseek-account/locale/pt.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-deepseek-account/locale/ru.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-deepseek-account/locale/zh.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-deepseek-account/package.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-deepseek-account/src/index.ts",
+    "match": "DeepSeek",
+    "count": 3,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-deepseek-api-key/locale/de.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-deepseek-api-key/locale/es.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-deepseek-api-key/locale/fr.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-deepseek-api-key/locale/ja.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-deepseek-api-key/locale/pt.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-deepseek-api-key/locale/ru.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-deepseek-api-key/locale/zh.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-deepseek-api-key/package.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-deepseek-api-key/src/index.ts",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-deepseek/package.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-deepseek/src/adapter.ts",
+    "match": "DeepSeek",
+    "count": 6,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-deepseek/src/file-id.ts",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-deepseek/src/file-store.ts",
+    "match": "DeepSeek",
+    "count": 4,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-deepseek/src/files-api.ts",
+    "match": "DeepSeek",
+    "count": 7,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-deepseek/src/images.ts",
+    "match": "DeepSeek",
+    "count": 3,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-deepseek/src/listed-catalog.ts",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-deepseek/src/listing.ts",
+    "match": "DeepSeek",
+    "count": 4,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-deepseek/src/models.ts",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-deepseek/src/replay.ts",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-deepseek/src/request-extensions.ts",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-deepseek/src/request-files.ts",
+    "match": "DeepSeek",
+    "count": 3,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-deepseek/src/serialize.ts",
+    "match": "DeepSeek",
+    "count": 8,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-deepseek/src/sse.ts",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-deepseek/src/translate.ts",
+    "match": "DeepSeek",
+    "count": 5,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-deepseek/src/transport.ts",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-pi-ai/locale/de.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-pi-ai/locale/es.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-pi-ai/locale/fr.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-pi-ai/locale/ja.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-pi-ai/locale/pt.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-pi-ai/locale/ru.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-pi-ai/locale/zh.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/llm-pi-ai/package.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/plugin-package-inventory-deepseek/locale/de.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/plugin-package-inventory-deepseek/locale/es.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/plugin-package-inventory-deepseek/locale/fr.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/plugin-package-inventory-deepseek/locale/ja.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/plugin-package-inventory-deepseek/locale/pt.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/plugin-package-inventory-deepseek/locale/ru.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/plugin-package-inventory-deepseek/locale/zh.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/llm/plugin-package-inventory-deepseek/package.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/session/session-log-deepseek/locale/de.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/session/session-log-deepseek/locale/es.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/session/session-log-deepseek/locale/fr.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/session/session-log-deepseek/locale/ja.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/session/session-log-deepseek/locale/pt.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/session/session-log-deepseek/locale/ru.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/session/session-log-deepseek/locale/zh.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/session/session-log-deepseek/package.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/session/session-log-deepseek/src/index.ts",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/web/web-deepseek-api/locale/de.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/web/web-deepseek-api/locale/es.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/web/web-deepseek-api/locale/fr.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/web/web-deepseek-api/locale/ja.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/web/web-deepseek-api/locale/pt.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/web/web-deepseek-api/locale/ru.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/web/web-deepseek-api/locale/zh.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/web/web-deepseek-api/package.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/web/web-deepseek-api/src/fetch.ts",
+    "match": "DeepSeek",
+    "count": 24,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/web/web-deepseek-api/src/index.ts",
+    "match": "DeepSeek",
+    "count": 10,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/web/web-deepseek-api/src/search.ts",
+    "match": "DeepSeek",
+    "count": 16,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/web/web-deepseek-api/src/transport.ts",
+    "match": "DeepSeek",
+    "count": 12,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/web/web-fetch-http/src/provider.ts",
+    "match": "DeepSeek",
+    "count": 8,
+    "step": "3c"
+  },
+  {
+    "rule": "text",
+    "file": "packages/web/web-search-deepseek/locale/de.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/web/web-search-deepseek/locale/es.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/web/web-search-deepseek/locale/fr.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/web/web-search-deepseek/locale/ja.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/web/web-search-deepseek/locale/pt.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/web/web-search-deepseek/locale/ru.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/web/web-search-deepseek/locale/zh.json",
+    "match": "DeepSeek",
+    "count": 2,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/web/web-search-deepseek/package.json",
+    "match": "DeepSeek",
+    "count": 1,
+    "step": "3a"
+  },
+  {
+    "rule": "text",
+    "file": "packages/web/web-search-deepseek/src/provider.ts",
+    "match": "DeepSeek",
+    "count": 20,
+    "step": "3a"
+  }
+]
