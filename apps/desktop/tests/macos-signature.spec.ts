@@ -81,7 +81,10 @@ describe('desktop macOS release signature', () => {
         identity: RELEASE_ENVIRONMENT.DSH_DESKTOP_MACOS_SIGNING_IDENTITY,
         forceCodeSigning: true,
         notarize: true,
-        signIgnore: ['/Contents/Resources/app\\.asar\\.unpacked/dsh(?:/|$)', '/Contents/Resources/runtime/primary-runtime(?:/|$)', '\\.pak$'],
+        signIgnore: [
+          '/Contents/Resources/app\\.asar\\.unpacked/dsh(?:/|$)', '/Contents/Resources/runtime/primary-runtime(?:/|$)',
+          '/Contents/Resources/runtime/casper(?:/|$)', '\\.pak$',
+        ],
       },
       dmg: {
         format: 'ULMO',
@@ -121,6 +124,8 @@ describe('desktop macOS release signature', () => {
     expect(ignored('/App.app/Contents/Frameworks/Electron.framework/Versions/A/Resources/en.lproj/locale.pak')).toBe(true)
     expect(ignored('/App.app/Contents/Frameworks/Electron.framework/Versions/A/Resources/resources.pak')).toBe(true)
     expect(ignored('/App.app/Contents/Resources/runtime/primary-runtime/dependencies/pnpm/addon.node')).toBe(true)
+    expect(ignored('/App.app/Contents/Resources/runtime/casper/casper')).toBe(true)
+    expect(ignored('/App.app/Contents/Resources/runtime/casper/tools/uv')).toBe(true)
     for (const path of [
       '/App.app/Contents/Resources/runtime/node/node',
       '/App.app/Contents/Frameworks/Electron.framework/Versions/A/library.dylib',

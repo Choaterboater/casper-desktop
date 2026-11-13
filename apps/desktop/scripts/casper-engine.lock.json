@@ -1,0 +1,44 @@
+{
+  "casper": {
+    "repository": "Choaterboater/casper",
+    "version": "0.4.15",
+    "tag": "v0.4.15",
+    "sums": {
+      "asset": "SHA256SUMS",
+      "sha256": "06a8669ddc1ad6cda17ea24366038e5afe6cc55a6f9c646c6f0876bdce519142"
+    },
+    "targets": {
+      "mac-arm64": {
+        "asset": "casper-darwin-arm64",
+        "sha256": "aa7d649d8d393a2b379ec30786a6fce62b227497b8c6ac1a6890df81eaaccfe4"
+      },
+      "mac-x64": {
+        "asset": "casper-darwin-x64",
+        "sha256": "2e07a7ad0b242e54f55be3e83d78a36d9d48ea006f5e60cd40f686030b9a0f30"
+      },
+      "win-x64": {
+        "asset": "casper-windows-x64.exe",
+        "sha256": "a794027434017facd316a406187e8413bf38e7fd5fecb9c81a1c61b69339bb9a"
+      }
+    }
+  },
+  "uv": {
+    "repository": "astral-sh/uv",
+    "version": "0.13.6",
+    "tag": "0.13.6",
+    "targets": {
+      "mac-arm64": {
+        "asset": "uv-aarch64-apple-darwin.tar.gz",
+        "sha256": "60fbd5c8a1ed681845eea28d9d622fcde03c51e91a43465b64a1e17db1ed3472"
+      },
+      "mac-x64": {
+        "asset": "uv-x86_64-apple-darwin.tar.gz",
+        "sha256": "63ba17fdda55ad1a230d4b37fc6017ffa10c23688c83818bd3bfdf914c652a02"
+      },
+      "win-x64": {
+        "asset": "uv-x86_64-pc-windows-msvc.zip",
+        "sha256": "a2a8820d5eea32f08ef467ef3b7f66883a9b076d5737a2fc2fbb5f458d1bb50f"
+      }
+    }
+  }
+}
