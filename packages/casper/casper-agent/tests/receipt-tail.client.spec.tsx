@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SessionLiveEventEntry } from '@deepseek-ai/dsh-api-session-controller/client'
-import type { ChatSnapshot } from '@deepseek-ai/dsh-client-ui-chat/client'
+import type { ChatSnapshot, TurnTailChatData } from '@deepseek-ai/dsh-client-ui-chat/client'
 import { assistantDefinition } from '@deepseek-ai/dsh-client-ui-chat/src/client/conversation-nodes/assistant.ts'
 import { chatViewDefinition } from '@deepseek-ai/dsh-client-ui-chat/src/client/conversation-nodes/chat-snapshot-builder.ts'
 import { toolDefinition } from '@deepseek-ai/dsh-client-ui-chat/src/client/conversation-nodes/tool.ts'
@@ -121,7 +121,13 @@ describe('the receipt at the turn\'s tail', () => {
     const nodes = [...chat(casperTurn(RECEIPT)).nodes.values()]
     // The step's assistant message holds the receipt's call block, so the answer is not the turn's last step.
     expect(nodes.find(node => node.kind === 'turn-process')?.data).toMatchObject({ answerAnchorSeq: null, answerStep: null })
-    expect(nodes.find(node => node.kind === 'turn-tail')?.data).toMatchObject({ branchUnavailable: true })
+  })
+
+  it('leaves the answer the turn\'s last row, so the turn can be forked from it', () => {
+    const tail = chat(casperTurn(RECEIPT)).nodes.values().find(node => node.kind === 'turn-tail')?.data as TurnTailChatData
+    // The receipt step's message holds only the claimed call, so it adds no row after the answer.
+    expect(tail.closing?.blocks).toEqual([{ kind: 'text', text: 'Done.' }])
+    expect(tail.branchUnavailable).toBe(false)
   })
 
   it('shows the receipt\'s text when its meta does not parse, and nothing for a turn without one', () => {

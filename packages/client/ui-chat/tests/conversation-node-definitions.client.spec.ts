@@ -1973,6 +1973,33 @@ describe('built-in conversation node Definitions', () => {
     expect(tail.branchUnavailable).toBe(true)
   })
 
+  it('keeps branching unavailable when a message of only a tool call follows the closing Assistant', () => {
+    const value = assembler([
+      at(1, 'turn/start', { turn: 1 }),
+      at(2, 'step/start', { turn: 1, step: 1 }),
+      at(3, 'assistant/message', { turn: 1, step: 1, message: assistantMessage('answer', 'answer') }, { surfaceOp: 'append' }),
+      at(4, 'step/end', { turn: 1, step: 1 }),
+      at(5, 'step/start', { turn: 1, step: 2 }),
+      at(6, 'assistant/message', {
+        turn: 1,
+        step: 2,
+        message: {
+          id: 'call-only',
+          role: 'assistant',
+          content: [{ type: 'tool-call', id: 'late-call', name: 'read', arguments: '{}' }],
+          source: { kind: 'model', provider: 'fake', model: 'fake' },
+        },
+      }, { surfaceOp: 'append' }),
+      at(7, 'tool/call', { turn: 1, step: 2, callId: 'late-call', name: 'read', arguments: '{}' }),
+      at(8, 'step/end', { turn: 1, step: 2 }),
+      at(9, 'turn/end', { turn: 1, reason: { kind: 'completed' } }),
+    ])
+
+    const tail = node(snapshot(value), 'turn-tail')?.data as TurnTailChatData
+    expect(tail.closing?.finalNode.seq).toBe(3)
+    expect(tail.branchUnavailable).toBe(true)
+  })
+
   it('publishes exact Turn usage only after pagination supplies the full lifecycle window', () => {
     const value = assembler([
       at(3, 'assistant/message', {
