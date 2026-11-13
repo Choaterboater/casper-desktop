@@ -1,23 +1,23 @@
 Synthetic browser KeyboardEvents, not an OS input-method test.
 package / isComposing=true: inspect=0, install=0; editable; value retained
 - textbox "包名或地址":
-  - /placeholder: 例如 dsh-plugin-whale-pet
+  - /placeholder: 例如 @author/plugin-name
   - text: ime-confirm-package
 package / Safari isComposing=false, keyCode=229: inspect=0, install=0; editable; value retained
 - textbox "包名或地址":
-  - /placeholder: 例如 dsh-plugin-whale-pet
+  - /placeholder: 例如 @author/plugin-name
   - text: ime-confirm-package
 package / compositionstart + unmarked Enter: inspect=0, install=0; editable; value retained
 - textbox "包名或地址":
-  - /placeholder: 例如 dsh-plugin-whale-pet
+  - /placeholder: 例如 @author/plugin-name
   - text: ime-confirm-package
 package / compositionend + immediate unmarked Enter: inspect=0, install=0; editable; value retained
 - textbox "包名或地址":
-  - /placeholder: 例如 dsh-plugin-whale-pet
+  - /placeholder: 例如 @author/plugin-name
   - text: ime-confirm-package
 package / compositionend + 9ms unmarked Enter: inspect=0, install=0; editable; value retained
 - textbox "包名或地址":
-  - /placeholder: 例如 dsh-plugin-whale-pet
+  - /placeholder: 例如 @author/plugin-name
   - text: ime-confirm-package
 package / plain Enter: inspect=1, install=1
 - dialog "插件安装失败":

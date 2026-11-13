@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Anpassung des Pi-AI-Modells",
-    "description": "Bereitstellung der DeepSeek-Modellanpassung über pi-ai für Casper als designverifizierte Implementierung von dsh-llm-deepseek."
+    "description": "Verbindet Casper über pi-ai mit Modellen vieler Anbieter."
   }
 }

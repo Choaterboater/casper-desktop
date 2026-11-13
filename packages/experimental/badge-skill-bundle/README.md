@@ -25,7 +25,7 @@ Let Agents whose presets load skills add a “powered by dsh” badge to documen
 <a id="use-this-package"></a>
 ## Use this package
 
-In Web or Desktop, open Plugins and enable **DSH badge skill** in Official. Switch it off to remove its profile layer.
+In Web or Desktop, open Plugins and enable **dsh badge skill** in Official. Switch it off to remove its profile layer.
 
 The switch adds or removes a Host-wide skill provider for existing and new Agents. Presets that expose skill loading can use the badge; minimal keeps its tool catalog unchanged.
 

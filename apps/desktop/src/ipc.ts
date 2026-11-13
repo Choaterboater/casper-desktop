@@ -103,13 +103,17 @@ export interface DshDesktopProductApi {
    * @returns `name=value` fields separated by `; `, with no hostname, user name, or serial number.
    */
   deviceInfo(): Promise<string>
-  readonly updates: {
+  /** Present only when main passes {@link DESKTOP_UPDATE_FEED_ARGUMENT}; absent, the client shows no update controls. */
+  readonly updates?: {
     readonly channels: DesktopChannelBridge
     status(): Promise<DesktopUpdatePresentation>
     open(): Promise<void>
     subscribe(listener: (state: DesktopUpdatePresentation) => void): () => void
   }
 }
+
+/** Main-window preload argument present only when this process has a packaged update feed. */
+export const DESKTOP_UPDATE_FEED_ARGUMENT = '--dsh-update-feed'
 
 /** Scheme of Desktop-owned application documents. */
 export const SCHEME = 'dsh-app'

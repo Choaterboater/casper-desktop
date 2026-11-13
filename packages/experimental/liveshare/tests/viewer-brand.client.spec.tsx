@@ -40,7 +40,7 @@ function target(basePath = '/team/liveshare'): void {
 }
 
 describe('viewer brand row', () => {
-  it('links home and states the owner and the owner DSH version', async () => {
+  it('links home and states the owner and the owner Casper version', async () => {
     target()
     publish({ owner: '许翰翔', dshVersion: '0.1.5-rc.2', relay: '20260911-143800-6a72b8' })
     render(<ViewerBrandName t={t} />)
@@ -48,9 +48,9 @@ describe('viewer brand row', () => {
     expect(link.getAttribute('href')).toBe('/team/liveshare/')
     expect(link.textContent).toContain('由 许翰翔 分享')
     expect(link.textContent).toContain('LiveShare')
-    expect(link.textContent).toContain('DSH 0.1.5-rc.2')
+    expect(link.textContent).toContain('Casper 0.1.5-rc.2')
     // The Relay's own release stays a detail of the same link instead of widening the row.
-    expect(link.getAttribute('title')).toBe('由 许翰翔 分享 · DSH 0.1.5-rc.2 · relay 20260911-143800-6a72b8')
+    expect(link.getAttribute('title')).toBe('由 许翰翔 分享 · Casper 0.1.5-rc.2 · relay 20260911-143800-6a72b8')
     expect(link.textContent).not.toContain('20260911-143800-6a72b8')
   })
 
@@ -61,7 +61,7 @@ describe('viewer brand row', () => {
     const link = screen.getByRole('link', { name: '回到 LiveShare 首页' })
     expect(link.getAttribute('href')).toBe('/')
     expect(link.textContent).toContain('由 未知分享者 分享')
-    expect(link.textContent).not.toContain('DSH')
+    expect(link.textContent).not.toContain('Casper')
     expect(link.getAttribute('title')).toBe('由 未知分享者 分享')
   })
 
@@ -83,7 +83,7 @@ describe('viewer brand row', () => {
     publish({ owner: '许翰翔', dshVersion: '0.1.5-rc.2' })
     const link = screen.getByRole('link', { name: '回到 LiveShare 首页' })
     expect(link.textContent).toContain('由 许翰翔 分享')
-    expect(link.textContent).toContain('DSH 0.1.5-rc.2')
+    expect(link.textContent).toContain('Casper 0.1.5-rc.2')
   })
 
   it('keeps the owner release inline and its build metadata on the tooltip', () => {
@@ -92,10 +92,10 @@ describe('viewer brand row', () => {
     render(<ViewerBrandName t={t} />)
     const link = screen.getByRole('link', { name: '回到 LiveShare 首页' })
 
-    expect(link.textContent).toContain('DSH 0.1.5-rc.2')
+    expect(link.textContent).toContain('Casper 0.1.5-rc.2')
     expect(link.textContent).not.toContain('9f2c4d1')
     // The whole identifier one click away, so a build never widens the row.
-    expect(link.getAttribute('title')).toContain('DSH 0.1.5-rc.2+9f2c4d1')
+    expect(link.getAttribute('title')).toContain('Casper 0.1.5-rc.2+9f2c4d1')
   })
 
   it('renders the shipped Harness mark at the size the shell asks for', () => {

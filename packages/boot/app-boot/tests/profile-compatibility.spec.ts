@@ -90,7 +90,7 @@ it.each([
 it('requires explicit risk acknowledgement and the running runtime for a grant', async () => {
   const dir = profileFixture()
   await expect(setProfileVersionExemption(dir, 'plugin@1.0.0', runtime, true, false)).rejects.toThrow('crashes or data loss')
-  await expect(setProfileVersionExemption(dir, 'plugin@1.0.0', '9.9.9', true, true)).rejects.toThrow(`runs DSH ${runtime}`)
+  await expect(setProfileVersionExemption(dir, 'plugin@1.0.0', '9.9.9', true, true)).rejects.toThrow(`runs version ${runtime}`)
   expect(readProfileVersionExemptions(dir)).toEqual({})
 })
 

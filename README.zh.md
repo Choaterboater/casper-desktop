@@ -56,7 +56,7 @@ npx pnpm@11.28.5 run start:desktop
 
 拉取请求和推送到 `main` 的提交会在 GitHub 自带的 runner 上运行 [Casper CI](.github/workflows/casper-ci.yml)：静态检查、类型检查、lint 与单元测试。GitHub 会运行 `.github/workflows` 中的每个 workflow 文件，因此该目录只放 Casper CI；只要该目录中还有其他 workflow 文件，[一个单元测试](scripts/casper-workflows.spec.ts)就会失败。上游的 workflow 需要上游的密钥和 runner，因此原样保存在 `.github/upstream-workflows` 中，GitHub 不会运行那里的文件。上游合并新增 workflow 文件时，请在推送合并分支之前把它移到 `.github/upstream-workflows`，因为拉取请求新增的 workflow 会在该拉取请求上运行。
 
-Casper CI 还会扫描桌面应用实际发布的内容。[一个单元测试](scripts/casper-desktop-shipped.spec.ts)沿用打包器自身的包集合，只要出现上游或 npm 镜像的主机名、8 种语言中任一种的上游产品名称、上游服务包或服务行，或对它们的导入，就会失败。少数结果在[规则](scripts/casper/desktop-shipped-rules.ts)中被永久接受，每条都有精确的次数；其余结果暂存在一个只减不增的[台账](scripts/casper/desktop-shipped.pending.json)中：`pnpm exec tsx scripts/casper/desktop-shipped.ts --shrink` 只会降低它，从不增加。该测试读取源码而不是构建产物，因此要在本地检查打包好的应用，请运行 `pnpm exec tsx scripts/casper/scan-packaged-app.ts <Casper.app> --target darwin-arm64`。
+Casper CI 还会扫描桌面应用实际发布的内容。[一个单元测试](scripts/casper-desktop-shipped.spec.ts)沿用打包器自身的包集合，只要出现上游或 npm 镜像的主机名、8 种语言中任一种的上游产品名称、语言词典中上游产品的简称（DSH、Harness）、上游服务包或服务行，或对它们的导入，就会失败。它接受的结果列在[规则](scripts/casper/desktop-shipped-rules.ts)中，每条都有原因和精确的次数：桌面应用从不显示的上游专用文案、它关闭的 npm 镜像常量、pi-ai 模型目录、OpenTelemetry 属性列表中一处文档注释里的链接，以及“关于”面板中的署名。该测试读取源码而不是构建产物，因此要在本地检查打包好的应用，请运行 `pnpm exec tsx scripts/casper/scan-packaged-app.ts <Casper.app> --target darwin-arm64`。
 
 ## 许可证
 

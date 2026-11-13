@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { REBRAND_RULES, runRebrand } from './casper/rebrand.ts'
+import { REBRAND_RULES, applyRebrandRules, ruleState, runRebrand } from './casper/rebrand.ts'
 
 const root = resolve(import.meta.dirname, '..')
 const read = (path: string): string => readFileSync(resolve(root, path), 'utf8')
@@ -96,8 +96,45 @@ describe('Casper identity', () => {
     }
   })
 
-  it('applies every English product-name swap in the rebrand script', () => {
+  it('applies every product-copy swap in the rebrand script', () => {
     expect(REBRAND_RULES.length).toBeGreaterThan(0)
     expect(runRebrand(root, false).map(({ rule, state }) => `${state} ${rule.file}: ${rule.from}`)).toEqual([])
+  })
+
+  it.each([
+    ['a single swap still pending', 'a DSH b', undefined, 'pending'],
+    ['a single swap applied', 'a Casper b', undefined, 'applied'],
+    ['a single swap whose text repeats', 'DSH DSH', undefined, 'ambiguous'],
+    ['a counted swap with every occurrence pending', 'DSH x DSH', 2, 'pending'],
+    ['a counted swap with every occurrence applied', 'Casper x Casper', 2, 'applied'],
+    ['a counted swap applied only in part', 'Casper x DSH', 2, 'stale'],
+    ['a counted swap that repeats more often', 'DSH DSH DSH', 2, 'ambiguous'],
+    ['a swap upstream reworded', 'a Harness b', undefined, 'stale'],
+  ] as const)('classifies %s', (_case, text, count, state) => {
+    expect(ruleState(text, { file: 'f', from: 'DSH', to: 'Casper', ...count === undefined ? {} : { count } })).toBe(state)
+  })
+
+  it('applies rules in order to upstream text and reports one keyed on Casper-edited text as stale', () => {
+    const rules = [
+      { file: 'f', from: 'restart DSH', to: 'restart Casper' },
+      { file: 'f', from: 'Use DSH', to: 'Use Casper' },
+      { file: 'f', from: 'restart Casper now', to: 'restart Casper' },
+      { file: 'f', from: 'Casper-edited line', to: 'final line' },
+    ]
+    const run = applyRebrandRules(rules, () => 'restart DSH now\nUse DSH\n', 'write')
+    expect(run.changed.get('f')).toBe('restart Casper\nUse Casper\n')
+    expect(run.problems).toEqual([{ rule: rules[3], state: 'stale' }])
+    expect(applyRebrandRules(rules.slice(0, 2), () => 'restart DSH now\nUse DSH\n', 'check').problems.map(({ state }) => state))
+      .toEqual(['pending', 'pending'])
+  })
+
+  it('reports a rule that changes nothing in upstream text, because an earlier rule already wrote its result', () => {
+    const rules = [
+      { file: 'f', from: 'Another DSH (such as dsh web) is running', to: 'Another Casper is running' },
+      { file: 'f', from: 'Another Casper (such as dsh web) is running', to: 'Another Casper is running' },
+    ]
+    expect(applyRebrandRules(rules, () => 'Another DSH (such as dsh web) is running\n', 'write').problems).toEqual([])
+    expect(applyRebrandRules(rules, () => 'Another DSH (such as dsh web) is running\n', 'upstream').problems)
+      .toEqual([{ rule: rules[1], state: 'applied' }])
   })
 })

@@ -28,7 +28,7 @@ it('disables unsupported bundles, shows the Host restriction, and refuses direct
   await page.goto(scaffold.authenticatedUrl)
   await connectFreshWorkspaceZh(page, scaffold.workspaceCwd)
   await page.getByRole('navigation', { name: '全局面板' }).getByRole('button', { name: '插件', exact: true }).click()
-  const reason = '此插件不支持运行 DSH 的主机操作系统'
+  const reason = '此插件不支持运行 Casper 的主机操作系统'
   const card = page.locator(`[data-plugin-package="${name}"]`)
   await card.getByText(reason, { exact: true }).waitFor()
   expect(await card.getByRole('switch').isEnabled()).toBe(false)

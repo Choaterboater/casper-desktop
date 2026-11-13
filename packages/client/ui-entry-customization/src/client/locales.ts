@@ -15,9 +15,9 @@ export const zh: Record<keyof typeof en, string> = {
   'pin': '将{name}固定到侧边栏',
   install: '浏览更多插件',
   create: '创建你的插件',
-  'createPrompt.sidebar': '创建一个带左侧栏入口的 DSH 插件。',
-  'createPrompt.conversation': '创建一个 DSH 会话视图插件。',
-  'createPrompt.rightbar': '创建一个带右侧栏入口的 DSH 插件。',
+  'createPrompt.sidebar': '创建一个带左侧栏入口的 Casper 插件。',
+  'createPrompt.conversation': '创建一个 Casper 会话视图插件。',
+  'createPrompt.rightbar': '创建一个带右侧栏入口的 Casper 插件。',
 }
 
 /** Japanese copy, checked against the English keys. */
@@ -26,9 +26,9 @@ export const ja = {
   'pin': '{name}をサイドバーに固定',
   'install': '他のプラグインを探す',
   'create': 'プラグインを作成',
-  'createPrompt.sidebar': '左サイドバーにエントリを持つ DSH プラグインを作成します。',
-  'createPrompt.conversation': 'DSH 会話ビュープラグインを作成します。',
-  'createPrompt.rightbar': '右サイドバーにエントリを持つ DSH プラグインを作成します。',
+  'createPrompt.sidebar': '左サイドバーにエントリを持つ Casper プラグインを作成します。',
+  'createPrompt.conversation': 'Casper 会話ビュープラグインを作成します。',
+  'createPrompt.rightbar': '右サイドバーにエントリを持つ Casper プラグインを作成します。',
 } satisfies Record<keyof typeof en, string>
 
 /** Spanish dictionary, checked against the English keys. */
@@ -37,9 +37,9 @@ export const es = {
   'pin': 'Fijar {name} en la barra lateral',
   install: 'Explorar otros complementos',
   create: 'Crea tu complemento',
-  'createPrompt.sidebar': 'Cree un complemento DSH con una entrada en la barra lateral izquierda.',
-  'createPrompt.conversation': 'Cree un complemento de vista de conversación DSH.',
-  'createPrompt.rightbar': 'Cree un complemento DSH con una entrada en la barra lateral derecha.',
+  'createPrompt.sidebar': 'Cree un complemento de Casper con una entrada en la barra lateral izquierda.',
+  'createPrompt.conversation': 'Cree un complemento de vista de conversación de Casper.',
+  'createPrompt.rightbar': 'Cree un complemento de Casper con una entrada en la barra lateral derecha.',
 } satisfies Record<keyof typeof en, string>
 
 /** French dictionary, checked against the English keys. */
@@ -48,9 +48,9 @@ export const fr = {
   'pin': 'Épingler {name} à la barre latérale',
   install: "Parcourir d'autres plugins",
   create: 'Créez votre plugin',
-  'createPrompt.sidebar': 'Créez un plugin DSH avec une entrée dans la barre latérale gauche.',
-  'createPrompt.conversation': "Créez un plugin d'affichage de conversation DSH.",
-  'createPrompt.rightbar': 'Créez un plugin DSH avec une entrée dans la barre latérale droite.',
+  'createPrompt.sidebar': 'Créez un plugin Casper avec une entrée dans la barre latérale gauche.',
+  'createPrompt.conversation': "Créez un plugin Casper d'affichage de conversation.",
+  'createPrompt.rightbar': 'Créez un plugin Casper avec une entrée dans la barre latérale droite.',
 } satisfies Record<keyof typeof en, string>
 
 /** German dictionary, checked against the English keys. */
@@ -59,9 +59,9 @@ export const de = {
   'pin': '{name} an der Seitenleiste anheften',
   install: 'Durchsuchen Sie andere Plugins',
   create: 'Erstellen Sie Ihr Plugin',
-  'createPrompt.sidebar': 'Erstellen Sie ein DSH-Plugin mit einem Eintrag in der linken Seitenleiste.',
-  'createPrompt.conversation': 'Erstellen Sie ein DSH-Plugin für die Konversationsansicht.',
-  'createPrompt.rightbar': 'Erstellen Sie ein DSH-Plugin mit einem Eintrag in der rechten Seitenleiste.',
+  'createPrompt.sidebar': 'Erstellen Sie ein Casper-Plugin mit einem Eintrag in der linken Seitenleiste.',
+  'createPrompt.conversation': 'Erstellen Sie ein Casper-Plugin für die Konversationsansicht.',
+  'createPrompt.rightbar': 'Erstellen Sie ein Casper-Plugin mit einem Eintrag in der rechten Seitenleiste.',
 } satisfies Record<keyof typeof en, string>
 
 /** Russian dictionary, checked against the English keys. */
@@ -70,9 +70,9 @@ export const ru = {
   'pin': 'Закрепить {name} на боковой панели',
   install: 'Просмотрите другие плагины',
   create: 'Создайте свой плагин',
-  'createPrompt.sidebar': 'Создайте плагин DSH с записью на левой боковой панели.',
-  'createPrompt.conversation': 'Создайте плагин просмотра диалога DSH.',
-  'createPrompt.rightbar': 'Создайте плагин DSH с записью на правой боковой панели.',
+  'createPrompt.sidebar': 'Создайте плагин Casper с записью на левой боковой панели.',
+  'createPrompt.conversation': 'Создайте плагин Casper для просмотра диалога.',
+  'createPrompt.rightbar': 'Создайте плагин Casper с записью на правой боковой панели.',
 } satisfies Record<keyof typeof en, string>
 
 /** Portuguese dictionary, checked against the English keys. */
@@ -81,7 +81,7 @@ export const pt = {
   'pin': 'Fixar {name} na barra lateral',
   install: 'Procure outros plug-ins',
   create: 'Crie seu plug-in',
-  'createPrompt.sidebar': 'Crie um plug-in DSH com uma entrada na barra lateral esquerda.',
-  'createPrompt.conversation': 'Crie um plug-in de visualização de conversa DSH.',
-  'createPrompt.rightbar': 'Crie um plug-in DSH com uma entrada na barra lateral direita.',
+  'createPrompt.sidebar': 'Crie um plug-in do Casper com uma entrada na barra lateral esquerda.',
+  'createPrompt.conversation': 'Crie um plug-in de visualização de conversa do Casper.',
+  'createPrompt.rightbar': 'Crie um plug-in do Casper com uma entrada na barra lateral direita.',
 } satisfies Record<keyof typeof en, string>

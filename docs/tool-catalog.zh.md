@@ -62,7 +62,7 @@
 
 ### `plugin_manager`
 
-列出当前 profile 中的插件或组合包，启用或禁用它们，安装组合包或移除已安装的组合包。每项操作都要求 danger-full-access 权限或本次调用的批准。批准不改变会话权限模式。变更影响该 profile 的所有会话。先列出条目以获取准确标识。包安装可能运行已获批准的构建脚本。支持热更新的 profile 立即应用变更，包括已安装包的升级；未直接应用的变更结果带有 nextStep，说明下一步要做什么或告诉用户什么。不兼容的 DSH peer 依赖会阻止安装和激活。版本豁免可能导致崩溃和数据丢失：授权前必须警告用户，并获得用户对精确插件版本与运行时版本组合的明确许可。
+列出当前 profile 中的插件或组合包，启用或禁用它们，安装组合包或移除已安装的组合包。每项操作都要求 danger-full-access 权限或本次调用的批准。批准不改变会话权限模式。变更影响该 profile 的所有会话。先列出条目以获取准确标识。包安装可能运行已获批准的构建脚本。支持热更新的 profile 立即应用变更，包括已安装包的升级；未直接应用的变更结果带有 nextStep，说明下一步要做什么或告诉用户什么。未满足的 Casper 版本要求（engines.dsh，否则为 dsh peer 依赖）会阻止安装和激活。版本豁免可能导致崩溃和数据丢失：授权前必须警告用户，并获得用户对精确插件版本与运行时版本组合的明确许可。
 
 ```json
 {
@@ -92,7 +92,7 @@
     },
     "runtimeVersion": {
       "type": "string",
-      "description": "For set_version_exemption: exact DSH version from list_version_exemptions. Target must be the manifest package-name@version, not an alias or version range."
+      "description": "For set_version_exemption: exact Casper version from list_version_exemptions. Target must be the manifest package-name@version, not an alias or version range."
     },
     "acceptRisk": {
       "type": "boolean",
