@@ -72,7 +72,7 @@ The bundle adds no request content directly; each inserted row's package owns an
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- `dsh-web-app`'s own manifest depends on four forbidden packages (the account controller, the account settings UI, product analytics and product telemetry), so this bundle's install closure still reaches them. The desktop's package closure has to omit them itself.
+- `dsh-web-app`'s own manifest depends on four forbidden packages (the account controller, the account settings UI, product analytics and product telemetry), so this bundle's install closure reaches them. The Desktop package set omits them through [`DESKTOP_OMITTED_PACKAGES`](../../../apps/desktop/src/core-package-set.ts).
 - A removed row inside a flow-style list, or one whose removal would empty its list, cannot be removed line by line; the generator fails instead.
 
 -----

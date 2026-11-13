@@ -1,17 +1,23 @@
 /**
  * Local cross-check of a packaged Casper desktop app: apply the shipped-output gate's host and screen-text rules to every
- * file in `app.asar` (bundles included, which the source-plane gate cannot see) and compare its `@deepseek-ai` packages
- * with the closure the gate scans. Packaging needs macOS or Windows, so this runs locally, not in Casper CI.
+ * file in `app.asar` (bundles included, which the source-plane gate cannot see), compare its top-level `@deepseek-ai`
+ * packages with the closure the gate scans, and require that no omitted or forbidden package is installed at any depth
+ * and that the dsh runtime tree, `dsh/`, holds one copy of each workspace package. The Electron shell's own
+ * `node_modules` is a separate runtime and may repeat packages the dsh runtime has. Packaging needs macOS or Windows,
+ * so this runs locally, not in Casper CI.
  *
  * Usage: `pnpm exec tsx scripts/casper/scan-packaged-app.ts <Casper.app | app.asar> --target <platform>-<arch> [--json <report.json>]`,
  * where the target is the archive's own, such as `darwin-arm64`.
- * It reads the archive only; it never launches the app. Exit status 1 means the workspace package sets differ.
+ * It reads the archive only; it never launches the app. Exit status 1 means the workspace package sets differ or the
+ * archive installs a package it must not.
  * @module scripts/casper/scan-packaged-app
  */
 
 import { closeSync, existsSync, openSync, readSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
+import { DESKTOP_OMITTED_PACKAGES } from '../../apps/desktop/src/core-package-set.ts'
+import { DESKTOP_FORBIDDEN_PACKAGES } from './desktop-policy.ts'
 import { DESKTOP_SHIPPED_TARGETS, desktopShippedWorkspacePackages } from './desktop-shipped.ts'
 import { FORBIDDEN_HOST, FORBIDDEN_SCREEN_TEXT } from './desktop-shipped-rules.ts'
 
@@ -32,7 +38,11 @@ export interface PackagedAppReport {
   readonly files: Readonly<Record<string, Readonly<Record<string, number>>>>
   /** `@deepseek-ai` packages installed under `dsh/node_modules`. */
   readonly packages: readonly string[]
+  /** Folder of every `@deepseek-ai` package installed at any depth, by package name. */
+  readonly installed: Readonly<Record<string, readonly string[]>>
 }
+
+const INSTALLED_PACKAGE = /(?:^|\/)node_modules\/(@deepseek-ai\/[^/]+)\/package\.json$/u
 
 function readAt(fd: number, length: number, position: number): Buffer {
   const buffer = Buffer.alloc(length)
@@ -60,6 +70,7 @@ export function scanPackagedApp(archive: string): PackagedAppReport {
     const hosts: Record<string, number> = {}
     const texts: Record<string, number> = {}
     const files: Record<string, Record<string, number>> = {}
+    const installed: Record<string, string[]> = {}
     const count = (into: Record<string, number>, file: string, match: string): void => {
       into[match] = (into[match] ?? 0) + 1
       const perFile = files[file] ??= {}
@@ -70,6 +81,8 @@ export function scanPackagedApp(archive: string): PackagedAppReport {
         for (const [name, child] of Object.entries(node.files)) visit(child, path === '' ? name : `${path}/${name}`)
         return
       }
+      const name = INSTALLED_PACKAGE.exec(path)?.[1]
+      if (name !== undefined) (installed[name] ??= []).push(path.slice(0, -'/package.json'.length))
       if (node.unpacked === true || node.size === undefined || node.offset === undefined || node.size === 0) return
       const text = readAt(fd, node.size, base + Number(node.offset)).toString('latin1')
       for (const match of text.matchAll(FORBIDDEN_HOST)) count(hosts, path, match[0].toLowerCase())
@@ -80,7 +93,8 @@ export function scanPackagedApp(archive: string): PackagedAppReport {
     visit(header, '')
     const scoped = header.files?.dsh?.files?.node_modules?.files?.['@deepseek-ai']?.files ?? {}
     const packages = Object.keys(scoped).map(name => `@deepseek-ai/${name}`).sort()
-    return { hosts, texts, files, packages }
+    for (const folders of Object.values(installed)) folders.sort()
+    return { hosts, texts, files, packages, installed }
   } finally {
     closeSync(fd)
   }
@@ -108,7 +122,17 @@ function main(): void {
   console.log(`workspace packages: ${shipped.length} in the archive, ${expected.length} in the gate's ${values.target} closure`)
   for (const name of missing) console.error(`scan-packaged-app: the gate scans ${name}, which the archive does not ship`)
   for (const name of extra) console.error(`scan-packaged-app: the archive ships ${name}, which the gate does not scan`)
-  if (missing.length > 0 || extra.length > 0) process.exitCode = 1
+  const unshippable = new Set([...DESKTOP_OMITTED_PACKAGES, ...DESKTOP_FORBIDDEN_PACKAGES])
+  const duplicates = (folders: readonly string[]): string[] => folders.length > 1
+    ? folders.map(folder => `${folder}, one of ${folders.length} copies of a workspace package in the dsh runtime`)
+    : []
+  const disallowed = Object.entries(report.installed).flatMap(([name, folders]) => [
+    ...unshippable.has(name) ? folders.map(folder => `${folder}, a package the desktop must not ship`) : [],
+    ...duplicates(workspace.includes(name) ? folders.filter(folder => folder.startsWith('dsh/')) : []),
+  ])
+  console.log(`@deepseek-ai packages at any depth: ${Object.keys(report.installed).length}, disallowed folders: ${disallowed.length}`)
+  for (const folder of disallowed) console.error(`scan-packaged-app: the archive installs ${folder}`)
+  if (missing.length > 0 || extra.length > 0 || disallowed.length > 0) process.exitCode = 1
 }
 
 if (import.meta.main) main()

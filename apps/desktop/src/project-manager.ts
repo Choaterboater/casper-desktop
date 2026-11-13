@@ -17,6 +17,7 @@ import { join } from 'node:path'
 import {
   DESKTOP_HOST_PACKAGE,
   desktopCorePackageOverrides,
+  desktopOmittedPackageOverrides,
   verifyDesktopCorePackageSet,
 } from './core-package-set.ts'
 import type { DesktopPaths } from './paths.ts'
@@ -131,8 +132,15 @@ export class DesktopProjectManager {
   }
 }
 
-/** Create build-only project metadata for materializing the signed runtime. */
-export function createRuntimeProjectMetadata(projectDir: string, release: DesktopRelease): void {
+/**
+ * Create build-only project metadata for materializing the signed runtime. Every package-set member is a direct `file:`
+ * dependency and override; each omitted name is overridden to `-`, so the install never resolves it.
+ * @param projectDir - Build directory containing the verified package set.
+ * @param release - Release identity the package set must match.
+ * @param omitted - Package names the package set leaves out and the install must drop: `DESKTOP_OMITTED_PACKAGES`
+ *   and the left-out optional packages of the set's target; none may be in the set.
+ */
+export function createRuntimeProjectMetadata(projectDir: string, release: DesktopRelease, omitted: readonly string[]): void {
   mkdirSync(projectDir, { recursive: true, mode: 0o700 })
   const packageSet = verifyDesktopCorePackageSet(projectDir, release.version)
   const manifest = {
@@ -145,7 +153,10 @@ export function createRuntimeProjectMetadata(projectDir: string, release: Deskto
   writeJson(join(projectDir, 'package.json'), manifest)
   writeFileSync(
     join(projectDir, 'pnpm-workspace.yaml'),
-    workspaceFile(desktopCorePackageOverrides(packageSet)),
+    workspaceFile({
+      ...desktopCorePackageOverrides(packageSet),
+      ...desktopOmittedPackageOverrides(packageSet, omitted),
+    }),
     { mode: 0o600 },
   )
 }

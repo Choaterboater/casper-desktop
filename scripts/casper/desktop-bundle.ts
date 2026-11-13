@@ -12,7 +12,8 @@
  * order and ends with the hand-written `casper.patch.yml`; the dependencies are both sources' dependencies plus
  * `dsh-web-app`, whose own rows load its code, minus {@link DESKTOP_FORBIDDEN_PACKAGES}, plus, as `workspace:*`, each
  * other package that `casper.patch.yml` names. `dsh-web-app`'s own manifest still depends on forbidden packages, so
- * this bundle's install closure reaches them; the desktop's package closure must omit them itself.
+ * this bundle's install closure reaches them; the Desktop package set omits them through `DESKTOP_OMITTED_PACKAGES` in
+ * `apps/desktop/src/core-package-set.ts`.
  *
  * `--write` writes every output; `--check` exits 1 and names each output that differs from its generated text.
  * @module scripts/casper/desktop-bundle

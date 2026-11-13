@@ -14,11 +14,14 @@ import { parseDesktopRelease, type DesktopRelease } from '../src/release.ts'
 import {
   DESKTOP_HOST_PACKAGE,
   DESKTOP_HOST_RUNTIME_FILES,
+  DESKTOP_OMITTED_PACKAGES,
   DESKTOP_PACKAGES_DIR,
   DESKTOP_PACKAGE_SET_FILE,
   readDesktopCorePackageSet,
   verifyDesktopCoreLockfile,
 } from '../src/core-package-set.ts'
+import { verifyDesktopLockfileExclusions } from './runtime-lockfile.ts'
+import { desktopUnshippedOptionalPackages } from './prepare-package-set.ts'
 import { smokePrimaryRuntime } from './prepare-primary-runtime.ts'
 import { smokePreparedRuntime } from './smoke-prepared-runtime.ts'
 import { prepareRuntimeManifests } from './prepare-runtime-manifests.ts'
@@ -126,17 +129,17 @@ async function main(): Promise<void> {
     const patches = await packagingStep(process.env.DSH_DESKTOP_PACKAGING_RUN_DIR, 'runtime:stage-packages', async () => {
       copyFileSync(join(PACKAGE_SET_ROOT, DESKTOP_PACKAGE_SET_FILE), join(BUILD_ROOT, DESKTOP_PACKAGE_SET_FILE))
       cpSync(join(PACKAGE_SET_ROOT, DESKTOP_PACKAGES_DIR), join(BUILD_ROOT, DESKTOP_PACKAGES_DIR), { recursive: true })
-      createRuntimeProjectMetadata(BUILD_ROOT, release)
+      const unshippedOptional = desktopUnshippedOptionalPackages(BUILD_ROOT, readDesktopCorePackageSet(BUILD_ROOT, release.version))
+      createRuntimeProjectMetadata(BUILD_ROOT, release, [...DESKTOP_OMITTED_PACKAGES, ...unshippedOptional])
       return prepareRuntimePatches(BUILD_ROOT, resolve(APP_ROOT, '..', '..'))
     })
     await packagingStep(process.env.DSH_DESKTOP_PACKAGING_RUN_DIR, 'runtime:lockfile', () => runPnpm(['install', '--lockfile-only']))
     verifyRuntimePatches(BUILD_ROOT, patches)
     const lockfile = readFileSync(join(BUILD_ROOT, 'pnpm-lock.yaml'), 'utf8')
     console.log(`desktop runtime: lockfile sha256 ${createHash('sha256').update(lockfile).digest('hex')}`)
-    verifyDesktopCoreLockfile(
-      lockfile,
-      readDesktopCorePackageSet(BUILD_ROOT, release.version),
-    )
+    const lockedPackageSet = readDesktopCorePackageSet(BUILD_ROOT, release.version)
+    verifyDesktopCoreLockfile(lockfile, lockedPackageSet)
+    verifyDesktopLockfileExclusions(lockfile, lockedPackageSet)
     await packagingStep(process.env.DSH_DESKTOP_PACKAGING_RUN_DIR, 'runtime:install', () => runPnpm(['install', '--prod', '--frozen-lockfile', '--trust-lockfile']))
     const packageSet = readDesktopCorePackageSet(BUILD_ROOT, release.version)
     const targetName = resolveDesktopBuildTarget()

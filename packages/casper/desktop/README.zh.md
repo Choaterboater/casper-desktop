@@ -72,7 +72,7 @@ Casper 桌面版组合包保存桌面应用的 profile 层：上游 [`dsh-base`]
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- `dsh-web-app` 自己的清单依赖四个禁止的包（账户控制器、账户设置界面、产品分析与产品遥测），因此此组合包的安装闭包仍会到达它们。桌面应用的包闭包必须自行排除它们。
+- `dsh-web-app` 自己的清单依赖四个禁止的包（账户控制器、账户设置界面、产品分析与产品遥测），因此此组合包的安装闭包会到达它们。桌面应用的包集合通过 [`DESKTOP_OMITTED_PACKAGES`](../../../apps/desktop/src/core-package-set.ts) 排除它们。
 - 位于流式列表中的被移除行，或删除后会使其列表变空的行，无法逐行删除；此时生成器会失败。
 
 -----

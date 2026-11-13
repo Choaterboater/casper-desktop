@@ -17,7 +17,7 @@ description: "Desktop profile 从 Casper 桌面 bundle 组合，其中没有上�
 
 - 不设置网页搜索提供方；在搜索提供方解析成功前，不向模型提供 `web_search`（`web` 行，`offerUnresolvedSearch: false`）。`web_fetch` 不变。
 - 不设置默认模型（`agent-default-model` 的 provider 与 model 为空）。模型选择器显示“请选择模型”，在选定模型前 Standard Session 的首个提示会失败。
-- 插件管理器还隐藏 `@deepseek-ai/dsh-casper-desktop`、`dsh-base`、`dsh-web-app` 以及其他上游 profile bundle，因此插件页和 `plugin_manager` 工具都无法开启它们。[casper-wire-identity](../casper-wire-identity/guide.zh.md) 中的注册表设置现在来自此 bundle。
+- 插件管理器还隐藏 `@deepseek-ai/dsh-casper-desktop` 与 `dsh-web-app`，因此插件页和 `plugin_manager` 工具都无法开启它们。Desktop 根本不安装 `dsh-base` 或其他上游 profile bundle。[casper-wire-identity](../casper-wire-identity/guide.zh.md) 中的注册表设置现在来自此 bundle。
 
 ## 迁移
 
