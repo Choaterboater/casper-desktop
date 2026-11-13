@@ -23,6 +23,8 @@ const IMPORT_PLANT = 'packages/casper/casper-agent/src/index.ts'
 const ROW_PLANT = 'packages/bundle/web-app/presets/casper.patch.yml'
 const EXEMPT_HOST_PLANT = 'packages/llm/llm-pi-ai/src/provider-data.generated.ts'
 const CREDIT_FILE = 'apps/desktop/src/main.ts'
+/** The Web bundle's package publishes `dist/`; the gate reads its sources instead. */
+const WEB_SOURCE_PLANT = 'apps/web/src/main.ts'
 const OUTSIDE_PLANT = 'packages/test-support/llm-mock-server/src/index.ts'
 const localePlant = (locale: string): string => `packages/llm/llm/locale/${locale}.json`
 
@@ -33,6 +35,7 @@ function plantedOverlay(): Map<string, string> {
     [ROW_PLANT, `${read(ROW_PLANT)}\n- id: llm-deepseek\n  disabled: false\n`],
     [EXEMPT_HOST_PLANT, `${read(EXEMPT_HOST_PLANT)}\nexport const PLANTED_SECOND = 'https://api.deepseek.com/beta'\n`],
     [CREDIT_FILE, read(CREDIT_FILE).replace("copyright: 'Choaterboater · built on DeepSeek Harness (MIT)'", "copyright: 'Choaterboater'")],
+    [WEB_SOURCE_PLANT, `${read(WEB_SOURCE_PLANT)}\nexport const PLANTED_WEB = 'https://platform.deepseek.com/'\n`],
     [OUTSIDE_PLANT, `${read(OUTSIDE_PLANT)}\nexport const PLANTED_OUTSIDE = 'https://api.deepseek.com/v1'\n`],
   ])
   for (const locale of DESKTOP_LOCALES) {
@@ -62,12 +65,13 @@ describe('Casper desktop shipped output', () => {
     expect(shrinkPendingLedger(real, pending)).toEqual(pending)
   })
 
-  it('fails on each planted host, word, import, row, extra exempted host and deleted credit', () => {
+  it('fails on each planted host, Web-bundle source, word, import, row, extra exempted host and deleted credit', () => {
     const evidence = (file: string): string => overlay.get(file) ?? read(file)
     const problems = checkDesktopShipped(planted, DESKTOP_SHIPPED_EXEMPTIONS, readPendingLedger(), evidence)
     expect(problems).toContain(`new: host api.deepseek.com in ${HOST_PLANT} (1x)`)
     expect(problems).toContain(`new: import @deepseek-ai/dsh-llm-deepseek-api-key in ${IMPORT_PLANT} (1x)`)
     expect(problems).toContain('new: row llm-deepseek enabled in composition (1x)')
+    expect(problems).toContain(`new: host platform.deepseek.com in ${WEB_SOURCE_PLANT} (1x)`)
     expect(problems).toContain(`new: host api.deepseek.com in ${EXEMPT_HOST_PLANT} occurs 2x, the exemption allows 1`)
     expect(problems).toContain(`stale: text DeepSeek in ${CREDIT_FILE} no longer occurs, remove the exemption entry`)
     for (const locale of DESKTOP_LOCALES) expect(problems).toContain(`new: text DeepSeek in ${localePlant(locale)} (1x)`)
