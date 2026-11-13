@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFi
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { SessionConfigOption, SessionModeState } from '@agentclientprotocol/sdk'
+import type { AuthMethod, SessionConfigOption, SessionModeState } from '@agentclientprotocol/sdk'
 import { DEFAULT_ACCESS_MODES } from '../src/access.ts'
 import type { Config } from '../src/config.ts'
 
@@ -94,6 +94,16 @@ export interface FakeScript {
   readonly forkError?: { readonly code: number; readonly message: string }
   /** The id of a copy `session/fork` makes. */
   readonly forkSessionId?: string
+  /** The `initialize` reply's `authMethods`, as Casper lists its sign-in ways. */
+  readonly authMethods?: readonly AuthMethod[]
+  /** The sign-ins `_casper/auth/status` names at start. */
+  readonly signIns?: readonly { readonly provider: string; readonly type: string }[]
+  /** `_casper/auth/update` params `authenticate` sends, each with its `methodId` added. */
+  readonly authSteps?: readonly Record<string, unknown>[]
+  /** `authenticate` fails with -32000 and this message. */
+  readonly authError?: string
+  /** A file whose existence ends a held `authenticate`; `_casper/auth/cancel` ends it too. */
+  readonly holdAuth?: string
 }
 
 /** One command the stand-in offers, in ACP's `available_commands_update` shape. */

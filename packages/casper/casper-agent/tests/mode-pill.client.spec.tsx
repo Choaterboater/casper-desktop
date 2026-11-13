@@ -53,7 +53,7 @@ describe('ModePill', () => {
     const effect = vi.fn((run: () => unknown) => run())
     const uiConversation = { events: { register: vi.fn(() => () => {}) }, views: { register: vi.fn(() => () => {}) } }
     const locale = { register: vi.fn(() => () => {}), bind: vi.fn(() => vi.fn()) }
-    apply({ slots, effect, locale, uiConversation } as never)
+    apply({ slots, effect, locale, uiConversation, inject: () => {} } as never)
     const entry = register.mock.calls.find(call => call[0].name === 'conversation.input.left')
     expect(entry?.[0]).toEqual({ name: 'conversation.input.left', id: 'casper-mode-pill', locale: NS })
     expect(entry?.[1]).toBe(ModePill)

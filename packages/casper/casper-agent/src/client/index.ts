@@ -7,7 +7,9 @@
  * steps, and the keyed tool view of `casper_receipt` calls. Casper's checks
  * leave the Chat for their own Checks view beside it. The mode pill, an
  * entry beside the composer's access control, names an access mode Casper
- * picked itself.
+ * picked itself. The Casper models card, in the Models settings page's
+ * footer, signs Casper in to its model providers through the `casperSignIn`
+ * Remote, once the Remote service is present.
  * @module @deepseek-ai/dsh-casper-agent/client
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
@@ -18,6 +20,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: declares the `conversation.chat.turnTail` slot.
 import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
+import remote from '@deepseek-ai/dsh-casper-agent/remote'
 import type { ComposerChainProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 // Type-only: pulls the renderer's Context merge (ctx.slots).
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
@@ -31,6 +34,7 @@ import { de, en, es, fr, ja, NS, pt, ru, zh } from './locales.ts'
 import { ModePill } from './ModePill.tsx'
 import { receiptDefinition } from './receipt-turn.ts'
 import { ReceiptRow, ReceiptTail } from './ReceiptRow.tsx'
+import { mountSignIn } from './sign-in-mount.ts'
 
 export { ARM_DELAY_MS, CasperBoxCard, selectCasperBox } from './CasperBoxCard.tsx'
 export {
@@ -47,6 +51,9 @@ export { receiptDefinition, resultText } from './receipt-turn.ts'
 export type { ReceiptTurnData } from './receipt-turn.ts'
 export { ReceiptRow, ReceiptTail } from './ReceiptRow.tsx'
 export type { ReceiptRowProps, ReceiptTailProps } from './ReceiptRow.tsx'
+export { CasperSignInCard, rowsOf, splitLabel } from './CasperSignInCard.tsx'
+export type { CasperSignInCardProps, CasperSignInOperations } from './CasperSignInCard.tsx'
+export { CASPER_SIGN_IN_ENTRY, mountSignIn, signInOperations } from './sign-in-mount.ts'
 
 /** Required services: the Slot registry, the locale dictionaries, the conversation Definitions, and the Session bindings. */
 export const inject = ['slots', 'locale', 'uiConversation', 'sessions']
@@ -55,8 +62,9 @@ export const inject = ['slots', 'locale', 'uiConversation', 'sessions']
  * Register Casper's approval card before the question composer (priority -1),
  * the receipt's Definition with its card in the Turn tail, and the receipt
  * card as the `casper_receipt` tool view, the check Definitions with the
- * Checks view after the trajectory view, and the mode pill after the
- * composer's mode controls.
+ * Checks view after the trajectory view, the mode pill after the composer's
+ * mode controls, and, once the Remote service is present, the Casper models
+ * card.
  * @param ctx - Client root context.
  */
 export function apply(ctx: ClientContext): void {
@@ -109,4 +117,5 @@ export function apply(ctx: ClientContext): void {
     { name: 'conversation.input.left', id: 'casper-mode-pill', locale: NS },
     ModePill,
   ))
+  ctx.inject(['remote'], async child => await mountSignIn(child, remote))
 }

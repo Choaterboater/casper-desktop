@@ -629,6 +629,33 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'casperSignIn',
+    summary: 'The `casperSignIn` Remote namespace; see the module comment.',
+    description: 'The `casperSignIn` Remote namespace; see the module comment.',
+    methods: [
+      {
+        signature: '@Remote async state(signal: AbortSignal): Promise<CasperSignInState>',
+        description: 'Read the ways Casper signs in and the sign-ins it has saved.',
+        parameters: [{ name: 'signal', description: 'call lifetime; aborting ends Casper.' }],
+        returns: 'the ways the card can show and the saved sign-ins.',
+        throws: ['RemoteError `casperSignIn/failed` when Casper cannot start or refuses.'],
+      },
+      {
+        signature: '@Remote({ mode: \'stream\' }) signIn(methodId: string, key: string | undefined, signal: AbortSignal): AsyncIterable<CasperSignInFrame>',
+        description: 'Run one sign-in and stream its steps; closing the stream stops it.',
+        parameters: [{ name: 'methodId', description: 'one of {@link state}\'s method ids.' }, { name: 'key', description: 'the pasted key, for an `api_key` way only.' }, { name: 'signal', description: 'stream lifetime.' }],
+        returns: 'the steps, ending with `signed-in` or `failed` unless stopped.',
+      },
+      {
+        signature: '@Remote async signOut(provider: string, signal: AbortSignal): Promise<boolean>',
+        description: 'Remove the sign-in Casper saved for one provider.',
+        parameters: [{ name: 'provider', description: 'the provider, as {@link state} names it.' }, { name: 'signal', description: 'call lifetime; aborting ends Casper.' }],
+        returns: 'whether there was a sign-in to remove.',
+        throws: ['RemoteError `casperSignIn/failed` when Casper cannot start or refuses.'],
+      },
+    ],
+  },
+  {
     key: 'claudeCodeMods',
     summary: 'The bridge service: loaded mods, their hooks, and the harness listeners that raise their events.',
     description: 'The bridge service: loaded mods, their hooks, and the harness listeners that raise their events. Mods join through ClaudeCodeMods.add, which defineMod calls when a mod plugin mounts. The Remote methods let a Client draw each session\'s band above the prompt and press its buttons.',
@@ -5899,6 +5926,26 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ButtonProps',
     declaration: 'export interface ButtonProps {\n    readonly label: string;\n    readonly hotkey?: string | undefined;\n    readonly disabled?: boolean | undefined;\n    readonly onPress?: (() => unknown) | undefined;\n}',
+  },
+  {
+    name: 'CasperSavedSignIn',
+    declaration: 'export interface CasperSavedSignIn {\n    provider: string;\n    type: string;\n}',
+  },
+  {
+    name: 'CasperSignInFrame',
+    declaration: 'export type CasperSignInFrame = {\n    type: \'browser\';\n    url: string;\n    opened: boolean;\n} | {\n    type: \'device_code\';\n    url: string;\n    code: string;\n} | {\n    type: \'signed-in\';\n    provider: string;\n} | {\n    type: \'failed\';\n    message: string;\n};',
+  },
+  {
+    name: 'CasperSignInKind',
+    declaration: 'export type CasperSignInKind = \'api_key\' | \'browser\' | \'device_code\';',
+  },
+  {
+    name: 'CasperSignInMethod',
+    declaration: 'export interface CasperSignInMethod {\n    id: string;\n    label: string;\n    provider: string;\n    kind: CasperSignInKind;\n}',
+  },
+  {
+    name: 'CasperSignInState',
+    declaration: 'export interface CasperSignInState {\n    methods: CasperSignInMethod[];\n    signIns: CasperSavedSignIn[];\n}',
   },
   {
     name: 'ChangeRequestCheck',
