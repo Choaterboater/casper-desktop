@@ -1,7 +1,7 @@
 Casper
 Casper
 添加一个 API Key 开始使用
-配置 DeepSeek 官方模型，即可开始使用
+添加模型服务商的 API Key，或稍后在“设置 → 模型”中选择任意服务商
 输入 API 密钥 [password]
 保存并继续 [disabled]
 稍后配置

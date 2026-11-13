@@ -1,6 +1,6 @@
 /**
  * Casper agent plugin: Sessions on a Casper preset are driven by the Casper
- * agent over its ACP server (`casper acp`) instead of the DeepSeek agent loop.
+ * agent over its ACP server (`casper acp`) instead of the built-in agent loop.
  * Every other Session keeps the default factory.
  *
  * @module @deepseek-ai/dsh-casper-agent

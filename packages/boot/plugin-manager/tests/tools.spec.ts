@@ -296,8 +296,8 @@ it('tells the agent the next step for each change outcome it can act on', async 
   expect(await outcome({ changed: false, application: 'cancelled' })).toContain('nothing changed')
   expect(await outcome({ changed: true, application: 'overridden' })).toContain('higher-priority layer')
   expect(await outcome({ changed: true, application: 'restart-required', restartReason: 'host-module' }))
-    .toBe('Tell the user to restart DSH to apply this change: the change reaches modules DSH itself loaded.')
-  expect(await outcome({ changed: true, application: 'restart-required' })).toBe('Tell the user to restart DSH to apply this change.')
+    .toBe('Tell the user to restart Casper to apply this change: the change reaches modules Casper itself loaded.')
+  expect(await outcome({ changed: true, application: 'restart-required' })).toBe('Tell the user to restart Casper to apply this change.')
   expect(await outcome({ changed: false, application: 'failed', packageResult: { kind: 'build-blocked' } })).toContain('approvedBuilds')
   // A refusal code is more specific than the package manager's failure kind.
   expect(await outcome({ changed: false, application: 'failed', packageResult: { kind: 'network' }, error: { code: 'stale-approval' } }))

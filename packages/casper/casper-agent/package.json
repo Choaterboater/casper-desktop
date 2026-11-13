@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-casper-agent",
-  "description": "Casper agent: drive a Session with the Casper agent over its ACP server instead of the DeepSeek agent loop",
+  "description": "Casper agent: drive a Session with the Casper agent over its ACP server instead of the built-in agent loop",
   "version": "0.2.2-alpha.3",
   "publishConfig": {
     "access": "public"

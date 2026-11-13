@@ -5,7 +5,7 @@ import type { DesktopUpdateState, DshDesktopProductApi } from '../src/ipc.ts'
 import type { DesktopUpdateBridge } from '@deepseek-ai/dsh-client-ui-settings-general/types'
 
 it('keeps the Electron preload assignable to the product consumer', () => {
-  const assign = (bridge: DshDesktopProductApi['updates']): DesktopUpdateBridge => bridge
+  const assign = (bridge: NonNullable<DshDesktopProductApi['updates']>): DesktopUpdateBridge => bridge
   expect(assign).toBeTypeOf('function')
 })
 

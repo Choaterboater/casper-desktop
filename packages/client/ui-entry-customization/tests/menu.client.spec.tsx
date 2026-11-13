@@ -222,9 +222,9 @@ describe('More menu registrations', () => {
     ['en', 'sidebar.panellist.actions', 'Create a Casper plugin with a left sidebar entry.'],
     ['en', 'conversation.session.header.views.actions', 'Create a Casper conversation view plugin.'],
     ['en', 'sidebar.right.tab.guide.actions', 'Create a Casper plugin with a right sidebar entry.'],
-    ['zh', 'sidebar.panellist.actions', '创建一个带左侧栏入口的 DSH 插件。'],
-    ['zh', 'conversation.session.header.views.actions', '创建一个 DSH 会话视图插件。'],
-    ['zh', 'sidebar.right.tab.guide.actions', '创建一个带右侧栏入口的 DSH 插件。'],
+    ['zh', 'sidebar.panellist.actions', '创建一个带左侧栏入口的 Casper 插件。'],
+    ['zh', 'conversation.session.header.views.actions', '创建一个 Casper 会话视图插件。'],
+    ['zh', 'sidebar.right.tab.guide.actions', '创建一个带右侧栏入口的 Casper 插件。'],
   ] as const)('starts an unsent %s Creator draft from %s', async (language, seat, prompt) => {
     const b = await bench(language)
     fireEvent.click(within(b.view.getByRole('menu', { name: seat }))

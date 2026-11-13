@@ -23,7 +23,7 @@ import {
 import type { DesktopPaths } from './paths.ts'
 import type { DesktopRelease } from './release.ts'
 import { readDesktopRuntime } from './runtime-tree.ts'
-import { CASPER_DESKTOP_BUNDLES, migrateCasperDesktopBundles } from './casper-desktop-profile.ts'
+import { CASPER_DESKTOP_BUNDLES, migrateCasperDesktopBundles, migrateRetiredWebProviders } from './casper-desktop-profile.ts'
 import { initProfile, removeLinkProjections, sanitizeProfile } from '@deepseek-ai/dsh-app-boot'
 
 const PROJECT_NAME = '@deepseek-ai/dsh-desktop-runtime'
@@ -78,16 +78,20 @@ export class DesktopProjectManager {
 
   /**
    * Load application metadata and prepare the external plugin profile without installing packages; an existing profile's
-   * upstream Web template bundles are replaced by the Casper desktop bundle.
+   * upstream Web template bundles are replaced by the Casper desktop bundle, and its stored choices of web providers the
+   * desktop no longer composes are cleared.
    * @throws {Error} When the profile's bundle list names no template bundle; see {@link migrateCasperDesktopBundles}.
+   * @throws {RetiredWebProviderMigrationError} When the profile patch cannot be loaded or a retired web provider choice
+   *   cannot be removed exactly; see {@link migrateRetiredWebProviders}.
    */
   async applyRelease(): Promise<void> {
-    await this.withLock(() => {
+    await this.withLock(async () => {
       // Validation only: an unreadable or mismatched runtime descriptor stops preparation before the Host starts.
       readDesktopRuntime(this.runtime.dsh)
       migrateProfileSettings(this.paths.profile)
       createPluginProfile(this.paths.profile)
       migrateCasperDesktopBundles(this.paths.profile)
+      await migrateRetiredWebProviders(this.paths.profile)
       removeLinkProjections(this.paths.profile)
     })
   }

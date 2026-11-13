@@ -15,6 +15,7 @@ export const DESKTOP_REMOVED_ROWS: Readonly<Record<string, string>> = {
   'web-search-deepseek': '@deepseek-ai/dsh-web-search-deepseek',
   'web-deepseek-api': '@deepseek-ai/dsh-web-deepseek-api',
   'session-log-deepseek': '@deepseek-ai/dsh-session-log-deepseek',
+  'ui-settings-session-log': '@deepseek-ai/dsh-client-ui-settings-session-log',
   'deepseek-llm-api-extensions': '@deepseek-ai/dsh-deepseek-llm-api-extensions',
   'llm-deepseek': '@deepseek-ai/dsh-llm-deepseek-api-key',
   'plugin-package-inventory-deepseek': '@deepseek-ai/dsh-plugin-package-inventory-deepseek',

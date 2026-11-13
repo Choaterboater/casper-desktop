@@ -6,9 +6,8 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import {
   REPOSITORY_ROOT,
   checkDesktopShipped,
-  readPendingLedger,
+  occurrencesOutsideKeys,
   scanDesktopShipped,
-  shrinkPendingLedger,
   sourceStrings,
   type ShippedScan,
 } from './casper/desktop-shipped.ts'
@@ -30,6 +29,9 @@ const OUTSIDE_PLANT = 'packages/test-support/llm-mock-server/src/index.ts'
 const OMITTED_IMPORT_PLANT = 'apps/cli/src/bin.ts'
 const OMITTED_PLANT = 'packages/bundle/headless/cordis.patch.yml'
 const localePlant = (locale: string): string => `packages/llm/llm/locale/${locale}.json`
+/** A dictionary source and a plain source; only the dictionary's product-name use is a finding. */
+const DICTIONARY_PLANT = 'packages/client/ui-chat/src/client/locale.ts'
+const NON_DICTIONARY_PLANT = 'packages/client/ui-chat/src/client/conversation-nodes/turn-error.ts'
 
 function plantedOverlay(): Map<string, string> {
   const overlay = new Map<string, string>([
@@ -42,6 +44,8 @@ function plantedOverlay(): Map<string, string> {
     [OUTSIDE_PLANT, `${read(OUTSIDE_PLANT)}\nexport const PLANTED_OUTSIDE = 'https://api.deepseek.com/v1'\n`],
     [OMITTED_IMPORT_PLANT, `${read(OMITTED_IMPORT_PLANT)}\nimport '@deepseek-ai/dsh-base'\n`],
     [OMITTED_PLANT, `${read(OMITTED_PLANT)}\n# https://api.deepseek.com/v1\n`],
+    [DICTIONARY_PLANT, `${read(DICTIONARY_PLANT)}\nexport const PLANTED_NAME = 'Restart DSH; it reads $DSH_HOME and DSH_HOME.'\nexport const PLANTED_SHORT = 'Restart Harness (backToHarness).'\n`],
+    [NON_DICTIONARY_PLANT, `${read(NON_DICTIONARY_PLANT)}\nexport const PLANTED_LOG = 'DSH process'\n`],
   ])
   for (const locale of DESKTOP_LOCALES) {
     const dictionary = JSON.parse(read(localePlant(locale))) as Record<string, unknown>
@@ -61,18 +65,16 @@ describe('Casper desktop shipped output', () => {
     planted = scanDesktopShipped(overlay)
   }, SCAN_TIMEOUT_MS)
 
-  it('passes on the real tree: every finding is a permanent exemption or in the pending ledger', () => {
-    expect(checkDesktopShipped(real, DESKTOP_SHIPPED_EXEMPTIONS, readPendingLedger())).toEqual([])
+  it('passes on the real tree: every finding is a permanent exemption', () => {
+    expect(checkDesktopShipped(real, DESKTOP_SHIPPED_EXEMPTIONS)).toEqual([])
   })
 
-  it('keeps the pending ledger as small as the tree allows', () => {
-    const pending = readPendingLedger()
-    expect(shrinkPendingLedger(real, pending)).toEqual(pending)
-  })
-
-  it('fails on each planted host, Web-bundle source, word, import, omitted import, row, extra exempted host and deleted credit', () => {
+  it('fails on each planted host, Web-bundle source, word, product name, import, omitted import, row, extra exempted host and deleted credit', () => {
     const evidence = (file: string): string => overlay.get(file) ?? read(file)
-    const problems = checkDesktopShipped(planted, DESKTOP_SHIPPED_EXEMPTIONS, readPendingLedger(), evidence)
+    const problems = checkDesktopShipped(planted, DESKTOP_SHIPPED_EXEMPTIONS, evidence)
+    expect(problems).toContain(`new: text DSH in ${DICTIONARY_PLANT} (1x)`)
+    expect(problems).toContain(`new: text Harness in ${DICTIONARY_PLANT} (1x)`)
+    expect(problems.filter(problem => problem.includes(NON_DICTIONARY_PLANT))).toEqual([])
     expect(problems).toContain(`new: host api.deepseek.com in ${HOST_PLANT} (1x)`)
     expect(problems).toContain(`new: import @deepseek-ai/dsh-llm-deepseek-api-key in ${IMPORT_PLANT} (1x)`)
     expect(problems).toContain(`new: import @deepseek-ai/dsh-base in ${OMITTED_IMPORT_PLANT} (1x)`)
@@ -88,9 +90,42 @@ describe('Casper desktop shipped output', () => {
     [OMITTED_PLANT, '@deepseek-ai/dsh-headless'],
   ])('ignores a plant in %s, outside the shipped closure', (plant, pkg) => {
     const evidence = (file: string): string => overlay.get(file) ?? read(file)
-    const problems = checkDesktopShipped(planted, DESKTOP_SHIPPED_EXEMPTIONS, readPendingLedger(), evidence)
+    const problems = checkDesktopShipped(planted, DESKTOP_SHIPPED_EXEMPTIONS, evidence)
     expect(problems.filter(problem => problem.includes(plant))).toEqual([])
     expect(planted.packages.has(pkg)).toBe(false)
+  })
+
+  it('fails when an exempted name moves to a dictionary key its exemption does not list, at the same count', () => {
+    const file = 'packages/client/ui-settings-models/src/client/locales.ts'
+    const text = read(file)
+    const moved = text.replace("deepSeekAccount: 'DeepSeek Account',", "deepSeekAccount: 'Account', title: 'DeepSeek models',")
+    expect(moved).not.toBe(text)
+    const problems = checkDesktopShipped(real, DESKTOP_SHIPPED_EXEMPTIONS, path => (path === file ? moved : read(path)))
+    expect(problems).toEqual([
+      `text DeepSeek in ${file}: 1 occurrence(s) lie outside the exempted keys deepSeekAccount, onboardingDescription`,
+    ])
+  })
+
+  it.each([
+    ["  providerDeepSeek: 'DeepSeek Search API',", 0],
+    ["  | 'providerDeepSeek' | 'providerLocal'", 0],
+    ["  a: 'x', providerDeepSeek: 'DeepSeek'", 0],
+    ["  title: 'DeepSeek', providerDeepSeek: 'y'", 1],
+    ["  url: 'https://DeepSeek.example'", 1],
+  ])('counts occurrences outside the listed keys in %s', (line, outside) => {
+    expect(occurrencesOutsideKeys(line, 'DeepSeek', ['providerDeepSeek'])).toBe(outside)
+  })
+
+  it('matches an exempted host case-insensitively, as the host scan does', () => {
+    const text = "  deepSeekBaseUrl: 'https://api.deepseek.com',\n  title: 'See API.DeepSeek.com',\n"
+    expect(occurrencesOutsideKeys(text, 'api.deepseek.com', ['deepSeekBaseUrl'], true)).toBe(1)
+    expect(occurrencesOutsideKeys(text, 'api.deepseek.com', ['deepSeekBaseUrl'])).toBe(0)
+  })
+
+  it('reads no screen text from module specifiers', () => {
+    const source = "import a from './DeepSeekA.tsx'\nimport type { B } from './DeepSeekB.ts'\nexport * from './DeepSeekC.ts'\n"
+      + "type C = import('./DeepSeekD.ts').C\nimport e = require('./DeepSeekE.ts')\nconst f = import('./DeepSeekF.ts')\nconst g = 'DeepSeek'"
+    expect(sourceStrings('a.ts', source)).toEqual(['DeepSeek'])
   })
 
   it('reads screen text from literals, templates and JSX, not from comments', () => {

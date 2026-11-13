@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Harness 開発コンテキスト",
-    "description": "Harness のソースディレクトリと Web URL をモデルに伝えます。それらを理由にシステムプロンプトを変更しません。"
+    "title": "Casper 開発コンテキスト",
+    "description": "Casper のソースディレクトリと Web URL をモデルに伝えます。それらを理由にシステムプロンプトを変更しません。"
   }
 }

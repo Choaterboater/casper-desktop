@@ -27,7 +27,7 @@ Agents can load the official "powered by dsh" badge skill from this bundled prov
 
 Enable the plugin to make the `dsh-badge` skill available in the session skill catalog; the model can then load it like any other skill and follow its instructions for adding a "powered by dsh" badge.
 
-In Plugins, this component is named **DSH** and uses the DSH tag icon. Its skill is named `dsh-badge`.
+In Plugins, this component is named **dsh badge** and uses the DSH tag icon. Its skill is named `dsh-badge`.
 
 ### When to choose it
 

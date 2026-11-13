@@ -1,6 +1,7 @@
 /**
- * Scan what the Casper desktop ships, on the source plane, for upstream hosts, upstream screen text, forbidden packages,
- * imports of them, and removed service rows. No build is needed: workspace packages are read from `src/` in place of the
+ * Scan what the Casper desktop ships, on the source plane, for upstream hosts, upstream screen text (and upstream's short
+ * product name in locale dictionaries), forbidden packages, imports of them, and removed service rows. Comments and module
+ * specifiers are not screen text. No build is needed: workspace packages are read from `src/` in place of the
  * `lib/` they publish, third-party packages from the installed `node_modules`, and the desktop's rows from its profile bundles.
  *
  * What is scanned:
@@ -17,7 +18,7 @@
  * @module scripts/casper/desktop-shipped
  */
 
-import { existsSync, globSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, globSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import * as yaml from 'js-yaml'
 import ts from 'typescript'
@@ -34,7 +35,9 @@ import {
   DESKTOP_LOCALES,
   DESKTOP_SHIPPED_EXEMPTIONS,
   FORBIDDEN_HOST,
+  FORBIDDEN_PRODUCT_NAME,
   FORBIDDEN_SCREEN_TEXT,
+  LOCALE_DICTIONARY,
   MINIMUM_SHIPPED_PACKAGES,
   REQUIRED_SHIPPED_PACKAGES,
   type Exemption,
@@ -234,8 +237,10 @@ class Scanner {
     if (!textRules) return
     const locale = LOCALE_FILE.exec(label)?.[1]
     if (locale !== undefined) this.locales.add(locale)
+    const dictionary = LOCALE_DICTIONARY.test(label)
     for (const text of this.screenTexts(path, label)) {
       for (const match of text.matchAll(FORBIDDEN_SCREEN_TEXT)) this.collector.add('text', label, match[0])
+      if (dictionary) for (const match of text.matchAll(FORBIDDEN_PRODUCT_NAME)) this.collector.add('text', label, match[0])
     }
     if (SOURCE_FILE.test(label) && !this.forbiddenDirs.some(dir => label.startsWith(dir))) {
       for (const specifier of collectRuntimeSourceSpecifiers(label, this.readText(path))) {
@@ -272,8 +277,18 @@ function stringValues(value: unknown): string[] {
   return []
 }
 
+/** Whether a string literal names a module: an import, export, `import()`, `import x = require()` or import type specifier. */
+function isModuleSpecifier(node: ts.StringLiteralLike): boolean {
+  const parent = node.parent
+  if (ts.isImportDeclaration(parent) || ts.isExportDeclaration(parent)) return parent.moduleSpecifier === node
+  if (ts.isCallExpression(parent)) return parent.expression.kind === ts.SyntaxKind.ImportKeyword && parent.arguments[0] === node
+  if (ts.isExternalModuleReference(parent)) return true
+  return ts.isLiteralTypeNode(parent) && ts.isImportTypeNode(parent.parent)
+}
+
 /**
- * Collect string literal, template and JSX text contents from one source file; comments are not screen text.
+ * Collect string literal, template and JSX text contents from one source file; comments and module specifiers are not
+ * screen text.
  * @param path - File path used to select TypeScript's parser mode.
  * @param source - Source text.
  * @returns The literal texts in source order.
@@ -283,7 +298,9 @@ export function sourceStrings(path: string, source: string): string[] {
   const file = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, kind)
   const texts: string[] = []
   const visit = (node: ts.Node): void => {
-    if (ts.isStringLiteralLike(node) || ts.isTemplateLiteralToken(node) || ts.isJsxText(node)) texts.push(node.text)
+    if (ts.isStringLiteralLike(node)) {
+      if (!isModuleSpecifier(node)) texts.push(node.text)
+    } else if (ts.isTemplateLiteralToken(node) || ts.isJsxText(node)) texts.push(node.text)
     ts.forEachChild(node, visit)
   }
   visit(file)
@@ -452,38 +469,40 @@ function scanComposition(scanner: Scanner, workspace: ReadonlyMap<string, Worksp
   entries.forEach(visit)
 }
 
-/** Path of the shrink-only ledger of findings a later Step 3 change removes. */
-export const PENDING_LEDGER = join(REPOSITORY_ROOT, 'scripts/casper/desktop-shipped.pending.json')
-
-/** A finding still waiting for the Step 3 change that removes it. */
-export interface PendingFinding extends Finding {
-  /** The change that removes it: `3a` composition and packaging, `3c` the remaining screen text and constants. */
-  readonly step: '3a' | '3c'
-}
-
-/**
- * Read the pending ledger.
- * @param path - Ledger path.
- * @returns The pending findings, as written.
- */
-export function readPendingLedger(path = PENDING_LEDGER): PendingFinding[] {
-  return JSON.parse(readFileSync(path, 'utf8')) as PendingFinding[]
-}
-
 const findingKey = (finding: Finding): string => `${finding.rule} ${finding.match} in ${finding.file}`
 
+const DICTIONARY_KEY = /['"]?([\w.]+)['"]?\s*:\s*['"`]/gu
+
 /**
- * Compare one scan with the permanent exemptions and the pending ledger; every count must match exactly.
+ * Count the occurrences of `match` in `text` that no listed dictionary key holds (see {@link Exemption.keys}).
+ * @param text - The exempted file's text.
+ * @param match - The exempted host or screen text.
+ * @param keys - Dictionary keys that may hold an occurrence.
+ * @param ignoreCase - Match case-insensitively, as the host rule scans.
+ * @returns How many occurrences lie outside those keys.
+ */
+export function occurrencesOutsideKeys(text: string, match: string, keys: readonly string[], ignoreCase = false): number {
+  let outside = 0
+  const pattern = new RegExp(match.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'), ignoreCase ? 'giu' : 'gu')
+  for (const { index: at } of text.matchAll(pattern)) {
+    const prefix = text.slice(text.lastIndexOf('\n', at) + 1, at)
+    const key = [...prefix.matchAll(DICTIONARY_KEY)].at(-1)?.[1]
+    const word = `${/[\w.]*$/u.exec(prefix)?.[0] ?? ''}${/^[\w.]*/u.exec(text.slice(at))?.[0] ?? ''}`
+    if (!keys.some(name => name === key || name === word)) outside += 1
+  }
+  return outside
+}
+
+/**
+ * Compare one scan with the permanent exemptions; every count must match exactly.
  * @param scan - What the scan saw and found.
  * @param exemptions - Permanent exemptions.
- * @param pending - Pending ledger.
- * @param readEvidence - Reads an exempted file's text, to count its evidence.
+ * @param readEvidence - Reads an exempted file's text, to count its evidence and check its keys.
  * @returns Problems, each a sentence; empty when the scan passes.
  */
 export function checkDesktopShipped(
   scan: ShippedScan,
   exemptions: readonly Exemption[],
-  pending: readonly PendingFinding[],
   readEvidence: (file: string) => string = file => readFileSync(join(REPOSITORY_ROOT, file), 'utf8'),
 ): string[] {
   const problems: string[] = []
@@ -496,58 +515,41 @@ export function checkDesktopShipped(
   for (const locale of DESKTOP_LOCALES) {
     if (!scan.locales.has(locale)) problems.push(`the scan read no ${locale} dictionary; the locale walk broke`)
   }
-  const allowed = new Map<string, { count: number; source: string }>()
-  for (const [source, entries] of [['exemption', exemptions], ['pending ledger', pending]] as const) {
-    for (const entry of entries) {
-      const key = findingKey(entry)
-      if (allowed.has(key)) problems.push(`${key} is listed twice; keep one entry`)
-      allowed.set(key, { count: entry.count, source })
-    }
+  const allowed = new Map<string, number>()
+  for (const entry of exemptions) {
+    const key = findingKey(entry)
+    if (allowed.has(key)) problems.push(`${key} is listed twice; keep one entry`)
+    allowed.set(key, entry.count)
   }
   const found = new Map(scan.findings.map(finding => [findingKey(finding), finding]))
   for (const finding of scan.findings) {
     const key = findingKey(finding)
     const allowance = allowed.get(key)
     if (allowance === undefined) problems.push(`new: ${key} (${finding.count}x)`)
-    else if (finding.count > allowance.count) problems.push(`new: ${key} occurs ${finding.count}x, the ${allowance.source} allows ${allowance.count}`)
-    else if (finding.count < allowance.count) problems.push(`stale: ${key} occurs ${finding.count}x, lower the ${allowance.source} entry from ${allowance.count}`)
+    else if (finding.count > allowance) problems.push(`new: ${key} occurs ${finding.count}x, the exemption allows ${allowance}`)
+    else if (finding.count < allowance) problems.push(`stale: ${key} occurs ${finding.count}x, lower the exemption entry from ${allowance}`)
   }
-  for (const [key, allowance] of allowed) {
-    if (!found.has(key)) problems.push(`stale: ${key} no longer occurs, remove the ${allowance.source} entry`)
+  for (const key of allowed.keys()) {
+    if (!found.has(key)) problems.push(`stale: ${key} no longer occurs, remove the exemption entry`)
   }
   for (const exemption of exemptions) {
-    if (exemption.evidence === undefined) continue
-    const occurrences = readEvidence(exemption.file).split(exemption.evidence).length - 1
-    if (occurrences !== exemption.count) {
-      problems.push(`exemption evidence ${JSON.stringify(exemption.evidence)} occurs ${occurrences}x in ${exemption.file}, expected ${exemption.count}`)
+    if (exemption.evidence !== undefined) {
+      const occurrences = readEvidence(exemption.file).split(exemption.evidence).length - 1
+      if (occurrences !== exemption.count) {
+        problems.push(`exemption evidence ${JSON.stringify(exemption.evidence)} occurs ${occurrences}x in ${exemption.file}, expected ${exemption.count}`)
+      }
+    }
+    if (exemption.keys !== undefined) {
+      const outside = occurrencesOutsideKeys(readEvidence(exemption.file), exemption.match, exemption.keys, exemption.rule === 'host')
+      if (outside > 0) problems.push(`${findingKey(exemption)}: ${outside} occurrence(s) lie outside the exempted keys ${exemption.keys.join(', ')}`)
     }
   }
   return problems
 }
 
-/**
- * Lower or remove ledger entries the scan no longer needs; never add or raise one.
- * @param scan - What the scan saw and found.
- * @param pending - Current pending ledger.
- * @returns The shrunk ledger.
- */
-export function shrinkPendingLedger(scan: ShippedScan, pending: readonly PendingFinding[]): PendingFinding[] {
-  const found = new Map(scan.findings.map(finding => [findingKey(finding), finding.count]))
-  return pending
-    .map(entry => ({ ...entry, count: Math.min(entry.count, found.get(findingKey(entry)) ?? 0) }))
-    .filter(entry => entry.count > 0)
-    .sort(compareFindings)
-}
-
 function main(): void {
   const scan = scanDesktopShipped()
-  const pending = readPendingLedger()
-  if (process.argv.includes('--shrink')) {
-    const shrunk = shrinkPendingLedger(scan, pending)
-    writeFileSync(PENDING_LEDGER, `${JSON.stringify(shrunk, undefined, 2)}\n`)
-    console.log(`desktop shipped: pending ledger ${pending.length} -> ${shrunk.length} entries`)
-  }
-  const problems = checkDesktopShipped(scan, DESKTOP_SHIPPED_EXEMPTIONS, readPendingLedger())
+  const problems = checkDesktopShipped(scan, DESKTOP_SHIPPED_EXEMPTIONS)
   for (const problem of problems) console.error(`desktop shipped: ${problem}`)
   console.log(`desktop shipped: ${scan.files} files in ${scan.packages.size} packages, ${problems.length} problem(s)`)
   if (problems.length > 0) process.exitCode = 1

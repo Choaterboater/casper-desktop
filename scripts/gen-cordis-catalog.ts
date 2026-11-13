@@ -28,6 +28,7 @@ import {
   REGION_END,
 } from '@deepseek-ai/dsh-typert-generator'
 import type { CordisCatalogPolicy } from '@deepseek-ai/dsh-typert-generator'
+import { CASPER_RUNTIME_EVENT_EXCLUSIONS, CASPER_RUNTIME_SERVICE_EXCLUSIONS } from './casper/cordis-catalog-exclusions.ts'
 import { renderCordisCoreApiPages } from './cordis-core-api.ts'
 import { contextKeyMap, contextMergeFiles, eventNameList } from './cordis-walk.ts'
 import {
@@ -1128,7 +1129,8 @@ export const CORDIS_CATALOG_POLICY: CordisCatalogPolicy = {
   linkedTypePages: LINK_MAP,
   foundationTypeNames: FOUNDATION_TYPE_NAMES,
   typeLinkExemptions: TYPE_LINK_EXEMPTIONS,
-  runtimeServiceExclusions: new Set(['cordisInspect', 'dynamicCordisRunner']),
+  runtimeServiceExclusions: new Set(['cordisInspect', 'dynamicCordisRunner', ...CASPER_RUNTIME_SERVICE_EXCLUSIONS]),
+  runtimeEventExclusions: new Set(CASPER_RUNTIME_EVENT_EXCLUSIONS),
   runtimeServices: [{
     key: 'timer',
     type: 'TimerService',

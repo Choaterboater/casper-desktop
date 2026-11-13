@@ -95,7 +95,7 @@ it.for(['standard', 'ptc'] as const)('keeps %s plugin changes pending until the 
   expect(advertises(requests[0]!, 'plugin_manager')).toBe(true)
   expect(JSON.stringify(requests[changedAt]!.messages)).toContain('restart-required')
   expect(JSON.stringify(requests[changedAt]!.messages)).toContain('no-hmr')
-  expect(JSON.stringify(requests[changedAt]!.messages)).toContain('restart DSH')
+  expect(JSON.stringify(requests[changedAt]!.messages)).toContain('restart Casper')
   expect(advertises(requests.at(-1)!, 'web_fetch')).toBe(true)
   const saved = await readFile(join(root, 'home/profiles/sdk/cordis.patch.yml'), 'utf8')
   expect(saved).toContain('tool-web')

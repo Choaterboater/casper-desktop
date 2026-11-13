@@ -38,7 +38,7 @@ const translate: LiveshareShareDialogProps['t'] = (key, params) => {
 const RELAY = DOUBLE_RELAY
 const OTHER = 'https://other.example.test'
 const UNSAVED = 'This address is not saved yet; save it to put it in force.'
-const UNREACHABLE = 'Cannot reach the DSH Liveshare share service.'
+const UNREACHABLE = 'Cannot reach the Casper Liveshare share service.'
 
 type MaybeAsync<T> = T | Promise<T>
 

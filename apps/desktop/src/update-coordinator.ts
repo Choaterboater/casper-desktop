@@ -84,6 +84,9 @@ export class DesktopUpdateCoordinator {
     this.updater.on('error', this.onError)
   }
 
+  /** Whether this process has a packaged update source; checks always fail without one. */
+  get hasFeed(): boolean { return this.enabled() }
+
   /** Latest observable state; complete download identity remains main-process-owned. */
   get state(): DesktopUpdateState { return this.current }
 

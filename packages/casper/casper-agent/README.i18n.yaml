@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/casper/casper-agent/README.md
 /:
-  en: 46d3d3bfb2dc30ca
-  zh: baf2ba0857645ba3
+  en: 8c1a587fd6b123da
+  zh: 44ecb408c434cd9e
 /deepseek-ai-dsh-casper-agent:
   en: c9639a3881c64d81
   zh: faa86b67b491657a
 /deepseek-ai-dsh-casper-agent/summary:
-  en: 849b414a49123638
-  zh: 3e6ac6000528a6c9
+  en: 7f634e72fbe6fc38
+  zh: 3d250cdf48be6eee
 /deepseek-ai-dsh-casper-agent/table-of-contents:
   en: 76368b6b1da79c80
   zh: 52384aee991ac542
