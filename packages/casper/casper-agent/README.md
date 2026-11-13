@@ -207,6 +207,11 @@ A pick goes to the Agent, not the Host catalog: it is checked against Casper's l
 
 A new Session shows the list kept in the host storage domain `casper_agent_models` (one global record) until its own Casper starts, with `model` from the config as its current model when set; before any Casper has sent a list, the picker says Casper lists its models once it starts. A resumed Session keeps what its history recorded. A Session created before this list was recorded refuses a pick until its Casper starts.
 
+<a id="casper-sign-ins"></a>
+### Casper's sign-ins
+
+Settings > Models shows a Casper models card under the app's providers, so Casper's own model sign-ins are set up in the app with no terminal. It runs the same engine as a Session, the one the app ships unless `useInstalledCasper` is on, so it needs no Casper installed on the computer. Each provider's row lists Casper's ways for it, and keeps them once Casper has a saved sign-in, beside Sign out, so a sign-in can be made again or another way. The plugin registers the `casperSignIn` Remote namespace (`CasperSignInController`, which injects `subprocess` and `typert`), and the card is an entry in the page's `settings.models.footer` slot. Each request starts one `casper acp` process with no conversation, found and started as a Session's is, with the app profile's variables, and ends it when the request ends. `state` reads the ways from `initialize`'s `authMethods`, keeping those whose `_meta.casper.kind` is `api_key`, `browser`, or `device_code`, and the saved sign-ins from `_casper/auth/status`. `signIn` sends `authenticate` and streams each `_casper/auth/update` step for that way: the page Casper opened, or a page and a code to enter there; the stream ends with `signed-in` or with `failed` and Casper's words. Closing the stream, with Cancel or by leaving the page, sends `_casper/auth/cancel` before the process ends. `signOut` sends `_casper/auth/logout`. A pasted key goes to Casper only in `authenticate`'s `_meta.casper.key`; no reply or step carries it back. Casper keeps these sign-ins in its own login file, not in the app's credential store. A Casper that cannot start fails `state` and `signOut` with `casperSignIn/failed` and the start failure's words, which the card shows with Try again.
+
 <a id="process-lifetime-and-resume"></a>
 ### Process lifetime and resume
 
@@ -359,6 +364,7 @@ The plugin sends no model request, so it has no cache effect; Casper's own reque
 - With `appTeams` off the Team switch still shows in a Casper Session and still governs its Standard children. Casper's children are Standard agents on Casper's model only when the app has the same route, else on the app's default model; they follow the app's rules rather than Casper's private places, and cannot be waited on with `wait_agent`.
 - With `casperTitles` off, a Casper Session's written title is made on the app's default model, which may be a DeepSeek model, not on the model Casper runs.
 - A name the user gives a Casper Session in the app stays, so a later `/rename` typed to Casper renames only Casper's own conversation. A Session titled before Casper sent names can take Casper's stored name the next time Casper reopens it.
+- The Casper models card offers only the sign-in ways Casper lists to apps. Casper does not list its Claude Code plan sign-in there, so that one is made with Casper's own `/login`; once saved, it shows on the card and can be signed out there.
 
 <a id="dev-note"></a>
 ### Dev Note

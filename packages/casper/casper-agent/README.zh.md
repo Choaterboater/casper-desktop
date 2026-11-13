@@ -207,6 +207,11 @@ Casper 在 `session/new` 与 `session/load` 的回复中发送它的选项，并
 
 新会话在自己的 Casper 启动之前显示保存在 Host 存储域 `casper_agent_models`（一条全局记录）中的列表，设置了配置中的 `model` 时以它为当前模型；在任何 Casper 发送列表之前，选择器会说明 Casper 启动后才会列出模型。恢复的会话保留其历史记录的内容。在记录此列表之前创建的会话，在其 Casper 启动之前会拒绝选择。
 
+<a id="casper-sign-ins"></a>
+### Casper 的登录
+
+设置 > 模型在应用的服务商下方显示 Casper 模型卡片，因此 Casper 自己的模型登录可以在应用中完成，无需终端。它运行与会话相同的引擎，即应用自带的引擎（除非开启 `useInstalledCasper`），因此电脑上无需安装 Casper。每个服务商的一行列出 Casper 为它提供的登录方式，Casper 已保存登录后也保留这些方式，与退出登录并列，以便重新登录或换一种方式登录。插件注册 `casperSignIn` Remote 命名空间（`CasperSignInController`，注入 `subprocess` 与 `typert`），卡片是该页面 `settings.models.footer` 插槽中的一项。每个请求启动一个不打开对话的 `casper acp` 进程，查找和启动方式与会话的相同，并带上应用配置档的变量，请求结束时结束该进程。`state` 从 `initialize` 的 `authMethods` 读取登录方式，只保留 `_meta.casper.kind` 为 `api_key`、`browser` 或 `device_code` 的方式，并从 `_casper/auth/status` 读取已保存的登录。`signIn` 发送 `authenticate`，并以流的形式发送该方式的每个 `_casper/auth/update` 步骤：Casper 打开的页面，或一个页面及要在其中输入的代码；流以 `signed-in` 结束，或以 `failed` 加 Casper 的原话结束。关闭流（点击取消或离开页面）会在进程结束前发送 `_casper/auth/cancel`。`signOut` 发送 `_casper/auth/logout`。粘贴的密钥只放在 `authenticate` 的 `_meta.casper.key` 中发给 Casper；任何回复或步骤都不会把它带回。Casper 把这些登录保存在自己的登录文件中，而不是应用的凭据存储中。无法启动的 Casper 会让 `state` 与 `signOut` 以 `casperSignIn/failed` 和启动失败的原话失败，卡片会显示它并提供重试。
+
 <a id="process-lifetime-and-resume"></a>
 ### 进程生命周期与恢复
 
@@ -359,6 +364,7 @@ Casper 会话的模型菜单与标准会话一样显示应用的**启用智能�
 - `appTeams` 关闭时，Casper 会话中仍显示团队开关，并且它仍控制其标准子代理。Casper 的子代理是标准代理，只有应用有相同路由时才使用 Casper 的模型，否则使用应用的默认模型；它们遵循应用的规则而不是 Casper 的私密位置，并且不能用 `wait_agent` 等待。
 - `casperTitles` 关闭时，Casper 会话的标题由应用的默认模型（可能是 DeepSeek 模型）生成，而不是由 Casper 所运行的模型生成。
 - 用户在应用中给 Casper 会话起的名称会保留，因此之后向 Casper 输入的 `/rename` 只会重命名 Casper 自己的对话。在 Casper 发送名称之前就已有标题的会话，可能会在 Casper 下次重新打开它时采用 Casper 保存的名称。
+- Casper 模型卡片只提供 Casper 向应用列出的登录方式。Casper 不在其中列出 Claude Code 套餐登录，因此该登录需用 Casper 自己的 `/login` 完成；保存后它会显示在卡片上，并可在卡片上退出登录。
 
 <a id="dev-note"></a>
 ### 开发备注

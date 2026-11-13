@@ -111,6 +111,8 @@ flowchart LR
   svc_jobController["ctx.jobController<br/>Host job Remote controller"]
   pkg_api_settings_controller["api-settings-controller"]
   svc_authorizationController["ctx.authorizationController<br/>Host sign-in Remote controller"]
+  pkg_casper_agent["casper-agent"]
+  svc_casperSignIn["ctx.casperSignIn<br/>Casper sign-in Remote controller"]
   svc_credentialsController["ctx.credentialsController<br/>Host credential-surface Remote controller"]
   svc_settingsController["ctx.settingsController<br/>Host settings-surface Remote controller"]
   pkg_api_workspace_files["api-workspace-files"]
@@ -344,6 +346,7 @@ flowchart LR
   pkg_bash_local --> svc_shell
   pkg_bash_sandbox --> svc_shell
   pkg_browser_use --> svc_browserUse
+  pkg_casper_agent --> svc_casperSignIn
   pkg_client_connection --> svc_connection
   pkg_client_file_upload --> svc_fileUploads
   pkg_client_modules --> svc_clientModules
@@ -688,6 +691,7 @@ flowchart LR
 | `ctx.sessionSkillCatalog` | `core` | [`api-session-controller`](../packages/api/session-controller) | - | - | - | 在不激活冷 Agent 的前提下列出 Session 组合中允许用户调用的 skill。 |
 | `ctx.jobController` | `core` | [`api-job-controller`](../packages/api/job-controller) | - | - | - | 经生成的 Remote namespace 流式发送一个后台任务的观测 record；名册仍在会话控制流上。 |
 | `ctx.authorizationController` | `core` | [`api-settings-controller`](../packages/api/settings-controller) | - | - | - | 把 ctx.authorization 的登录部分投影到生成的 `authorization` Remote namespace：列出登录流程，流式发送单次尝试的通知与提示，通过单独调用接收每个回答，并支持取消与退出登录；任何方法都不返回凭据。 |
+| `ctx.casperSignIn` | `core` | [`casper-agent`](../packages/casper/casper-agent) | - | - | - | 通过生成的 `casperSignIn` Remote namespace 让 Casper 引擎登录其模型服务商：列出 Casper 的登录方式和已保存的登录，流式发送单次登录的步骤，并支持取消与退出登录，每次都通过一个短暂的 `casper acp` 进程完成；登录由 Casper 保存在它自己的登录文件中。 |
 | `ctx.credentialsController` | `core` | [`api-settings-controller`](../packages/api/settings-controller) | - | - | - | 把凭据引用 seam 投影到生成的 Remote namespace：批量扇出、视图投影与拒绝映射都在这里，而不在 seam Definition 上。 |
 | `ctx.settingsController` | `core` | [`api-settings-controller`](../packages/api/settings-controller) | - | - | - | 把用户设置 seam 投影到生成的 Remote namespace：读取一律脱敏，所有拒绝在这里分类，而不在 seam Definition 上。 |
 | `ctx.workspaceFiles` | `core` | [`api-workspace-files`](../packages/api/workspace-files) | - | - | - | 为会话工作区根内的文件提供 stat、分页文本、字节窗口、目录列举与变更流，经 lstat、包含关系与 stat 重检限定。 |

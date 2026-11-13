@@ -39,8 +39,11 @@
   en: ff4060d4a2f58c99
   zh: 9d8254144fbf07b0
 /deepseek-ai-dsh-casper-agent/understand-the-implementation/model-picker:
-  en: f3bd7515231b4537
-  zh: 0dbe7e13e7fee613
+  en: e7fb5d9cb3d76ffd
+  zh: 59dcd7f919abd4d3
+/deepseek-ai-dsh-casper-agent/understand-the-implementation/casper-s-sign-ins:
+  en: 9acd8bf0fad63a54
+  zh: f75ec5e3d3658ecc
 /deepseek-ai-dsh-casper-agent/understand-the-implementation/process-lifetime-and-resume:
   en: 1ee21e7898971427
   zh: 663c1ea4cb4016d1
@@ -72,8 +75,8 @@
   en: 99237c3b88b098af
   zh: da166b221288cd59
 /deepseek-ai-dsh-casper-agent/known-limitations-and-deferred-work:
-  en: 43787627f6e87086
-  zh: c0b2521c27799b9a
+  en: ce38bff1d5cba746
+  zh: e56a3a9c27b472f8
 /deepseek-ai-dsh-casper-agent/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

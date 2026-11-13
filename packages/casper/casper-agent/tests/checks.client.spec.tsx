@@ -246,7 +246,7 @@ describe('the Checks view registration', () => {
     }
     const binding = { sessionId: 's1' }
     const sessions = { binding: vi.fn((id: string) => id === 's1' ? binding : undefined) }
-    apply({ slots, effect: (run: () => unknown) => run(), locale, uiConversation, sessions } as never)
+    apply({ slots, effect: (run: () => unknown) => run(), locale, uiConversation, sessions, inject: () => {} } as never)
     expect(uiConversation.events.register).toHaveBeenCalledWith(expect.objectContaining({ kind: 'casper-check-chat', target: 'chat' }))
     expect(uiConversation.events.register).toHaveBeenCalledWith(expect.objectContaining({ kind: 'casper-check', target: 'casper-checks' }))
     expect(uiConversation.views.register).toHaveBeenCalledWith(checksViewDefinition)

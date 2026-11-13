@@ -1,6 +1,6 @@
-/** `casper-receipt` namespace dictionaries for Casper's receipt card, approval card, mode pill and Checks view. */
+/** `casper-receipt` namespace dictionaries for Casper's receipt card, approval card, mode pill, Checks view and Casper models card. */
 
-/** Dictionary namespace owned by the receipt card, the approval card, the mode pill and the Checks view. */
+/** Dictionary namespace owned by the receipt card, the approval card, the mode pill, the Checks view and the Casper models card. */
 export const NS = 'casper-receipt'
 
 /** English dictionary (the key-set source of truth). */
@@ -46,6 +46,27 @@ export const en = {
   'checks.passed': 'passed',
   'checks.failed': 'failed',
   'checks.untitled': 'Check',
+  'signIn.title': 'Casper models',
+  'signIn.intro': 'Sign Casper in to the model providers it uses. Casper keeps these sign-ins itself, apart from the providers above.',
+  'signIn.loading': "Checking Casper's sign-ins…",
+  'signIn.loadFailed': 'Casper could not list its sign-ins: {message}',
+  'signIn.retry': 'Try again',
+  'signIn.none': 'Casper offers no sign-ins the app can run.',
+  'signIn.signedIn': 'Signed in',
+  'signIn.start': 'Sign in',
+  'signIn.signOut': 'Sign out',
+  'signIn.cancel': 'Cancel',
+  'signIn.keyLabel': 'API key for {provider}',
+  'signIn.keySave': 'Save key',
+  'signIn.waiting': 'Waiting for Casper…',
+  'signIn.browser': 'Finish signing in on the page that opened in your browser.',
+  'signIn.browserClosed': 'Open the sign-in page to finish signing in.',
+  'signIn.openPage': 'Open sign-in page',
+  'signIn.code': 'Enter this code on the sign-in page:',
+  'signIn.done': 'Signed in. New Casper conversations can use it.',
+  'signIn.stopped': 'Sign-in stopped.',
+  'signIn.failed': 'Sign-in failed: {message}',
+  'signIn.signOutFailed': 'Sign-out failed: {message}',
 } satisfies Record<string, string>
 
 /** The receipt namespace key union. */
@@ -53,7 +74,7 @@ export type CasperReceiptKey = keyof typeof en
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
-    /** Casper's receipt card, approval card, mode pill and Checks view copy. */
+    /** Casper's receipt card, approval card, mode pill, Checks view and Casper models card copy. */
     'casper-receipt': CasperReceiptKey
   }
 }
@@ -101,6 +122,27 @@ export const zh = {
   'checks.passed': '通过',
   'checks.failed': '失败',
   'checks.untitled': '检查',
+  'signIn.title': 'Casper 模型',
+  'signIn.intro': '让 Casper 登录它使用的模型服务商。这些登录由 Casper 自己保存，与上方的服务商分开。',
+  'signIn.loading': '正在检查 Casper 的登录…',
+  'signIn.loadFailed': 'Casper 无法列出它的登录：{message}',
+  'signIn.retry': '重试',
+  'signIn.none': 'Casper 没有应用可以运行的登录方式。',
+  'signIn.signedIn': '已登录',
+  'signIn.start': '登录',
+  'signIn.signOut': '退出登录',
+  'signIn.cancel': '取消',
+  'signIn.keyLabel': '{provider} 的 API 密钥',
+  'signIn.keySave': '保存密钥',
+  'signIn.waiting': '正在等待 Casper…',
+  'signIn.browser': '请在浏览器中打开的页面上完成登录。',
+  'signIn.browserClosed': '打开登录页面以完成登录。',
+  'signIn.openPage': '打开登录页面',
+  'signIn.code': '在登录页面输入此代码：',
+  'signIn.done': '已登录。新的 Casper 对话可以使用它。',
+  'signIn.stopped': '登录已停止。',
+  'signIn.failed': '登录失败：{message}',
+  'signIn.signOutFailed': '退出登录失败：{message}',
 } satisfies Record<CasperReceiptKey, string>
 
 /** Japanese dictionary. */
@@ -146,6 +188,27 @@ export const ja = {
   'checks.passed': '合格',
   'checks.failed': '失敗',
   'checks.untitled': 'チェック',
+  'signIn.title': 'Casper のモデル',
+  'signIn.intro': 'Casper が使うモデルプロバイダーに Casper をサインインさせます。これらのサインインは上のプロバイダーとは別に Casper 自身が保存します。',
+  'signIn.loading': 'Casper のサインインを確認しています…',
+  'signIn.loadFailed': 'Casper はサインインを一覧できませんでした: {message}',
+  'signIn.retry': '再試行',
+  'signIn.none': 'アプリで実行できるサインイン方法が Casper にありません。',
+  'signIn.signedIn': 'サインイン済み',
+  'signIn.start': 'サインイン',
+  'signIn.signOut': 'サインアウト',
+  'signIn.cancel': 'キャンセル',
+  'signIn.keyLabel': '{provider} の API キー',
+  'signIn.keySave': 'キーを保存',
+  'signIn.waiting': 'Casper を待っています…',
+  'signIn.browser': 'ブラウザーで開いたページでサインインを完了してください。',
+  'signIn.browserClosed': 'サインインページを開いてサインインを完了してください。',
+  'signIn.openPage': 'サインインページを開く',
+  'signIn.code': 'サインインページでこのコードを入力してください:',
+  'signIn.done': 'サインインしました。新しい Casper の会話で使えます。',
+  'signIn.stopped': 'サインインを中止しました。',
+  'signIn.failed': 'サインインに失敗しました: {message}',
+  'signIn.signOutFailed': 'サインアウトに失敗しました: {message}',
 } satisfies Record<CasperReceiptKey, string>
 
 /** Spanish dictionary. */
@@ -191,6 +254,27 @@ export const es = {
   'checks.passed': 'superada',
   'checks.failed': 'fallida',
   'checks.untitled': 'Comprobación',
+  'signIn.title': 'Modelos de Casper',
+  'signIn.intro': 'Inicia sesión de Casper en los proveedores de modelos que usa. Casper guarda estos inicios de sesión por su cuenta, aparte de los proveedores de arriba.',
+  'signIn.loading': 'Comprobando los inicios de sesión de Casper…',
+  'signIn.loadFailed': 'Casper no pudo mostrar sus inicios de sesión: {message}',
+  'signIn.retry': 'Reintentar',
+  'signIn.none': 'Casper no ofrece inicios de sesión que la aplicación pueda ejecutar.',
+  'signIn.signedIn': 'Sesión iniciada',
+  'signIn.start': 'Iniciar sesión',
+  'signIn.signOut': 'Cerrar sesión',
+  'signIn.cancel': 'Cancelar',
+  'signIn.keyLabel': 'Clave de API de {provider}',
+  'signIn.keySave': 'Guardar clave',
+  'signIn.waiting': 'Esperando a Casper…',
+  'signIn.browser': 'Termina de iniciar sesión en la página que se abrió en tu navegador.',
+  'signIn.browserClosed': 'Abre la página de inicio de sesión para terminar.',
+  'signIn.openPage': 'Abrir página de inicio de sesión',
+  'signIn.code': 'Introduce este código en la página de inicio de sesión:',
+  'signIn.done': 'Sesión iniciada. Las nuevas conversaciones de Casper pueden usarla.',
+  'signIn.stopped': 'Inicio de sesión detenido.',
+  'signIn.failed': 'Error al iniciar sesión: {message}',
+  'signIn.signOutFailed': 'Error al cerrar sesión: {message}',
 } satisfies Record<CasperReceiptKey, string>
 
 /** French dictionary. */
@@ -236,6 +320,27 @@ export const fr = {
   'checks.passed': 'réussie',
   'checks.failed': 'échouée',
   'checks.untitled': 'Vérification',
+  'signIn.title': 'Modèles Casper',
+  'signIn.intro': "Connectez Casper aux fournisseurs de modèles qu'il utilise. Casper conserve lui-même ces connexions, à part des fournisseurs ci-dessus.",
+  'signIn.loading': 'Vérification des connexions de Casper…',
+  'signIn.loadFailed': "Casper n'a pas pu lister ses connexions : {message}",
+  'signIn.retry': 'Réessayer',
+  'signIn.none': "Casper ne propose aucune connexion que l'application peut lancer.",
+  'signIn.signedIn': 'Connecté',
+  'signIn.start': 'Se connecter',
+  'signIn.signOut': 'Se déconnecter',
+  'signIn.cancel': 'Annuler',
+  'signIn.keyLabel': 'Clé API pour {provider}',
+  'signIn.keySave': 'Enregistrer la clé',
+  'signIn.waiting': 'En attente de Casper…',
+  'signIn.browser': 'Terminez la connexion sur la page ouverte dans votre navigateur.',
+  'signIn.browserClosed': 'Ouvrez la page de connexion pour terminer.',
+  'signIn.openPage': 'Ouvrir la page de connexion',
+  'signIn.code': 'Saisissez ce code sur la page de connexion :',
+  'signIn.done': "Connecté. Les nouvelles conversations Casper peuvent l'utiliser.",
+  'signIn.stopped': 'Connexion arrêtée.',
+  'signIn.failed': 'Échec de la connexion : {message}',
+  'signIn.signOutFailed': 'Échec de la déconnexion : {message}',
 } satisfies Record<CasperReceiptKey, string>
 
 /** German dictionary. */
@@ -281,6 +386,27 @@ export const de = {
   'checks.passed': 'bestanden',
   'checks.failed': 'fehlgeschlagen',
   'checks.untitled': 'Prüfung',
+  'signIn.title': 'Casper-Modelle',
+  'signIn.intro': 'Melde Casper bei den Modellanbietern an, die es nutzt. Casper speichert diese Anmeldungen selbst, getrennt von den Anbietern oben.',
+  'signIn.loading': 'Caspers Anmeldungen werden geprüft…',
+  'signIn.loadFailed': 'Casper konnte seine Anmeldungen nicht auflisten: {message}',
+  'signIn.retry': 'Erneut versuchen',
+  'signIn.none': 'Casper bietet keine Anmeldung, die die App ausführen kann.',
+  'signIn.signedIn': 'Angemeldet',
+  'signIn.start': 'Anmelden',
+  'signIn.signOut': 'Abmelden',
+  'signIn.cancel': 'Abbrechen',
+  'signIn.keyLabel': 'API-Schlüssel für {provider}',
+  'signIn.keySave': 'Schlüssel speichern',
+  'signIn.waiting': 'Warte auf Casper…',
+  'signIn.browser': 'Schließe die Anmeldung auf der Seite ab, die sich in deinem Browser geöffnet hat.',
+  'signIn.browserClosed': 'Öffne die Anmeldeseite, um die Anmeldung abzuschließen.',
+  'signIn.openPage': 'Anmeldeseite öffnen',
+  'signIn.code': 'Gib diesen Code auf der Anmeldeseite ein:',
+  'signIn.done': 'Angemeldet. Neue Casper-Unterhaltungen können es nutzen.',
+  'signIn.stopped': 'Anmeldung beendet.',
+  'signIn.failed': 'Anmeldung fehlgeschlagen: {message}',
+  'signIn.signOutFailed': 'Abmeldung fehlgeschlagen: {message}',
 } satisfies Record<CasperReceiptKey, string>
 
 /** Russian dictionary. */
@@ -326,6 +452,27 @@ export const ru = {
   'checks.passed': 'пройдена',
   'checks.failed': 'не пройдена',
   'checks.untitled': 'Проверка',
+  'signIn.title': 'Модели Casper',
+  'signIn.intro': 'Войдите в Casper у поставщиков моделей, которых он использует. Casper хранит эти входы сам, отдельно от поставщиков выше.',
+  'signIn.loading': 'Проверка входов Casper…',
+  'signIn.loadFailed': 'Casper не смог показать свои входы: {message}',
+  'signIn.retry': 'Повторить',
+  'signIn.none': 'Casper не предлагает способов входа, которые может запустить приложение.',
+  'signIn.signedIn': 'Вход выполнен',
+  'signIn.start': 'Войти',
+  'signIn.signOut': 'Выйти',
+  'signIn.cancel': 'Отмена',
+  'signIn.keyLabel': 'API-ключ для {provider}',
+  'signIn.keySave': 'Сохранить ключ',
+  'signIn.waiting': 'Ожидание Casper…',
+  'signIn.browser': 'Завершите вход на странице, открывшейся в браузере.',
+  'signIn.browserClosed': 'Откройте страницу входа, чтобы завершить вход.',
+  'signIn.openPage': 'Открыть страницу входа',
+  'signIn.code': 'Введите этот код на странице входа:',
+  'signIn.done': 'Вход выполнен. Новые беседы Casper могут его использовать.',
+  'signIn.stopped': 'Вход остановлен.',
+  'signIn.failed': 'Не удалось войти: {message}',
+  'signIn.signOutFailed': 'Не удалось выйти: {message}',
 } satisfies Record<CasperReceiptKey, string>
 
 /** Portuguese dictionary. */
@@ -371,4 +518,25 @@ export const pt = {
   'checks.passed': 'aprovada',
   'checks.failed': 'reprovada',
   'checks.untitled': 'Verificação',
+  'signIn.title': 'Modelos do Casper',
+  'signIn.intro': 'Conecte o Casper aos provedores de modelos que ele usa. O Casper guarda esses logins por conta própria, separados dos provedores acima.',
+  'signIn.loading': 'Verificando os logins do Casper…',
+  'signIn.loadFailed': 'O Casper não conseguiu listar seus logins: {message}',
+  'signIn.retry': 'Tentar novamente',
+  'signIn.none': 'O Casper não oferece logins que o aplicativo possa executar.',
+  'signIn.signedIn': 'Conectado',
+  'signIn.start': 'Entrar',
+  'signIn.signOut': 'Sair',
+  'signIn.cancel': 'Cancelar',
+  'signIn.keyLabel': 'Chave de API de {provider}',
+  'signIn.keySave': 'Salvar chave',
+  'signIn.waiting': 'Aguardando o Casper…',
+  'signIn.browser': 'Conclua o login na página aberta no seu navegador.',
+  'signIn.browserClosed': 'Abra a página de login para concluir.',
+  'signIn.openPage': 'Abrir página de login',
+  'signIn.code': 'Digite este código na página de login:',
+  'signIn.done': 'Conectado. Novas conversas do Casper podem usá-lo.',
+  'signIn.stopped': 'Login interrompido.',
+  'signIn.failed': 'Falha no login: {message}',
+  'signIn.signOutFailed': 'Falha ao sair: {message}',
 } satisfies Record<CasperReceiptKey, string>
