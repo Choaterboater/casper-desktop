@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Casper para escritorio",
+    "description": "Las capas de perfil de la app de escritorio de Casper: las filas del núcleo compartido y de la app web sin los servicios upstream, seguidas de la capa de Casper."
+  }
+}

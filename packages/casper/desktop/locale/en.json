@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Casper desktop",
+    "description": "The Casper desktop app's profile layers: the shared core and Web app rows without the upstream services, followed by the Casper layer."
+  }
+}

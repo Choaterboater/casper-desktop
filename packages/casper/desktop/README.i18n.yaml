@@ -1,0 +1,37 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/casper/desktop/README.md
+/:
+  en: a170616a0feab1b3
+  zh: b63cd5738f4db6c3
+/deepseek-ai-dsh-casper-desktop:
+  en: a0c45f81ddd9a6bc
+  zh: 8ea192d870a9388f
+/deepseek-ai-dsh-casper-desktop/summary:
+  en: 043b24fafbc480e8
+  zh: 9af0f43f8261260a
+/deepseek-ai-dsh-casper-desktop/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 988e839059414d27
+/deepseek-ai-dsh-casper-desktop/use-this-package:
+  en: 1a24d619947e0e64
+  zh: 815499c51cb0389d
+/deepseek-ai-dsh-casper-desktop/understand-the-implementation:
+  en: 04b910a4b1b7c9ca
+  zh: 09f1c2062f49aeed
+/deepseek-ai-dsh-casper-desktop/further-exploration:
+  en: dc63d487387a3bb5
+  zh: 1b86b70f42b1f7b9
+/deepseek-ai-dsh-casper-desktop/model-experience:
+  en: f6c4d2609b5f4bb6
+  zh: fc7d3e06bd9cb872
+/deepseek-ai-dsh-casper-desktop/model-experience/kv-cache-effect:
+  en: 154ce90596d74270
+  zh: dd69a454d980d58a
+/deepseek-ai-dsh-casper-desktop/known-limitations-and-deferred-work:
+  en: 1faa8e69a3b69645
+  zh: 59546c2d6037a87c
+/deepseek-ai-dsh-casper-desktop/known-limitations-and-deferred-work/dev-note:
+  en: fd2322eb796b04e6
+  zh: ad1ce633f84b6d9f

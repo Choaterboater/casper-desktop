@@ -1,5 +1,5 @@
 ---
-description: "The casper package group: the Casper agent driver and the Sidebar browser tools with their Desktop Client half, for readers choosing or navigating the Casper packages."
+description: "The casper package group: the Casper agent driver, the Sidebar browser tools with their Desktop Client half, and the desktop profile bundle, for readers choosing or navigating the Casper packages."
 kind: "package-group"
 ---
 
@@ -22,13 +22,14 @@ The casper group adds Casper to the desktop app. Sessions on the Casper preset r
 <a id="packages"></a>
 ## Packages
 
-Each package is a plugin. The desktop app mounts the Casper agent and both Sidebar browser packages.
+Each package except `desktop` is a plugin; `desktop` is a profile bundle that the desktop app does not select yet. The desktop app mounts the Casper agent and both Sidebar browser packages.
 
 | Package | Role |
 |---|---|
 | [`casper-agent`](casper-agent/README.md) | Drives Casper preset Sessions with the Casper agent over its ACP server |
 | [`tool-sidebar-browser`](tool-sidebar-browser/README.md) | Gives the model tools to read and drive the browser tabs beside a conversation |
 | [`sidebar-browser-client`](sidebar-browser-client/README.md) | Runs the Sidebar browser tool operations in the desktop app |
+| [`desktop`](desktop/README.md) | Holds the desktop app's profile layers: upstream's base and Web layers without the upstream service rows, then the Casper layer |
 
 <a id="related-documentation"></a>
 ## Related documentation

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Casper para desktop",
+    "description": "As camadas de perfil do app de desktop do Casper: as linhas do núcleo compartilhado e do app Web sem os serviços upstream, seguidas da camada do Casper."
+  }
+}
