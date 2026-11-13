@@ -71,6 +71,17 @@ describe('Desktop local packaging configuration', () => {
     })
   })
 
+  it.each(['darwin', 'win32'] as const)('takes the production update origin from a %s production preset', async (platform) => {
+    await withDirectory(async (directory) => {
+      await mkdir(join(directory, 'presets'))
+      await writeFile(join(directory, 'presets', 'production.env'),
+        'DSH_DESKTOP_AUTO_UPDATE_ENV=production\nDOWNLOAD_PROD_ORIGIN=https://downloads.example.com\n')
+      const environment = loadDesktopPackageEnvironment(platform,
+        { DSH_PACKAGING_CONFIG_DIR: directory, DSH_PACKAGING_PRESET: 'production' }, directory, { unsigned: true })
+      expect(environment.DOWNLOAD_PROD_ORIGIN).toBe('https://downloads.example.com')
+    })
+  })
+
   it.each([' ', '0', '5', '9', '-1', '10', '3.5', '03', 'fast'])('rejects invalid workflow compression %j before reading settings', (value) => {
     expect(() => loadDesktopPackageEnvironment('win32', { PACKAGE_WINDOWS_COMPRESSION_LEVEL: value }, 'missing-settings'))
       .toThrow('PACKAGE_WINDOWS_COMPRESSION_LEVEL')
