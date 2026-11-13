@@ -418,7 +418,7 @@ export class CasperConnection {
    * @returns the connection and its conversation.
    * @throws CasperError `CASPER_ENGINE_MISSING` when the bundled engine is not an executable file, `CASPER_NOT_FOUND`
    *   when the installed command cannot be resolved, and `CASPER_START_FAILED` otherwise;
-   *   an Error carrying the abort reason as its cause when aborted.
+   *   an Error carrying the abort reason as its cause when aborted, once the started process has exited.
    */
   static async start(options: CasperConnectionOptions, stored: string | undefined, signal: AbortSignal): Promise<CasperStarted> {
     const { config } = options
@@ -450,6 +450,8 @@ export class CasperConnection {
     } catch (error: unknown) {
       if (signal.aborted) {
         connection.terminate()
+        // A stopped start settles once its process range is empty, so a closing Agent leaves no process behind.
+        await connection.dispose()
         throw new Error('Casper start was stopped', { cause: signal.reason })
       }
       if (error instanceof CasperError) {
