@@ -30,7 +30,8 @@ import { resolveDesktopPaths } from './paths.ts'
 import { casperEngineEnvironment } from './casper-engine.ts'
 import { DesktopProjectManager } from './project-manager.ts'
 import { DesktopHostFatalError, DesktopHostProcess, DesktopHostUncleanExitError } from './host-process.ts'
-import { DesktopPlatformView, PLATFORM_IPC, platformBounds } from './platform-view.ts'
+import { PLATFORM_IPC, platformBounds } from './platform-ipc.ts'
+import { CasperPlatformSurface, type DesktopPlatformSurface } from './platform-surface.ts'
 import { installDesktopFileDrag } from './file-drag.ts'
 import { installDesktopDirectoryPicker } from './directory-picker.ts'
 import { installMicrophonePermissions } from './microphone-permissions.ts'
@@ -58,6 +59,7 @@ import { desktopUpdateErrorSummary, presentDesktopUpdate } from './update-presen
 import { desktopErrorState } from './startup-error.ts'
 import { readDesktopLoginShellEnvironment, resolveDesktopLoginShellConfig } from './login-shell-environment.ts'
 import { DesktopMandatoryUpdatePolicy, resolveDesktopPolicyConfig, type DesktopPolicyState } from './mandatory-update-policy.ts'
+import { desktopPlatformClientHeaders } from './client-headers.ts'
 import { desktopClientMetadata, desktopClientVersion } from './client-metadata.ts'
 import { DesktopMandatoryUpdateWindow } from './mandatory-update-window.ts'
 import { DesktopPolicyTestAuth } from './policy-test-auth.ts'
@@ -521,9 +523,8 @@ async function main(): Promise<void> {
     navigation = next
     return next.promise
   }
-  const platformView = new DesktopPlatformView(join(app.getAppPath(), 'lib', 'preload-platform-account.cjs'),
-    () => locale.id === 'zh-CN' ? 'zh_CN' : 'en_US', process.platform === 'win32' ? 'win32' : 'darwin',
-    owner => isMandatory() || updateOverlays.input(owner).blocked)
+  // Casper shows no upstream account, so no Platform document is ever created.
+  const platformView: DesktopPlatformSurface = new CasperPlatformSurface()
   const backend = new DesktopBackendController((onFailure) => {
     const hostInspectPort = developmentHostInspectPort(development)
     const host = new DesktopHostProcess(resources.node, resources.dsh, activeProject,
@@ -1530,7 +1531,7 @@ async function main(): Promise<void> {
       mandatoryUI?.sync()
       if (state.blocking && !wasBlocking) void updateSchedule.check(false, true).catch((error: unknown) => { console.error(error) })
       wasBlocking = state.blocking
-    }, policyAuth?.request, () => desktopClientMetadata(locale.id))
+    }, policyAuth?.request, () => desktopClientMetadata(locale.id), desktopPlatformClientHeaders)
     const policy = mandatoryPolicy
     mandatoryUI = new DesktopMandatoryUpdateWindow({
       overlays: updateOverlays,

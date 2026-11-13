@@ -14,6 +14,7 @@ import { presentDesktopUpdate } from '../../lib/types/update-presentation.js'
 import { resolveDesktopLocale } from '../../lib/types/locale.js'
 import { createUpdateServer } from './update-server.mjs'
 import { DesktopMandatoryUpdatePolicy, resolveDesktopPolicyConfig } from '../../lib/types/mandatory-update-policy.js'
+import { desktopPlatformClientHeaders } from '../../lib/types/client-headers.js'
 import { DesktopMandatoryUpdateWindow } from '../../lib/types/mandatory-update-window.js'
 import { DesktopUpdatePreparationError } from '../../lib/types/update-error.js'
 import { DesktopUpdateHttpExecutor } from '../../lib/types/updates/electron-updater/http-executor.js'
@@ -243,7 +244,8 @@ async function main() {
       let modal
       const policy = new DesktopMandatoryUpdatePolicy(config, { platform: 'win32', arch: 'x64', bundledDshVersion: '1.0.0' },
         () => { modal?.sync() }, undefined,
-        () => ({ version: '1.0.0', locale: 'zh-CN', timezoneOffsetSeconds: -new Date().getTimezoneOffset() * 60 }))
+        () => ({ version: '1.0.0', locale: 'zh-CN', timezoneOffsetSeconds: -new Date().getTimezoneOffset() * 60 }),
+        desktopPlatformClientHeaders)
       modal = new DesktopMandatoryUpdateWindow({
         overlays: new DesktopUpdateOverlays(),
         preload: fileURLToPath(new URL('../../lib/preload-mandatory.cjs', import.meta.url)),

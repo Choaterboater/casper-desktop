@@ -239,20 +239,6 @@
   },
   {
     "rule": "import",
-    "file": "apps/desktop/src/mandatory-update-policy.ts",
-    "match": "@deepseek-ai/dsh-deepseek-account",
-    "count": 1,
-    "step": "3a"
-  },
-  {
-    "rule": "import",
-    "file": "apps/desktop/src/platform-view.ts",
-    "match": "@deepseek-ai/dsh-deepseek-account",
-    "count": 1,
-    "step": "3a"
-  },
-  {
-    "rule": "import",
     "file": "packages/sdk/server/src/server.ts",
     "match": "@deepseek-ai/dsh-llm-deepseek-api-key",
     "count": 1,

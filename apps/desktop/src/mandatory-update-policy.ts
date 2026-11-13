@@ -1,7 +1,7 @@
 /** Mandatory-update policy, independent of local business traffic and updater artifacts. */
 
 import { valid } from 'semver'
-import { platformClientHeaders, type AccountClientMetadata } from '@deepseek-ai/dsh-deepseek-account'
+import type { AccountClientMetadata } from '@deepseek-ai/dsh-deepseek-account/types'
 
 /** Installed release identity; no field is supplied by a renderer. */
 export interface DesktopPolicyIdentity {
@@ -142,6 +142,7 @@ export class DesktopMandatoryUpdatePolicy {
    * @param publish - Receives policy changes without controlling downloads or existing tasks.
    * @param request - Anonymous Fetch or the dedicated test-authentication Session transport.
    * @param client - UI build version, language, and UTC offset, sampled for every check.
+   * @param clientHeaders - Builds the platform client identity headers from the installed platform and sampled client.
    * @param random - Jitter source, replaceable for clock-driven tests.
    */
   constructor(
@@ -150,6 +151,7 @@ export class DesktopMandatoryUpdatePolicy {
     private readonly publish: (state: DesktopPolicyState) => void,
     private readonly request: typeof fetch = fetch,
     private readonly client: () => AccountClientMetadata,
+    private readonly clientHeaders: (platform: DesktopPolicyIdentity['platform'], client: AccountClientMetadata) => Record<string, string>,
     private readonly random: () => number = Math.random,
   ) {
     if (valid(this.client().version) === null || valid(identity.bundledDshVersion) === null
@@ -159,7 +161,7 @@ export class DesktopMandatoryUpdatePolicy {
   /** Platform headers for one check; the calling UI's language and UTC offset are read now. */
   private requestHeaders(channel: DesktopPolicyIdentity['channel']): Record<string, string> {
     return {
-      ...platformClientHeaders(this.identity.platform, this.client()),
+      ...this.clientHeaders(this.identity.platform, this.client()),
       'x-client-arch': this.identity.arch, 'x-client-update-channel': channel,
       'x-client-bundled-dsh-version': this.identity.bundledDshVersion,
     }
