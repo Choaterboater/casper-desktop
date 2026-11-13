@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { resolveDesktopPaths } from '../src/paths.ts'
+import { CASPER_DESKTOP_BUNDLE } from '../src/casper-desktop-profile.ts'
 import { DesktopProjectManager } from '../src/project-manager.ts'
 import { readProfilePlugins } from '@deepseek-ai/dsh-app-boot'
 import { runtimeFixture } from './runtime-fixture.ts'
@@ -48,7 +49,7 @@ describe('desktop external plugin profile', () => {
     await manager.applyRelease()
     seedPlugin(manager)
     const profile = manager.paths.profile
-    const name = '@deepseek-ai/dsh-web-app'
+    const name = 'installed-package'
     const path = join(profile, 'node_modules', name)
     mkdirSync(path, { recursive: true })
     writeFileSync(join(path, 'package.json'), JSON.stringify({ name, version: '1.0.0' }))
@@ -121,7 +122,7 @@ describe('desktop external plugin profile', () => {
     }
     expect(manifest.dependencies.plugin).toBe('1.0.0')
     expect(manifest.dsh.profile.bundles).not.toContain('plugin')
-    expect(manifest.dsh.profile.bundles).toContain('@deepseek-ai/dsh-web-app')
+    expect(manifest.dsh.profile.bundles).toEqual([CASPER_DESKTOP_BUNDLE])
     await manager.applyRelease()
     expect(readFileSync(patch, 'utf8')).toContain('[]')
   })
@@ -328,5 +329,76 @@ describe('desktop link-backend projections', () => {
     expect(existsSync(join(profile, '.dsh-module-fallback'))).toBe(false)
     expect(lstatSync(join(profile, 'node_modules', 'bridge'), { throwIfNoEntry: false })).toBeUndefined()
     expect(existsSync(join(target, 'package.json'))).toBe(true)
+  })
+})
+
+describe('Casper desktop bundle migration', () => {
+  const BASE = '@deepseek-ai/dsh-base'
+  const WEB_APP = '@deepseek-ai/dsh-web-app'
+  /** Write a profile manifest as an earlier release left it, with an existing patch file. */
+  function legacyProfile(manager: DesktopProjectManager, bundles: unknown): string {
+    mkdirSync(manager.paths.profile, { recursive: true })
+    const path = join(manager.paths.profile, 'package.json')
+    writeFileSync(path, `${JSON.stringify({
+      name: 'dsh-profile-desktop', private: true, dependencies: { plugin: '1.0.0' }, dsh: { profile: { bundles } }, extra: 'kept',
+    }, undefined, 2)}\n`)
+    writeFileSync(join(manager.paths.profile, 'cordis.patch.yml'), '- id: plugin-row\n  disabled: true\n')
+    return path
+  }
+  const read = (path: string): { dependencies: Record<string, string>; dsh: { profile: { bundles: unknown } }; extra: string } =>
+    JSON.parse(readFileSync(path, 'utf8')) as { dependencies: Record<string, string>; dsh: { profile: { bundles: unknown } }; extra: string }
+
+  it('replaces the upstream Web template bundles with the Casper bundle and keeps every other field and plugin', async () => {
+    const { manager } = setup()
+    const path = legacyProfile(manager, [BASE, WEB_APP, 'plugin'])
+    await manager.applyRelease()
+    expect(read(path)).toMatchObject({ dependencies: { plugin: '1.0.0' }, dsh: { profile: { bundles: [CASPER_DESKTOP_BUNDLE, 'plugin'] } }, extra: 'kept' })
+    expect(readFileSync(join(manager.paths.profile, 'cordis.patch.yml'), 'utf8')).toBe('- id: plugin-row\n  disabled: true\n')
+  })
+
+  it('leaves a migrated or new profile byte-identical on the next launch', async () => {
+    const { manager } = setup()
+    const path = legacyProfile(manager, [BASE, WEB_APP, 'plugin'])
+    await manager.applyRelease()
+    const migrated = readFileSync(path, 'utf8')
+    await manager.applyRelease()
+    expect(readFileSync(path, 'utf8')).toBe(migrated)
+
+    const fresh = setup().manager
+    await fresh.applyRelease()
+    const created = join(fresh.paths.profile, 'package.json')
+    expect(read(created).dsh.profile.bundles).toEqual([CASPER_DESKTOP_BUNDLE])
+    const bytes = readFileSync(created, 'utf8')
+    await fresh.applyRelease()
+    expect(readFileSync(created, 'utf8')).toBe(bytes)
+  })
+
+  it.each([
+    [['plugin', BASE, WEB_APP], ['plugin', CASPER_DESKTOP_BUNDLE]],
+    [[WEB_APP, BASE], [CASPER_DESKTOP_BUNDLE]],
+    [[BASE, 'plugin', WEB_APP, CASPER_DESKTOP_BUNDLE], [CASPER_DESKTOP_BUNDLE, 'plugin']],
+  ])('puts the Casper bundle where the first template bundle was: %j', async (before, after) => {
+    const { manager } = setup()
+    const path = legacyProfile(manager, before)
+    await manager.applyRelease()
+    expect(read(path).dsh.profile.bundles).toEqual(after)
+  })
+
+  it('fails loud, without writing, when the profile lists no template bundle, and recovery restores it', async () => {
+    const { manager } = setup()
+    const path = legacyProfile(manager, ['plugin'])
+    const bytes = readFileSync(path, 'utf8')
+    await expect(manager.applyRelease()).rejects.toThrow(/lists no @deepseek-ai\/dsh-casper-desktop/u)
+    expect(readFileSync(path, 'utf8')).toBe(bytes)
+    expect(existsSync(manager.paths.lock)).toBe(false)
+    await manager.disableAllPlugins()
+    await expect(manager.applyRelease()).resolves.toBeUndefined()
+    expect(read(path).dsh.profile.bundles).toEqual([CASPER_DESKTOP_BUNDLE])
+  })
+
+  it('refuses a bundle list that is not a list of package names', async () => {
+    const { manager } = setup()
+    legacyProfile(manager, 'x')
+    await expect(manager.applyRelease()).rejects.toThrow(/must be a list of package names/u)
   })
 })

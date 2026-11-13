@@ -1,3 +1,70 @@
 # The Casper layer of the Casper desktop bundle, applied after the generated upstream layers. Rows here override
-# upstream rows by id, with the profile's own cordis.patch.yml still to come.
-[]
+# upstream rows by id, with the profile's own cordis.patch.yml still to come. A patch's config replaces the generated
+# row's config whole, so each row restates every field it keeps.
+
+# No timing probe of the npm registry and its mirror before installs and README loads.
+- id: ui-plugin-manager
+  config:
+    registryProbeEnabled: false
+
+# Casper offers neither the optional bundles upstream ships nor the upstream profile bundles this bundle replaces: the
+# Plugins page, Settings and the plugin_manager tool leave them out while they are switched off and refuse to switch
+# them on. A failed install is not retried against a fallback registry, and README and image reads use jsdelivr and
+# unpkg only. The base row has no config, so this one owns it whole.
+- id: plugin-manager
+  config:
+    fallbackRegistries: []
+    detailNpmFileSources: [jsdelivr, unpkg]
+    hiddenBundles:
+      - '@deepseek-ai/dsh-casper-desktop'
+      - '@deepseek-ai/dsh-base'
+      - '@deepseek-ai/dsh-web-app'
+      - '@deepseek-ai/dsh-headless'
+      - '@deepseek-ai/dsh-sdk-app'
+      - '@deepseek-ai/dsh-acp-app'
+      - '@deepseek-ai/dsh-sdk-minimal'
+      - '@deepseek-ai/dsh-personalized-recommendations'
+      - '@deepseek-ai/dsh-cua-bundle'
+      - '@deepseek-ai/dsh-experimental-session-search'
+      - '@deepseek-ai/dsh-experimental-ralph-bundle'
+      - '@deepseek-ai/dsh-experimental-terminal-bundle'
+      - '@deepseek-ai/dsh-experimental-badge-skill-bundle'
+      - '@deepseek-ai/dsh-experimental-session-titles-bundle'
+      - '@deepseek-ai/dsh-experimental-voice-input-bundle'
+      - '@deepseek-ai/dsh-experimental-cot-translation-bundle'
+      - '@deepseek-ai/dsh-experimental-auto-review'
+      - '@deepseek-ai/dsh-experimental-inspector-profile'
+      - '@deepseek-ai/dsh-experimental-liveshare'
+      - '@deepseek-ai/dsh-experimental-plugin-market-bundle'
+      - '@deepseek-ai/dsh-experimental-tool-worktree'
+      - '@deepseek-ai/dsh-experimental-forge-bundle'
+
+# No default web search provider, and web_search is not offered until a search provider resolves.
+- id: web
+  config:
+    fetchProvider: http
+    offerUnresolvedSearch: false
+
+# The app's own modes have no default model until one is picked in a Session's model picker: an empty provider or
+# model is no selection, and the picker shows "Select model".
+- id: agent-default-model
+  config:
+    provider: ''
+    model: ''
+
+# Session upload has no built-in collector: opting in with DSH_TELEMETRY_MODE also requires DSH_TELEMETRY_OTLP_URL,
+# and the plugin refuses to load without it.
+- id: session-telemetry-otel
+  config:
+    mode: !!js process.env.DSH_TELEMETRY_MODE || 'DISABLED'
+    shutdownTimeoutMillis: 3000
+    maxRequestBytes: 4000000
+    exporter:
+      url: !!js process.env.DSH_TELEMETRY_OTLP_URL
+      compression: gzip
+      timeoutMillis: 1000
+    processor:
+      scheduledDelayMillis: 10000
+      maxQueueSize: 2048
+      maxExportBatchSize: 2048
+      exportTimeoutMillis: 1500

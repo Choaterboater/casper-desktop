@@ -1,5 +1,5 @@
-// Real Git reaches a controlled proxy failure or stall; with npmmirror configured as the
-// fallback registry, the browser offers a mirror for a replacement spec, or another way once the install
+// Real Git reaches a controlled proxy failure or stall; the browser
+// offers a mirror for a replacement spec, or another way once the install
 // already asks the mirror, without retrying the failed address. Without a
 // configured fallback registry the same failure keeps the plain failed
 // screen, whose details name the check's own Git run and complete log.
@@ -36,7 +36,7 @@ it.each(['network', 'timeout'] as const)('offers a mirror after a GitHub %s, the
   const gitConfig = join(scratch, 'git.config')
   await writeFile(gitConfig, `[http "https://github.com/"]\n proxy = http://127.0.0.1:${String(address.port)}\n`)
   const overlay = join(scratch, 'cordis.patch.yml')
-  await writeFile(overlay, "- id: ui-plugin-manager\n  config: { registryProbeEnabled: false }\n- id: plugin-manager\n  config: { fallbackRegistries: ['https://registry.npmmirror.com/'] }\n")
+  await writeFile(overlay, '- id: ui-plugin-manager\n  config: { registryProbeEnabled: false }\n')
   const scaffold = await launchWebScaffold({
     profile: { packages: [], packageManager: { command: process.execPath, args: [], env: { GIT_CONFIG_GLOBAL: gitConfig, GIT_CONFIG_NOSYSTEM: '1' } } },
     extraOverlayPath: overlay,

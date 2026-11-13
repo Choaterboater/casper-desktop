@@ -9,6 +9,6 @@ export type { AssemblyPlan, ClientPluginModule, ClientRosterRow } from './roster
 export { TestClient } from './test-client.ts'
 export type { TestClientOptions } from './test-client.ts'
 export { remoteDefaultResponses } from './remote-default-responses.ts'
-export { bundleRoster, webApp, webAppWithDeepSeekAccount } from './bundle-roster.ts'
+export { bundleRoster, webApp } from './bundle-roster.ts'
 export { createClientTest } from './vitest.ts'
 export type { ClientTestFixtures } from './vitest.ts'

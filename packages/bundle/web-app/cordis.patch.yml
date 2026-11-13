@@ -326,9 +326,6 @@
     # Without a profile-backed Host it reports itself unavailable.
     - id: ui-plugin-manager
       name: '@deepseek-ai/dsh-client-ui-plugin-manager'
-      # Casper: no timing probe of the npm registry and its npmmirror copy before installs and README loads.
-      config:
-        registryProbeEnabled: false
 
     # Read-only Plugin list tab in the Settings Plugins section; the built-in
     # bundles the sidebar page leaves out are inspected here.
@@ -648,76 +645,3 @@
         command: !!js '(() => { const fs = process.getBuiltinModule("node:fs"); const path = process.getBuiltinModule("node:path"); const os = process.getBuiltinModule("node:os"); const exe = process.platform === "win32" ? "uvx.exe" : "uvx"; const dirs = [...(process.env.PATH ?? "").split(path.delimiter), path.join(os.homedir(), ".local", "bin"), path.join(os.homedir(), ".cargo", "bin"), "/opt/homebrew/bin", "/usr/local/bin"]; for (const dir of dirs) { if (dir !== "" && fs.existsSync(path.join(dir, exe))) return path.join(dir, exe) } return exe })()'
         args: ['--from', 'casper-network-mcp==0.1.7', 'casper-network-mcp', '--read-only']
         env: !!js 'Object.fromEntries(Object.entries(process.env).filter(([name, value]) => value !== undefined && /^(MIST|CENTRAL|CLEARPASS|UXI|OPSRAMP)_[A-Z0-9_]+$/.test(name)))'
-
-# ── Casper: no DeepSeek services and no usage reporting ─────────────────────
-# Casper sends nothing to DeepSeek unless the user adds DeepSeek as a model
-# provider in Settings → Models (pi-ai catalog). Product telemetry, product
-# analytics, the DeepSeek account sign-in, DeepSeek-hosted web search and the
-# DeepSeek-only API extensions are off; session upload is DISABLED in dsh-base.
-# Feedback ratings stay in the local Session log only.
-- id: desktop-product-telemetry
-  disabled: true
-- id: product-analytics
-  disabled: true
-- id: deepseek-account
-  disabled: true
-- id: llm-deepseek-account
-  disabled: true
-- id: account-controller
-  disabled: true
-- id: ui-settings-account
-  disabled: true
-- id: web-search-deepseek
-  disabled: true
-- id: web-deepseek-api
-  disabled: true
-- id: session-log-deepseek
-  disabled: true
-- id: deepseek-llm-api-extensions
-  disabled: true
-- id: llm-deepseek
-  disabled: true
-- id: plugin-package-inventory-deepseek
-  disabled: true
-# Casper does not offer the optional bundles DeepSeek ships: the Plugins page, Settings and the
-# plugin_manager tool leave them out while they are switched off and refuse to switch them on.
-# The dsh-base row has no config, so this one owns it whole. A failed install is not retried against the
-# npmmirror registry (fallbackRegistries is empty), and README and image reads use jsdelivr and unpkg only.
-- id: plugin-manager
-  config:
-    fallbackRegistries: []
-    detailNpmFileSources: [jsdelivr, unpkg]
-    hiddenBundles:
-      - '@deepseek-ai/dsh-personalized-recommendations'
-      - '@deepseek-ai/dsh-cua-bundle'
-      - '@deepseek-ai/dsh-experimental-session-search'
-      - '@deepseek-ai/dsh-experimental-ralph-bundle'
-      - '@deepseek-ai/dsh-experimental-terminal-bundle'
-      - '@deepseek-ai/dsh-experimental-badge-skill-bundle'
-      - '@deepseek-ai/dsh-experimental-session-titles-bundle'
-      - '@deepseek-ai/dsh-experimental-voice-input-bundle'
-      - '@deepseek-ai/dsh-experimental-cot-translation-bundle'
-      - '@deepseek-ai/dsh-experimental-auto-review'
-      - '@deepseek-ai/dsh-experimental-inspector-profile'
-      - '@deepseek-ai/dsh-experimental-liveshare'
-      - '@deepseek-ai/dsh-experimental-plugin-market-bundle'
-      - '@deepseek-ai/dsh-experimental-tool-worktree'
-      - '@deepseek-ai/dsh-experimental-forge-bundle'
-
-# Session upload has no built-in collector: opting in with DSH_TELEMETRY_MODE
-# also requires DSH_TELEMETRY_OTLP_URL, and the plugin refuses to load without it.
-# A patch config replaces the dsh-base block whole, so every field is restated.
-- id: session-telemetry-otel
-  config:
-    mode: !!js process.env.DSH_TELEMETRY_MODE || 'DISABLED'
-    shutdownTimeoutMillis: 3000
-    maxRequestBytes: 4000000
-    exporter:
-      url: !!js process.env.DSH_TELEMETRY_OTLP_URL
-      compression: gzip
-      timeoutMillis: 1000
-    processor:
-      scheduledDelayMillis: 10000
-      maxQueueSize: 2048
-      maxExportBatchSize: 2048
-      exportTimeoutMillis: 1500

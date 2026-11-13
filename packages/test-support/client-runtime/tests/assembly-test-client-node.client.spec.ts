@@ -12,7 +12,7 @@ const RENDERER_ONLY = webApp.pick(['@deepseek-ai/dsh-client-ui-renderer'])
 const globals = globalThis as { __DSH_TRANSPORT__?: ClientTransportHooks }
 const ACCOUNT_CONTROLLER = '@deepseek-ai/dsh-api-account-controller'
 const PRODUCT_ANALYTICS = '@deepseek-ai/dsh-client-product-analytics'
-/** The api roster plus the self-mounting rows the shipped profile disables, declared as their manifests declare them. */
+/** The api roster plus the self-mounting account controller and product analytics rows, declared as their manifests declare them. */
 const SELF_MOUNTED_ROSTER = ClientRoster.of([
   ...API_ROSTER.rows,
   { name: ACCOUNT_CONTROLLER, inject: ['@deepseek-ai/dsh-api-gateway'], immediately: false },

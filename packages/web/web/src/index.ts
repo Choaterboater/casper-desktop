@@ -57,13 +57,20 @@ interface Selection<P> {
  * provider auto-selects). Each operation reads the current value, so a settings
  * change applies to the next search or fetch without remounting the service.
  * Operational overrides such as environment variables must feed these same
- * fields rather than introduce a hidden priority chain.
+ * fields rather than introduce a hidden priority chain. `offerUnresolvedSearch`
+ * decides what `searchReady()` answers while search provider selection fails.
  */
 export interface WebRuntimeConfig {
   /** Explicit search provider id. Omitted = auto-select when exactly one usable. */
   readonly searchProvider: Volatile<string | undefined>
   /** Explicit fetch provider id. Omitted = auto-select when exactly one usable. */
   readonly fetchProvider: Volatile<string | undefined>
+  /**
+   * Whether `searchReady()` answers true while search provider selection fails, leaving
+   * `search()` to report the failure. False withholds `web_search` until a search provider
+   * resolves. Defaults to true.
+   */
+  readonly offerUnresolvedSearch: Volatile<boolean>
 }
 
 /**
@@ -84,10 +91,13 @@ export class WebRuntime extends TypertRemoteService {
    * Provider selection config. Operational env overrides feed the SAME fields:
    * `$DSH_WEB_SEARCH_PROVIDER` / `$DSH_WEB_FETCH_PROVIDER` are equivalent to
    * `searchProvider` / `fetchProvider` and are NOT a hidden priority chain.
+   * `offerUnresolvedSearch` (default true) decides the `searchReady()` answer while search
+   * provider selection fails.
    */
   static Config = z.object({
     searchProvider: z.string().volatile(),
     fetchProvider: z.string().volatile(),
+    offerUnresolvedSearch: z.boolean().default(true).volatile(),
   })
 
   private searchProviders = new Map<string, WebSearchProvider>()
@@ -191,12 +201,15 @@ export class WebRuntime extends TypertRemoteService {
    * Whether the provider `search()` would select can authenticate a search made for a
    * model request on the `llmProvider` chat route. Asks only that provider's `ready()`;
    * one without `ready()` counts as ready. Makes no network calls. A selection failure
-   * answers true, because `search()` reports that failure as a structured `WebError`.
+   * answers the current `offerUnresolvedSearch` value: true (the default) leaves `search()`
+   * to report that failure as a structured `WebError`, and false withholds search until a
+   * provider resolves.
    * @param llmProvider - the provider route id of the model request, when known.
-   * @returns false only when the selected provider reports that it cannot authenticate.
+   * @returns false when the selected provider reports that it cannot authenticate, or when
+   *   selection fails and `offerUnresolvedSearch` is false.
    */
   async searchReady(llmProvider?: string): Promise<boolean> {
-    return await selectedProviderReady(() => this.selectSearchProvider(), llmProvider)
+    return await selectedProviderReady(() => this.selectSearchProvider(), llmProvider, this.config.offerUnresolvedSearch.get())
   }
 
   /** Select the search provider with the rules above, throwing the matching {@link WebError}. */
@@ -229,7 +242,7 @@ export class WebRuntime extends TypertRemoteService {
    * @returns false only when the selected provider reports that it cannot authenticate.
    */
   async fetchReady(llmProvider?: string): Promise<boolean> {
-    return await selectedProviderReady(() => this.selectFetchProvider(), llmProvider)
+    return await selectedProviderReady(() => this.selectFetchProvider(), llmProvider, true)
   }
 
   /** Select the fetch provider with the rules above, throwing the matching {@link WebError}. */
@@ -261,13 +274,17 @@ interface ResolvableProvider {
  * Ask the provider an operation selects whether it can authenticate for one chat route.
  * @param select - the operation's selection; throws its {@link WebError} when no provider qualifies.
  * @param llmProvider - the provider route id of the model request, when known.
- * @returns the provider's answer; true when it has no `ready()` or selection fails, because the
- *   operation reports that failure itself.
+ * @param unresolved - the answer when selection fails; true leaves the operation to report the failure.
+ * @returns the provider's answer, true when it has no `ready()`, or `unresolved` when selection fails.
  */
-async function selectedProviderReady(select: () => ResolvableProvider, llmProvider: string | undefined): Promise<boolean> {
+async function selectedProviderReady(
+  select: () => ResolvableProvider,
+  llmProvider: string | undefined,
+  unresolved: boolean,
+): Promise<boolean> {
   let provider: ResolvableProvider
   try { provider = select() }
-  catch (_selectionFailure) { return true /* The operation surfaces the same failure when called. */ }
+  catch (_selectionFailure) { return unresolved /* The operation surfaces the same failure when called. */ }
   return await provider.ready?.(llmProvider) ?? true
 }
 

@@ -9,6 +9,7 @@ import { bundlePatchPaths, composeEntries, loadOverlayPatches } from '@deepseek-
 import type { DshBundleManifest } from '../packages/util/package-manifest/src/types.ts'
 import { isAgentPresetEntry, isCordisGroupEntry, loadCordisYaml } from './cordis-yaml.ts'
 import {
+  CASPER_PATCH,
   DESKTOP_BUNDLE_DIR,
   REPOSITORY_ROOT,
   checkDesktopBundle,
@@ -34,6 +35,14 @@ function layer(dir: string): ReturnType<typeof loadOverlayPatches> {
   return bundlePatchPaths(join(REPOSITORY_ROOT, dir), manifest(dir).dsh.bundle).flatMap(path => loadOverlayPatches('casper-desktop-bundle', path))
 }
 
+/** The bundle's generated upstream layers: every layer but the hand-written Casper one. */
+function generatedLayer(): ReturnType<typeof loadOverlayPatches> {
+  const casper = join(REPOSITORY_ROOT, DESKTOP_BUNDLE_DIR, CASPER_PATCH)
+  return bundlePatchPaths(join(REPOSITORY_ROOT, DESKTOP_BUNDLE_DIR), manifest(DESKTOP_BUNDLE_DIR).dsh.bundle)
+    .filter(path => path !== casper)
+    .flatMap(path => loadOverlayPatches('casper-desktop-bundle', path))
+}
+
 /** Remove the listed rows from composed entries, recursing into groups. */
 function withoutRemovedRows(entries: readonly EntryOptions[]): EntryOptions[] {
   return entries
@@ -56,11 +65,18 @@ describe('Casper desktop bundle', () => {
     expect(checkDesktopBundle()).toEqual([])
   })
 
-  it('composes to upstream base and web-app with the removed rows taken out', () => {
-    const casper = composeEntries([layer(DESKTOP_BUNDLE_DIR)])
+  it('composes its generated layers to upstream base and web-app with the removed rows taken out', () => {
+    const casper = composeEntries([generatedLayer()])
     const upstream = composeEntries([layer('packages/bundle/base'), layer('packages/bundle/web-app')])
     expect(casper).toEqual(withoutRemovedRows(upstream))
     expect(allEntries(upstream).filter(entry => REMOVED_IDS.includes(entry.id as string)).length).toBeGreaterThan(0)
+  })
+
+  it('patches only rows its generated layers insert, so an upstream rename cannot skip a Casper override', () => {
+    const warnings: string[] = []
+    composeEntries([layer(DESKTOP_BUNDLE_DIR)], message => warnings.push(message))
+    expect(warnings).toEqual([])
+    expect(loadCordisYaml(readFileSync(join(REPOSITORY_ROOT, DESKTOP_BUNDLE_DIR, CASPER_PATCH), 'utf8'))).not.toEqual([])
   })
 
   it('names none of the removed rows, in the composition or in any layer', () => {
@@ -162,8 +178,9 @@ describe('Casper desktop bundle', () => {
     const root = copiedRoot()
     expect(generateDesktopBundle(root).length).toBeGreaterThan(2)
     const base = join(root, 'packages/bundle/base/cordis.patch.yml')
+    const webApp = join(root, 'packages/bundle/web-app/cordis.patch.yml')
+    writeFileSync(webApp, `${readFileSync(webApp, 'utf8')}- id: deepseek-account\n  disabled: true\n`)
     writeFileSync(base, readFileSync(base, 'utf8').replace('    - id: deepseek-account\n', '    - id: renamed-account\n'))
-    expect(readFileSync(join(root, 'packages/bundle/web-app/cordis.patch.yml'), 'utf8')).toMatch(/^- id: deepseek-account$/mu)
     expect(() => generateDesktopBundle(root)).toThrow(/not inserted by any source patch file: deepseek-account;/u)
   })
 

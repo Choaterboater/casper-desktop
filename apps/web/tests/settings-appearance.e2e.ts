@@ -127,8 +127,7 @@ it('uses 16px text for coarse-pointer font fields and preserves compact fine-poi
 })
 
 it('shares settings card materials and control sizes in both palettes', async () => {
-  // The shipped Casper profile disables the DeepSeek account settings page; this scenario composes it back.
-  const scaffold = await launchWebScaffold({ extraOverlayPath: fileURLToPath(new URL('./deepseek-account.overlay.yml', import.meta.url)) })
+  const scaffold = await launchWebScaffold({})
   onTestFinished(() => scaffold.close())
   await scaffold.ctx.settings.mutate('ui-settings-account', [
     { op: 'set', path: ['step'], value: 'done' },

@@ -551,7 +551,7 @@ async function main(): Promise<void> {
         if (!reportedLaunch) { reportedLaunch = true; void track('desktop_app_launch', {}) }
         stopAccount?.()
         const accountBackend = welcomeBackend.account
-        // Casper disables the DeepSeek account service; without it the watch stream would reconnect every second forever.
+        // The Casper desktop bundle has no upstream account service; without it the watch stream would reconnect every second forever.
         const accountAvailable = await accountBackend.state().then(() => true, () => false)
         stopAccount = !accountAvailable ? undefined : accountBackend.watch((state) => {
           if (quitting) return

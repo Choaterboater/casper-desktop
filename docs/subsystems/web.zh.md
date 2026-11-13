@@ -125,7 +125,7 @@ type WebFetchBody =
 
 提供方的 `available(): boolean` 是一个廉价的本地检查（凭证是否存在、配置是否可解析），**禁止发起网络调用**。它是执行时选择提供方的输入，而不是健康检查系统：`search()`／`fetch()` 会读取它来选择可用的提供方。选择失败时，调用方会收到可据以分支处理的结构化 `WebError`；其错误代码和消息会说明缺失的 id 或存在歧义的候选集。与可用性不同，注册情况在操作运行前即可观测：`listProviders()` 按 `id`、可选的 `title` 和可选的多语言 `description` 返回每个已注册的搜索与抓取提供方，每次注册或注销后都会触发不带载荷的 `web/providers-changed` 事件；可用性仍只在操作运行时体现。
 
-搜索或抓取提供方还可以实现 `ready(llmProvider): Promise<boolean>`，这是只检查配置、禁止发起网络调用的判断：它回答为该对话路由上的模型请求发起的操作是否有可发送的凭据。`searchReady(llmProvider?)` 与 `fetchReady(llmProvider?)` 只询问 `search()` 或 `fetch()` 会选中的提供方，把没有 `ready()` 的提供方视为就绪，并在选择失败时回答 true，因为对应操作会把该失败报告为 `WebError`。就绪判断不是选择输入；`dsh-tool-web` 把它作为 `web_search` 与 `web_fetch` 的激活条件，因此路由回答 false 的模型步骤既不声明也不派发该工具。DeepSeek Search 与 Fetch API 提供方依据该路由在账号令牌与 API 密钥之间选择，见 [web-deepseek-api 鉴权](../../packages/web/web-deepseek-api/README.zh.md#authentication)一节。
+搜索或抓取提供方还可以实现 `ready(llmProvider): Promise<boolean>`，这是只检查配置、禁止发起网络调用的判断：它回答为该对话路由上的模型请求发起的操作是否有可发送的凭据。`searchReady(llmProvider?)` 与 `fetchReady(llmProvider?)` 只询问 `search()` 或 `fetch()` 会选中的提供方，把没有 `ready()` 的提供方视为就绪，并在选择失败时默认回答 true，因为对应操作会把该失败报告为 `WebError`；配置 `offerUnresolvedSearch: false` 时，搜索选择失败令 `searchReady` 回答 false。就绪判断不是选择输入；`dsh-tool-web` 把它作为 `web_search` 与 `web_fetch` 的激活条件，因此路由回答 false 的模型步骤既不声明也不派发该工具。DeepSeek Search 与 Fetch API 提供方依据该路由在账号令牌与 API 密钥之间选择，见 [web-deepseek-api 鉴权](../../packages/web/web-deepseek-api/README.zh.md#authentication)一节。
 
 选择从不依赖注册顺序、配置顺序或 HMR（热模块替换）顺序：一项能力要么有显式的提供方 id（配置 `searchProvider`／`fetchProvider`，或填充同一字段的对应环境变量），要么在恰好只有一个可用提供方注册时自动选择；如果存在多个可用提供方却未配置 id，则抛出 `WEB_PROVIDER_AMBIGUOUS`，而不会选用最先注册的提供方。每次操作在执行时读取配置的 id，因此保存的设置变更无需重新挂载 `ctx.web` 即对下一次搜索或抓取生效。
 
@@ -209,9 +209,12 @@ async search(request: WebSearchRequest, signal?: AbortSignal): Promise<WebSearch
  * Whether the provider `search()` would select can authenticate a search made for a
  * model request on the `llmProvider` chat route. Asks only that provider's `ready()`;
  * one without `ready()` counts as ready. Makes no network calls. A selection failure
- * answers true, because `search()` reports that failure as a structured `WebError`.
+ * answers the current `offerUnresolvedSearch` value: true (the default) leaves `search()`
+ * to report that failure as a structured `WebError`, and false withholds search until a
+ * provider resolves.
  * @param llmProvider - the provider route id of the model request, when known.
- * @returns false only when the selected provider reports that it cannot authenticate.
+ * @returns false when the selected provider reports that it cannot authenticate, or when
+ *   selection fails and `offerUnresolvedSearch` is false.
  */
 async searchReady(llmProvider?: string): Promise<boolean>
 

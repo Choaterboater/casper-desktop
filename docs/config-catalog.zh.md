@@ -4667,7 +4667,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-tool-web`
 
 - `inject`: `tools` · `web` · `systemPrompt`
-- `source`: [`packages/web/tool-web/src/index.ts:39`](../packages/web/tool-web/src/index.ts)
+- `source`: [`packages/web/tool-web/src/index.ts:41`](../packages/web/tool-web/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config: which web tools to register, search bounds, per-tool budgets, and the fetch output cap. */
@@ -4799,7 +4799,7 @@ export type ApprovalPolicy = 'ask' | 'never'
 ## `@deepseek-ai/dsh-web`
 
 - `refs`: `Volatile` (`@deepseek-ai/cordis`)
-- `source`: [`packages/web/web/src/index.ts:62`](../packages/web/web/src/index.ts)
+- `source`: [`packages/web/web/src/index.ts:63`](../packages/web/web/src/index.ts)
 
 ```ts config-catalog
 /**
@@ -4808,13 +4808,20 @@ export type ApprovalPolicy = 'ask' | 'never'
  * provider auto-selects). Each operation reads the current value, so a settings
  * change applies to the next search or fetch without remounting the service.
  * Operational overrides such as environment variables must feed these same
- * fields rather than introduce a hidden priority chain.
+ * fields rather than introduce a hidden priority chain. `offerUnresolvedSearch`
+ * decides what `searchReady()` answers while search provider selection fails.
  */
 export interface WebRuntimeConfig {
   /** Explicit search provider id. Omitted = auto-select when exactly one usable. */
   readonly searchProvider: Volatile<string | undefined>
   /** Explicit fetch provider id. Omitted = auto-select when exactly one usable. */
   readonly fetchProvider: Volatile<string | undefined>
+  /**
+   * Whether `searchReady()` answers true while search provider selection fails, leaving
+   * `search()` to report the failure. False withholds `web_search` until a search provider
+   * resolves. Defaults to true.
+   */
+  readonly offerUnresolvedSearch: Volatile<boolean>
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-web -->

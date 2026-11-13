@@ -17,11 +17,9 @@ it.skipIf(webSnapshotMode() === 'record')('persists the upload switch and omits 
   onTestFinished(() => server.close())
   const key = credentialRef('DSH_UPLOAD_BROWSER_KEY')
   const overlay = join(root, 'upload.yml')
-  // The shipped Casper profile disables session-log upload to DeepSeek; this scenario composes it back.
   await writeFile(overlay, JSON.stringify([
     { id: 'llm-deepseek', config: { baseURL: server.baseURL, apiKeyEnv: key } },
-    { id: 'deepseek-llm-api-extensions', disabled: false },
-    { id: 'session-log-deepseek', disabled: false, config: { enabled: true } },
+    { id: 'session-log-deepseek', config: { enabled: true } },
     { id: 'agent-default-model', config: { provider: 'deepseek-official', model: 'deepseek-v4-flash' } },
   ]))
   const scaffold = await launchWebScaffold({ deepSeekMissingCredential: true, extraOverlayPath: overlay })
