@@ -4,8 +4,6 @@ description: "Store-owned Sessions reject writes before creation announcement co
 ---
 # Store-owned Session writes follow publication
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 `Session.append()` and `appendPluginRecord()` on store-owned instances reject writes until the instance enters a `SessionStore` and its synchronous `session/created` dispatch completes, and after it leaves. Store ownership starts at `prepare()` or `enter()`. Creation listeners cannot append; a failed announcement leaves writes disabled. Independent `Session.create()` and `Session.fromRestore()` instances remain writable without notifying store observers. Constructor, restore, and fork history still load normally. The Agent factory completes `session/created` before invoking setup; `agent/created` still follows setup. During `session/created`, `ctx.agents.get(session.id)` now returns `undefined`. Listeners registered inside setup miss their own Session’s creation announcement. Setup events now reach live Session subscribers as well as persisted history.

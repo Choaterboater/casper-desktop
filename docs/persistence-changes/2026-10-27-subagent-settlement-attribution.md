@@ -5,8 +5,6 @@ kind: persistence-change
 
 # 2026-10-27-subagent-settlement-attribution
 
-English | [中文](2026-10-27-subagent-settlement-attribution.zh.md)
-
 ## Summary
 
 Adds optional stopReason attribution to persisted subagent settlement notices while keeping the Session format version unchanged.

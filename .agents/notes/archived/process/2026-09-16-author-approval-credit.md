@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-16-author-approval-credit.zh.md)
-
 ## Problem
 
 The approval policy needs author experience to contribute enough points for an established author and one ordinary reviewer to meet the two-point requirement.

@@ -5,8 +5,6 @@ description: "Client plugins must use the prefixed context menu types and hooks 
 
 # Context menu types and icons
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 The `@deepseek-ai/dsh-client-ui-context-menu/client` export `MenuTarget` is renamed to `ContextMenuTarget`, matching `ContextMenuTargetMap`. The old name has no compatibility alias. Target fields and runtime behavior are unchanged. Workspace and sidebar injections rename `menuTarget` / `useMenuTarget` to `contextMenuTarget` / `useContextMenuTarget`. Action icons accept `{ key, src? }` instead of React nodes and render through the keyed `contextMenu.icon` Slot.

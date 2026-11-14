@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-27-progressive-office-skills.zh.md)
-
 ## Problem
 
 Combined authoring and rendering instructions spend context on operations unrelated to ordinary editing. Rendering tool activation adds a second discovery path and durable state even though shell tools already own execution permissions and process management. A missing renderer can prevent loading otherwise usable editing guidance.

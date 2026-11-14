@@ -3,11 +3,9 @@
 
 # Experimental Plugin Record Catalog
 
-English | [中文](experimental-persistence-catalog.zh.md)
-
 These current-source PluginRecordMap declarations describe ignorable, log-only records owned by experimental packages. Payload annotations link to their owning source without expanding referenced types. Records stay outside the known-event set, persistence schema fingerprints, and compatibility history; format migrations retain them on a best-effort basis.
 
-Run `pnpm run gen-persistence-catalog` to regenerate both persistence catalogs, their language pairs, and associated artifacts. `pnpm run verify-persistence-catalog` checks all generated files.
+Run `pnpm run gen-persistence-catalog` to regenerate both persistence catalogs and their associated artifacts. `pnpm run verify-persistence-catalog` checks all generated files.
 
 Shared Session event declarations and resolved schemas appear in the [Session persistence event catalog](persistence-catalog.md).
 

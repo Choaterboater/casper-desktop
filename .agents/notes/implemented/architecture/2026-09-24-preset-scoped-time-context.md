@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-24-preset-scoped-time-context.zh.md)
-
 ## Problem
 
 A row in `packages/bundle/web-app/cordis.patch.yml` serves every preset in the profile, so a `time-context` row placed there would append one user-role message per eligible step to every preset, `minimal` included. The `minimal` preset composes only a persona and a persistent shell: it declares no reminder tool, and nothing in it turns the reading into a scheduled target, so that message would have no consumer in its composition.

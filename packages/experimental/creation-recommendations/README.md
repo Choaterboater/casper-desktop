@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-creation-recommendations
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 For an explicit interface request, a clear implied viewing or editing need, or a result with concrete continuing use, the Agent answers first and may offer one optional creation card at the completed Turn’s end. Explicit requests can serve a single task. The user can change the suggested location, then choose Create. A background Creator builds a new plugin and installs it into the profile. Undo removes that plugin, and Restore reinstalls it.

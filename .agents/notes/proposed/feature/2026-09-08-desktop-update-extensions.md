@@ -2,8 +2,6 @@
 
 Status: proposed
 
-English | [中文](2026-09-08-desktop-update-extensions.zh.md)
-
 ## Problem
 
 Frequent releases may eventually benefit from independently revised Desktop packages, a stable subscription, next-launch installation, or replacing an older pending update. These choices introduce additional release and installer states that are not needed to ship the initial fixed-Nightly, explicitly approved installation flow.

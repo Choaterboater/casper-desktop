@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-16-plugin-configuration-on-the-plugins-page.zh.md)
-
 ## Problem
 
 A plugin's settings lived in Settings, on the Plugins section's configuration tab: four collapsible cards, one per host-plane namespace, beside a read-only inventory tab. The sidebar's Plugins page listed and switched bundles but could not open a plugin's settings, so two surfaces split one object between them, and a bundle installed from outside the repository had no place for a form of its own at all.

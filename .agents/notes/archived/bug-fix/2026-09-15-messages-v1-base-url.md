@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-15-messages-v1-base-url.zh.md)
-
 ## Problem
 
 The Messages transport appends the Anthropic-standard `/v1` namespace to a configured base URL. A base that already ends in `/v1` previously produced `/v1/v1/messages`, while recognizing every `v`-plus-digit suffix as a provider version granted undocumented compatibility and could bypass the standard namespace.

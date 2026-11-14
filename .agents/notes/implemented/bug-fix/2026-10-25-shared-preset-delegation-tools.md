@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-25-shared-preset-delegation-tools.zh.md)
-
 ## Problem
 
 Agents sharing a preset need the same delegation definitions immediately after a preset switch. Installing identical tools separately for each Agent introduces an asynchronous visibility gap and places those definitions in the Agent's own registration layer, which is exempt from inherited-tool restrictions.

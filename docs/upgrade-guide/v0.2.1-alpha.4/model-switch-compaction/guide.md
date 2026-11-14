@@ -5,8 +5,6 @@ description: "Automatic model switches require a valid destination pressure budg
 
 # Model switches check destination context pressure
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 With `compaction-basic` automatic mode enabled, a provider/model switch now checks destination pressure before recording the new request header. Previously, proactive pressure checks used the last committed route and warned on configuration or summary failure. A switch now fails with `MODEL_SWITCH_COMPACTION_FAILED` when destination capacity cannot be resolved, its pressure budget is invalid, or compaction cannot reduce history below its threshold. This also affects short conversations with invalid destination budgets. Completed pruning and earlier checkpoints remain; the previous request header is preserved.

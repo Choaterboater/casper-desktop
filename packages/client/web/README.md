@@ -5,8 +5,6 @@ kind: "package-library"
 
 # @deepseek-ai/dsh-client-web
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 `dsh-client-web` boots the web GUI: it loads the client module system from the Host-provided boot graph, then activates the client plugins before the application mounts. The UI mounts once every required plugin and every plugin a required one waits on is up; any other plugin that fails is reported in the console and left out. A framework-free boot page keeps a required-plugin failure visible instead of a blank screen. It also defines the shared module table (`PLATFORM_MODULES`) that every dynamic bundle resolves its externals against. The model never sees this package.

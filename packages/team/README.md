@@ -5,8 +5,6 @@ kind: "package-group"
 
 # team/ — shared task coordination
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 The Team packages let agents in a subagent tree share task ownership and dependencies. The service saves each root Session’s Team selection and task board. The tool plugin exposes task operations and collaboration guidance to the model. Subagent creation, discovery, messaging, and interruption remain in the subagent package family.

@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-client-ui-settings-web-search
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Open **Plugins** in the sidebar and select **Web search and fetch** in the Official group to choose the providers web search and web fetch use, set the Search API result count, or configure legacy Messages search. The DeepSeek Search and Fetch APIs take no credential settings here: they use the conversation's DeepSeek account or a DeepSeek API key. The page writes only on save; a legacy key goes through the credentials domain. The page exists while the Host serves the `web` namespace; each official provider's controls appear only while the Host serves that provider's namespace.

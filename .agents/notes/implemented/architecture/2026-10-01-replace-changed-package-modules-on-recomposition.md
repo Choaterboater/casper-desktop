@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-01-replace-changed-package-modules-on-recomposition.zh.md)
-
 ## Problem
 
 Node caches an evaluated module by file URL. A profile installs packages with pnpm's hoisted layout, so a package lives at `node_modules/<name>` whatever its version. Overwriting, upgrading or reinstalling it keeps every file URL, and a later import or Loader entry restart returns the cached module of the previous version. The [package-refresh Note](2026-09-30-profile-package-refresh-and-manifest-invalidation.md) refreshes runtime resolution and package configuration but leaves this module cache; Plugin Manager therefore reported overwrites as `restart-required`, and a reinstall at the same path after removal reported `applied` while the previous version kept running. A `link:` development package hits the same cache whenever its build output changes, unless its directory is listed in HMR's source watch roots.

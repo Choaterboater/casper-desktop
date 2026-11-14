@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-agent-preset
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Define an Agent’s child plugins in ordinary Cordis YAML. Declare several presets and let sessions select one. Definitions load eagerly, and edits affect subsequently created Agents.

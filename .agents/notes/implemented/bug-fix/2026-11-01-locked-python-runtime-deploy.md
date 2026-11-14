@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-11-01-locked-python-runtime-deploy.zh.md)
-
 ## Problem
 
 Python executable packaging needs the same dependency versions and integrity records as the workspace lockfile. Legacy hoisted deployment ignores that lockfile and resolves compatible registry versions again: a manifest permitting `tslib@^2.8.1` can install `2.9.1` while the lockfile records `2.8.1`. Office archive preparation then rejects the missing locked integrity. A successful frozen workspace install does not constrain that later legacy deployment.

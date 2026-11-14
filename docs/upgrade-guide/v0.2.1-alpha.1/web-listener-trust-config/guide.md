@@ -5,8 +5,6 @@ description: "The Web profile replaces the `webRuntime` service and the `web-run
 
 # Web listener and trust configuration moves to `webStartup`
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 The Web profile no longer provides the `webRuntime` service, and the `web-runtime` row no longer declares a `trustedHosts` config value. A profile, overlay, or `--patch` file that injects `webRuntime` now waits for a service that never mounts, and an expression reading `ctx.webRuntime.trustedHosts` fails to evaluate, so the required Connection cannot start.

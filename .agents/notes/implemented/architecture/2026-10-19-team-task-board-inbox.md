@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-19-team-task-board-inbox.zh.md)
-
 ## Problem
 
 The subagent tree already supplies identity, discovery, routing, and lifecycle. A second Team roster can grant assignment authority from stale history and duplicates member navigation. Team-wide status waits observe unrelated activity and miss input already pending for the caller. Persisting task-board wakeups as messages adds unread state and message schemas even though the task journal already owns the state to inspect.

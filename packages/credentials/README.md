@@ -5,8 +5,6 @@ kind: "package-group"
 
 # credentials/ — credentials and authorization
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 The `credentials/` group lets configuration name secrets instead of embedding their values. Use `credentials/` to store, look up, and remove credentials, `credentials-local/` for private on-machine storage with environment fallbacks, and `authorization/` when obtaining a credential requires asking a human. Rotated stored values apply to the next model request, and a stored value takes precedence over `DEEPSEEK_API_KEY=… dsh`. Configuration files contain only credential names; local secret values remain readable only by the same OS user.

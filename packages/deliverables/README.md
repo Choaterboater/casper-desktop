@@ -5,8 +5,6 @@ kind: "package-group"
 
 # packages/deliverables
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 The deliverables family records what a turn hands to the user as durable Session events that only clients read: the `present` tool declares final files the model delivered, and the workspace-changes recorder captures the files a turn changed with their line counts from git snapshots and whole-file captures, and serves each file's comparison. The Web [deliverables plugin](../client/ui-deliverables/README.md) renders both at the end of a turn. Choose this family for a product that shows delivered files and per-turn changes; `present` needs `ctx.tools` and `ctx.fs`, the recorder needs `ctx.subprocess` and a git executable.

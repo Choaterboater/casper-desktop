@@ -5,8 +5,6 @@ Archived: 2026-09-30
 
 Update: the `reported` option this note introduced is gone with the [jobs seam consolidation](../architecture/2026-09-03-jobs-seam-consolidation.md). The registry keeps no report bit; `dsh-tool-jobs` claims only its own `job_kill` and waits in a ledger, so a human `job.kill` leaves the notice due by construction. The reason merge, the `job.kill` Remote, and the two-press control are unchanged.
 
-English | [中文](2026-08-26-human-job-kill.zh.md)
-
 ## Problem
 
 The [web job display note](2026-08-08-web-background-job-display.md) shipped the task list read-only and recorded why: `JobRegistry.kill()` marks the job `reported`, and the [`dsh-tool-jobs`](../../../../packages/jobs/tool-jobs/README.md) completion reporter suppresses the settlement notice for a reported job. That coupling is correct for the one caller that existed — the model's `job_kill`, whose own tool result already tells the model what it did — but a human pressing a stop button has no model-visible channel at all. A kill written against that contract would leave the model believing its task is still running, exactly the stale-world-model failure Claude Code ships today (its `/tasks` kill sets `notified: true` and the model learns nothing) and Kimi avoids (a model `TaskStop` suppresses its own notification; a human stop delivers one).

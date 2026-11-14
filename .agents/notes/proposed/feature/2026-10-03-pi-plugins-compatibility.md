@@ -2,8 +2,6 @@
 
 Status: proposed
 
-English | [中文](2026-10-03-pi-plugins-compatibility.zh.md)
-
 ## Problem
 
 Pi 1.0.0 has two separate mechanisms for running customization code. Extensions are in-process TypeScript factories with a published API; the [Pi extensions bridge note](2026-10-03-pi-extensions-bridge.md) covers them. Plugins are a newer mechanism built on Pi's Chord composition runtime: a plugin package contributes facets, and each facet runs in the process its name selects. This note covers plugins.

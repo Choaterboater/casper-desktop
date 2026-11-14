@@ -5,8 +5,6 @@ kind: package-reference
 
 # @deepseek-ai/dsh-client-ui-file-drag
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Users can drag original images from conversations or the sidebar into the composer, or into other applications through Desktop. Drag failures remain visible after the originating image or panel closes. Transfers between browser windows remain subject to browser capabilities.

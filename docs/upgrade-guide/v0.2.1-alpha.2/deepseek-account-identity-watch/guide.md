@@ -5,8 +5,6 @@ description: "DeepSeekAccount.watch no longer includes Platform identity changes
 
 # Explicitly subscribe to account identity changes
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 The public `DeepSeekAccount.watch(signal)` method previously emitted a snapshot when a profile read first supplied or changed the cached Platform user ID. It now emits account-state changes only by default. Plugins that use this stream to refresh `getPlatformSession()` must opt into identity changes. Credential replacement and sign-in state changes still notify every subscriber.

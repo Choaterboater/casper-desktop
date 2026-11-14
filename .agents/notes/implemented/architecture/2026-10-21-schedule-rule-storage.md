@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-21-schedule-rule-storage.zh.md)
-
 ## Problem
 
 Host tasks already use the versioned `schedule` domain. A second domain, importer, and placeholder RRULE duplicate timing and storage authority. Cron and RRULE should be supported timing types rather than separate generations of the task API.

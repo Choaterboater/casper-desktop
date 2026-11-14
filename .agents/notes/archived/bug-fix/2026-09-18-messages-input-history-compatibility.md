@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-18-messages-input-history-compatibility.zh.md)
-
 ## Problem
 
 Saved subagent settlement notices can contain child reasoning and tool calls in parent user messages. Chat Completions and pi-ai omit these blocks from user input, while rejecting them in Messages prevents every later request containing the same history. The [text-only settlement producer](../feature/2026-08-06-manager-owned-subagent-settlement-delivery.md) prevents new notices from carrying these blocks but cannot repair already recorded messages.

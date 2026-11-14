@@ -1,7 +1,5 @@
 # Claude Code mods: compatibility
 
-English | [中文](claude-code-mods.zh.md)
-
 Every way a mod behaves differently through this bridge than under Claude Code, as of Claude Code 2.1.287 ([mods reference](https://code.claude.com/docs/en/plugins/mods/reference), its `claude-code.d.ts`) and the [Getting started with Claude Code mods](https://claude.dev/blog/getting-started-with-claude-code-mods/) post of 2026-10-01. A row names the Claude Code behavior, what this bridge does, and the reason or the follow-up. Anything not listed here behaves as the reference describes; a hook on an event this host never raises is named in a warning when the mod loads, and a `$` call outside the served table rejects with `no implementation for <namespace>.<method>`.
 
 ## Packaging and loading

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-24-shared-time-vocabulary.zh.md)
-
 ## Problem
 
 `dsh-util-time` existed for one job and one caller shape: `canonicalClientTimeZone` validated a caller-reported zone at a wire boundary and answered `undefined`, which `dsh-api-session-controller` and `dsh-subagent` mapped onto their own domain errors. Two other consumers had grown parts of the same vocabulary privately. Schedule held a strict RFC 3339 instant parser, a local-calendar parser, a four-digit-year bound and canonical formatter, a local wall-clock resolver, and its own IANA zone canonicalizer in `packages/schedule/schedule/src/domain.ts`, throwing `ScheduleInputError` instead of answering a result. `dsh-time-context` held a second copy of the IANA zone profile in `packages/context/time-context/src/request-zone.ts`, with its own regular expression and its own `Intl.DateTimeFormat` canonicalization, to enforce the stricter policy that a request may only name a zone another process resolves back to the same identity. The IANA profile and the `Intl` canonicalization step therefore existed three times in all, so a change to that profile had to be made and verified once per copy, and the next consumer of a wall-clock selector had no shared entry point to reach for.

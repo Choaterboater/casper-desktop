@@ -5,8 +5,6 @@ description: "`ctx.sessionProjections.checkpoint(session)` keeps a released unit
 
 # Released projection units stay in checkpoints
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 Previously, when the last registrant of a projection key released it, through `handle.dispose()` or by unloading the owning fiber, the registry deleted the unit and `ctx.sessionProjections.checkpoint(session)` stopped returning its row.

@@ -5,8 +5,6 @@ kind: "package-library"
 
 # @deepseek-ai/dsh-sandbox-windows-acl
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 On Windows, this package confines child-process writes and deletes to the workspace and a private temporary directory: `workspace-write` grants both, `read-only` grants neither. Mounting `dsh-sandbox-local` selects this for confined bash and PowerShell commands, or callers use the public `AclSandbox` API directly; any failed Win32 operation prevents an unrestricted spawn. Each grant combines a capability-SID allow ACE, a deny of the ambient parent-directory delete right, and a Low integrity label the lowered token must match, so one granted root cannot reach another. The guarantee stays partial: hard links alias file objects and files ACL'd by another AppContainer tool stay unreadable.

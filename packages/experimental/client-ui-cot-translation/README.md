@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-experimental-client-ui-cot-translation
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Read expanded model reasoning in another language and switch back to its original text. Choose a translation service and target language from the Plugins panel. Translation sends displayed reasoning to the selected external service, which may include private code or conversation details. Original reasoning remains in the Session and model context.

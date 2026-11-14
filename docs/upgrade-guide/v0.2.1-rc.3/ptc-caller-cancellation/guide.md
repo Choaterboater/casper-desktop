@@ -5,8 +5,6 @@ description: "Caller-cancelled run_code results use ABORTED instead of CODE_RUN_
 
 # PTC caller cancellation uses the standard tool error code
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 When a running `run_code` call is cancelled by its caller and the runtime reports `abort`, its `tool/result` error changes from `CodeRunFailedError` / `CODE_RUN_FAILED` to `AbortError` / `ABORTED`. The result content is `Error: tool call aborted`, replacing the runtime diagnostic, captured output and sandbox summary. SDK clients and Session consumers that classify these results are affected.

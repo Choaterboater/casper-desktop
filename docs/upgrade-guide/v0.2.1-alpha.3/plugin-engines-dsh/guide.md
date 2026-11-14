@@ -5,8 +5,6 @@ description: "Plugin compatibility checks read engines.dsh before DSH peerDepend
 
 # Plugin compatibility reads `engines.dsh` first
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 In v0.2.1-alpha.3, installation and profile startup judged a plugin or bundle only by its `peerDependencies` on `@deepseek-ai/dsh` and `@deepseek-ai/dsh-*`, and ignored `engines.dsh`. In the next release, an own `engines.dsh` range decides alone and those peers are ignored; the peer rule applies only when `engines.dsh` is absent. `workspace:` values are valid only in peers; in `engines.dsh` they are incompatible. A non-object `engines` or a non-string `engines.dsh` makes the manifest unreadable for compatibility, which refuses the package. Plugin authors whose package declares `engines.dsh`, or declares `engines` as something other than an object, are affected.

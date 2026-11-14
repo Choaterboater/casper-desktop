@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-18-profile-plugin-host-runtime-instances.zh.md)
-
 ## Problem
 
 A plugin the profile installs out-of-tree resolves its bare specifiers along the ancestor `node_modules` chain, where the profile's own layer sits above the runtime resolution's interception layer ([lookup order](2026-09-19-profile-resolution-lookup-order.md)). It therefore receives its own copy of every package it reaches through a `dependencies` edge, while the Host that loads the plugin keeps the installation's copy. Most packages tolerate that. `@deepseek-ai/dsh-scope` does not: it tags a scoped context with a module-local `Symbol('dsh.scope')` and keeps scope parents and event-carrier keys in module-local tables, and every registry that reads a tag — tool registration, prompt sections, MCP resources, scoped events — compares it by identity. A profile copy's `createScope` writes a tag the installation's `scopeOf` cannot read, so a registration meant for one Agent lands in the process-global layer.

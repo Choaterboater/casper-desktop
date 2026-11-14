@@ -2,8 +2,6 @@
 
 Status: proposed
 
-English | [中文](2026-10-29-event-triggered-automation-tasks.zh.md)
-
 ## Problem
 
 Automation tasks run only on time rules today. The Host stores each rule, and every due time queues the task's instruction as a follow-up message in the task's original Session ([Host-owned scheduled messages](../../implemented/architecture/2026-09-16-host-schedule-storage.md)); the model creates and edits tasks through preset-scoped tools ([Preset-scoped Schedule tools](../../implemented/architecture/2026-09-24-preset-scoped-schedule-tools.md)). Work that should start when something else changes, such as a pull request's checks failing, a reviewer requesting changes, or a message arriving, cannot be expressed as a task, so users check those sources by hand across Sessions.

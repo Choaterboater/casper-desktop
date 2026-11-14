@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-07-29-terminal-llm-stream-failures.zh.md)
-
 This note supersedes the thrown-error identity and call-local sidecar mechanism in [bounded LLM request recovery](2026-06-21-bounded-llm-request-recovery.md), which retains structured failure facts, retry policy, and durable attempts. The [compaction reference](../../../../packages/compaction/compaction-basic/README.md) defines current overflow recovery.
 
 ## Problem

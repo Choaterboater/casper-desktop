@@ -5,8 +5,6 @@ kind: "package-library"
 
 # @deepseek-ai/dsh-home-paths
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 `@deepseek-ai/dsh-home-paths` lets package authors resolve the Casper data root and the shared agent configuration root their consumers read. An explicit path wins over the environment variable, which wins over the default under the operating-system home; blank environment values are ignored. Its public helpers can render a root without revealing an absolute machine path, expand only bare or current-user tilde forms, and canonicalize watch targets whose final components do not yet exist. Use it as a direct library dependency, not through `cordis.yml`.

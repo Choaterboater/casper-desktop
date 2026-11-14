@@ -16,8 +16,6 @@ kind: "package-reference"
 ```markdown
 # @deepseek-ai/dsh-<name>
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Three to five sentences and at most 100 `wc -w`-style words on what a user or agent can DO with the package: outcomes, when to choose it, main cost, most important boundary. Apply the [Summary voice rules](../SKILL.md#voice-rules); never describe its role, type, or internal identity.
@@ -100,4 +98,3 @@ None.
 - **Fact-check before writing.** Mount the package in a test composition and run every command, config field, default, and behavior claim this README makes. Delete anything you did not reproduce; link the generated config catalog instead of restating fields.
 - **Installation guidance.** A plugin package mounts through `cordis.yml` rows. Only a package declaring `dsh.bundle.patch` installs as a profile layer via `dsh plugin --profile <name> add <package>` — if this package lacks that declaration, say how it mounts in a composition, never `dsh plugin add`.
 - **Model Experience and Known Limitations are gate-owned.** Match the exact headings and per-package forms the two gates enforce; update the gates' audited lists in the same change when behavior moves a package between forms.
-- Re-run `pnpm run verify-translation-pairing --write packages/<group>/<pkg>/README.md` after editing the pair.

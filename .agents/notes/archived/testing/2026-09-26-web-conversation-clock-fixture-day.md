@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-26-web-conversation-clock-fixture-day.zh.md)
-
 ## Problem
 
 Run 36157253018 (job 108144715986, `node 24 / snapshots and artifacts`) failed four browser scenarios in one pass — [steering](../../../../apps/web/tests/steering.e2e.ts), [markdown-images](../../../../apps/web/tests/markdown-images.e2e.ts), [message-actions](../../../../apps/web/tests/message-actions.e2e.ts), and [reference-composer](../../../../apps/web/tests/reference-composer.e2e.ts) — with one aria difference: a message rendered `… and stop. 9/25 23:58` where its golden records `… and stop. {{clock}}`.

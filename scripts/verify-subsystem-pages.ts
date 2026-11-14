@@ -1,6 +1,6 @@
 /**
  * Doc-sync gate for package-group subsystem references. Every package group
- * either links at least one existing `docs/subsystems/` page from its English
+ * either links at least one existing `docs/subsystems/` page from its
  * group README or carries an explicit, justified exemption below.
  */
 
@@ -53,7 +53,7 @@ function subsystemLinks(source: string): string[] {
     if (node.type !== 'link') return
     const match = /^\.\.\/\.\.\/docs\/subsystems\/([^/#?]+\.md)(?:#[^?#]*)?$/.exec(node.url)
     const page = match?.[1]
-    if (page !== undefined && page !== 'README.md' && !page.endsWith('.zh.md')) links.add(`docs/subsystems/${page}`)
+    if (page !== undefined && page !== 'README.md') links.add(`docs/subsystems/${page}`)
   })
   return [...links].sort()
 }

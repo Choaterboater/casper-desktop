@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-client-shortcuts
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Customize application keyboard commands for each device. Desktop and Web choose separate defaults for the receiving device. Custom bindings survive reloads on the same device. Commands disappear when their owning plugin unloads, while their saved overrides remain available for reinstallation.

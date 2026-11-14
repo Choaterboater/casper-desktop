@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-21-experimental-capabilities-as-optional-bundles.zh.md)
-
 ## Problem
 
 The Web plugin page offered two optional bundles, Agent Teams and voice input. Auto review and the Inspector were published experimental packages that a person had to install by name or mount through a hand-written profile patch, although both already declared a bundle patch or shipped a mountable overlay.

@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-22-desktop-main-bundle-after-workspace-tsdown.zh.md)
-
 ## Problem
 
 A macOS Desktop package built from a fresh worktree crashed at launch with `ERR_MODULE_NOT_FOUND: Cannot find package '@deepseek-ai/dsh-home-paths' imported from app.asar/lib/main.js`. The packaging log showed why: rolldown had reported `[UNRESOLVED_IMPORT] Could not resolve '@deepseek-ai/dsh-home-paths' … treating it as an external dependency`, and the same for `@deepseek-ai/dsh-app-boot` and `@deepseek-ai/dsh-deepseek-account`. The three packages are workspace devDependencies of `apps/desktop` that the main-process bundle must inline, because electron-builder copies only the manifest's `dependencies` into `app.asar/node_modules`.

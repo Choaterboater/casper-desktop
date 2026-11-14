@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-11-02-liveshare-plugin-method-catalog.zh.md)
-
 ## Problem
 
 LiveShare used to expose plugin endpoints through a declaration API. The API let a plugin name arbitrary endpoints, so a catalog mistake could widen a viewer's reach without a corresponding Gateway check. The replacement needs one source of truth that says which plugin methods a share may expose.

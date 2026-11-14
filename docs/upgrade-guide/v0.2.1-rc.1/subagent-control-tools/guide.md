@@ -5,8 +5,6 @@ description: Custom subagent compositions must update model-selection settings a
 
 # Update subagent model selection and control tools
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 `@deepseek-ai/dsh-tool-subagent` replaces `modelSelectionSettings` with `modelSelection`, which controls optional child route fields. Discovery requires `modelDiscovery: true` on one instance per tool scope. Both options default to false. The package has no `/list-models` plugin export. Shipped Web and Desktop presets enable both options on spawn and keep fork route fields disabled; custom fork tools may enable selection. Headless, SDK, and ACP defaults retain their tool sets.

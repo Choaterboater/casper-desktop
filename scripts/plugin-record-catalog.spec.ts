@@ -153,27 +153,18 @@ describe('plugin record declarations', () => {
 })
 
 describe('plugin record catalogue output', () => {
-  it('renders honest empty states in both languages', () => {
-    const english = renderPluginRecordCatalog([])
-    const chinese = renderPluginRecordCatalog([], 'zh')
-    expect(english).toContain('# Experimental Plugin Record Catalog')
-    expect(english).toContain('English | [中文](experimental-persistence-catalog.zh.md)')
-    expect(english).toContain('No production package currently declares a plugin record.')
-    expect(english).toContain('[Session persistence event catalog](persistence-catalog.md)')
-    expect(chinese).toContain('[English](experimental-persistence-catalog.md) | 中文')
-    expect(chinese).toContain('当前没有生产包声明插件记录。')
-    expect(chinese).toContain('[会话持久化事件目录](persistence-catalog.zh.md)')
+  it('renders an honest empty state', () => {
+    const output = renderPluginRecordCatalog([])
+    expect(output).toContain('# Experimental Plugin Record Catalog')
+    expect(output).toContain('No production package currently declares a plugin record.')
+    expect(output).toContain('[Session persistence event catalog](persistence-catalog.md)')
   })
 
   it('links the main catalogue to the experimental page without embedding its inventory', () => {
-    const english = render([], [])
-    const chinese = render([], [], undefined, 'zh')
-    expect(english).toContain('[experimental plugin record catalog](experimental-persistence-catalog.md)')
-    expect(chinese).toContain('[实验性插件记录目录](experimental-persistence-catalog.zh.md)')
-    expect(english).not.toContain('No production package currently declares')
-    expect(english).not.toContain('| Record | Owner |')
-    expect(chinese).not.toContain('当前没有生产包声明')
-    expect(chinese).not.toContain('| 记录 | 所属包 |')
+    const output = render([], [])
+    expect(output).toContain('[experimental plugin record catalog](experimental-persistence-catalog.md)')
+    expect(output).not.toContain('No production package currently declares')
+    expect(output).not.toContain('| Record | Owner |')
   })
 
   it('renders compact, sorted rows with escaped annotations and no line-number churn', () => {
@@ -191,7 +182,7 @@ describe('plugin record catalogue output', () => {
     expect(output).not.toMatch(/records\.ts:\d/u)
   })
 
-  it('limits record declaration changes to the experimental artifact pair and its metadata', () => {
+  it('limits record declaration changes to the experimental artifact', () => {
     const root = fixture({
       'tsconfig.host.json': JSON.stringify({ compilerOptions: {
         target: 'es2024', module: 'esnext', moduleResolution: 'bundler', strict: true, types: [],
@@ -218,13 +209,9 @@ export type SessionEvent<T extends keyof SessionEventMap = keyof SessionEventMap
     })
     const schema = extractPersistenceSchema(root)
     const empty = persistenceCatalogArtifacts(root, schema)
-    const experimentalPaths = [
-      'docs/experimental-persistence-catalog.md',
-      'docs/experimental-persistence-catalog.zh.md',
-      'docs/experimental-persistence-catalog.i18n.yaml',
-    ]
+    const experimentalPaths = ['docs/experimental-persistence-catalog.md']
     expect(empty.map(artifact => artifact.path)).toEqual([
-      'docs/persistence-catalog.md', 'docs/persistence-catalog.zh.md', 'docs/persistence-catalog.i18n.yaml',
+      'docs/persistence-catalog.md',
       ...experimentalPaths,
       'packages/core/session/src/known-event-types.ts', 'docs/persistence-schema.json',
     ])

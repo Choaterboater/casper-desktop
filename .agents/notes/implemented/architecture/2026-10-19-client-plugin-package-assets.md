@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-19-client-plugin-package-assets.zh.md)
-
 ## Problem
 
 The browser half of a dynamic Client plugin is a lazy-CJS factory built by the [client build preset](../../../../packages/client/tsdown.client.ts) and loaded through the `/plugins` route of the [Client module system](../../../../packages/client/modules/README.md). That route served only `client.js` and package-local chunks, so an image that plugin code referenced had to be embedded in the bundle as a base64 data URL, and an image used by a stylesheet needed a package-level build plugin that rewrote it into the inlined style.

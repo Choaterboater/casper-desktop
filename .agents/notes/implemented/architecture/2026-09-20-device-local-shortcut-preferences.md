@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-20-device-local-shortcut-preferences.zh.md)
-
 ## Problem
 
 Keyboard bindings depend on the receiving device's operating system and browser restrictions. A Host can serve several devices, while a local save can fail after a user records a new combination. Activating an unpersisted binding makes the interface disagree with the next application launch. Rewriting unreadable or future-version preferences can destroy choices an older client cannot interpret.

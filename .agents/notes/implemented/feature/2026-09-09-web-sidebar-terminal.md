@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-09-web-sidebar-terminal.zh.md)
-
 ## Problem
 
 Web users need an interactive shell beside a Session to inspect the workspace and run commands. The Agent's persistent terminal tools control prompts and wait for semantic results; a human terminal instead needs raw keyboard input, normal shell configuration and a full screen. Browser rendering and transport can disappear while a command is still running.

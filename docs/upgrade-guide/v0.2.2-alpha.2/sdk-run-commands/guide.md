@@ -5,8 +5,6 @@ description: "SDK run recognizes native commands and returns RunResult after its
 
 # SDK run accepts native commands
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 Python and TypeScript `run()` accept strings and content-block arrays through the existing entry and always return `RunResult`. Supported native commands are recognized by their definition identities and effective registered names. English and Chinese aliases follow renamed definitions; unrelated exact-name replacements remain ordinary input. See the [supported command rules](../../../../packages/sdk/server/README.md#command-input).

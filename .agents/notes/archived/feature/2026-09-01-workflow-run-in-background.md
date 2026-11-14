@@ -5,8 +5,6 @@ Archived: 2026-09-30
 
 Update: with the [jobs seam consolidation](../architecture/2026-09-03-jobs-seam-consolidation.md) the run registers a `JobSpec` (no `record` flag), narrates through `JobHandle.append` and `updateProgress`, and returns its rendered value as `JobOutcome.result`, which the model's first read after settlement carries once.
 
-English | [中文](2026-09-01-workflow-run-in-background.zh.md)
-
 ## Problem
 
 A `workflow` call blocked the parent turn until the whole script settled: a long orchestration (an audit fanning out over hundreds of files) held the model hostage for its entire wall-clock, with no way to keep working, no live progress for a human, and cancellation as the only exit. Every other long-running execution surface — bash, pwsh, one-shot subagents — already had a `run_in_background` route into `ctx.jobs`. The [record merge](../architecture/2026-09-01-jobs-absorb-activity-record.md) also removed the foreground workflow's activity mirror on the explicit promise that live workflow narration would return as a background record job.

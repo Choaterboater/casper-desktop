@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-14-experimental-dependency-policy.zh.md)
-
 ## Problem
 
 A [verify-package-dependencies](../../../../scripts/verify-package-dependencies.ts) scope of `packages/!(experimental)/*/package.json` exempts the whole experimental group from the rule that browser and type relationships belong only in devDependencies ([client dependency rules](../../../../packages/client/AGENTS.md#dependency-declaration)), and [published dependency faces](2026-08-26-published-dependency-faces.md) stated its coverage as "non-experimental packages". Under that scope, 4 experimental client packages declared client, api, session, and similar packages as peerDependencies. The webworker packer follows workspace peers into the image, so browser static libraries became sweep roots, and packing agent-team-profile produced 82 unresolvable requests. The [experimental package rules](../../../../packages/experimental/AGENTS.md) state that experimental status does not relax engineering requirements, which that exemption contradicts.

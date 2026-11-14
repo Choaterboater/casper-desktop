@@ -5,8 +5,6 @@ description: "The Schedule model tools become `schedule_create`, `schedule_list`
 
 # Schedule tools manage every Host task by RRULE and target
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 Earlier, `@deepseek-ai/dsh-tool-schedule` registered `schedule_create`, `schedule_list`, `schedule_update`, and `schedule_delete`. They managed only the reminders of the calling Session, and `schedule_create` took one timing selector: `after_seconds`, `at`, `every_seconds`, `daily`, `weekly`, or `cron`.

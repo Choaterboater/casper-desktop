@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-12-exclusive-conversation-matches.zh.md)
-
 ## Problem
 
 Every event Definition matches each event independently, and a target may hold a generic Definition that presents a whole event family. When a business Definition presents one kind of that family itself, both Definitions match the same event and each builds a Context and a Node. Nothing let the business Definition say that the event belongs to it on that target.

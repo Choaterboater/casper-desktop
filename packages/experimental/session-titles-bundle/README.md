@@ -5,8 +5,6 @@ kind: "package-bundle"
 
 # @deepseek-ai/dsh-experimental-session-titles-bundle
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Generate experimental session titles from the conversation's eligible human prompts. This replaces the first-prompt title provider and applies across presets. It ships switched off in Web and Desktop. Select it in Plugins to enable it.

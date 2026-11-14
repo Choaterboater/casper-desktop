@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-19-profile-resolution-lookup-order.zh.md)
-
 ## Problem
 
 A profile loads plugins from its own package project. The dsh installation packages and the dependencies embedded in bundles are not on the profile's dependency tree, so Node's default `node_modules` lookup starting from the profile cannot find them.

@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-host-product-telemetry-otel
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Send selected product usage events to an OTLP/HTTP collector. Events carry a name, string summary, occurrence time, and scalar or one-level object attributes. Mounting the plugin collects nothing automatically; applications explicitly submit each event. Delivery is best effort and does not confirm warehouse ingestion.

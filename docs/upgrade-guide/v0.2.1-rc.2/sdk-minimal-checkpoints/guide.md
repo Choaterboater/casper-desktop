@@ -5,8 +5,6 @@ description: "The sdk-minimal profile now stops model and tool dispatch when ses
 
 # SDK-minimal requires durable checkpoints
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 The `sdk-minimal` profile enables `session-checkpoint-policy`. It waits for session history to flush before model requests, top-level tool execution, and agent steps. Previously these operations could proceed while JSONL writes were buffered; persistence errors could remain background warnings. A checkpoint failure now stops the dependent operation. First-use file-lock initialization is paid before the first model request, and checkpoint writes contribute to request latency. This does not change the Session format or guarantee that forced termination preserves the final unflushed response.

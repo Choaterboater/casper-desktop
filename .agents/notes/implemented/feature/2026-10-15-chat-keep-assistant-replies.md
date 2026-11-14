@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-15-chat-keep-assistant-replies.zh.md)
-
 ## Problem
 
 In Compact, Standard, and Detailed, a normally completed Turn folds as a whole. Under the previous rule the reader saw only the input, the whole-Turn control, the **final answer**, and the footer. The final answer is chosen by position: the last Assistant message in the latest Step that has visible reply content and no tool-call block (`latestAnswer` in [turn-process.ts](../../../../packages/client/ui-chat/src/client/conversation-nodes/turn-process.ts)). Every intermediate reply before it was hidden with the process.

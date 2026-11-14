@@ -5,8 +5,6 @@ description: "Persistent-terminal bundle controls leave the Plugins page; profil
 
 # Manage persistent terminals through profile configuration
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 Web and Desktop no longer show the persistent-terminal bundle in Plugins lists or detail pages, including for profiles that already enabled it. The package and existing activation remain intact. The minimal preset's own persistent shell is independent of this bundle.

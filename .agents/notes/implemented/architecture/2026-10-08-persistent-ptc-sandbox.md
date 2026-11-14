@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-08-persistent-ptc-sandbox.zh.md)
-
 ## Problem
 
 Retaining JavaScript variables does not require broader file access. A process that outlives one execution can also outlive a one-time approval or a Session policy change. File-policy changes must invalidate retained environments and begin stopping their file handles and background work.

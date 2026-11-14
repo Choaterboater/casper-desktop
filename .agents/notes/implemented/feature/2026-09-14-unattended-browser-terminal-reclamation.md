@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-14-unattended-browser-terminal-reclamation.zh.md)
-
 ## Problem
 
 A browser can disappear without closing its terminal tabs. Keeping every abandoned terminal retains shells, descendant processes and screen buffers indefinitely. Output subscriptions do not identify abandonment: hidden tabs and inactive Sessions legitimately stop following the screen.

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-04-session-open-performance-gate.zh.md)
-
 ## Problem
 
 The Session format v2 rollout changed two paths whose cost scales with model output: the JSONL backend migrates and publishes a released-v0 log, and the Client folds each settled reply's embedded compact stream. Neither path had an executable performance check, so first open grew from about 35 ms to about 5 s on a 127,400-event synthetic log (and from about 0.3 s to 26 s on a 575,000-chunk real log, with 2.7 GB peak RSS and heap exhaustion under a 512 MB limit), while Client fold grew linearly with streamed deltas instead of compact records; these regressions reached master unnoticed.
@@ -12,7 +10,7 @@ Measuring only `SessionPersistence.open()` does not stably describe the result f
 
 ## Decision
 
-Linux pull requests run a required `node 24 / benchmarks` job that executes `pnpm run check:ci:bench` → `scripts/run-ci-bench.ts`. Its disposable library build omits repeated TypeScript diagnostics under the [PR artifact build policy](../process/2026-10-05-pr-artifact-typechecks.md); required full builds retain them. The private `@deepseek-ai/dsh-benchmarks` workspace owns benchmark-only dependencies. The command first builds workspace libraries and dedicated workers under `benchmarks/.dsh-build/`, then invokes `vitest.bench.config.ts`. The [standard hosted runner reference](../../../../.github/upstream-workflows/ci.yml) owns runner selection and the outer job timeout. The job runs the benchmark lane alone; Vitest runs one file at a time and only prepares input, starts measurement children, aggregates results, and enforces budgets. Every timed Node CPU path executes compiled JavaScript under plain Node with `NODE_OPTIONS` removed and no TypeScript loader; bare workspace imports therefore resolve from `benchmarks/node_modules` through package exports to built `lib/` entries.
+Linux pull requests run a required `node 24 / benchmarks` job that executes `pnpm run check:ci:bench` → `scripts/run-ci-bench.ts`. Its disposable library build omits repeated TypeScript diagnostics under the [PR artifact build policy](../process/2026-10-05-pr-artifact-typechecks.md); required full builds retain them. The private `@deepseek-ai/dsh-benchmarks` workspace owns benchmark-only dependencies. The command first builds workspace libraries and dedicated workers under `benchmarks/.dsh-build/`, then invokes `vitest.bench.config.ts`. The standard hosted runner reference (`.github/upstream-workflows/ci.yml`) owns runner selection and the outer job timeout. The job runs the benchmark lane alone; Vitest runs one file at a time and only prepares input, starts measurement children, aggregates results, and enforces budgets. Every timed Node CPU path executes compiled JavaScript under plain Node with `NODE_OPTIONS` removed and no TypeScript loader; bare workspace imports therefore resolve from `benchmarks/node_modules` through package exports to built `lib/` entries.
 
 Required performance gates live under top-level `benchmarks/`, grouped by measured user path rather than package ownership. Host files use `*.bench.ts`, Client-face files use `*.bench.client.ts`, and scenario-specific workers and fixtures stay beside their benchmark without a benchmark suffix. Package-local `.perf.ts` files remain non-gating diagnostics; `scripts/` owns orchestration rather than benchmark cases.
 

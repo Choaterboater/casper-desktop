@@ -5,8 +5,6 @@ description: "Messages mock streams publish named SSE events for native SDK cons
 
 # Read named events from the Messages mock server
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 The next release makes `@deepseek-ai/dsh-llm-mock-server` emit the Messages event name beside each structured SSE payload. Native SDKs require these names to process message and content-block events. Consumers that accept only unnamed SSE messages must update their event handling. Scripted payloads, ordering, request capture, and chunk counts are unchanged; the deliberately malformed JSON behavior still sends its invalid data directly.

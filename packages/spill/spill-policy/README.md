@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-spill-policy
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Keep oversized text and image results within a shared estimated token budget. The model receives ordered head/tail content and a path to the complete result. Images remain in attachment storage; the result file records their readable paths. Omitting `maxInlineTokens` disables retention, and recovery failures leave the original content visible.

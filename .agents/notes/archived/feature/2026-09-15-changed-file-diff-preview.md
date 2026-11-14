@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-15-changed-file-diff-preview.zh.md)
-
 ## Problem
 
 The [changed-files card](2026-09-11-turn-changed-files-card.md) tells the user which files a turn changed and by how many lines, but not what changed. A row opened the file's current content in the Sidebar, or in a desktop application, which shows neither the turn's edit nor the state before it. Files git does not cover — ignored files, files outside the repository, and every file-tool edit in a working directory without a repository — had only the hunks the file tools persist with their results: partial context, counts summed over repeated edits, and no whole-file comparison at all.

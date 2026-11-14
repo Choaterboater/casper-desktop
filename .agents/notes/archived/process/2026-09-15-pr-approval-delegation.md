@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-15-pr-approval-delegation.zh.md)
-
 ## Problem
 
 A reviewer may trust another reviewer to decide a particular PR while retaining the score associated with their own repository role and code ownership. Counting both the original approval and transferred points would inflate that reviewer's contribution.

@@ -5,8 +5,6 @@ description: "Bundled NumPy and pandas omit their upstream test suites."
 
 # NumPy and pandas upstream tests require a separate environment
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 Desktop and Python SDK runtime distributions previously included NumPy and pandas test directories. Bundled distributions now omit those directories, so scripts importing their test modules or running their complete upstream suites need a separate installation. Data processing, Office authoring, `numpy.testing`, `pandas.testing`, and `pandas._testing` remain available.

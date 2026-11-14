@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-11-node-office-kit.zh.md)
-
 ## Problem
 
 Binary Office and OOXML files require document layout before they can be previewed. Conversion must stay on the device without opening an Office application or adding source bytes to a model conversation. Native engines need platform-specific distribution, while browser conversion duplicates font transport, worker ownership, and resource limits across the Host and Client.

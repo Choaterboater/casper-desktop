@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-client-ui-settings-shell
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Open **Plugins** in the sidebar and select **Shell** in the Official group to set how long one command may run and how much of each output stream stays in memory. The page stages what is typed and writes it only on save, marks the values the user overrode, and offers to reset each back to the deployment's default. The page exists while the Host serves the `shell` namespace, so a deployment without a local shell executor shows no trace of it.

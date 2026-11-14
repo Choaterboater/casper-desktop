@@ -4,8 +4,6 @@ description: "Desktop runs the Harness workspace in a native application. This r
 
 # Casper desktop app
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Desktop runs the Harness workspace in a native application. This reference covers application behavior, development and integration; the packaging, Windows signing and publication guides own build and release operations.

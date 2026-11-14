@@ -5,8 +5,6 @@ description: "Custom ApprovalService compositions must provide sessionProjection
 
 # Approval requires the Projection registry
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 `ApprovalService` requires `sessionProjections`. It waits for projection registration during activation instead of reading the event log when the registry is absent or pending. Custom compositions that mounted approval alone must add the registry. Shipped profiles already provide it.

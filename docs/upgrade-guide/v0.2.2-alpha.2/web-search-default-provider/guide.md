@@ -5,8 +5,6 @@ description: "The shipped Search default moves from legacy Messages search to th
 
 # Search defaults to the DeepSeek Search API; Exa and Perplexity are removed
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 Previously, the shared base composition set `web.searchProvider` to `deepseek-official`: each search was an auxiliary Messages request to `web-search-deepseek`'s endpoint, sending `Perform a web search for the query: <query>` to `deepseek-v4-flash` with a server-side `web_search` tool, billed as model tokens. Now it sets `deepseek-search-api`: each search is one direct request to the DeepSeek Search API, without a model request, and may incur Search API charges instead of model tokens. That request sends `query`, `count`, `need_content: false`, and, unless `web-deepseek-api.sendOriginalQuestion` is `false`, the user's latest prompt cut to 128 characters as `ori_question`. Its credential and endpoint follow the [DeepSeek model route](../web-search-credential-modes/guide.md). Compositions that set `web.searchProvider` themselves see no change, and Fetch still defaults to `http`.

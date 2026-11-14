@@ -5,8 +5,6 @@ Archived: 2026-09-30
 
 Superseded: the standalone seam described here was folded into `ctx.jobs` as the per-job observation record — see [jobs absorb the record](../architecture/2026-09-01-jobs-absorb-activity-record.md); the durable-vs-live analysis below still holds.
 
-English | [中文](2026-08-24-activity-observation-seam.zh.md)
-
 ## Problem
 
 Every incremental reader in the shell, terminal, and jobs layers is single-consumer and consuming: `ShellProcess.readOutput()`, `TerminalSendOperation.readOutput()`, and `JobRegistry.read()` all destroy the delta they return, because the owning model is the intended reader. The [web background-job display](2026-08-08-web-background-job-display.md) shipped the roster on those terms — its carrier is test-pinned to never call `ctx.jobs.read()`, since a browser read would silently steal bytes the model's `job_output` would never see — and explicitly deferred the output phase to "a separate non-consuming observation API". So a human watching the Web client saw that a background build was running but never a line of its output, and the `workflow/log` / `workflow/phase` events scripts are told to narrate with had no consumer at all.

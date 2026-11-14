@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-28-desktop-login-shell-environment.zh.md)
-
 ## Problem
 
 macOS Dock, Finder, and Linux desktop launches start Desktop with only the session manager's environment. Variables that users export from `~/.zprofile` or `~/.zshrc`, including PATH entries for Homebrew, version managers, and API keys, are absent from the Host, agent shells, terminals, and profile configuration. The same Host launched from a terminal sees them.

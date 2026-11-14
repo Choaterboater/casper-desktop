@@ -5,8 +5,6 @@ description: "Desktop starts new Sessions on the Casper preset, which runs the C
 
 # Desktop starts new Sessions on the Casper preset
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 Previously, the Desktop profile's preset registry defaulted to `standard`, so every new Session ran on the DeepSeek agent loop. Now the Desktop default is `casper`: a new Session runs the Casper agent through a `casper acp` process, started at its first prompt, and a Session's mode cannot switch between Casper and another preset once it exists (the mode picker starts a new Session instead). A default saved in the Agent presets settings page still wins, and existing Sessions keep the preset they recorded. Web and other profiles keep `standard`. Desktop runs the Casper engine it ships ([casper-bundled-engine](../casper-bundled-engine/guide.md)), so a Casper Session starts without a `casper` command on the computer.

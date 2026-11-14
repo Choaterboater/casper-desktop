@@ -5,7 +5,6 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { aggregateCheckArgs, buildHostContracts, buildLibraryArtifacts, compileReferencedProjects } from './compile-referenced-projects.ts'
-import { runCiBench } from './run-ci-bench.ts'
 import { removeFixtureSafely } from './test-fixture-cleanup.ts'
 import { setPublishedFiles, writeTypertWorkspace } from './typert-workspace.fixture.ts'
 
@@ -143,27 +142,6 @@ describe('internal artifact build order', () => {
     expect(() => { buildLibraryArtifacts(root, false) }).toThrow('exited with 7')
     expect(commands()).toHaveLength(1)
   })
-
-  it('defers benchmark diagnostics while normal artifact builds reject the same source', () => {
-    const { root, leaf } = fixture()
-    const commands = recordedCommands(root)
-    writeFileSync(join(leaf, 'src/index.ts'), 'export const value: number = "invalid"\n')
-
-    runCiBench(root)
-
-    expect(commands()).toEqual([
-      ['run', 'build:native-system'],
-      ['exec', 'tsdown', '--config-loader', 'native', '--env.DSH_BUILD_FACE', 'host'],
-      ['--filter', '@deepseek-ai/dsh-desktop', 'run', 'bundle'],
-      ['exec', 'tsdown', '--config-loader', 'native', '--env.DSH_BUILD_FACE', 'client'],
-      ['exec', 'tsdown', '--config-loader', 'native', '--config', 'benchmarks/tsdown.config.ts'],
-      ['run', 'build:web'],
-      ['run', 'test:bench:built'],
-    ].map(args => ({ args, title: 'Inherited Build Title' })))
-
-    expect(() => { buildLibraryArtifacts(root, false) }).toThrow('host compiler exited with')
-    expect(commands()).toHaveLength(7)
-  })
 })
 
 describe('bundle-free Host contracts', { timeout: 60_000 }, () => {
@@ -245,67 +223,6 @@ describe('package project compilation', () => {
     compileReferencedProjects(root, face)
 
     expect(artifacts(leaf)).toEqual(expected)
-  })
-
-  it.each(['host', 'client'] as const)('preserves %s runtime output during benchmark emission', (face) => {
-    const { root, leaf } = fixture()
-    writeFileSync(join(leaf, 'src/support.ts'), [
-      'export interface Payload { label: string }',
-      'export const enum Offset { Baseline = 40 }',
-      '',
-    ].join('\n'))
-    writeFileSync(join(leaf, 'src/index.ts'), [
-      'import { Offset, type Payload } from "./support.js"',
-      'export const value: number = Offset.Baseline + 2',
-      'export function describe(payload: Payload): string { return `${payload.label}: ${value}` }',
-      '',
-    ].join('\n'))
-    compileReferencedProjects(root, face)
-    const runtimeArtifacts = () => Object.fromEntries(Object.entries(artifacts(leaf))
-      .filter(([path]) => /\.js(?:\.map)?$/.test(path)))
-    const expected = runtimeArtifacts()
-    expect(Object.keys(expected)).toEqual([
-      'types/index.js', 'types/index.js.map', 'types/support.js', 'types/support.js.map',
-    ])
-    rmSync(join(leaf, 'lib'), { recursive: true })
-
-    compileReferencedProjects(root, face, 'benchmark-emit')
-
-    expect(runtimeArtifacts()).toEqual(expected)
-    const entrypoint = pathToFileURL(join(leaf, 'lib/types/index.js')).href
-    const result = spawnSync(process.execPath, [
-      '--input-type=module', '-e',
-      `import { describe } from ${JSON.stringify(entrypoint)}; console.log(describe({ label: 'answer' }))`,
-    ], { cwd: root, encoding: 'utf8' })
-    expect(result.error).toBeUndefined()
-    expect(result.signal).toBeNull()
-    expect(result.status, result.stderr).toBe(0)
-    expect(result.stdout.trim()).toBe('answer: 42')
-  })
-
-  it.each(['host', 'client'] as const)('rechecks %s semantic errors after benchmark emission without forcing a rebuild', (face) => {
-    const { root, leaf } = fixture()
-    writeFileSync(join(leaf, 'src/index.ts'), 'export const value: number = "invalid"\n')
-
-    compileReferencedProjects(root, face, 'benchmark-emit')
-
-    expect(Object.keys(artifacts(leaf)).some(path => path.endsWith('.tsbuildinfo'))).toBe(true)
-    const complete = spawnSync(process.execPath, [compiler, '-b', `tsconfig.${face}.json`], {
-      cwd: root,
-      encoding: 'utf8',
-    })
-    expect(complete.error).toBeUndefined()
-    expect(complete.signal).toBeNull()
-    expect(complete.status).not.toBe(0)
-    expect(complete.stdout).toContain('src/index.ts(1,14): error TS2322')
-  })
-
-  it('rejects package syntax errors during benchmark emission', () => {
-    const { root, leaf } = fixture()
-    writeFileSync(join(leaf, 'src/index.ts'), 'export const value = ;\n')
-
-    expect(() => { compileReferencedProjects(root, 'host', 'benchmark-emit') })
-      .toThrow('host compiler exited with')
   })
 
   it('keeps aggregate-only errors in the complete compiler check', () => {

@@ -5,8 +5,6 @@ description: "Team projection stops restoring historical teammates and mailbox s
 
 # Team projection retains tasks and mode
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 The `agentTeam` projection no longer restores `members`, `messages`, or `delivered` from historical `team/member` and `team/message/*` events. It ignores their payloads, so historical roster or mailbox validation failures no longer block task reads or writes. Historical teammates are not restored and queued mail is not delivered.

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-22-subagent-target-user-controls.zh.md)
-
 ## Problem
 
 A browser knows the subagent it is displaying, but requiring its direct creator and a continuable marker makes every control caller repeat history metadata. A caller-supplied parent id checks address consistency without establishing the caller's identity or permission. Calls that resolve only the global access resource also cannot express a grant on one target Session.

@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-experimental-forge-session
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 List the pull requests a Session is working on without a separate registry. A projection derives bindings from the Session's own `gh pr create`, `gh pr view`, `gh pr edit`, `gh pr checkout`, and `git push` shell results and from binding records. After each push, and when a caller such as the forge panel reports the branch a Session works on, the service looks up open change requests for that branch and records the unbound ones. Watching a Session polls its bound change requests through `ctx.forge`. The Session summary carries the bindings to clients.

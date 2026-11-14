@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-15-client-session-blank-reconciliation.zh.md)
-
 ## Problem
 
 A successful prompt response converts the Client's `New Session` row before a turn necessarily starts. A later `session.list` response can still report `blank: true` and undo that conversion. Reconnect triggers the same refresh. Keeping the conversion only inside a Session object also loses it when that object is replaced.

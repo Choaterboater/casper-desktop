@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-16-browser-excel-preview.zh.md)
-
 ## Problem
 
 PDF conversion loses spreadsheet navigation and the relationship between a formula and its saved value. Spreadsheet preview also needlessly depends on the Host Office engine when the browser can read the workbook.

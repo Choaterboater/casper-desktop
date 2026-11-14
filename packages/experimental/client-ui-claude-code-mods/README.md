@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-experimental-client-ui-claude-code-mods
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 This optional browser plugin draws the band a [Claude Code mod](../claude-code-mods/README.md) renders above the prompt. It mounts the bridge's `claudeCodeMods` Remote, watches each open session's band, and renders the serialized `Box`/`Text`/`Button` tree as a full-width entry above the composer card; clicking a button runs the mod's `onPress` on the Host and the band redraws. Without a mod that draws, nothing is shown.

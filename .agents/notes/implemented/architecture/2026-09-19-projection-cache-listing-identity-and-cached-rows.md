@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-19-projection-cache-listing-identity-and-cached-rows.zh.md)
-
 ## Problem
 
 After a Host process restart, every forked session (`SessionHeader.isSeeded === true`) shows no title in the sidebar session list, `@` reference completion shows only the session id, and list ordering degrades to creation time. Opening the session once restores all of it. On one development machine on 2026-09-19, 44 of 241 projcache records were seeded, all 44 carried a valid `title` row, and the list never read any of them.

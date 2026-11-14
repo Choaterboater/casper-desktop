@@ -2,8 +2,6 @@
 
 Status: proposed
 
-English | [中文](2026-09-17-defer-office-background-scheduling.zh.md)
-
 ## Problem
 
 The [conversion queue](../../../../packages/document/office-to-pdf/src/queue.ts) implements foreground promotion, demotion after reader cancellation, eviction of queued background work, a reserved foreground reader allowance, and separate background concurrency accounting. These mechanisms protect foreground conversion from speculative prewarming; ordinary conversion still needs the queue's general resource limits.

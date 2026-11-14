@@ -4,8 +4,6 @@ kind: "package-reference"
 ---
 # @deepseek-ai/dsh-client-ui-session
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Use this package to expose Session catalog, retain information, and unified UI status through standard Slot hooks. It materializes per-`SessionBinding` hooks and props, while `SessionProvider` can inherit an outer binding or bind an explicit `SessionReference`. It owns process-local pending-interaction and completion-reminder policy without owning Controller transport, history, or references.

@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-tool-schedule
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Use `dsh-tool-schedule` to let an agent create, list, view, update, and delete Host scheduled tasks through `schedule_create`, `schedule_list`, `schedule_view`, and `schedule_edit`. A scheduled task delivers its instruction to a target Session at each occurrence of its recurrence rule. The package registers the four tools in the preset or Agent scope that mounts it; `minimal` keeps none. Tasks belong to the Host: the tools read and change any task by id, and only the delivery target names a Session. The Host `@deepseek-ai/dsh-schedule` service owns storage, scheduling, and delivery. Failures return one structured error code.

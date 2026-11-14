@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-experimental-forge-github
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Read GitHub and GitHub Enterprise pull requests for `ctx.forge` with the GitHub CLI that is already signed in on the host. Each poll batches pull requests by host to read state, changed lines, checks, review decision, mergeability, and unresolved review threads for every due pull request.

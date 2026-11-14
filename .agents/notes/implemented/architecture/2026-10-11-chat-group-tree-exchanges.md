@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-11-chat-group-tree-exchanges.zh.md)
-
 ## Problem
 
 On next message folding kept only the last Turn of the loaded timeline expanded. A Turn woken by a notice (a settled subagent, goal round, schedule, or background job) is not submitted by this Client, yet its arrival made the preceding Turn historical and folded it. No own-input driver computed the exact remaining room for that fold, so the scroll layer reserved generic bottom space and a reader following the tail saw blank space. In the recorded Session the notice woke the next Turn 13–15 ms after the previous Turn ended; the minimal reproduction left 596 px blank that had not recovered after five seconds.

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-10-desktop-local-updater-qualification.zh.md)
-
 ## Problem
 
 Desktop update interaction depends on feed parsing, network failures, download integrity, and platform preparation. Simulated updater events cannot establish that these operations work together. Requiring cloud cache configuration and hardware signing for each feedback cycle makes local product validation depend on release infrastructure.

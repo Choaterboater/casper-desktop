@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-24-preparing-tool-arguments.zh.md)
-
 ## Problem
 
 [Three-stage tool calls](2026-09-22-tool-call-three-phases.md) make tool identity visible before `tool/call`. A raw argument prefix alone cannot supply field-aware presentation: write/edit need a complete path and decoded content length, while bash/run_code need the description before the command or program finishes streaming.
@@ -72,7 +70,7 @@ Third-party tools receive the same view without registration or a separate subsc
 - Negative controls restore read-time acknowledgement, repeated Match allocation, and short-text segmentation; four focused tests fail at their corresponding assertions and pass after restoration. Definitions retain independent State; Turn and Step records remain Session-owned.
 - Additional controls eagerly parse unread containers, accept same-length conflicting text, or rebuild Assistant State for parameter-only deltas. Each fails its owning assertion; the boundary-index implementation passes after restoration.
 
-The required [conversation-fold benchmark](../../../../benchmarks/conversation-fold/conversation-fold.bench.client.ts) drives the real Tool Definition, Assembler, Chat groups, and published write-row reads with 16-character fragments, flushing every 64 fragments. Three fresh compiled Node workers report all samples and their median; setup and forced GC are outside timing, and retained heap is measured with the Assembler and argument view still reachable. Row reads validate decoded progress and the file path; the worker also reports process peak RSS.
+The required conversation-fold benchmark (`benchmarks/conversation-fold/conversation-fold.bench.client.ts`) drives the real Tool Definition, Assembler, Chat groups, and published write-row reads with 16-character fragments, flushing every 64 fragments. Three fresh compiled Node workers report all samples and their median; setup and forced GC are outside timing, and retained heap is measured with the Assembler and argument view still reachable. Row reads validate decoded progress and the file path; the worker also reports process peak RSS.
 
 Local Chat-only measurements on 2026-09-29 compare the pre-feature baseline with the optimized implementation for 512 KiB write content and 32,769 body deltas. On Linux x64, AMD EPYC 7763, Node 24.18.0, median unprofiled processing time is 212.16 → 176.12 ms, cumulative allocation including collected objects is 132.06 → 76.65 MiB, and retained heap is 24.89 → 21.84 MiB. These measurements exclude model, network, browser rendering, and non-Chat targets; they do not establish whole-page or CI-runner latency.
 

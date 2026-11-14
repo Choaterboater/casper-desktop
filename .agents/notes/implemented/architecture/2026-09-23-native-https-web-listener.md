@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-23-native-https-web-listener.zh.md)
-
 ## Problem
 
 A directly reached Web listener needs to encrypt launch tokens and session cookies without requiring a separate reverse proxy. Advertising an HTTPS URL does not encrypt the listener or establish certificate trust.

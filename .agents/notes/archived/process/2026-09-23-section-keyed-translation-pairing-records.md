@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-23-section-keyed-translation-pairing-records.zh.md)
-
 ## Problem
 
 A consistency record held the full blob hash of each language file. Any edit to a pair changed both lines, so two branches that edited different parts of the same pair always conflicted on the record, even when Git merged both Markdown files cleanly. Generated references such as `docs/config-catalog.md`, `docs/module-graph.md`, and `docs/event-producer-consumer.md` were affected most: most PRs that touch packages, config, or events regenerate one of them, and each regeneration also required a hand-copied Chinese update and a new record. A worktree-local merge driver composed such records, but GitHub's mergeability check never runs it, so PRs still showed a conflict until someone merged the base locally and pushed.

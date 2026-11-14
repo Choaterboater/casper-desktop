@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-19-no-unknown-casts.zh.md)
-
 ## Problem
 
 An assertion through `unknown` removes TypeScript's compatibility check between the original value and a subsequent asserted type. Production code can hide an incorrect interface, and tests can claim that an incomplete fixture satisfies a service. Existing uses also include legitimate widening of untyped parser results, which can use explicit `unknown` declarations instead.

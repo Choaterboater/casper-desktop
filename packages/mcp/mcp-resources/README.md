@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-mcp-resources
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 `dsh-mcp-resources` lets the model discover and read documents from configured MCP servers. Shipped profiles make its three shared tools available automatically when a server is configured in the caller's scope. Each tool requires an explicit server name and reads content only when called. Resource text enters conversation history; binary payloads remain available to programmatic callers and appear as descriptions to the model.

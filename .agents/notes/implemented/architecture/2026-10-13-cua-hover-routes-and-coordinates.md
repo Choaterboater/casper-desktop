@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-13-cua-hover-routes-and-coordinates.zh.md)
-
 ## Problem
 
 Hover-only controls can sometimes be revealed without moving the user's pointer. Treating every hover as a system movement unnecessarily disturbs that pointer. Screenshot pixels also differ from native window points after Retina capture, attachment normalization or model-request resizing; making the model convert them duplicates provider geometry rules.

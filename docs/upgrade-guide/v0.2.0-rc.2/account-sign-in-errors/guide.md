@@ -5,8 +5,6 @@ description: "Account sign-in transport failures now report no-response instead 
 
 # Account sign-in error codes
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 `SignInErrorCode` adds `no-response`. Account state returned by `account/getState`, `account/startSignIn`, and `account/watch` reports this code when fetch fails before returning a Response, including request timeouts. These failures previously reported `network`. HTTP response errors still report `network`; authorization-attempt expiry still reports `expired`.

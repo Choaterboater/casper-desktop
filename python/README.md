@@ -1,7 +1,5 @@
 # Casper Python SDK
 
-English | [中文](README.zh.md)
-
 Python packages for driving Casper as a subprocess. The client SDK communicates with the bundled runtime over newline-delimited JSON-RPC on stdio.
 
 ## Packages

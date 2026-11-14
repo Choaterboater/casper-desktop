@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-sandbox-ssh
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 `dsh-sandbox-ssh` supplies `ctx.sandbox` for processes launched by the SSH subprocess provider. The remote host selects its installed local sandbox backend and applies each call’s policy there. Bash and Node receive the same backend’s enforcement level, denial signatures and runner-failure classification.

@@ -5,8 +5,6 @@ description: "AccountBonusNotification exposes unvalidated optional metadata and
 
 # Update account notification consumers
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 The public `AccountBonusNotification` returned by `DeepSeekAccount.getUnnotifiedBonuses()` and `account/getUnnotifiedBonuses` preserves `campaign`, `amount`, `currency`, and `grantedAt` as optional, unvalidated metadata typed as `JsonValue`. Notifications retain `orderId`, `message`, and `expiresAt`, and add an optional `title`. An empty `expiresAt` means the notification never expires. `orderId` accepts arbitrary strings rather than requiring UUIDs.

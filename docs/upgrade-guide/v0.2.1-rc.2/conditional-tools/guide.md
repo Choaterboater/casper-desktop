@@ -5,8 +5,6 @@ description: "Tool declarations come only from step-admitted registrations: `sys
 
 # Declare conditional tools through step admission
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 `ctx.tools.register(definition, { when })` adds a synchronous or asynchronous condition. AgentLoop resolves conditions once per proposed step with `{ agent, modelSelection, signal }`, before prompt assembly and `agent/pre-step`, and uses the resulting `ResolvedToolSet` for tool declarations, Native dispatch, PTC bindings, and nested calls in that step and its retries. A false condition removes the tool from all of them; a thrown condition ends the turn with `TOOL_ACTIVATION_FAILED`.

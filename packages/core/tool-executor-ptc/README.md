@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-tool-executor-ptc
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Use this executor when models should call tools through `run_code` programs. Mount a compatible PTC runtime and tool registry first. Scoped restrictions determine the generated SDK; only `run_code` is directly callable. Configure concurrency for parallel-safe program subcalls.

@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-client-ui-sidebar-documentpreview
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Preview files in the right Sidebar and choose among registered renderers. Markdown and code support paged text; PDF, HTML, common images, and spreadsheets receive complete bytes; unknown extensions use plain text. Word and PowerPoint documents convert locally to PDF; spreadsheets open in the browser. The tab provides file status, renderer selection, wrap, and automatic or manual reload. Plugins can add local opening controls to the header and unsupported-preview empty state.

@@ -5,8 +5,6 @@ description: "The Team mode slash command is removed; use the root conversation 
 
 # Select Team mode from the conversation menu
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 `/team on` and `/team off` are no longer registered. The root conversation’s **Use Agent Teams** switch calls `remote.agentTeams.setEnabled` directly. Saved selections, task retention, and root-only authorization are unchanged.

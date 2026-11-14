@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-22-deepseek-official-model-listing.zh.md)
-
 ## Problem
 
 The `deepseek-official` route offered whatever its `models` setting held, and that setting defaults to the catalog bundled with each build. A model the DeepSeek API added reached API-key users only through a release, while the account route already followed the service's `GET /models` listing at the same origin. Unlike the account route's catalog, the official route's catalog is user-editable: the Models page stores an edited catalog in `models`, and a gateway behind `baseURL` declares its models there.

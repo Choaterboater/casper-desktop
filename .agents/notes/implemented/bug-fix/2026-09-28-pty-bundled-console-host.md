@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-28-pty-bundled-console-host.zh.md)
-
 ## Problem
 
 The master `serial / windows (self-hosted standby)` drill has been red since 2026-09-15: its `test:coverage` gate fails on `packages/shell/tool-pwsh-persistent/tests/loader-composition.spec.ts`, either with `settleReasons` reporting one `stdin_read` among six `inferred_idle` settlements or with the case exhausting its 120 s budget. The same case passes in 5.3 s on the Blacksmith Windows image.

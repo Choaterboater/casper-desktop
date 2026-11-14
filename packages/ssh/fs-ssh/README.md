@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-fs-ssh
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 `dsh-fs-ssh` provides `ctx.fs` in the SSH helper’s filesystem. File tools read and mutate the same files that remote Bash, terminals, language servers and Node programs see. Remote canonicalization, version guards and atomic mutations use the local filesystem implementations installed beside the helper.

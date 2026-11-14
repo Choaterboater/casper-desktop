@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-22-input-echo-admission-ownership.zh.md)
-
 ## Problem
 
 An idle submission can appear first as a local Chat echo, then as an Inbox row in QueueDock, and finally as a durable user message. Inbox projection and conversation history arrive independently: retiring the echo on acceptance leaves a gap before admission, while a delayed Inbox projection can duplicate an already-admitted message. Separately, turn/start precedes user/message, so an empty progress title can appear before the echo and exchange positions with it when the real input arrives.

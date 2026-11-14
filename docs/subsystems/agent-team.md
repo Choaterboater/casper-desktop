@@ -1,7 +1,5 @@
 # Agent Teams
 
-English | [中文](agent-team.zh.md)
-
 Types shared by the shared task board, model tools, and host adapters. The [task-board wait decision](../../.agents/notes/implemented/architecture/2026-10-19-team-task-board-inbox.md) owns coordination semantics; this page records durable and client-visible forms from [`packages/team/agent-team/src/types.ts`](../../packages/team/agent-team/src/types.ts).
 
 ## Identity and historical roster

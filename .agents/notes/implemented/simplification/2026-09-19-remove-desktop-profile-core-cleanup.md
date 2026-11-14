@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-19-remove-desktop-profile-core-cleanup.zh.md)
-
 ## Problem
 
 Since 2026-09-15, production Desktop cleaned the profile before starting the Host, using the package names listed by the runtime descriptor: it deleted same-named entries under `$DSH_HOME/profiles/desktop/node_modules`, pruned the manifest's dependency declarations and pnpm overrides for those names, discarded the lockfile when package state changed, and removed development-time links once according to `desktop-runtime-state.json`. It targeted two kinds of residue: earlier Desktop builds had installed the core packages into the profile as local tarballs through pnpm, writing declarations, overrides, and a lockfile; and the development mode of the link backend had projected the installation closure into the same profile's `node_modules`. Under nearest-wins resolution those copies shadowed the runtime bundled with the application, combining an old Web frontend with new plugins.

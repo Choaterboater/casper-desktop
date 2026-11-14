@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-13-chat-single-fold-motion.zh.md)
-
 ## Problem
 
 When "When to Collapse Work Details" is "On next message", the previous exchange's process rows close when the next human input arrives. The scroll layer had two fold paths and chose one by `ownInput` ([use-chat-scroll.ts](../../../../packages/client/ui-chat/src/client/chat/use-chat-scroll.ts)):

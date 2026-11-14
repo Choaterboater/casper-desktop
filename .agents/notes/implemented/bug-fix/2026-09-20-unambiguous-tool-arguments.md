@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-20-unambiguous-tool-arguments.zh.md)
-
 ## Problem
 
 Models can populate optional fields that do not affect the requested operation. Rejecting these calls adds retries without protecting any state.

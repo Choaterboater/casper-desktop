@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-22-workspace-release-ranges.zh.md)
-
 ## Problem
 
 DSH packages share one product release. Cordis, its vendored libraries, and Node Addon System have independent releases; consumers need their patch updates without automatically accepting a new minor version.

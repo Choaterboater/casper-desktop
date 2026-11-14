@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-12-browser-use-provider-registration.zh.md)
-
 ## Problem
 
 Browser-control backends expose different operations and observation formats. A common browser action API would constrain those experiments before a portable consumer exists. Browser sessions can be isolated, while attaching an existing logged-in browser must preserve its state and prevent concurrent ownership inside a provider.

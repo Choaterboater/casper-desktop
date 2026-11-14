@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-18-chat-navigation-performance.zh.md)
-
 ## Problem
 
 A long Session makes three independent costs visible: a turn rail with one DOM mark per known turn, transcript navigation that rediscovers an already known landing, and historical jumps that publish every fetched page. Each intermediate prepend rebuilds growing conversation indexes and exposes another transcript update before the requested turn is available. Combining these concerns into one controller obscures which operations require DOM geometry and which only apply reading or paging policy.

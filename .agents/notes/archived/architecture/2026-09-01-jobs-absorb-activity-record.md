@@ -5,8 +5,6 @@ Archived: 2026-09-30
 
 Superseded: the record declaration (`JobStart.record`, `RecordingJob`, `readRecord`, `pumpJobOutput`) and the split wire (`SessionJob.record` on the session control stream, `ctx.jobOutput`) described below were consolidated into one output ring and direct operations on `ctx.jobs` — see [the jobs seam consolidation](2026-09-03-jobs-seam-consolidation.md). The argument for absorbing the standalone activity seam into `ctx.jobs` still holds.
 
-English | [中文](2026-09-01-jobs-absorb-activity-record.zh.md)
-
 ## Problem
 
 The [activity observation seam](../feature/2026-08-24-activity-observation-seam.md) shipped live output streaming as a second registry beside `ctx.jobs`: producers registered the same work twice (a job for lifecycle, an activity for observation), kept the two terminal states consistent by hand (`observeBackgroundActivity` waited for `proc.done` before mapping the outcome so a pump failure could not freeze a wrong terminal state), correlated the rows through `ActivityCorrelation.jobId`, and wrapped every observation call in registry-absent degradation branches. The Web client maintained two rosters (session-control `jobs` frames and the activity control stream) and joined them per row. Measured before the merge: eight pairing call sites, and one producer population — background bash/pwsh (both registries), PTY sends and subagent delegations (jobs only), foreground workflow (activity only).

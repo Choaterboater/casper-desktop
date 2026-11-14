@@ -5,8 +5,6 @@ description: "Subagent reasoning overrides require an explicit provider and mode
 
 # Subagent reasoning overrides require an explicit route
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 Delegation tools with model selection enabled reject `reasoning_effort` unless the same call supplies both `provider` and `model`. Previously, an effort-only call could use a configured or inherited route. The rejection occurs before child creation.

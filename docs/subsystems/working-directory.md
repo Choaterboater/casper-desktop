@@ -1,7 +1,5 @@
 # Working Directory
 
-English | [中文](working-directory.zh.md)
-
 A Session's active directory is owned by [`dsh-working-directory`](../../packages/session/working-directory/README.md). The immutable header identifies the original project; `working-directory/change` records the effective directory used by later directory-based operations. The generated [persistence catalog](../persistence-catalog.md) owns the event declaration.
 
 ## Directory selection

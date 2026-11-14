@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-13-context-breakdown-system-prompt-state.zh.md)
-
 ## Problem
 
 `contextBreakdown` kept one `{ seq, heuristicTokens, system }` entry per retained surface node so that any replacement could subtract the exact price of its range and re-select the last nonempty system prompt. Its checkpoint therefore grew with the number of messages in the model context. In a local corpus of 836 Sessions, 151,122 entries made the unit's rows 7.13 MB of the projection cache and up to 103 KB for one Session, and every cached Session listing validated all of them. Long tool-heavy runs below the compaction threshold kept about 2,000 entries each.

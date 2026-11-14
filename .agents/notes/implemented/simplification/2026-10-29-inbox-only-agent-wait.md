@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-29-inbox-only-agent-wait.zh.md)
-
 ## Problem
 
 A task-board commit changes shared state but does not deliver input to a member. Ending every member's wait on each edit couples ordinary subagent controls to Team coordination and makes callers resume without a message explaining what needs attention.

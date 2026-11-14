@@ -120,7 +120,6 @@ export const DESKTOP_SHIPPED_EXEMPTIONS: readonly Exemption[] = [
     evidence: "throw new Error('unexpected DeepSeek onboarding state')",
   },
   { rule: 'host', file: `${MODELS}/README.md`, match: 'api.deepseek.com', count: 1, reason: `the README describes the ${MODELS_UPSTREAM}` },
-  { rule: 'host', file: `${MODELS}/README.zh.md`, match: 'api.deepseek.com', count: 1, reason: `the README describes the ${MODELS_UPSTREAM}` },
   {
     rule: 'text',
     file: 'packages/client/ui-model-selection/src/client/locales.ts',
@@ -162,7 +161,6 @@ export const DESKTOP_SHIPPED_EXEMPTIONS: readonly Exemption[] = [
     evidence: "'providerDeepSeek",
   },
   { rule: 'host', file: 'packages/boot/plugin-manager/README.md', match: 'registry.npmmirror.com', count: 1, reason: NPM_MIRROR },
-  { rule: 'host', file: 'packages/boot/plugin-manager/README.zh.md', match: 'registry.npmmirror.com', count: 1, reason: NPM_MIRROR },
   {
     rule: 'host',
     file: 'packages/boot/plugin-manager/src/registry.ts',
@@ -180,7 +178,6 @@ export const DESKTOP_SHIPPED_EXEMPTIONS: readonly Exemption[] = [
     evidence: "'registry.npmmirror.com'",
   },
   { rule: 'host', file: 'packages/client/ui-plugin-manager/README.md', match: 'registry.npmmirror.com', count: 1, reason: NPM_MIRROR },
-  { rule: 'host', file: 'packages/client/ui-plugin-manager/README.zh.md', match: 'registry.npmmirror.com', count: 1, reason: NPM_MIRROR },
   {
     rule: 'host',
     file: 'packages/client/ui-plugin-manager/src/client/presentation.ts',

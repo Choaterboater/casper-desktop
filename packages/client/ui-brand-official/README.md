@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-client-ui-brand-official
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 This package gives an `official` client build the Casper mark and name in the sidebar. Other build profiles keep the shell's ghost mark and local-build label, while the conversation hero always uses the animated ghost. Choose it for deployments branded as Casper; deployments with another identity should provide a replacement brand package. It has no runtime state and does not affect model requests.

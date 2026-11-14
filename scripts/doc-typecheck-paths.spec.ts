@@ -2,9 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { builtDeclarationPath, isFrozenUpgradeGuidePath } from './doc-typecheck-paths.ts'
 
 describe('frozen upgrade-guide examples', () => {
-  it('excludes earlier release guides in both languages from current API compilation', () => {
+  it('excludes earlier release guides from current API compilation', () => {
     expect(isFrozenUpgradeGuidePath('docs/upgrade-guide/v0.2.1-alpha.1/subagent-activations/guide.md', '0.2.1-rc.2')).toBe(true)
-    expect(isFrozenUpgradeGuidePath('docs/upgrade-guide/v0.2.1-alpha.1/subagent-activations/guide.zh.md', '0.2.1-rc.2')).toBe(true)
   })
 
   it.each([

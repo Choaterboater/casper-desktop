@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-06-26-fsspec-style-fs-seam.zh.md)
-
 ## Problem
 
 The filesystem capability from [filesystem-capability-seam](../../archived/architecture/2026-06-17-filesystem-capability-seam.md) currently makes one abstract `FileSystem` service own two different jobs:

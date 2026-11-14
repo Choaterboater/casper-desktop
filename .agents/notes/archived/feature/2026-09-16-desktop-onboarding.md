@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-16-desktop-onboarding.zh.md)
-
 ## Problem
 
 Account users need an introduction to credit and display choices after native authentication. The native credential entry already has a separate startup responsibility; repeating browser onboarding or treating missing account data as a new user would couple presentation to authentication failures.

@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-web-fetch-http
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 With `dsh-web-fetch-http`, the harness can fetch HTTP(S) pages through the web service (`ctx.web`) and get their status code plus bounded, decoded content without sending credentials. Choose it when a composition needs retrieval with URL validation, same-origin redirects, byte and character caps, and an explicit product `User-Agent`. It returns non-2xx responses as results rather than errors, and rejects binary data and unsupported content types. It does not restrict destination addresses, so it reaches loopback and private-network hosts. The model-facing `web_fetch` tool lives in `dsh-tool-web`, which renders this provider's bodies.

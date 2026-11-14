@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-14-desktop-installed-update-journal.zh.md)
-
 ## Problem
 
 An installed update replaces application files and exits the process that observed the download. Terminal output alone cannot connect a failed transfer, explicit retry, installation authorization, and the next version's startup. Raw updater diagnostics can contain private URLs or credentials.

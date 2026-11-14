@@ -2,8 +2,6 @@
 
 Status: proposed
 
-English | [中文](2026-09-19-prune-stream-visibility-helpers.zh.md)
-
 ## Problem
 
 The [compact Assistant stream implementation](../../../../packages/llm/llm/src/assistant-stream.ts) exports five visibility queries: `isVisibleChunk`, `chunkHasVisibleText`, `runFirstVisibleTime`, `assistantStreamHasVisibleContent`, and `assistantStreamHasVisibleText`. Repository searches find no production caller outside that family. Its other consumers are the [unit tests](../../../../packages/llm/llm/tests/assistant-stream.spec.ts), package documentation, and the [record-reader reference](../../../../packages/llm/llm/README.md). The package root and published `./assistant-stream` entry expose the functions to external callers, whose usage this search cannot establish.

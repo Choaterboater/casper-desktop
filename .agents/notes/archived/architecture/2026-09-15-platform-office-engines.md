@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-15-platform-office-engines.zh.md)
-
 ## Problem
 
 Installing WASM beside a usable native engine adds a second LibreOffice payload to application downloads and installed resources. The original fallback policy in [independent kit ownership](2026-09-14-independent-libreoffice-kit.md) requires that extra payload even on fixed-platform Desktop and Python distributions.

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-14-web-document-relative-app-routes.zh.md)
-
 ## Problem
 
 Every browser reference to a shell-owned route was origin-root absolute: `/api/...` RPC, `/plugins/??...` plugin bundles, the Remote stream mux, the HMR event stream, and the launch entry's token-cleanup redirect to `/`. One listener served behind a prefix-stripping proxy (a mount such as `https://host/tools/dsh/` that forwards `/tools/dsh/...` as `/...`) therefore saw those requests at the origin root, where no route answers them: the shell, its plugin bundles, and its streams all missed. A single bundle has to serve both the origin root and any mount without a second build.

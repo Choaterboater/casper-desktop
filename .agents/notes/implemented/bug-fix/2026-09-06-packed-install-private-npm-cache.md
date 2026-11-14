@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-06-packed-install-private-npm-cache.zh.md)
-
 ## Problem
 
 The [packed-install verifier](../../../../scripts/release/verify-packed-install.ts) removes its temporary consumer but an npm install using the ambient cache leaves tarball content and logs outside that cleanup. Repeated release rehearsals can therefore grow the shared runner user cache even when every consumer is removed. A full root filesystem can fail unrelated CI jobs.

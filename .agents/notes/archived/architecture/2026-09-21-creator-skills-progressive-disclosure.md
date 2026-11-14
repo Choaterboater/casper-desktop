@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-21-creator-skills-progressive-disclosure.zh.md)
-
 ## Problem
 
 The shipped `cordis-plugin-development` skill carried three mutually exclusive recipes and a verification checklist in one 8.7 KB file, above the 8192-character threshold at which the standard preset's tool-result pruner keeps only the head and tail. Both creator skills forbade reading DSH package sources, which made the skill text the only knowledge source and left the agent guessing whenever it did not cover a case. The skills also addressed the profile as `$DSH_HOME/profiles/<profile>`, a name the agent's shell never received.

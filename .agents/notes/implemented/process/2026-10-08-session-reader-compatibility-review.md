@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-08-session-reader-compatibility-review.zh.md)
-
 ## Problem
 
 A structural schema difference does not establish that a Session needs a new integer version. An optional environment header field illustrates the cost: sessions that omit the feature can retain identical logs, while sessions that require it can be refused by older readers. A global bump also excludes feature-free sessions and requires a new generation and adjacent migration. Conversely, an unknown field or value does not establish safe refusal: permissive readers can ignore required meaning, and recovery can mistake unsupported records for damaged tails.

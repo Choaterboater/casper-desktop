@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-22-chat-scroll-follow-and-footer-geometry.zh.md)
-
 ## Problem
 
 Transcript overflow must remain clipped without trapping floating controls or changing the scroll ancestor of sticky content. An `overflow-y: hidden` ancestor becomes the nearest scroll container even when readers scroll a different outer element. It prevents Markdown code banners and expanded compaction headers from sticking to the visible conversation scrollport; floating controls inside that ancestor also use transcript geometry instead of viewport geometry.

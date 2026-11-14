@@ -4,8 +4,6 @@ description: "Task-board changes no longer end wait_agent calls; send a message 
 ---
 # Agent waits require inbox input
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 `wait_agent` waits only for the calling Agent's next-step inbox. Task creation, assignment, completion, and other task updates no longer end an active wait. They do not add inbox messages or start idle Agents. Queued next-turn input and other Agents' status changes also leave the wait pending.

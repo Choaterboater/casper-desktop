@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-experimental-tool-subagent-oar
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Use one `subagent_oar` tool to choose a configured external agent for each standalone text task. Configuration fixes the available runtime aliases and their providers; the model selects an alias without changing native arguments or permissions. Each task uses independent context and returns a child id, with a later completion notice delivered to the parent.

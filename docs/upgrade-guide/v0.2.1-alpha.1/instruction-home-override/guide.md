@@ -5,8 +5,6 @@ description: "The `agent-instructions` row no longer accepts `dshHome`; instruct
 
 # Instruction loading resolves one harness home
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 `@deepseek-ai/dsh-agent-instructions` removed its `dshHome` config field. The plugin resolves the harness home through `resolveDshHome()` from `@deepseek-ai/dsh-home-paths`, like every other harness consumer: the home is `$DSH_HOME` when it is set and non-blank, otherwise `~/.dsh`, with tilde expansion.

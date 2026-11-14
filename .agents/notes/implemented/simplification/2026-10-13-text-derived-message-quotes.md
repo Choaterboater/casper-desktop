@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-13-text-derived-message-quotes.zh.md)
-
 ## Problem
 
 Quote-only content indexes duplicate information in Markdown text and require coordinated prompt, source, echo, and queue metadata. The same visible blockquote can acquire different presentation and direct-input behavior depending on how it was created.

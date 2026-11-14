@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-18-account-quota-top-up.zh.md)
-
 ## Problem
 
 A provider quota failure can mean an exhausted first-party account balance, an API-key account problem, or a custom gateway response. All require a useful explanation, but only the first case can be repaired by opening the signed-in user's embedded DeepSeek recharge page. Inferring that case from provider prose or current UI configuration would make historical failures unstable and could expose an irrelevant billing action.

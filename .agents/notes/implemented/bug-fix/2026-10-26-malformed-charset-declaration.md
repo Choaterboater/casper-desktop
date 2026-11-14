@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-26-malformed-charset-declaration.zh.md)
-
 ## Problem
 
 A response can declare `charset=utf-8,gbk` over readable UTF-8 HTML. Passing that entire parameter to `TextDecoder` rejects the page before reading it. Compatibility needs an explicit encoding preference because successful decoding alone cannot identify the server's intended encoding.

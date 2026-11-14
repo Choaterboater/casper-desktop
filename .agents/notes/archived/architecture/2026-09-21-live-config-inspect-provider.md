@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-21-live-config-inspect-provider.zh.md)
-
 ## Problem
 
 Creator mode agents write `config:` rows for installed plugins without any runtime source of Config schemas. The CLI `--dump-config-schema` reference is not reachable from the running session, and the `Builtin` Host inspect provider advertised sandbox symbols for a dynamic Host half the model can no longer define.

@@ -5,8 +5,6 @@ description: "Timer wrappers return void in TypeScript and ignore calls after di
 
 # Timer wrapper return types and disposal
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 The functions returned by `ctx.throttle()` and `ctx.debounce()` now declare a `void` return type. They previously inherited the callback's return type, although they already returned `undefined` at runtime. TypeScript code that uses the wrapper's return value or assigns it to the callback's type may need updating. Host and browser use the same `TimerService` implementation.

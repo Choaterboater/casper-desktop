@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-16-desktop-release-version-derivation.zh.md)
-
 ## Problem
 
 Replacing a dsh prerelease identifier with the update channel name loses the base release identity and changes SemVer ordering. A date alone cannot distinguish multiple test builds of the same base.

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-21-desktop-page-close-shortcuts.zh.md)
-
 ## Problem
 
 The [shortcut PRD](https://trtgsjkv6r.feishu.cn/wiki/APvtwgbztiBLzvk9DM4cQbccnhf) gives the close command two targets: the focused right-sidebar page, or the Desktop window when no page can close. Electron's native close role bypasses the page owner. On Windows, closing the last window also quits the Desktop instance and stops its Host tasks, so this fallback is a lifecycle choice rather than a menu-label change.

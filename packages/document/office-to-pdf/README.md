@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-office-to-pdf
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Convert Office documents to PDFs on the Host computer. Targets with a declared native LibreOffice engine use it; other targets use Node WASM. The provider accepts DOC, DOCX, XLS, XLSX, PPT, and PPTX. OOXML conversion returns missing-font names; binary Office conversion returns an empty list.

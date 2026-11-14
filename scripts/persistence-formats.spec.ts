@@ -79,7 +79,7 @@ function saveReference(root: string, version: number, currentVersion: number, sn
     `# Session format v${version}`, '', `[Inventory](${schemaName})`, '', '| Root | Kind | SHA-256 |', '|---|---|---|',
     ...snapshot.roots.map(root => `| \`${root.key}\` | ${root.kind} | \`${root.digest}\` |`), '',
   ]
-  for (const suffix of ['.md', '.zh.md']) write(root, `docs/${filename}${suffix}`, lines.join('\n'))
+  write(root, `docs/${filename}.md`, lines.join('\n'))
   replaceSnapshot(root, version, currentVersion, snapshot)
 }
 
@@ -99,20 +99,16 @@ function edit(root: string, path: string, from: string, to: string): void {
   write(root, path, source.replace(from, to))
 }
 
-function editPair(root: string, version: number, from: string, to: string): void {
-  for (const suffix of ['.md', '.zh.md']) edit(root, `docs/persistence-changes/historical-formats/v${version}${suffix}`, from, to)
+function editReference(root: string, version: number, from: string, to: string): void {
+  edit(root, `docs/persistence-changes/historical-formats/v${version}.md`, from, to)
 }
 
 function prepareFacts(root: string, currentVersion = 3): void {
-  for (const suffix of ['.md', '.zh.md']) {
-    for (let version = 0; version < currentVersion; version += 1) {
-      const path = `docs/persistence-changes/historical-formats/v${version}${suffix}`
-      const switcher = suffix === '.md' ? `English | [中文](v${version}.zh.md)` : `[English](v${version}.md) | 中文`
-      write(root, path, readFileSync(join(root, path), 'utf8') + `\n${switcher}\n\n<!-- persistence-format-schema:start -->\n\nPending schemas.\n\n<!-- persistence-format-schema:end -->\n`)
-    }
-    const switcher = suffix === '.md' ? 'English | [中文](README.zh.md)' : '[English](README.md) | 中文'
-    write(root, `docs/persistence-changes/historical-formats/README${suffix}`, `# Session formats\n\n${switcher}\n\nAuthored context.\n\n<!-- persistence-format-index:start -->\n\nPending formats.\n\n<!-- persistence-format-index:end -->\n`)
+  for (let version = 0; version < currentVersion; version += 1) {
+    const path = `docs/persistence-changes/historical-formats/v${version}.md`
+    write(root, path, readFileSync(join(root, path), 'utf8') + '\n<!-- persistence-format-schema:start -->\n\nPending schemas.\n\n<!-- persistence-format-schema:end -->\n')
   }
+  write(root, 'docs/persistence-changes/historical-formats/README.md', '# Session formats\n\nAuthored context.\n\n<!-- persistence-format-index:start -->\n\nPending formats.\n\n<!-- persistence-format-index:end -->\n')
 }
 
 describe('archive current persistence format', () => {
@@ -195,9 +191,9 @@ describe('archive current persistence format', () => {
 })
 
 describe('complete persistence format references', () => {
-  it.each(['.md', '.zh.md'])('rejects source coordinates in authored format evidence in %s', (suffix) => {
+  it('rejects source coordinates in authored format evidence', () => {
     const root = fixture()
-    const path = `docs/persistence-changes/historical-formats/v1${suffix}`
+    const path = 'docs/persistence-changes/historical-formats/v1.md'
     const original = readFileSync(join(root, path), 'utf8')
     for (const position of [':36', ':36:2', '#L36', '#L36-L38']) {
       write(root, path, original + `\nSource: \`packages/core/session/src/types.ts${position}\`.\n`)
@@ -223,7 +219,7 @@ describe('complete persistence format references', () => {
     expect(loadPersistenceFormats(root).entries).toHaveLength(1)
   })
 
-  it.each(['.md', '.zh.md', '.schema.json'])('requires every historical companion %s', (suffix) => {
+  it.each(['.md', '.schema.json'])('requires every historical companion %s', (suffix) => {
     const root = fixture()
     rmSync(join(root, `docs/persistence-changes/historical-formats/v1${suffix}`))
     expect(() => loadPersistenceFormats(root)).toThrow(`missing persistence format artifact v1${suffix}`)
@@ -231,11 +227,11 @@ describe('complete persistence format references', () => {
 
   it('rejects a gap even when all remaining versions have complete companions', () => {
     const root = fixture()
-    for (const suffix of ['.md', '.zh.md', '.schema.json']) rmSync(join(root, `docs/persistence-changes/historical-formats/v1${suffix}`))
+    for (const suffix of ['.md', '.schema.json']) rmSync(join(root, `docs/persistence-changes/historical-formats/v1${suffix}`))
     expect(() => loadPersistenceFormats(root)).toThrow('v1: missing persistence format artifact')
   })
 
-  it.each(['persistence-catalog.md', 'persistence-catalog.zh.md', 'persistence-schema.json'])('requires the current reference artifact %s', (filename) => {
+  it.each(['persistence-catalog.md', 'persistence-schema.json'])('requires the current reference artifact %s', (filename) => {
     const root = fixture()
     rmSync(join(root, `docs/${filename}`))
     expect(() => loadPersistenceFormats(root)).toThrow(`missing persistence format artifact docs/${filename}`)
@@ -250,16 +246,10 @@ describe('complete persistence format references', () => {
     expect(loadPersistenceFormats(root).entries.map(entry => entry.version)).toEqual([0, 1, 2, 3, 4])
   })
 
-  it.each(['v3.md', 'v9.schema.json', 'v01.md', 'v-1.md', 'v2.schema.yaml', 'v3.i18n.yaml'])('rejects unexpected or duplicate format filename %s', (filename) => {
+  it.each(['v3.md', 'v9.schema.json', 'v01.md', 'v-1.md', 'v2.schema.yaml'])('rejects unexpected or duplicate format filename %s', (filename) => {
     const root = fixture()
     write(root, `docs/persistence-changes/historical-formats/${filename}`, '{}')
     expect(() => loadPersistenceFormats(root)).toThrow(`unexpected persistence format artifact ${filename}`)
-  })
-
-  it('rejects bilingual declarations that differ', () => {
-    const root = fixture()
-    edit(root, 'docs/persistence-changes/historical-formats/v1.zh.md', 'pullRequest: 3349', 'pullRequest: 3397')
-    expect(() => loadPersistenceFormats(root)).toThrow('bilingual machine records differ')
   })
 
   it.each([
@@ -274,13 +264,13 @@ describe('complete persistence format references', () => {
     ['schemaVersion: 1', 'schemaVersion: 1\nunknown: true', 'expected fields'],
   ])('rejects inconsistent machine data: %s', (from, to, error) => {
     const root = fixture()
-    editPair(root, 1, from, to)
+    editReference(root, 1, from, to)
     expect(() => loadPersistenceFormats(root)).toThrow(error)
   })
 
   it('rejects a source tag outside the DSH release namespace', () => {
     const root = fixture()
-    editPair(root, 0, 'tag: dsh-v0.1.0-rc.5', 'tag: latest')
+    editReference(root, 0, 'tag: dsh-v0.1.0-rc.5', 'tag: latest')
     expect(() => loadPersistenceFormats(root)).toThrow('invalid source tag')
   })
 
@@ -290,7 +280,7 @@ describe('complete persistence format references', () => {
     const from = variant === 'extra' ? 'roots:\n' : `  SessionHeader: ${digest}\n`
     const to = variant === 'missing' ? '' : variant === 'extra' ? `roots:\n  event:undeclared: ${'f'.repeat(64)}\n`
       : `  SessionHeader: ${'f'.repeat(64)}\n`
-    editPair(root, 1, from, to)
+    editReference(root, 1, from, to)
     expect(() => loadPersistenceFormats(root)).toThrow('recorded roots do not match the complete schema inventory')
   })
 
@@ -301,18 +291,16 @@ describe('complete persistence format references', () => {
       : `  SessionHeader: ${digest}\n`
     const to = variant === 'unknown-key' ? `  unknown: ${digest}\n` : variant === 'invalid-digest' ? '  SessionHeader: invalid\n'
       : variant === 'duplicate-key' ? from + from : 'roots: []\n'
-    editPair(root, 1, from, to)
+    editReference(root, 1, from, to)
     expect(() => loadPersistenceFormats(root)).toThrow(variant === 'duplicate-key' ? 'duplicated mapping key'
       : variant === 'not-a-mapping' ? 'roots must be a mapping' : 'invalid recorded root')
   })
 
   it.each(['missing', 'duplicate'])('rejects a %s machine block', (variant) => {
     const root = fixture()
-    for (const suffix of ['.md', '.zh.md']) {
-      const path = `docs/persistence-changes/historical-formats/v1${suffix}`
-      const text = readFileSync(join(root, path), 'utf8')
-      write(root, path, variant === 'missing' ? text.replace('```yaml persistence-format', '```yaml') : text + '\n```yaml persistence-format\n{}\n```\n')
-    }
+    const path = 'docs/persistence-changes/historical-formats/v1.md'
+    const text = readFileSync(join(root, path), 'utf8')
+    write(root, path, variant === 'missing' ? text.replace('```yaml persistence-format', '```yaml') : text + '\n```yaml persistence-format\n{}\n```\n')
     expect(() => loadPersistenceFormats(root)).toThrow('expected exactly one persistence-format machine record')
   })
 
@@ -394,16 +382,16 @@ describe('complete persistence format references', () => {
     expect(() => loadPersistenceFormats(root)).toThrow(variant === 'duplicate-root' ? 'duplicate schema root' : variant === 'invalid-digest' ? 'schema digest mismatch' : variant === 'invalid-graph' ? 'unknown schema node' : 'unknown field extra')
   })
 
-  it.each(['persistence-changes/historical-formats/v1.md', 'persistence-changes/historical-formats/v1.zh.md', 'persistence-catalog.md', 'persistence-catalog.zh.md'])('requires the matching schema link in %s', (document) => {
+  it.each(['persistence-changes/historical-formats/v1.md', 'persistence-catalog.md'])('requires the matching schema link in %s', (document) => {
     const root = fixture()
     const schema = document.startsWith('persistence-changes/historical-formats/') ? 'v1.schema.json' : 'persistence-schema.json'
     edit(root, `docs/${document}`, `](${schema})`, '](wrong.schema.json)')
     expect(() => loadPersistenceFormats(root)).toThrow(`missing link to ${schema}`)
   })
 
-  it.each(['persistence-catalog.md', 'persistence-catalog.zh.md'])('rejects a placeholder current catalog in %s', (document) => {
+  it('rejects a placeholder current catalog', () => {
     const root = fixture()
-    write(root, `docs/${document}`, '# Placeholder\n\n[Inventory](persistence-schema.json)\n')
+    write(root, 'docs/persistence-catalog.md', '# Placeholder\n\n[Inventory](persistence-schema.json)\n')
     expect(() => loadPersistenceFormats(root)).toThrow('missing schema index entry for SessionHeader')
   })
 
@@ -420,19 +408,16 @@ describe('complete persistence format references', () => {
     expect(index).toContain('Authored context.')
     expect(index).toContain('[V1](v1.md) | [JSON](v1.schema.json)')
     expect(index).toContain('[Current catalog](../../persistence-catalog.md) | [JSON](../../persistence-schema.json)')
-    const translatedIndex = readFileSync(join(root, 'docs/persistence-changes/historical-formats/README.zh.md'), 'utf8')
-    expect(translatedIndex).toContain('[V1](v1.zh.md) | [JSON](v1.schema.json)')
-    expect(translatedIndex).toContain('[当前目录](../../persistence-catalog.zh.md) | [JSON](../../persistence-schema.json)')
-    const english = readFileSync(join(root, 'docs/persistence-changes/historical-formats/v1.md'), 'utf8')
-    expect(english).toContain('pullRequest: 3349')
-    const [visible, collapsed] = english.split('<details>')
+    const reference = readFileSync(join(root, 'docs/persistence-changes/historical-formats/v1.md'), 'utf8')
+    expect(reference).toContain('pullRequest: 3349')
+    const [visible, collapsed] = reference.split('<details>')
     expect(visible).toContain('\n## Complete schemas\n')
     expect(visible).toContain('\n### Persistence type fingerprints\n')
     expect(collapsed).toContain('\n### Resolved persistence types\n')
     expect(collapsed).toContain('\n#### `SessionHeader`\n')
-    expect(english.match(/^## /gmu)).toHaveLength(1)
-    expect(english.match(/^### /gmu)).toHaveLength(2)
-    expect(english.match(/^#### /gmu)).toHaveLength(inventory(1).types.length)
+    expect(reference.match(/^## /gmu)).toHaveLength(1)
+    expect(reference.match(/^### /gmu)).toHaveLength(2)
+    expect(reference.match(/^#### /gmu)).toHaveLength(inventory(1).types.length)
     edit(root, 'docs/persistence-changes/historical-formats/v1.md', '<summary>Complete resolved types</summary>', '<summary>Missing definitions</summary>')
     expect(() => runPersistenceFormats([], root)).toThrow('Stale persistence format facts')
   })
@@ -442,18 +427,6 @@ describe('complete persistence format references', () => {
     prepareFacts(root, 0)
     runPersistenceFormats(['--write'], root)
     expect(runPersistenceFormats([], root)).toBe('Persistence formats: v0 through v0 verified (1 complete reference).')
-  })
-
-  it.each(['missing', 'stale'])('rejects a %s format pairing record and refreshes it with --write', (variant) => {
-    const root = fixture()
-    prepareFacts(root)
-    runPersistenceFormats(['--write'], root)
-    const sidecar = 'docs/persistence-changes/historical-formats/v1.i18n.yaml'
-    if (variant === 'missing') rmSync(join(root, sidecar))
-    else write(root, sidecar, 'schemaVersion: 1\n')
-    expect(() => runPersistenceFormats([], root)).toThrow(`Stale persistence format facts: ${sidecar}`)
-    runPersistenceFormats(['--write'], root)
-    expect(() => runPersistenceFormats([], root)).not.toThrow()
   })
 
   it('refuses to refresh facts until every format reference passes validation', () => {

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-17-process-local-blank-sessions.zh.md)
-
 ## Problem
 
 Two Hosts sharing Session storage can select the same blank Session when opening a Workspace. A blank Session already owns a live Agent, accepts slash commands, and can hold its writer lock after the creation checkpoint. An unowned persisted blank also carries command settings that remain useful after a Host restart.

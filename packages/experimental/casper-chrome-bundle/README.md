@@ -5,8 +5,6 @@ kind: "package-bundle"
 
 # @deepseek-ai/dsh-casper-chrome-bundle
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Let Casper browse and act in your own Google Chrome, with your tabs and signed-in sites. The bundle mounts the browser-use registry and the [Playwright MCP provider](../browser-use-playwright-mcp/README.md) in extension mode, which connects through the Playwright Extension instead of launching a separate browser. It ships switched off in Web and Desktop. Select **Casper in Chrome** in Plugins to enable it.

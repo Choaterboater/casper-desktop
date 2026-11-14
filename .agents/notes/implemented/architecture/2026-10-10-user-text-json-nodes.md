@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](<2026-10-10-user-text-json-nodes.zh.md>)
-
 ## Problem
 
 User text contains references owned by independent businesses. Recognition must follow original-text positions, resolve collisions deterministically, and reuse unaffected matching work when Facts change. The evaluator must expose its scheduling behavior to pure logic tests without depending on React, browser timing, or elapsed-time benchmarks.

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-16-experimental-voice-input.zh.md)
-
 ## Problem
 
 Dictation must preserve user control over when a coding task starts. Local recognition brings model files, a native runtime and CPU work; merely installing or enabling a UI contribution must not allocate these resources. Later cloud providers need a selection mechanism that does not silently change where recordings are processed.

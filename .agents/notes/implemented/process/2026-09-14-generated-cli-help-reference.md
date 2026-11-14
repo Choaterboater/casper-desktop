@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-14-generated-cli-help-reference.zh.md)
-
 ## Problem
 
 Launcher flags, profile options, and nested commands have separate owners. A manually maintained command reference can omit subcommands or retain obsolete defaults.

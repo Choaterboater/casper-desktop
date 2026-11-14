@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-09-parallel-macos-notarization.zh.md)
-
 ## Problem
 
 The Desktop release distributes a DMG for installation and a ZIP for updates. Waiting for App notarization before creating the DMG serializes two Apple submissions. A proxy improves upload throughput but does not overlap the independent service waits. Stapling modifies the App, so concurrent notarization and packaging cannot safely share that writable directory.

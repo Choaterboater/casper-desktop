@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-05-anonymous-reasoning-translation.zh.md)
-
 ## Problem
 
 Readers need reasoning in their chosen language without another model credential or replacement of the original assistant output. Translation needs an owner for external requests, cancellation, and failures independent of Agent execution.

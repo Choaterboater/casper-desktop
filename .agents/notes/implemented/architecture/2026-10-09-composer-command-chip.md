@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-09-composer-command-chip.zh.md)
-
 ## Problem
 
 The [Lexical composer decision](../../archived/architecture/2026-08-20-web-composer-lexical-editor.md) kept a claimed command as literal leading text. A TextNode transform styled the token and split typed overflow back out of it, and the submit machine held the claim while the draft string started with the token. Every edit at the token boundary ran through that transform. Lexical merges same-style neighbours before the overflow node's own transform runs, so the split and the merge looped until Lexical aborted the update with error #14 and the DOM diverged from the editor state (issue #4490). PR #5480 cleared the copied style for the reported gesture; pasting an image after a claim and IME composition reach the same transform and remained unverified. The plain-text reference entity also needed a precedence rule to leave the claimed token alone.

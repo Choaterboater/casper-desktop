@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-plugin-recommendations
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Users can discover a relevant built-in plugin while discussing a concrete need or asking how to do something in DSH. The Agent answers first, then offers one card at the completed Turn’s end; the user can open its plugin details, choose Enable, or choose Not now. Enabling changes the whole profile and persists across restarts. The Agent learns the result with the next request; clicking starts no model turn. Users can later disable or remove the plugin from its details page.

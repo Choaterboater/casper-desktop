@@ -26,7 +26,6 @@ description: Use when reviewing a pull request in the deepseek-harness repo — 
 - [dsh-session-projection](../dsh-session-projection/SKILL.md): projection ownership, state size, historical reads, and migrations.
 - [docs/testing.md](../../../docs/testing.md) and the [quality-gates reference](../../../docs/testing.md): required test tiers and gates.
 - [Agent Notes](../../notes/README.md): design rationale. Treat disagreement with an Agent Note as a design discussion, not an automatic veto.
-- For bilingual changes, read [translation-rules.md](../../../docs/i18n/translation-rules.md) and [terminology.md](../../../docs/i18n/terminology.md); the extended translation skill is outside automatic review and runs only on explicit user invocation.
 
 ## Blocking requirements
 

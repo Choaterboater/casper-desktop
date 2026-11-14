@@ -5,8 +5,6 @@ description: "JSONL persistence uses a namespace plugin import; direct service-c
 
 # Mount JSONL persistence through its plugin
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 `@deepseek-ai/dsh-session-persistence-jsonl` exports a function plugin through named `name`, `Config`, and `apply` exports, with no default export. Default imports, direct construction, subclassing, `instanceof`, and class type annotations are affected. The plugin retains listeners and handles through the consumer unloads triggered by removing this provider; concurrent root disposal remains unordered. The `sessionPersistence` service API, YAML configuration, and stored files remain unchanged.

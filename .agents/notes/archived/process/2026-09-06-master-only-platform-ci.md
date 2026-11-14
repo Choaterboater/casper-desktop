@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-06-master-only-platform-ci.zh.md)
-
 ## Problem
 
 Python runtime builds on macOS Intel and ARM and Linux ARM64, plus Windows build/site checks through Wine, consume paid hosted capacity on each pull-request revision. Native Linux and Windows x64 already provide required executable and installed-wheel evidence, and native Windows checks cover the build and process behavior before merge.

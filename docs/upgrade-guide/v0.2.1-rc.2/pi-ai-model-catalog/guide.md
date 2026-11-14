@@ -5,8 +5,6 @@ description: "The pi-ai 1.3.0 catalog removes model IDs and lowers some model ca
 
 # pi-ai 1.3.0 model catalog changes
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 The pi-ai dependency changes from 1.1.0 to 1.3.0. These chat model IDs leave the catalog. Stored `modelOverrides` report missing-catalog diagnostics; new overrides are rejected. Explicit `models` entries lose their catalog defaults.

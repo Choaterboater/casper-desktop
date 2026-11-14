@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-14-desktop-primary-runtime.zh.md)
-
 ## Problem
 
 Desktop agents need predictable Python data-processing libraries and an independent Node interpreter on machines without development environments. System interpreter selection must remain under user control.

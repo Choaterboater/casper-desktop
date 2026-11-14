@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-06-30-event-domain-semantics.zh.md)
-
 ## Problem
 
 The harness extends the agent loop through a Cordis event taxonomy (see [the microkernel event-taxonomy reference](../../../../docs/architecture.md)). As that taxonomy grew, the line between the three event domains blurred:

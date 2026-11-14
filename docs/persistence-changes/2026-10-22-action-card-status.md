@@ -5,8 +5,6 @@ kind: persistence-change
 
 # 2026-10-22-action-card-status
 
-English | [中文](2026-10-22-action-card-status.zh.md)
-
 ## Summary
 
 Adds action-card status attribution to logged model context.

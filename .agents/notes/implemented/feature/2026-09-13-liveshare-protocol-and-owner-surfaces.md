@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-13-liveshare-protocol-and-owner-surfaces.zh.md)
-
 ## Problem
 
 A DSH session runs on your own computer. A colleague sometimes needs to watch one while you work — to follow a debugging session, or to see how a long task is going. Today there is no way to do that. Sending the session log is not the same thing: the colleague would need your plugins, configuration, and sandbox to render it, and the session only makes sense while it is running on your machine.

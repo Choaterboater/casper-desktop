@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-18-schedule-task-tab-restore.zh.md)
-
 ## Problem
 
 The right Sidebar persists a Session's layout as tab records and not the navigation parameters an opener passed, per the [tab type and navigation decision](../architecture/2026-09-05-sidebar-tab-types-and-navigation.md). A `scheduleTask` tab restored by a reload therefore had no task identity: its body could show only its loading feedback and its chip only the constant label, until the user opened the task again from the Session entry. Recovering content belongs to the tab type's provider, as the [layout persistence decision](../architecture/2026-09-14-sidebar-layout-provider-recovery.md) established for terminals, and the Sidebar exposes no parameter store for a page type to reuse.

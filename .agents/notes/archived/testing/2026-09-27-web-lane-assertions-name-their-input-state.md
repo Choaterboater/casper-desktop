@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-27-web-lane-assertions-name-their-input-state.zh.md)
-
 ## Problem
 
 Three browser-lane scenarios captured an aria region while a state the golden records was only implied by whatever the pointer, the keyboard, or an in-flight Host read happened to be doing at that instant, so each capture could land on the other state.

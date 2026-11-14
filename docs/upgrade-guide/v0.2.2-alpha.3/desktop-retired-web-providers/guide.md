@@ -5,8 +5,6 @@ description: "Desktop launch removes a stored web search or fetch provider choic
 
 # Desktop clears stored upstream web provider choices
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 The Desktop profile no longer loads the upstream web search and fetch providers (rows `web-search-deepseek` and `web-deepseek-api`; see [desktop-casper-bundle](../desktop-casper-bundle/guide.md)). A profile that picked one of them on the Web search and fetch settings page still stores its id in the `config` of the `web` entry in `$DSH_HOME/profiles/desktop/cordis.patch.yml`: `searchProvider: deepseek-search-api`, `searchProvider: deepseek-official`, or `fetchProvider: deepseek-fetch-api`. The page then listed that choice as "(not loaded)", `web_search` was withheld, and every `web_fetch` call failed with `configured web provider "deepseek-fetch-api" is not registered`.

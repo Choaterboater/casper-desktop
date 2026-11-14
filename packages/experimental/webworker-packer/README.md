@@ -5,8 +5,6 @@ kind: "package-library"
 
 # `@deepseek-ai/dsh-experimental-webworker-packer`
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 The VFS image packer: turns one shipped profile's bundles and the installation's optional bundles into the gzip-compressed base tar the browser worker mounts as its filesystem, one archive per lazily loaded page chunk, and opaque data trees into ordered overlay tars ([experimental group](../README.md)). Nothing is compiled from source — the base image carries the repository's real build products, so a preview deployment debugs exactly what the served deployment ships. Read this page when packaging a preview image or diagnosing its contents.

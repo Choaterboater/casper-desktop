@@ -5,8 +5,6 @@ description: "Agent creation and resume options rename parentAgent to ownerAgent
 
 # Agent runtime ownership uses `ownerAgent`
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 `CreateAgentOptions` and `ResumeAgentOptions` in `@deepseek-ai/dsh-agent` replace `parentAgent` with `ownerAgent`. This affects plugins and custom factories calling `ctx.agents.create()` or `ctx.agents.resume()`. The field selects the live Agent that owns the runtime instance; omitting it creates a runtime root.

@@ -38,7 +38,6 @@
     "native/LICENSE.computer-use-icon",
     "native/upstream.json",
     "native/README.md",
-    "native/README.zh.md",
     "native/protocol.schema.json",
     "lib/types/**/*.d.ts"
   ],

@@ -2,15 +2,13 @@
 
 Status: implemented
 
-English | [中文](2026-09-06-backend-continuation-performance.zh.md)
-
 ## Problem
 
 Opening one Session does not measure the repeated cost of preparing model requests after a long tool conversation, executing another tool-heavy turn, or discovering multiple inactive fork children. The [Session-opening gate](2026-09-04-session-open-performance-gate.md) covers first history and activation but deliberately stops before new model work. Its text/reasoning workload also lacks historical tool-call arguments and large tool results.
 
 ## Decision
 
-The [agent-continuation benchmark](../../../../benchmarks/agent-continuation/agent-continuation.bench.ts) adds three scenario groups, including a shipped-profile variant, without changing product implementations. They use current-generation Zstandard Sessions authored through production append, stream accumulation, and persistence APIs. A separate seed process creates the deterministic source before measurement; each sample copies that source into its private root and starts a fresh compiled plain-Node worker. No recorded Session, ambient repository, network, private Harness home, or deployed GUI supplies input.
+The agent-continuation benchmark (`benchmarks/agent-continuation/agent-continuation.bench.ts`) adds three scenario groups, including a shipped-profile variant, without changing product implementations. They use current-generation Zstandard Sessions authored through production append, stream accumulation, and persistence APIs. A separate seed process creates the deterministic source before measurement; each sample copies that source into its private root and starts a fresh compiled plain-Node worker. No recorded Session, ambient repository, network, private Harness home, or deployed GUI supplies input.
 
 The shared history has 800 completed two-step turns, four tool calls per turn, and 2,048-character tool results: 13,600 events and 5,600 conversation messages. Each assistant reply carries reasoning, text, and compact streamed records; tool replies additionally carry fragmented arguments. Fixed timestamps and ids describe the seed. Live synthetic replies use the real loop's clocks and ids without overriding process globals.
 
@@ -39,7 +37,7 @@ The implementation reference is the PR #3537 merge on Apple M4 Pro, macOS arm64,
 | Tool continuation | 358.953, 324.790, 318.861, 320.119, 322.896 | 324.280, 321.952, 340.409, 325.470, 324.312 | 322.896 / 324.312 | 340 | 850 |
 | Child catalog | 318.730, 309.006, 311.404, 308.565, 310.105 | 308.670, 310.030, 280.086, 303.084, 284.829 | 310.105 / 303.084 | 320 | 800 |
 
-Continuation retains approximately 22.295 MiB; its source expectation is 23 MiB and its budget is 28.75 MiB. The historical SDK time expectation used the existing [calibration helper](../../../../benchmarks/support/calibration.ts): 2× shared CI time scale and 1.25× variance headroom. Request history uses the direct hosted expectation in the [request-freeze calibration](../../../../benchmarks/agent-continuation/agent-continuation.bench.ts), without the 2× scale. Memory uses only 1.25× headroom. The scale is inherited from the existing lane's calibration, not a new Linux measurement of these cases; CI evidence remains necessary when runner characteristics change. Baseline budgets protect the measured implementation; tighter budgets belong with a measured behavior-preserving fix.
+Continuation retains approximately 22.295 MiB; its source expectation is 23 MiB and its budget is 28.75 MiB. The historical SDK time expectation used the existing calibration helper (`benchmarks/support/calibration.ts`): 2× shared CI time scale and 1.25× variance headroom. Request history uses the direct hosted expectation in the request-freeze calibration (`benchmarks/agent-continuation/agent-continuation.bench.ts`), without the 2× scale. Memory uses only 1.25× headroom. The scale is inherited from the existing lane's calibration, not a new Linux measurement of these cases; CI evidence remains necessary when runner characteristics change. Baseline budgets protect the measured implementation; tighter budgets belong with a measured behavior-preserving fix.
 
 A separate plain-Node request-history CPU profile attributes 132.876 ms of sampled self time to deepFreeze called by buildRequest during a 211.300 ms operation. This identifies repeated traversal of already-frozen history as a focused investigation target, not a proven optimization result. Catalog first/repeat timings separately report the first and second parent-catalog observations.
 

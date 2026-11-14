@@ -5,8 +5,6 @@ kind: "package-bundle"
 
 # @deepseek-ai/dsh-experimental-forge-bundle
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Review each Session's change requests, checks, and diffs, start a new Session in a Git worktree, or ask the model to create one during a conversation. Enable Change requests & worktrees on the Web or Desktop Plugins page; shipped profiles leave it disabled. GitHub status comes from the Host's signed-in `gh` CLI; local worktree creation does not require GitHub authentication.

@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-experimental-browser-use-stagehand-native
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Navigate browser tabs, capture screenshots, and ask Stagehand to act, find actions, or extract page data. Stagehand uses a separately configured native model for its AI-assisted operations. Each live Session gets a fresh browser, or one Session exclusively attaches to an explicitly configured existing browser. This public experimental package is opt-in.

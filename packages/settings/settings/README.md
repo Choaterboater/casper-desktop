@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-settings
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Edit fields that plugins declare with `.volatile()` and inspect their effective values. Forms identify each plugin by its profile entry id, preserve secret values, and refuse stale writes. Changes persist through the active profile’s Cordis patch.

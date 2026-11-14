@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-19-lossless-projection-checkpoint-json.zh.md)
-
 ## Problem
 
 Projection checkpoints can contain opaque extension data and message metadata. A JSON key named `__proto__` is ordinary recorded data. The Zod JSON parser drops that own key while rebuilding objects, so reopening a valid checkpoint can yield different projection state from replaying the Session log.

@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-client-ui-shortcuts
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Browse the commands available in the current window and find them by action, English alias, or key. Open the reference from General Settings or Mod+/. Record, clear, or restore application bindings; fixed input actions remain read-only.

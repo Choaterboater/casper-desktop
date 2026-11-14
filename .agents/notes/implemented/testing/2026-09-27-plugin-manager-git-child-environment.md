@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-27-plugin-manager-git-child-environment.zh.md)
-
 ## Problem
 
 The self-hosted Windows serial lane failed 13 cases in run 36227311113 (job 108363684565); 12 share one cause: [github-connection.spec.ts](../../../../packages/boot/plugin-manager/tests/github-connection.spec.ts) 9 (the six install-address forms and three proxy cases) and [manager.spec.ts](../../../../packages/boot/plugin-manager/tests/manager.spec.ts) 3 real-Git install cases. The host carried Git's indexed command-line configuration — `GIT_CONFIG_COUNT` with `GIT_CONFIG_KEY_0` / `GIT_CONFIG_VALUE_0`, the group Git hands to `git -c` calls and their hook children. The shared subprocess scrub (`scrubbedParentEnv`) removes credential-shaped names, so it stripped the key and kept the counter; Git reads the counter first, and every child died with `error: missing config key GIT_CONFIG_KEY_0` / `fatal: unable to parse command-line config` (exit 128) before opening any configuration file.

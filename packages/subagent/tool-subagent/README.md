@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-tool-subagent
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Use this package to give an agent a named tool that delegates work to a configured backend. Every call starts a managed activation and returns a child id; the runtime owns completion notices and cleanup. Local children support messages and restoration, while external backends execute one task and return their final answer through the completion notice. Supported backends can expose approved child LLM routes. Each instance can select a child preset and depth limit.

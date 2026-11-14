@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-28-apply-patch-file-editing.zh.md)
-
 ## Problem
 
 A model editing several files or separated regions needs multiple literal-edit calls or a shell script. Shell and Python edits do not expose filesystem mutation intents, so a working directory without Git cannot reliably present those edits in the turn Review tab. A patch tool expresses related edits in one call while retaining guarded filesystem operations. #5121 asks for the capability and its effectiveness evaluation; #4556 supplies the broader motivation for efficient file editing.

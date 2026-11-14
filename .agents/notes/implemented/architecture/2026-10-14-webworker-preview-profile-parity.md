@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-14-webworker-preview-profile-parity.zh.md)
-
 ## Problem
 
 The browser Preview ([webworker-runtime](../../../../packages/experimental/webworker-runtime/README.md), [webworker-packer](../../../../packages/experimental/webworker-packer/README.md)) can receive its boot configuration at pack time: the packer runs `dsh --profile web --dump-config` against a temporary home and writes the output to the image's `config/cordis.yml`; the Worker then inserts the whole configuration back as the profile's own patch (one `insert`). Measured on such an image, this has three consequences:

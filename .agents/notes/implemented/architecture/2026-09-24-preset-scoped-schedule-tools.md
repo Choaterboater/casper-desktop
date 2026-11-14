@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-24-preset-scoped-schedule-tools.zh.md)
-
 ## Problem
 
 `@deepseek-ai/dsh-schedule` registered `schedule_create`, `schedule_list`, `schedule_update`, and `schedule_delete` itself, attaching them to every live root Agent from an `agent/created` listener whose only filter was membership in `ctx.agents.roots()`. That predicate says nothing about the Agent preset, so `minimal` — composed for a capability-poor agent — carried all four schemas and paid their fixed request-context token cost. Storage, delivery, and the preset mechanism were each correct; the availability decision sat in the package that owns the storage service.

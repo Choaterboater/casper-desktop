@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-09-ptc-trajectory-code-inspection.zh.md)
-
 ## Problem
 
 PTC programs arrive as JSON string arguments. Escaping makes long programs difficult to read in a generic argument tree, while historical calls may use a different runtime language from the current deployment. Recorded result text can contain both printed output and a returned value without retaining their separation.

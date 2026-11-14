@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-17-session-row-menu-actions-slot.zh.md)
-
 ## Problem
 
 The Session row's "..." menu and its hover buttons were closed lists owned by `ui-workspace`: the browser built the menu `items` by row state, rendered the pin and archive buttons itself, and dispatched every verb through callbacks it threaded down the tree, together with the toast and rename dialog those verbs needed. A client plugin could add a sidebar control of its own, but not an action beside the shipped ones without editing the owning package or copying the menu interaction.

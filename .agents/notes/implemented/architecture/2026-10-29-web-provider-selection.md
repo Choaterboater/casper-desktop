@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-29-web-provider-selection.zh.md)
-
 ## Problem
 
 The web service selects search and fetch providers through two independent fields, `web.searchProvider` and `web.fetchProvider`. A settings control that writes both at once ties fetch billing and target access policy to the search choice, and a control that offers only the DeepSeek choices it knows cannot select a provider that another plugin registers. A picker over registered providers needs the Host to report them, and the [web capability seam](2026-06-24-web-capability-seam.md) has no availability observation for it to reuse. Messages search starts an auxiliary model request for each query, whereas the [Search API](../feature/2026-10-15-deepseek-search-fetch-api.md) returns structured sources directly. The Search and Fetch APIs also need a DeepSeek credential, and a credential setting of their own makes every user reconcile it with the model provider they chat with.

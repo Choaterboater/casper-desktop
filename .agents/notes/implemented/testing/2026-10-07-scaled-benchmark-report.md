@@ -2,19 +2,17 @@
 
 Status: implemented
 
-English | [中文](2026-10-07-scaled-benchmark-report.zh.md)
-
 ## Problem
 
 Benchmark budgets state whether one endpoint regressed on the hosted runner. They do not tell readers how slow the same endpoint is on an older laptop or a typical cloud instance, or whether its working set fits a machine with 4 GB or 8 GB of available memory, so a passing or failing number does not convey user impact.
 
 ## Decision
 
-Every `test:bench` run writes `benchmarks/.dsh-report/report.html`, a self-contained page without network resources. Bench files pass each budgeted wall-clock median to `recordTimings` and whole-process peak RSS to `recordPeakMemory` from [scaling-report.ts](../../../../benchmarks/support/scaling-report.ts) before asserting budgets. Each call carries a case description stating what the case measures and which user scenario it affects; the page shows it when the reader hovers the case. A Vitest global setup clears the results before the run and renders the page after it, including after failed cases. Budgets and assertions do not change.
+Every `test:bench` run writes `benchmarks/.dsh-report/report.html`, a self-contained page without network resources. Bench files pass each budgeted wall-clock median to `recordTimings` and whole-process peak RSS to `recordPeakMemory` from `scaling-report.ts` before asserting budgets. Each call carries a case description stating what the case measures and which user scenario it affects; the page shows it when the reader hovers the case. A Vitest global setup clears the results before the run and renders the page after it, including after failed cases. Budgets and assertions do not change.
 
 ### Machine scaling
 
-[machine-profiles.ts](../../../../benchmarks/support/machine-profiles.ts) lists laptops from 2015, 2019, 2023, and 2026 with SSD storage, mainstream cloud instances with their default system disks, the hosted runners, and the M4 Pro calibration reference. Each profile has a PassMark single-thread rating, retrieved on 2026-10-07, its logical CPU count, and a typical 4 KiB queue-depth-1 latency of its storage. A scaled endpoint is `ms × ((1 − io) × cpuScore(measured) / cpuScore(target) × coreFactor + io × ioLatency(target) / ioLatency(measured))`.
+`machine-profiles.ts` lists laptops from 2015, 2019, 2023, and 2026 with SSD storage, mainstream cloud instances with their default system disks, the hosted runners, and the M4 Pro calibration reference. Each profile has a PassMark single-thread rating, retrieved on 2026-10-07, its logical CPU count, and a typical 4 KiB queue-depth-1 latency of its storage. A scaled endpoint is `ms × ((1 − io) × cpuScore(measured) / cpuScore(target) × coreFactor + io × ioLatency(target) / ioLatency(measured))`.
 
 Where the worker reports process CPU time over the endpoint interval, `io` is the measured share of wall time not spent on CPU, `max(0, 1 − cpuMs / ms)`, and the busy parallelism is `max(1, cpuMs / ms)`. The Session corpus, projection list, Session first history and Agent resume, and Agent continuation cases report it. Other endpoints declare a commented `io` beside the benchmark: in-memory Client and terminal work declares 0, and the browser, Session-open phase, and SDK profile endpoints declare estimates. `coreFactor` is `max(1, parallelism / cores(target)) / max(1, parallelism / cores(measured))`, so an endpoint that kept more CPUs busy than a target has slows down there. The page shows each default and its source, and readers can override and reset `io` per endpoint. The measuring machine is matched from the CPU model, uses its actual available CPU count, and can be changed in the page.
 

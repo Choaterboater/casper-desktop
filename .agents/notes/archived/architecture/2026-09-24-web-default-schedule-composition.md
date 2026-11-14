@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-25
 
-English | [中文](2026-09-24-web-default-schedule-composition.zh.md)
-
 ## Problem
 
 The Automation tasks page, the Session reminder catalog, and the `schedule_*` tools reached a Web deployment only through `--patch apps/cli/config/examples/schedule/cordis.yml`. `packages/bundle/web-app/cordis.patch.yml` carried the `ui-schedule` client row with `disabled: true`, and the Host rows `time-context` and `schedule` existed in that overlay alone. A person running the shipped `web` profile therefore saw no Automation tasks entry and no reminder tools, while every consumer that wanted them repeated the same three rows: the repository preview image kept its own overlay list, and two Web suites hard-coded the overlay path.

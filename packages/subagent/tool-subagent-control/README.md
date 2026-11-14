@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-tool-subagent-control
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 `dsh-tool-subagent-control` lets agents discover and message their subagent tree by Session id, interrupt descendants, and wait for their own next-step inbox. By default, one plugin instance registers all four tools; members inherit the same definitions and ordering.

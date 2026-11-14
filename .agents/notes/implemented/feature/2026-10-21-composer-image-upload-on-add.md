@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-21-composer-image-upload-on-add.zh.md)
-
 ## Problem
 
 The Web composer kept image drafts in the browser and base64-encoded each image into `session/prompt` at send time, so the Host received, validated, normalized, and stored image bytes inside prompt admission. Generic files already uploaded when picked ([generic file upload](2026-08-26-generic-file-upload.md)). An image message therefore carried up to the per-message image byte limit in one RPC body, and its send time grew with image size; a composer that waits for the Host to accept a message before clearing it would hold the draft for that whole transfer.

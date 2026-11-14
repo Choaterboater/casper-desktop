@@ -5,8 +5,6 @@ description: "The Plugins page replaces the standalone Git worktrees card with C
 
 # One plugin entry for change requests and worktrees
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 Web and Desktop use **Change requests & worktrees** to enable the review panel, the new-Session worktree option, and the model's `create_worktree` tool together. The separate **Git worktrees** card is hidden. Profiles that already enabled the Forge bundle also gain the model tool.

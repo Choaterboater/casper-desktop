@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-deliverable-file-references
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Agents receive the same file-link and result-delivery instructions in Web and SDK sessions. Use this guidance when a host can expose links or delivered files. It adds one fixed system-prompt paragraph; hosts retain responsibility for file access and rendering.

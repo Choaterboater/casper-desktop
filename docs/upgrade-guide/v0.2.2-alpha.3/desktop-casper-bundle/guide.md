@@ -5,8 +5,6 @@ description: "The Desktop profile composes from the Casper desktop bundle, which
 
 # Desktop composes from the Casper desktop bundle
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 Previously, `dsh.profile.bundles` in `$DSH_HOME/profiles/desktop/package.json` listed `@deepseek-ai/dsh-base` and `@deepseek-ai/dsh-web-app`, and the shared Web layer switched the upstream service rows off. Now the Desktop profile lists `@deepseek-ai/dsh-casper-desktop`, which is generated from those two bundles with the upstream service rows taken out: product telemetry and analytics, the upstream account and its Settings page, upstream-hosted web search, the upstream model provider, Session-log upload, the upstream API extensions and the plugin inventory. Those rows are absent, not disabled.

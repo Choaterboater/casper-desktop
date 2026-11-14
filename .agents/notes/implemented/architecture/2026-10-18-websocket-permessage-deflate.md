@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-18-websocket-permessage-deflate.zh.md)
-
 ## Problem
 
 The Web GUI carries every live Remote stream over one physical WebSocket, `/api/remote.mux`: model token deltas, session events, tool output, terminal output, and the `$events` fan-out. The mux itself is the implemented [Remote duplex stream](2026-09-19-remote-duplex-stream.md) design; this note adds one transport option to it. The Host's HTTP surface already exposes `compression: 'none' | 'gzip'`; before this option the WebSocket had no equivalent, so the link stayed uncompressed.

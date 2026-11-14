@@ -5,8 +5,6 @@ description: "Agent Teams removes its pending-message limit and stops delivering
 
 # Agent Teams messages use target inboxes
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 The experimental Agent Teams plugin sends new messages directly to the target Agent inbox instead of retaining a separate Team mailbox. `send_message` returns only `{ "sent": true }`; it exposes neither a message ID nor an `accepted` or `queued` status. Acceptance does not confirm model processing or a synchronous storage flush. Failed sends are not retained for retry, and explicit resends are not deduplicated.

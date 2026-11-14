@@ -1,7 +1,5 @@
 # Text translation
 
-English | [中文](translation.zh.md)
-
 The experimental [translator](../../packages/experimental/translator/README.md) translates text through anonymous browser endpoints or explicitly selected paid native Flash routes. Consumers own display, scheduling, and Session activation; Session-bound requests retain reusable results through an active Session writer.
 
 ## Requests and results

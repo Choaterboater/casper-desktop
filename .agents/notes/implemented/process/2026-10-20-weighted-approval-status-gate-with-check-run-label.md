@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-20-weighted-approval-status-gate-with-check-run-label.zh.md)
-
 ## Problem
 
 The `weighted approval` commit status is the record this repository's branch rules require, and below the approval threshold it stays `pending`. A commit status has no action-required state, so readers cannot tell an approval wait from running work.
@@ -22,7 +20,7 @@ The publisher selects the check runs created by the publishing token by `app.slu
 
 ## Verification
 
-[Approval policy tests](../../../../.github/review-ownership/check-approval.test.mjs) pin the unchanged status states, the check-run conclusion for a met and an unmet policy, the phase writes, revoking a published success through its conclusion, one run per head, invalid list responses, the status fallback when the label write fails, and the split between the status client and the check-run client. [Workflow tests](../../../../scripts/ci-workflow.spec.ts) pin the `checks: write` and `statuses: write` permissions, the App token step and its single secret reference, the `DECISION_TOKEN` wiring, and the setup phase commands.
+Approval policy tests (`.github/review-ownership/check-approval.test.mjs`) pin the unchanged status states, the check-run conclusion for a met and an unmet policy, the phase writes, revoking a published success through its conclusion, one run per head, invalid list responses, the status fallback when the label write fails, and the split between the status client and the check-run client. [Workflow tests](../../../../scripts/ci-workflow.spec.ts) pin the `checks: write` and `statuses: write` permissions, the App token step and its single secret reference, the `DECISION_TOKEN` wiring, and the setup phase commands.
 
 The check-run association limit was measured on 2026-10-20 with the reverted and the previous attempts on this repository: a required check run published with the job token stayed `Expected` in the merge box, and a non-required check run published with the job token was absent from the merge box's check list while the Checks page listed it.
 

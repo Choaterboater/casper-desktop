@@ -4,8 +4,6 @@ description: "Browse Session persistence-type changes across every captured DSH 
 
 # Persistence changes across DSH prereleases
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 This archive provides an approximate historical view of 26 DSH alpha/RC tags and their 25 adjacent transitions. Each release includes a short explanation, source tag, before/after digests, and complete snapshots of changed types for reading and format validation. It does not establish historical runtime compatibility or replace [current-source acknowledgements](../README.md).

@@ -381,7 +381,7 @@ describe('default product isolation', () => {
   it.each([false, true])('rejects a declared config tree without composition files when its directory exists: %s', (existing) => {
     const root = fixture()
     manifest(root, 'apps/cli/package.json', { dsh: { configTrees: [{ path: './config' }] } })
-    if (existing) write(root, 'apps/cli/config/README.i18n.yaml', 'en: test\n')
+    if (existing) write(root, 'apps/cli/config/README.md', '# Config\n')
 
     expect(verifyDefaultProductIsolation(root).failures.join('\n')).toContain('apps/cli/config')
   })

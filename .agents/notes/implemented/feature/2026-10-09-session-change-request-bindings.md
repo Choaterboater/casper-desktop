@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-09-session-change-request-bindings.zh.md)
-
 ## Problem
 
 A Session that opens or updates pull requests leaves them only in its shell output. Neither the user nor later consumers have a list of the change requests the Session works on or a shared view of their status. Code hosts differ in URLs, command-line tools, and status models, and any association must survive fork and resume without changing what the model sees.

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-26-cua-application-consent.zh.md)
-
 ## Problem
 
 macOS privileges authorize an execution host, not a user's choice of target application. Retained app and window objects can outlive that choice. Concurrent permission decisions must not restore access after the user revokes it.

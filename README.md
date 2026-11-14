@@ -1,7 +1,5 @@
 # Casper
 
-English | [中文](README.zh.md)
-
 This is the desktop app of [Casper](https://github.com/Choaterboater/casper), published by Choaterboater. It is built on [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (`dsh`, MIT) and is not an official DeepSeek product.
 
 New sessions start in **Casper mode**, which runs the real Casper CLI over ACP (`casper acp`): Casper's own agent loop, models and checks (record, replay, never report a check that did not run as passed), with its approval boxes, questions, plans and receipt shown as the app's cards. The harness's own agent loop stays available as Standard mode. The app also ships the read-only casper-network-mcp server, and sends nothing to DeepSeek unless you add it as a model provider.
@@ -52,7 +50,9 @@ Start with the [development guide](docs/development.md) and [architecture docume
 
 For agents, follow [AGENTS.md](AGENTS.md).
 
-Pull requests and pushes to `main` run [Casper CI](.github/workflows/casper-ci.yml) on GitHub's own runners: static gates, typecheck, lint and the unit tests. GitHub runs every workflow file in `.github/workflows`, so Casper CI is the only one there, and [a unit test](scripts/casper-workflows.spec.ts) fails while that folder holds any other. Upstream's workflows need upstream's secrets and runners, so they are kept unedited in `.github/upstream-workflows`, where GitHub never runs them. When an upstream merge adds a workflow file, move it to `.github/upstream-workflows` before pushing the merge branch, because GitHub runs a workflow that a pull request adds on that pull request.
+Pull requests and pushes to `main` run [Casper CI](.github/workflows/casper-ci.yml) on GitHub's own runners: static gates, typecheck, lint and the unit tests. GitHub runs every workflow file in `.github/workflows`, so Casper CI is the only one there, and [a unit test](scripts/casper-workflows.spec.ts) fails while that folder holds any other. Upstream's workflows need upstream's secrets and runners, so this repository does not keep them: when an upstream merge adds a workflow file, delete it before pushing the merge branch, because GitHub runs a workflow that a pull request adds on that pull request.
+
+Documentation is in English only; the app's own screen text still ships in 8 locales.
 
 Casper CI also scans what the desktop app ships. [A unit test](scripts/casper-desktop-shipped.spec.ts) walks the packager's own package set and fails on an upstream or npm-mirror host, upstream product text in any of the 8 locales, upstream's short product names (DSH, Harness) in a locale dictionary, an upstream service package or row, or an import of one. The findings it accepts are listed in [the rules](scripts/casper/desktop-shipped-rules.ts), each with its reason and an exact count; they are upstream-only copy the desktop never shows, npm-mirror constants it switches off, the pi-ai model catalog, a link in a doc comment of the OpenTelemetry attribute list, and the About credit. The test reads sources, not build output, so to check a packaged app locally, run `pnpm exec tsx scripts/casper/scan-packaged-app.ts <Casper.app> --target darwin-arm64`.
 

@@ -5,8 +5,6 @@ description: "Desktop runs the Casper engine it ships instead of a `casper` comm
 
 # Desktop runs the Casper engine it ships
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 Previously, the `casper-agent` plugin started the Casper that `command` found: on Desktop, `casper` on PATH or in `~/.local/bin`, `~/.bun/bin`, `/opt/homebrew/bin`, or `/usr/local/bin`. Now Desktop ships a pinned Casper engine in its runtime resources (`Contents/Resources/runtime/casper/casper` on macOS, `resources\runtime\casper\casper.exe` on Windows) and runs it, with the app's `node`, `npx`, `npm`, `uv`, and `uvx` at the end of Casper's PATH. A Casper installed on the computer is not used unless you turn it on. Casper always gets `CASPER_NO_UPDATE_CHECK=1`, so it never updates itself while the app runs it.

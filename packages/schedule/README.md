@@ -5,8 +5,6 @@ kind: "package-group"
 
 # schedule/ — Host-owned scheduled tasks
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Create RFC 5545 recurring tasks that deliver to an existing Session or to a new one, and keep them across Host restarts. Inspect active, paused, and ended tasks without opening their target Sessions. An Agent uses the Schedule tools, and a user uses the sidebar Automation tasks page, to create, edit, pause, resume, and delete tasks; the Automation tasks page can also run a task now. Due tasks arrive as ordinary follow-up messages in their target Session, not email, SMS, or push notifications.

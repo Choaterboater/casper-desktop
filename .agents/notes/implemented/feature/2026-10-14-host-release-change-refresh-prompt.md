@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-14-host-release-change-refresh-prompt.zh.md)
-
 ## Problem
 
 After `dsh web` is upgraded, or after a developer restarts `pnpm run dev:web` at another commit, an open browser page reconnects to the new Host automatically while its static shell stays at the old release. When the protocol is no longer compatible, the page keeps failing to reconnect or shows errors, and the user is not told that a reload is required.

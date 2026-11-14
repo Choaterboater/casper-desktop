@@ -5,8 +5,6 @@ description: "The dsh command a Casper desktop installation provides only manage
 
 # Desktop's dsh command only manages Desktop plugins
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 Previously, the `dsh` command that **Manage dsh Command…** registers ran the shared CLI with Desktop's runtime, so it could also boot profiles such as `web` and `headless`, dump configuration, and manage other profiles' plugins. Now it accepts only three forms:

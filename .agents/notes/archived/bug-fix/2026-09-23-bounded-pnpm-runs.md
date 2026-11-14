@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-23-bounded-pnpm-runs.zh.md)
-
 ## Problem
 
 A profile package operation could hold the profile write lock forever. A `dsh web` process held `~/.dsh/profiles/web/package.json.lock` for 22 minutes after its pnpm child printed `Done in 2s`: that child never exited, so the operation awaited an end that never came, the lock was never released, and every later management call in the process queued behind it. pnpm 11.13.0 consumes its one-shot worker-pool teardown once, re-creates the pool lazily afterwards, and unreferences a worker only during destruction, so the pool keeps the parent process alive with no repository-side change able to fix it.

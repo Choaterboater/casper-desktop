@@ -5,8 +5,6 @@ description: "Schedule clients use one Host-wide management API and typed timing
 
 # Schedule uses one Host-wide management API
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 Schedule management addresses every Host task by id. The native and Remote APIs share one service; the previous Session-bound `delete` and `update` methods are removed. Native creation takes a typed `timing`, and catalog results discriminate After, At, Every, Daily, Weekly, Cron, and RRULE with `kind`.

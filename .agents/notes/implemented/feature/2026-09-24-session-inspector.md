@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-24-session-inspector.zh.md)
-
 ## Problem
 
 Debugging a Session requires its raw log, Chat structures, and rendered conversation side by side. Runtime objects share Node, Turn, and Step identities and contain cycles, so JSON alone cannot support reference navigation. The Inspector needs an independent entry without making every Conversation View a Sidebar resource.

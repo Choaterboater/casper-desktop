@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-12-session-projection-registration-handles.zh.md)
-
 ## Problem
 
 Host readers coupled to registry key lookup lose access when a plugin unloads, although an Agent may still need projected state while its asynchronous cleanup drains. Repeated batch snapshots materialize unrelated client views. A synchronous registration API also makes every consumer assume that acquisition can never require asynchronous initialization.

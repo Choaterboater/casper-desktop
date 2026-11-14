@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-15-deepseek-search-fetch-api.zh.md)
-
 ## Problem
 
 DeepSeek web retrieval through Messages requires an auxiliary model request for each query. Harness extracts sources and citation excerpts but discards the generated answer. The dedicated Search and Fetch APIs provide structured sources and Markdown directly, so retrieval can run without Harness starting that auxiliary generation. Adopting these APIs requires explicit selection of both operations, independent deployment addresses, and a mapping of Fetch results onto the existing fetch result.

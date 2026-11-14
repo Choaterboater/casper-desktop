@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-15-plugin-detail-documents.zh.md)
-
 ## Problem
 
 Plugin cards and pages show a one-line description. A user choosing a plugin from a market, or checking what an installed bundle does, needs the longer description that package authors already write as a README, with screenshots, as extension marketplaces of code editors show it. The [market index](2026-10-02-plugin-market-index-format.md) carries list fields only, and an index document cannot carry a Markdown document and its images for every plugin.

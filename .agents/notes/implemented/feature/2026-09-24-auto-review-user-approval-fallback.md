@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-24-auto-review-user-approval-fallback.zh.md)
-
 ## Problem
 
 [Auto review](2026-08-28-auto-review.md) made every reviewer denial final and reported every reviewer failure as that same denial. A person watching the Session had no way to let a denied call run, even when the reviewer misjudged an action the person wanted, so the only recovery was to switch the whole Session to Full access. A malformed reviewer response, a provider error, or a missing Session fact reached the model and the user as `Auto review rejected tool "<name>"`, so neither could tell a policy decision from a technical failure or act on the cause.

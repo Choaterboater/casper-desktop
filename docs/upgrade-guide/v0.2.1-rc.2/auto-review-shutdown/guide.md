@@ -5,8 +5,6 @@ description: "Auto review Sessions retain their permission preset when the appli
 
 # Reopen Auto review Sessions after shutdown
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 Application shutdown previously could change a live Auto review Session to Full access, depending on disposal order. Shutdown now preserves Auto and its approval policy. Removing the Auto review plugin from a running application still changes its live Auto Sessions to Full access.

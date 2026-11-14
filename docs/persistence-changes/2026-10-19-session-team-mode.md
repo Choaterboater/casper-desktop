@@ -5,8 +5,6 @@ kind: persistence-change
 
 # 2026-10-19-session-team-mode
 
-English | [中文](2026-10-19-session-team-mode.zh.md)
-
 ## Summary
 
 Records the root Session’s Agent Teams selection with the required team/mode event.

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-14-desktop-installed-update-materials.zh.md)
-
 ## Problem
 
 An installed-update walkthrough needs two increasing versions with a shared application identity. Reusing normal release paths can expose test metadata to unrelated clients, while storing test state inside an installation directory loses evidence during replacement. A successful copy does not establish that a signed installer exists.

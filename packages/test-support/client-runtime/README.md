@@ -5,8 +5,6 @@ kind: "package-library"
 
 # @deepseek-ai/dsh-client-test-runtime
 
-English | [中文](README.zh.md)
-
 Direct component fixtures use `contextMenuHook(open)` to supply the global menu hook with production gesture handling. An unstubbed activation throws; Slot composition tests mount the menu plugin itself.
 
 ## Summary

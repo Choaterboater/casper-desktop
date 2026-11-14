@@ -2,8 +2,6 @@
 
 Status: proposed
 
-English | [中文](2026-10-18-parse-ssh-policy-once.zh.md)
-
 ## Problem
 
 The [`sandbox` and `fs.write`/`fs.edit` handlers](../../../../packages/ssh/ssh/src/helper.ts) are the private policy resolver's only callers. They validate requests with `policySchema`; the resolver repeats that parse, including a policy and extra-root array copy.

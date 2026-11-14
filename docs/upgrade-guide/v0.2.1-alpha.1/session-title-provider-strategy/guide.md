@@ -5,8 +5,6 @@ description: "Session-title providers register directly, own their strategy sett
 
 # Migrate session-title providers
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 `@deepseek-ai/dsh-session-title-llm` no longer exports `registerSessionTitleLlmProvider`, `generateSessionTitleWithLlm`, or `SessionTitleLlmMessageSelector`. `SessionTitleLlmConfig` now holds only execution controls (`maxInputBytes`, `maxOutputTokens`, `timeoutMs`, and the optional `provider`/`model` pair); `targetWords` and `targetCjkCharacters` moved into each provider's own `Config`. Each provider owns its system instruction, message framing, title parsing, reasoning selection, and output interpretation, registers directly with `ctx.sessionTitle.register()`, and calls `executeSessionTitleLlm(ctx, config, request, providerId, { system, input, messageSeqs, selectReasoningEffort })`. That function returns the assembled content blocks, the terminal finish, and the used model route. `SessionTitleProviderRequest` gains an optional `currentTitle` snapshot.

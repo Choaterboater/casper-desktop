@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-07-deepseek-messages-adapter.zh.md)
-
 ## Problem
 
 Messages represents thinking, signatures, tool calls, tool results, and cumulative usage as native protocol fields. Translating only the endpoint or flattening assistant history loses information needed by subsequent tool turns.

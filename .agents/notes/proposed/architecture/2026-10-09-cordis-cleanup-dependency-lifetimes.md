@@ -2,8 +2,6 @@
 
 Status: proposed
 
-English | [中文](2026-10-09-cordis-cleanup-dependency-lifetimes.zh.md)
-
 ## Problem
 
 A disposer can await its consumers while another disposer has already removed the listener or closed the resource those consumers need. Awaiting a provider's final disposal promise therefore does not establish resource survival. This affects shutdown and plugin replacement, including final Session events, accepted reminder delivery, credential commits, and remote process termination.

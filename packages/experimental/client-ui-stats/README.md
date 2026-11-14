@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-experimental-client-ui-stats
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Adds a Statistics tab beside Chat and Trajectory. Turn rows expand into steps with context and output tokens, cache hit rate, first-token latency, model and tool time, output speed, and a total-time bar. Scrolling up pulls earlier turns through shared Session paging. The Trigger column names what opened the turn, including a team message's sender, and prompt images show a count pill with a hover preview in the shared viewer. The tab reads Session events and durable prompt images; it registers no tool, prompt section, or service.

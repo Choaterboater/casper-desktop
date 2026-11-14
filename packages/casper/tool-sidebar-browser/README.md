@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-casper-sidebar-browser
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 These tools let the agent see and drive the browser tabs beside a conversation in the Casper desktop app. It can list, open, and navigate tabs, read a page's text and interactive elements, and take screenshots. Clicking, typing, pressing keys, and scrolling on a site first need the user's permission for that site, asked once per conversation. [`@deepseek-ai/dsh-casper-sidebar-browser-client`](../sidebar-browser-client/README.md) runs each operation in the Desktop app.

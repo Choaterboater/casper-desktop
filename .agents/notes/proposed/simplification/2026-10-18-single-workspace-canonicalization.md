@@ -2,8 +2,6 @@
 
 Status: proposed
 
-English | [中文](2026-10-18-single-workspace-canonicalization.zh.md)
-
 ## Problem
 
 [`LocalSandboxProvider.confine()`](../../../../packages/sandbox/sandbox-local/src/index.ts) canonicalizes `workspaceRoot` and copies the policy before dispatch. POSIX profile builders call [`workspaceWritableRoots()`](../../../../packages/sandbox/sandbox/src/roots.ts), which resolves that workspace again. The common preprocessing also runs for POSIX read-only policies that grant no workspace writes.

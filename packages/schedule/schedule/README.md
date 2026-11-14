@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-schedule
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Schedule sends instructions at a chosen time or on a repeating schedule. Ask an Agent to create and manage tasks, or use the Automation tasks page. Deliver to an existing conversation, create one conversation and reuse it, or create a new conversation for each run. Tasks survive restarts, but the Host must be running to deliver them. After a restart, a recurring task sends only its latest missed occurrence.

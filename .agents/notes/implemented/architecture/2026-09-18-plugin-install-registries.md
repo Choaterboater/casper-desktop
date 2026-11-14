@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-18-plugin-install-registries.zh.md)
-
 ## Problem
 
 The install dialog handed the spec to `pnpm add` with no registry of its own, so pnpm resolved packages from whatever its configuration named, which for a person who never wrote an `.npmrc` is `registry.npmjs.org`. On a network that cannot reach it, every install failed with a network error after pnpm's own retries, which take over a minute for a registry that does not answer; the check before the install failed the same way, and nothing offered a mirror. A mirror is the ordinary answer in mainland China, but pnpm's `--registry` is a CLI flag the dialog could not pass, and an `.npmrc` is not something the dialog's audience edits.

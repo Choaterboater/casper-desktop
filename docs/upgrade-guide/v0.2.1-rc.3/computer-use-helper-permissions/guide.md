@@ -5,8 +5,6 @@ description: "Computer Use needs permission for its own helper application inste
 
 # Authorize the Computer Use helper
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 macOS Computer Use runs as `DSH Computer Use.app`, launched through LaunchServices. Accessibility and Screen Recording grants for a terminal or Desktop launcher do not grant access to this helper. Source preparation builds and signs the application; installed packages require the prepared application and its `current.json` receipt. A custom `helperPath` pointing at a bare native binary is no longer a supported native launch path.

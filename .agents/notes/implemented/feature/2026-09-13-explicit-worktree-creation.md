@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-13-explicit-worktree-creation.zh.md)
-
 ## Problem
 
 A Session that needs an isolated checkout otherwise has to coordinate Git commands with its own working directory. Changing a shell process directory does not update the Session's later tools or recorded context, and a linked worktree's Git administration directory can lie outside the Session's existing write grant.

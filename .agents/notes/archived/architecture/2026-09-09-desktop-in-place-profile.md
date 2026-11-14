@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-17
 
-English | [中文](2026-09-09-desktop-in-place-profile.zh.md)
-
 ## Problem
 
 Staging preserves an old plugin installation but adds profile copying, directory moves, a recovery journal, and rollback state. Local plugin changes accept explicit repair after failure instead of this complexity.

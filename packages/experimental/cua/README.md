@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-cua
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Inspect applications, retain window objects across PTC calls, and send actions through the normal tool pipeline. Platform providers supply native execution; this library owns the object API, request validation, application consent, and image admission. The external PTC runtime owns variable persistence.

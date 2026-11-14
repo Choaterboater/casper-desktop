@@ -65,6 +65,13 @@ function runGit(args: string[]): string {
   return result.stdout
 }
 
+/** Read one sealed artifact from the baseline commit; undefined when that commit lacks it. */
+function readBaselineArtifact(ref: string, path: string): Buffer | undefined {
+  const result = spawnSync('git', ['show', `${ref}:.agents/notes/archived/${path}`], { cwd: repoRoot })
+  if (result.error !== undefined) throw result.error
+  return result.status === 0 ? result.stdout : undefined
+}
+
 function readBaselineManifest(ref: string): ArchiveManifest {
   runGit(['cat-file', '-e', `${ref}^{commit}`])
   const manifestEntry = runGit(['ls-tree', '--name-only', ref, '--', manifestRepoPath]).trim()
@@ -85,17 +92,19 @@ if (existsSync(manifestPath)) {
 
 // CI supplies its trusted pre-change commit; local writes compare with committed HEAD.
 const baselineRef = process.env.DSH_ARCHIVE_BASE_REF ?? 'HEAD'
+const extended = extendArchiveManifest(manifest, artifacts, path => readBaselineArtifact(baselineRef, path))
+errors.push(...extended.errors)
+// Write mode validates the manifest it would write; check mode validates the committed one.
+const validated: ArchiveManifest = writeMode ? { version: 1, files: extended.files } : manifest
 try {
   const baseline = readBaselineManifest(baselineRef)
-  errors.push(...validateArchiveManifestExtension(baseline, manifest))
+  errors.push(...validateArchiveManifestExtension(baseline, validated, path => readBaselineArtifact(baselineRef, path)))
 } catch (error: unknown) {
   errors.push(`archived/manifest.json: cannot read baseline ${JSON.stringify(baselineRef)}: ${error instanceof Error ? error.message : String(error)}`)
 }
-
-const extended = extendArchiveManifest(manifest, artifacts)
-errors.push(...extended.errors)
 if (!writeMode) {
   for (const path of extended.added) errors.push(`${path}: archived artifact is not sealed in manifest.json`)
+  for (const path of extended.retired) errors.push(`${path}: English-only retirement is not recorded in manifest.json`)
 }
 
 if (errors.length > 0) {
@@ -109,7 +118,7 @@ if (writeMode) {
   if (!existsSync(manifestPath) || readFileSync(manifestPath, 'utf8') !== rendered) {
     writeFileSync(manifestPath, rendered)
   }
-  console.log(`verify-archived-agent-notes: sealed ${extended.added.length} new artifact(s); existing seals unchanged.`)
+  console.log(`verify-archived-agent-notes: sealed ${extended.added.length} new artifact(s); recorded ${extended.retired.length} English-only retirement(s); other seals unchanged.`)
 } else {
   console.log(`verify-archived-agent-notes: ${artifacts.size} frozen artifact(s) checked across ${kinds.size} kind(s).`)
 }

@@ -3,7 +3,7 @@
 
 # dsh CLI help
 
-This reference contains complete help for the launcher, subcommands, and shipped profiles. Identical help appears once with every invocation listed. Help output retains its original language.
+This reference contains complete help for the launcher, subcommands, and shipped profiles. Identical help appears once with every invocation listed.
 
 Run `pnpm run gen-cli-help` to regenerate; run `pnpm run verify-cli-help` to check freshness.
 

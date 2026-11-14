@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-tool-working-directory
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Read the Session’s current directory or enter an existing directory with the same tool. Relative changes use the current directory. The returned absolute path can be passed to other tools.

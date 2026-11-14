@@ -5,8 +5,6 @@ description: "New Session creates a fresh Agent instead of reusing an existing e
 
 # Start a fresh Agent with New Session
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 In Web and Desktop, New Session creates a fresh Session and Agent using the current preset definition. It previously reused an existing empty Session in the workspace, which could retain an earlier preset definition.

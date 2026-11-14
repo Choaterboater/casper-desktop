@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-experimental-claude-code-mods
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Run [Claude Code mods](https://code.claude.com/docs/en/plugins/mods/overview) inside agent runs: wrap a mod's `register(on, options)` with `defineMod`, mount it as a plugin after this bridge, and its hooks guard tool calls, rewrite prompts, add commands and tools, read session facts, and draw a band above the prompt through the same `$`, `e`, `next` chain. The bridge requires `dsh-working-directory` and `dsh-agent`, and each `$` call rides a composed harness service. It is an alpha interface-compatibility demonstration: an unserved event is reported at load, an unserved `$` member fails naming the gap, and [the compatibility page](../../../docs/subsystems/claude-code-mods.md) lists every difference.

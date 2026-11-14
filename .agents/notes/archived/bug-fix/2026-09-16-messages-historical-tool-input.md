@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-16-messages-historical-tool-input.zh.md)
-
 ## Problem
 
 Chat Completions retains tool arguments as strings, including malformed JSON from failed calls. Switching that history to Messages requires an object for each `tool_use.input`. Rejecting one historical argument blocks every later request containing it, even after a successful tool retry; a summarization request containing the same call also fails.

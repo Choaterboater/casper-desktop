@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-client-ui-agent-team
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 This package displays shared tasks below the Subagent tree in one header panel. Host projection frames keep task state current without a refresh control. Ordinary subagent navigation owns the member list and teammate conversations. The Web bundle loads this package; it adds no model-facing input.

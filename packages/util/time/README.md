@@ -5,8 +5,6 @@ kind: "package-library"
 
 # dsh-util-time
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Shared time vocabulary for instant, zone, elapsed-time, and recurrence boundaries. Strict parsers return accepted values or refusal reasons; `resolveLocalInstant` applies maintained Temporal gap and overlap behavior. `Duration` stores a millisecond span. `Cron` and `RRule` parse distinct expression types and compute bounded occurrences from explicit decision times. The library owns no task state, delivery policy, domain errors, or model-facing text.

@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-17-settings-pages-as-companion-packages.zh.md)
-
 ## Problem
 
 The four official settings pages — shell, agent loop, Subagent, web search — lived in one client package, `ui-settings-plugins`, beside the Built-in plugins section. Every new built-in page grew that package, and a community bundle that wanted a settings page had no worked example of a page living with the plugin that owns the namespace. Moving each page into the Host package that registers its namespace was considered and does not fit: the shell namespace is registered by the executor families under the sandbox row, the loop package would gain a browser build for one number field, and the Subagent namespaces are registered from a subpath row, which carries no browser half.

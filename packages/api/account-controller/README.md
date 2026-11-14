@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-api-account-controller
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Account screens use authenticated Remote commands and a snapshot stream. The controller exposes login state without returning tokens or PKCE secrets.

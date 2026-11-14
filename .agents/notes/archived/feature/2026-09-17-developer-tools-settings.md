@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-17-developer-tools-settings.zh.md)
-
 ## Problem
 
 Diagnostic views, preset selection and changed-file summaries add complexity to routine tasks. Scripted HTML also grants capabilities that a basic document preview does not need. Desktop and Web share these renderers, so independent switches would let the same setting produce different results across clients.

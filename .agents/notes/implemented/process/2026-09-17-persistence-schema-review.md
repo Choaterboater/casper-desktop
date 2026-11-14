@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-17-persistence-schema-review.zh.md)
-
 ## Problem
 
 Structural fingerprints identify changed persistence types, but a fingerprint alone cannot explain a shared change or distinguish a declared reader promise from an assumption about runtime behavior. Names derived from union positions and traversal paths also change when unrelated siblings are added, obscuring the fields a reviewer needs to inspect.

@@ -5,8 +5,6 @@ description: "The Automation tasks optional bundle is removed; the Web compositi
 
 # Automation tasks bundle removed
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 In v0.2.0-rc.2, switching on Automation tasks in the Plugins page appended `@deepseek-ai/dsh-experimental-schedule-bundle` to `dsh.profile.bundles` in `$DSH_HOME/profiles/<name>/package.json`. That bundle inserted the `time-context`, `schedule`, and `ui-schedule` rows.

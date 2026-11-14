@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-16-separate-instruction-chain-budgets.zh.md)
-
 ## Problem
 
 `dsh-agent-instructions` rendered the user-global and project files as one chain under one `maxBytes`, the rule of the [original workspace-context decision](../../archived/feature/2026-06-24-workspace-context.md). Rendering omits the broadest files first, and user-global files are the broadest, so a large project chain removed them: under the shipped 65,536-byte budget, 20 KiB user-global, 30 KiB project root, and 20 KiB nested files rendered without the user-global file.

@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-08-web-subagent-catalog-projections.zh.md)
-
 ## Problem
 
 The parent catalog projection already publishes complete membership through the Session control stream. A separate catalog-change event, repeated RPC reads, and a second membership cache duplicate that delivery and require coordination between responses and later events. Historical Sessions still need initial loading when their projection is absent, and parent Agent availability remains independent of durable membership.

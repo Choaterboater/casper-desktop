@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-12-headless-environment-auth.zh.md)
-
 ## Problem
 
 The [stored credential precedence](2026-10-09-stored-credential-precedence.md) decision makes GUI saves effective even when the shell exports a key for another application. A headless job sharing that Harness home can then use the GUI account instead of the key explicitly supplied to the job. Changing reference precedence alone would leave pi-ai provider records and saved grants ahead of the environment.

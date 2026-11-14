@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-19-declared-session-attachment-carriers.zh.md)
-
 ## Problem
 
 Session attachment authorization and ZIP export inferred attachment ownership from common payload field names. An unknown ignorable event could therefore authorize an image read or export file bytes. Compaction content under `summary` and `rawOutput` was outside that field-name scan.

@@ -5,8 +5,6 @@ description: "Requests name Casper desktop instead of the upstream harness, Desk
 
 # Requests name Casper desktop and use no upstream service by default
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 - Every model provider request and every web fetch sends `User-Agent: casper-desktop/<version> (+https://github.com/Choaterboater/casper-desktop)`, the Codex subagent introduces itself to `codex app-server` as `casper-desktop`, and Session upload records carry the OTel resource `service.name: casper-desktop`. Previously all three named the upstream harness. Provider filters, logs or collector queries that match the old product token see the new one.

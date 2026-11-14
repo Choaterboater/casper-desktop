@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-tool-skill
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Agents can discover and load skills during a session. When the `skill` tool is visible, model-invocable skills or incomplete discovery produce a durable catalog before the first request. The tool loads full instructions; users can invoke user-invocable skills with `/name`. Entry, visibility, and completeness changes append a replacement catalog. Incomplete discovery publishes confirmed skills with a warning, including when none are confirmed. Configure `catalogDescriptionMaxLength` to cap descriptions.

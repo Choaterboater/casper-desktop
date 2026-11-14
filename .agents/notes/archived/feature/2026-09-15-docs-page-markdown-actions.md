@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-15-docs-page-markdown-actions.zh.md)
-
 ## Problem
 
 Readers need a visible way to obtain one documentation page as Markdown. The published text must retain its current language and projected links. A browser fetch also shares its development URL with Vite's page-module imports, so treating every Markdown request as source text breaks navigation.

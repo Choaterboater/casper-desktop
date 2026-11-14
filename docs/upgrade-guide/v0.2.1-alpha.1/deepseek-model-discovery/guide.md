@@ -5,8 +5,6 @@ description: "DeepSeek API-key model discovery requires a configured credential.
 
 # DeepSeek API-key model visibility
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 The `deepseek-official` route previously listed its configured models without an API key. It now returns an empty catalog when its credential is missing, so Desktop and Web hide the DeepSeek group. Model discovery reports malformed credentials and credential lookup failures. A saved or default selection absent from the catalog displays “Select model” without changing the stored selection. The independent DeepSeek account route still uses account login.

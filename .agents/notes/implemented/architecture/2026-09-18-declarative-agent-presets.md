@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-18-declarative-agent-presets.zh.md)
-
 ## Problem
 
 Preset directories duplicate Cordis configuration ownership. Separate discovery, metadata, copying and editing APIs cannot express the same composition through an ordinary profile patch. Disposing a definition during a save must also preserve plugins still used by running Agents.

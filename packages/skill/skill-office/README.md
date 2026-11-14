@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-skill-office
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 The catalog lists the Office router and six authoring or operation skills. Full instructions load on demand. Authoring skills use the selected Python libraries; operation skills supply the configured Node and LibreOffice Kit CLI paths. SDK and Desktop mount the skill provider and dependency query separately.

@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-workflow-ptc
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Run JavaScript workflows in fresh Node processes under the calling Session's file sandbox policy. Scripts keep the `agent()`, `parallel()`, `pipeline()`, `phase()` and `log()` hooks while subagents perform delegated work. The same execution provider serves PTC and workflows, including the opt-in Ralph loop. Runs have no overall elapsed deadline; cancellation stops the managed process and disposes child agents. The selected sandbox and subprocess providers determine enforcement and cleanup limits.

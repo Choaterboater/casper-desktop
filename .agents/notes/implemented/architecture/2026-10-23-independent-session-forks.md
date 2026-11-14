@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-23-independent-session-forks.zh.md)
-
 ## Problem
 
 Using `parentSession` for both copied history and delegation makes an ordinary fork appear to be a subagent. Consumers can emit false child-start notifications, hide resumable sessions, or impose source-relative ordering. Removing the writer alone leaves historical ordinary forks misclassified and exposes a V4 reader assumption: inherited delivery acknowledgements require a parent id even though the validated seed range already identifies copied events.

@@ -2,8 +2,6 @@
 
 Status: proposed
 
-English | [中文](2026-09-29-session-migration-follow-redirect.zh.md)
-
 ## Problem
 
 Opening historical Sessions can wait for lengthy format conversion. Ordinary loading cannot explain the current phase or show migration failure; placing progress inside history events would contaminate the model log and change journal sequence semantics.

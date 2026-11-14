@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-22-listed-model-badges.zh.md)
-
 ## Problem
 
 The Web model selector showed `1017` beside `DeepSeek-V4.1-Flash` through a dedicated client package that matched two DeepSeek providers, one model id, and one exact catalog name. Changing or retiring that release marker, or labeling another model, required a client release, while both DeepSeek routes already read model metadata from the service's `GET /models` listing.

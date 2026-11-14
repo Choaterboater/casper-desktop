@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-06-web-desktop-plugin-identity-compatibility.zh.md)
-
 ## Problem
 
 Moving a capability into the experimental directory changes its ownership and support classification. Renaming its published package or an existing configuration row additionally changes how installed profiles refer to that capability. Those identity changes can make a working Web or Desktop customization require edits unrelated to the capability's behavior.

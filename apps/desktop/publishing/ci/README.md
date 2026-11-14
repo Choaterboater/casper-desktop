@@ -4,8 +4,6 @@ description: "Operate retained Desktop package publication from dedicated macOS 
 
 # Desktop CI publication
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Publish a completed package from its original machine without downloading its installer again. Both test and production publish binaries followed by update YAML. Both deployments require GitHub Environment approval; only production creates a GitHub App tag. Real COS, CDN and administrator-permission acceptance remain deployment checks; local fixtures do not establish those permissions.
@@ -25,7 +23,7 @@ Publish a completed package from its original machine without downloading its in
 
 Use this sequence when onboarding a dedicated machine. The deployment operator owns registration, credentials, approvals and real upload acceptance; repository checks do not establish that a machine can publish.
 
-1. Prepare a runner-owned checkout and an external configuration directory. Follow [Windows machine setup and signing](../../windows-signing/README.md#machine-setup) or [macOS runner and signing setup](../../packaging/README.md#macos-actions) for tools, templates and platform credentials.
+1. Prepare a runner-owned checkout and an external configuration directory. Follow [Windows machine setup and signing](../../windows-signing/README.md#machine-setup) or [macOS release signing](../../packaging/README.md#macos-release-signing) for tools, templates and platform credentials.
 2. Register the runner using GitHub **Settings → Actions → Runners**, or the organization's runner administration page. Record its exact registered name, grant this repository access to its runner group, and assign the [required labels](#runner-labels). Keep the default labels during registration.
 3. Install and start the platform supervisor described in the platform guide. Windows Task Scheduler and the macOS LaunchAgent require the configured user's login; they do not provide unattended startup before login. Confirm both GitHub connectivity and `Listening for Jobs`, then check the runner is online in GitHub.
 4. Complete [machine publication configuration](#machine-setup), the repository's `DESKTOP_PUBLISH_RUNNERS` variable, and the two deployment Environments. The repository administrator owns routing and reviewers; the COS administrator owns bucket configuration and object read/write permissions; production also needs the configured GitHub App.

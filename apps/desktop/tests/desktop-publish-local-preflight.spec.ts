@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
@@ -32,14 +32,5 @@ it('checks the retained preset before approval and the approved preset before up
     await expect(preflightDesktopPublishLocal({ ...env, DSH_PACKAGING_CONFIG_DIR: 'relative' })).rejects.toThrow('absolute machine')
   } finally {
     await rm(root, { recursive: true, force: true })
-  }
-})
-
-it('runs the local preflight before dependency installation in both self-hosted jobs', async () => {
-  const workflow = await readFile('.github/upstream-workflows/desktop-publish.yml', 'utf8')
-  for (const job of ['prepare', 'publish']) {
-    const section = workflow.split(`\n  ${job}:`)[1]!.split(/\n  \w+:/u)[0]!
-    expect(section.indexOf('node apps/desktop/scripts/preflight-desktop-publish-local.mjs')).toBeGreaterThan(0)
-    expect(section.indexOf('node apps/desktop/scripts/preflight-desktop-publish-local.mjs')).toBeLessThan(section.indexOf('pnpm install --frozen-lockfile'))
   }
 })

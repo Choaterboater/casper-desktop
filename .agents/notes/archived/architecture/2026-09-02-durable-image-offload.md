@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-10
 
-English | [中文](2026-09-02-durable-image-offload.zh.md)
-
 ## Problem
 
 Request-size image offload was recomputed from scratch on every request. Each route collected every image occurrence on the derived surface, oldest first, and once the accumulated bytes exceeded its budget it rounded the excess up to a whole removal quantum and replaced that many oldest occurrences with placeholder text, per the [unified image request pipeline](../feature/2026-08-20-unified-image-request-pipeline.md). Nothing remembered where the previous request stopped; the prefix was stable only because the arithmetic over an append-only history repeated itself.

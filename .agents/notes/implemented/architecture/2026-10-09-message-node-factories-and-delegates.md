@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-09-message-node-factories-and-delegates.zh.md)
-
 ## Problem
 
 User messages, assistant output, Trajectory records, and tool results need independently replaceable image presentation. Their official entries can share one gallery, but sharing that implementation must not merge their replacement positions or hide the caller's image-reading authority.

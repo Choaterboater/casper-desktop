@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-11-lossless-build-speedups.zh.md)
-
 ## Problem
 
 A cold build carries three fixed costs that do not affect output contents:

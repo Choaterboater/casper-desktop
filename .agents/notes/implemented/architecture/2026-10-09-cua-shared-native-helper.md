@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-09-cua-shared-native-helper.zh.md)
-
 ## Problem
 
 On macOS 26.6.2, replayd derives capture-client identity from the executable path. Two live helpers at the same path repeatedly replace each other's connections even when their screenshot requests are sequential. Byte-identical executables at distinct real paths complete sequential and concurrent captures; two symlinks to one executable reproduce the failure. A per-request lock cannot isolate retained system connections.

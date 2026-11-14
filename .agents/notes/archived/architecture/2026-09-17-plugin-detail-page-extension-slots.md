@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-17-plugin-detail-page-extension-slots.zh.md)
-
 ## Problem
 
 The Plugins page's detail pages — a bundle's page, a row's page, an official plugin's page — carried only what the page drew itself and the object's own configuration ([plugin configuration on the Plugins page](2026-09-16-plugin-configuration-on-the-plugins-page.md)). A plugin with something to say about a bundle it does not own — a diagnostics plugin's health check, a market plugin's update badge, a documentation plugin's README section — had no place on that bundle's page, and importing the page to extend it is forbidden by the client bundle purity rule.

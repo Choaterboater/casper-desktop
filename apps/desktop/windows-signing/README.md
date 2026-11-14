@@ -4,8 +4,6 @@ description: "Configure and operate the Windows packaging runner, signing creden
 
 # Windows signing and runner operations
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Configure and operate the Windows packaging runner, signing credentials, EV token and signature cache. Read the accepted isolation risks before running branch code or accessing the token. Hardware failures require operator inspection; packaging success does not establish installation or production readiness.
@@ -30,7 +28,7 @@ The shared packaging runner assumes trusted internal-team code and operators. Un
 
 ## Machine setup and runner startup
 
-Use a runner-owned checkout and keep configuration, certificates and caches outside it. Registration and tool installation remain operator tasks. Packaging inputs and artifact retrieval are described in the [packaging guide](../packaging/README.md#windows-actions).
+Use a runner-owned checkout and keep configuration, certificates and caches outside it. Registration and tool installation remain operator tasks. Packaging inputs and artifact retrieval are described in the [packaging guide](../packaging/README.md).
 
 Run `pwsh -NoProfile -File apps/desktop/scripts/setup-windows-packaging.ps1 -Root <absolute-machine-root>` to prepare private `packaging/{presets,secrets,certificates}` and `cache/windows-signatures` directories and copy templates without overwriting existing files. Add `-CheckOnly` to inspect without writes. Fill the [preset templates](../config/windows-packaging/test.env.example) and [signing template](../config/windows-packaging/windows-signing.env.example) on the machine. Run `start-windows-packaging-runner.ps1 -RunnerRoot <registered-runner-directory> -ConfigRoot <machine-root>/packaging -CheckOnly` from the same scripts directory to inspect PowerShell 7.6.6 under the runner's `tools` directory, Node, Python, Git, tar and Visual C++ tools; packaging `--check` performs the remaining toolchain validation. Omit `-CheckOnly` to start the existing runner with an explicit config root and scrubbed inherited environment. Registration and tool installation are separate; these scripts never create tokens, alter system security settings or clear signing failure records. Use the signing cache maintenance command below to migrate existing entries before changing the preset's cache path.
 

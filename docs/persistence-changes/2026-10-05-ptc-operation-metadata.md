@@ -5,8 +5,6 @@ kind: persistence-change
 
 # 2026-10-05-ptc-operation-metadata
 
-English | [中文](2026-10-05-ptc-operation-metadata.zh.md)
-
 ## Summary
 
 Adds optional pure presentation metadata to persisted nested PTC tool results so history retains operation-time directories and file targets.

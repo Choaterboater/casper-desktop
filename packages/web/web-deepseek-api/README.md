@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-web-deepseek-api
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 Search and fetch the web through the DeepSeek Search and Fetch APIs: one direct request per operation, without an auxiliary model request. The plugin registers `deepseek-search-api` and `deepseek-fetch-api`; each capability follows the DeepSeek credential of the conversation: the DeepSeek account sign-in in a conversation on the DeepSeek account model provider, otherwise the DeepSeek API key. YAML can give either capability its own base URL and key instead. Search returns titles, URLs, and available snippets, summaries, and publication dates; Fetch returns page Markdown. The model-facing tools live in `dsh-tool-web`; [legacy Messages search](../web-search-deepseek/README.md) remains a separate provider.

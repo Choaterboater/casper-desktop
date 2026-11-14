@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-09-stored-credential-precedence.zh.md)
-
 The [headless environment authentication](2026-10-12-headless-environment-auth.md) decision partially supersedes this note's per-run override policy: the shipped headless profile omits the store. The ordering below remains the store's contract when mounted.
 
 ## Problem

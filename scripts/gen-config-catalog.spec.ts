@@ -5,8 +5,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { collectConfigCatalog, render, type CatalogEntry } from './gen-config-catalog.ts'
-import { computeTranslationPairingRecord, translationPairPaths } from './translation-pairing-record.ts'
-import { generatedRegions } from './translation-pairing.ts'
+import { generatedRegions } from './generated-region.ts'
 
 const roots: string[] = []
 const sharedSchema = `
@@ -238,28 +237,14 @@ describe('config catalog rendering', () => {
     },
     { pkg: '@deepseek-ai/dsh-plain', dir: 'packages/demo/plain', entry: 'packages/demo/plain/src/index.ts', kind: 'no-config', inject },
   ]
-  const paths = translationPairPaths('docs/config-catalog.md')
-  const record = (inject: string[]) => computeTranslationPairingRecord(
-    paths,
-    render(entries(inject), 'en'),
-    render(entries(inject), 'zh'),
-    { repoRoot: process.cwd(), isTranslationPairSource: () => false },
-  )
-
-  it('keeps package data in generated regions shared by both languages', () => {
-    const en = generatedRegions(render(entries(['jobs']), 'en')).map(region => region.text)
-    expect(en.map(region => region.split('\n')[0])).toEqual([
+  it('keeps package data in generated regions', () => {
+    const regions = generatedRegions(render(entries(['jobs']))).map(region => region.text)
+    expect(regions.map(region => region.split('\n')[0])).toEqual([
       '<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-demo -->',
       '<!-- BEGIN GENERATED config-catalog:no-config -->',
       '<!-- BEGIN GENERATED config-catalog:seam -->',
       '<!-- BEGIN GENERATED config-catalog:library -->',
     ])
-    expect(generatedRegions(render(entries(['jobs']), 'zh')).map(region => region.text)).toEqual(en)
-    expect(en[0]).toContain('- `inject`: `jobs`')
-  })
-
-  it('leaves the consistency record unchanged when only package data changes', () => {
-    expect(record(['jobs', 'typert'])).toEqual(record(['jobs']))
-    expect([...record(['jobs']).keys()].some(key => key.includes('dsh-demo'))).toBe(false)
+    expect(regions[0]).toContain('- `inject`: `jobs`')
   })
 })

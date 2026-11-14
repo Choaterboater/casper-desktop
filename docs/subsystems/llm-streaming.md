@@ -1,7 +1,5 @@
 # LLM Streaming
 
-English | [中文](llm-streaming.zh.md)
-
 The conversation and streaming types from [`packages/llm`](../../packages/llm/README.md): durable `Message` values, request-only user inputs, shared `ContentBlock` variants, the fully assembled model request, the raw `StreamChunk` protocol, the adapter contract every adapter must implement, and the shared assembler. The [core packages](core.md) hold and log these values on every turn; this page declares them.
 
 Source: [`packages/llm/llm/src/types.ts`](../../packages/llm/llm/src/types.ts)

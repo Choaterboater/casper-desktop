@@ -5,8 +5,6 @@ description: "Undescribed pi-ai models inherit larger context and output capacit
 
 # pi-ai default model capacities
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 For models whose capacity is absent from both configuration and the installed catalog, `llm-pi-ai` raises `defaultContextWindow` from 262,144 to 1,000,000 tokens and `defaultMaxTokens` from 32,768 to 128,000 tokens. A larger assumed context window can delay automatic compaction. Explicit model capacities, catalog values, and provider defaults retain their precedence. The output-capacity fallback does not become a Harness request-level `maxTokens` default.

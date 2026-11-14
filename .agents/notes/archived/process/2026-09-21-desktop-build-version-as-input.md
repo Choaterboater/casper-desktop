@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-09-30
 
-English | [中文](2026-09-21-desktop-build-version-as-input.zh.md)
-
 ## Problem
 
 [Deriving Desktop test versions](2026-09-16-desktop-release-version-derivation.md) fixed what a test build is called but not where that name lives. Publishing one meant running `release:dsh` to rewrite the version in every release-family manifest and the lockfile — 295 files — because packaging, the update feed, and upload validation each read the version from the checkout. Those edits are never committed, so a test build left the working tree dirty until someone reverted it, and a reverted tree no longer describes the artifacts that were published. The index in `<base>.YYYYMMDD.index` was also chosen by hand against the records and the bucket, which is a lookup a script can do.

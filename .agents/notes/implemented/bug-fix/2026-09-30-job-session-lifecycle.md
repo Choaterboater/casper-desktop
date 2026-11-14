@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-30-job-session-lifecycle.zh.md)
-
 ## Problem
 
 SDK consumers receive Session events, while job registration and settlement previously existed only in the live registry. A background tool can return before work finishes, and output collection can happen much later or never. Tool invocation times therefore cannot reconstruct a job's execution interval. Runtime-local ids also repeat after a registry restart.

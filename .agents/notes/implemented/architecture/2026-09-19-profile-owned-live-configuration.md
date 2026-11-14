@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-19-profile-owned-live-configuration.zh.md)
-
 ## Problem
 
 Separate settings registrations duplicated schemas, defaults, persistence, and notifications. They also placed stored user settings above deployment overlays without preserving which composition source supplied a value. Using the Loader's resolved Config gives validation and consumers one owner and preserves its lifecycle decisions.

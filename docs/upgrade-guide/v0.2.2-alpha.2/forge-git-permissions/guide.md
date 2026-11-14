@@ -4,8 +4,6 @@ description: "Forge Git queries use Session permissions and disable configured d
 ---
 # Forge Git query permissions and content conversion
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 Forge Git queries use the Session's sandbox mode instead of forcing `read-only`. `danger-full-access` works without a sandbox backend; `workspace-write` permits writes within its configured roots. A confined mode still refuses execution when its backend is unavailable.

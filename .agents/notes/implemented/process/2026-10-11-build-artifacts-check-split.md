@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-10-11-build-artifacts-check-split.zh.md)
-
 ## Problem
 
 `pnpm run build` runs the native addon, the package-library build (Host `tsc -b tsconfig.host.json` → Host tsdown → Desktop bundle → Client `tsc -b tsconfig.client.json` → Client tsdown), and the Web build serially. Besides referencing package projects, the Host and Client aggregates each carry a `noEmit` root program covering tests, scripts, benchmarks, and website. These two root programs emit no files and feed no later artifact step, yet sit on the serial critical path: timed alone, the Host root program takes 68.5 s and the Client root program 36.0 s, while the serial package-library build takes about 249 s (median of 2).

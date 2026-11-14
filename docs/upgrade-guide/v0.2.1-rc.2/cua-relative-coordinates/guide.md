@@ -5,8 +5,6 @@ description: "CUA relative coordinates accept integers from 0 to 999 and reject 
 
 # CUA relative coordinates use 0–999
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 The `cua` tool and application/window object methods now accept integers from 0 to 999 when `relative: true`. The previous range was 0 to 1000. Coordinates still use thousandths: divide by 1000, scale to window dimensions, and clamp inside the window. Values from 0 to 999 keep their existing positions. This affects `click`, `hover`, `scroll`, and both `drag` endpoints. Absolute screenshot pixels and AX element indices are unchanged.

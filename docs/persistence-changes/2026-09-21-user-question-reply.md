@@ -5,8 +5,6 @@ kind: persistence-change
 
 # 2026-09-21-user-question-reply
 
-English | [中文](2026-09-21-user-question-reply.zh.md)
-
 ## Summary
 
 Adds a qualified user-question-reply message source for a late answer to a continued ask_user_question call.

@@ -5,8 +5,6 @@ kind: persistence-change
 
 # 2026-11-07-casper-checks-source
 
-English | [中文](2026-11-07-casper-checks-source.zh.md)
-
 ## Summary
 
 Acknowledges the casper-checks message source kind that the casper-checks plugin already declares, keeping the Session format version unchanged.

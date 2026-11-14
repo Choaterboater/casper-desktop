@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-cordis-client-runner
 
-English | [中文](README.zh.md)
-
 ## Summary
 
 `dsh-cordis-client-runner` runs the browser half of process-local dynamic packages for programmatic callers and existing browser controls. It loads a definition after an approved request or explicit user gesture, and removes it when the Host retracts the run. Page refresh does not restore definitions. Creator UI plugins use installed Client modules through Plugin Manager.

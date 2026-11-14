@@ -5,8 +5,6 @@ description: Agent factory ownership parameters and registry tree queries are re
 
 # Subagent runtime ownership
 
-English | [中文](guide.zh.md)
-
 ## Change
 
 `@deepseek-ai/dsh-agent` removes the create/resume runtime-owner parameter (`parentAgent` or `ownerAgent`), `AgentRegistry.isOwnedBy()`, `AgentRegistry.roots()`, and the owner argument of `enter()`. Direct factory creation no longer enrolls an Agent in a managed subagent tree. Custom factories no longer implement runtime tree ownership.

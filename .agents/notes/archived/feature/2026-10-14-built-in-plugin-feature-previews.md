@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-10-19
 
-English | [中文](2026-10-14-built-in-plugin-feature-previews.zh.md)
-
 ## Problem
 
 A one-line plugin description does not always show what a plugin produces. Users deciding whether to enable an official bundle benefit from a picture of its result, such as a document ending with the badge that the DSH badge skill adds. A picture of this kind needs an owner, a localization rule, and a delivery path to the Client.

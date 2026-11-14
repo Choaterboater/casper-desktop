@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-11-02-deepseek-deferred-tool-failures.zh.md)
-
 ## Problem
 
 A synthetic immediate tool can make an all-deferred DeepSeek request acceptable while hiding an invalid tool-update projection. It also changes the request prefix and advertises a tool with no executor.
