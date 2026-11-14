@@ -31,7 +31,7 @@ export function officialBundleInstallTarget(name: string, installAnchor: string,
   if (anchor !== join(root, 'apps', 'cli', 'package.json')
     || !existsSync(join(root, 'package.json'))
     || manifestAt(join(root, 'package.json')).name !== '@deepseek-ai/dsh-root') {
-    throw new Error(`Official bundle ${name}: source DSH installation ${anchor} requires its complete workspace checkout`)
+    throw new Error(`Official bundle ${name}: source Casper installation ${anchor} requires its complete workspace checkout`)
   }
   const matches = globSync('packages/*/*/package.json', { cwd: root })
     .map(file => ({ file: join(root, file), manifest: manifestAt(join(root, file)) }))
@@ -43,7 +43,7 @@ export function officialBundleInstallTarget(name: string, installAnchor: string,
   const { file, manifest } = selected
   const directory = realpathSync(dirname(file))
   if (manifest.version !== version || manifest.private === true || manifest.dsh?.bundle === undefined) {
-    throw new Error(`Official bundle ${name}: ${file} must declare a public bundle at DSH version ${version}`)
+    throw new Error(`Official bundle ${name}: ${file} must declare a public bundle at version ${version}`)
   }
   const main = typeof manifest.main === 'string' ? resolve(directory, manifest.main) : undefined
   if (main === undefined || !existsSync(main) || !statSync(main).isFile()) {

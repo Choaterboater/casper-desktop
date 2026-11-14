@@ -1,37 +1,45 @@
 /**
- * Casper rebrand rules: exact in-place swaps of the DeepSeek Harness product name for Casper in
- * English product copy that upstream owns. After merging an upstream release, take upstream's
- * version of a conflicting file and run `node --import tsx/esm scripts/casper/rebrand.ts` to
- * re-apply; `--check` exits 1 when a swap is still pending or upstream reworded a line.
+ * Casper rebrand rules: exact in-place swaps of upstream product copy that upstream owns: the
+ * product name in English here, and brand-free wording and the product name in every language in
+ * `rebrand-product-copy.ts`. After merging an upstream release, take upstream's version of a
+ * conflicting file and run `node --import tsx/esm scripts/casper/rebrand.ts` to re-apply;
+ * `--check` exits 1 when a swap is still pending or upstream reworded a line. `--against <ref>`
+ * applies every rule in memory to the files as they are at an upstream git ref, such as the
+ * upstream import commit, and exits 1 when a rule's `from` is not that ref's text or a rule
+ * changes nothing there.
  *
- * Only English copy is rebranded. The `dsh` command, package, folder and storage names, and
- * DeepSeek-owned services and badges keep their upstream names. Each `from` is a whole source
- * line that must occur exactly once in its file, so other languages in the same file never match.
+ * The `dsh` command, package, folder, environment-variable and storage names keep their upstream
+ * names. Each `from` is upstream text, usually whole source lines, that must occur exactly once in
+ * its file, or exactly `count` times for text that repeats, so other languages never match.
  * @module scripts/casper/rebrand
  */
 
+import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { PRODUCT_COPY_REBRAND_RULES } from './rebrand-product-copy.ts'
 
 /** One exact text swap in one repository file. */
 export interface RebrandRule {
   /** Repository-relative path. */
   readonly file: string
-  /** Upstream text, unique in the file. */
+  /** Upstream text, unique in the file unless {@link RebrandRule.count} says how often it repeats. */
   readonly from: string
   /** Casper text that replaces it. */
   readonly to: string
+  /** Exact number of occurrences, for text that repeats in a file (such as test assertions); every one is swapped. Default 1. */
+  readonly count?: number
 }
 
 /** Where a rule stands against a file's current text. */
 export type RuleState = 'pending' | 'applied' | 'stale' | 'ambiguous'
 
-/** Every Casper product-name swap, grouped by file. */
-export const REBRAND_RULES: readonly RebrandRule[] = [
+/** Casper's English product-name swaps, grouped by file. */
+const PRODUCT_NAME_REBRAND_RULES: readonly RebrandRule[] = [
   // apps/desktop/src/locale.ts
   { file: 'apps/desktop/src/locale.ts',
     from: 'startupAddressInUse: \'Another DSH instance (such as dsh web or the desktop app) is running. They cannot start at the same time. Quit the other running DSH instance, then restart.\',',
-    to: 'startupAddressInUse: \'Another Casper instance (such as dsh web or the desktop app) is running. They cannot start at the same time. Quit the other running Casper instance, then restart.\',' },
+    to: 'startupAddressInUse: \'Another Casper instance is running. They cannot start at the same time. Quit the other running Casper instance, then restart.\',' },
   // packages/client/ui-agent-preset/src/client/locales.ts
   { file: 'packages/client/ui-agent-preset/src/client/locales.ts',
     from: 'sectionIntro: \'Choose the agent’s tools and how it works. Use Standard mode for everyday tasks, or Creator mode to add capabilities to DSH.\',',
@@ -53,7 +61,7 @@ export const REBRAND_RULES: readonly RebrandRule[] = [
   // packages/client/ui-conversation/src/client/locales.ts
   { file: 'packages/client/ui-conversation/src/client/locales.ts',
     from: '\'error.sessionInUse\': \'This session is already in use, possibly by another running DSH instance (such as dsh web or the desktop app). Quit other running DSH instances and try again.\',',
-    to: '\'error.sessionInUse\': \'This session is already in use, possibly by another running Casper instance (such as dsh web or the desktop app). Quit other running Casper instances and try again.\',' },
+    to: '\'error.sessionInUse\': \'This session is already in use, possibly by another running Casper instance. Quit other running Casper instances and try again.\',' },
   // packages/client/ui-entry-customization/src/client/locales.ts
   { file: 'packages/client/ui-entry-customization/src/client/locales.ts',
     from: '\'createPrompt.sidebar\': \'Create a DSH plugin with a left sidebar entry.\',',
@@ -67,7 +75,7 @@ export const REBRAND_RULES: readonly RebrandRule[] = [
   // packages/client/ui-model-selection/src/client/locales.ts
   { file: 'packages/client/ui-model-selection/src/client/locales.ts',
     from: '\'error.sessionInUse\': \'This session is already in use, possibly by another running DSH instance (such as dsh web or the desktop app). Quit other running DSH instances and try again.\',',
-    to: '\'error.sessionInUse\': \'This session is already in use, possibly by another running Casper instance (such as dsh web or the desktop app). Quit other running Casper instances and try again.\',' },
+    to: '\'error.sessionInUse\': \'This session is already in use, possibly by another running Casper instance. Quit other running Casper instances and try again.\',' },
   // packages/client/ui-plugin-manager/src/client/locales.ts
   { file: 'packages/client/ui-plugin-manager/src/client/locales.ts',
     from: 'restartNotice: \'Restart DSH to apply the change. {reason}\',',
@@ -242,7 +250,7 @@ export const REBRAND_RULES: readonly RebrandRule[] = [
   // Tests and expected outputs that pin the English copy above.
   { file: 'apps/desktop/tests/expected/fatal-address-in-use-en.txt',
     from: 'Another DSH instance (such as dsh web or the desktop app) is running. They cannot start at the same time. Quit the other running DSH instance, then restart.',
-    to: 'Another Casper instance (such as dsh web or the desktop app) is running. They cannot start at the same time. Quit the other running Casper instance, then restart.' },
+    to: 'Another Casper instance is running. They cannot start at the same time. Quit the other running Casper instance, then restart.' },
   { file: 'packages/client/ui-chat/tests/conversation-node-definitions.client.spec.ts',
     from: 'code: \'INTERRUPTED\', message: \'The DSH process exited before this turn finished.\',',
     to: 'code: \'INTERRUPTED\', message: \'The Casper process exited before this turn finished.\',' },
@@ -263,7 +271,7 @@ export const REBRAND_RULES: readonly RebrandRule[] = [
     to: 'expect(screen.getByRole(\'alert\').textContent).toContain(\'Upgrade Casper and try again.\')' },
   { file: 'packages/client/ui-shortcuts/tests/reference.client.spec.tsx',
     from: '? dictionary === en ? \'Upgrade Harness\' : \'升级 Harness\'',
-    to: '? dictionary === en ? \'Upgrade Casper\' : \'升级 Harness\'' },
+    to: '? dictionary === en ? \'Upgrade Casper\' : \'升级 Casper\'' },
   { file: 'packages/client/ui-plugin-manager/tests/components.client.spec.tsx',
     from: 'if (title === en.versionsBlocked) expect(within(section()).getByText(`2.0.0 needs @deepseek-ai/dsh >=0.9.0; this DSH is ${runtime}`)).toBeTruthy()',
     to: 'if (title === en.versionsBlocked) expect(within(section()).getByText(`2.0.0 needs @deepseek-ai/dsh >=0.9.0; this Casper is ${runtime}`)).toBeTruthy()' },
@@ -325,18 +333,23 @@ export const REBRAND_RULES: readonly RebrandRule[] = [
     to: "page.getByRole('status').filter({ hasText: 'Haunting' })" },
 ]
 
+/** Every Casper swap: the English product-name swaps, then the product-copy swaps in every language. */
+export const REBRAND_RULES: readonly RebrandRule[] = [...PRODUCT_NAME_REBRAND_RULES, ...PRODUCT_COPY_REBRAND_RULES]
+
 /**
  * Classify one rule against file text.
  * @param text - current file contents.
  * @param rule - the swap to classify.
- * @returns `pending` when `from` occurs once, `applied` when only `to` occurs once, `ambiguous` on repeats, otherwise `stale`.
+ * @returns `pending` when `from` occurs exactly {@link RebrandRule.count} times (default once), `applied` when only `to`
+ * does, `ambiguous` on more occurrences, otherwise `stale`.
  */
 export function ruleState(text: string, rule: RebrandRule): RuleState {
+  const expected = rule.count ?? 1
   const pending = text.split(rule.from).length - 1
   const applied = text.split(rule.to).length - 1
-  if (pending > 1 || applied > 1) return 'ambiguous'
-  if (pending === 1) return 'pending'
-  return applied === 1 ? 'applied' : 'stale'
+  if (pending > expected || applied > expected) return 'ambiguous'
+  if (pending === expected) return 'pending'
+  return applied === expected && pending === 0 ? 'applied' : 'stale'
 }
 
 /** One rule that cannot be applied, with its state. */
@@ -347,35 +360,67 @@ export interface RebrandProblem {
   readonly state: RuleState
 }
 
+/** Rule results over a set of file texts. */
+export interface RebrandRun {
+  /** Rules left pending (when not applying), stale, or ambiguous. */
+  readonly problems: readonly RebrandProblem[]
+  /** Rewritten text of each file a pending rule changed, by repository-relative path. */
+  readonly changed: ReadonlyMap<string, string>
+}
+
+/**
+ * How {@link applyRebrandRules} treats rule states: `check` reports pending rules; `write` applies them; `upstream`
+ * applies them to upstream text and also reports a rule that is already applied when reached, since its `from` is not
+ * upstream text and it never changes anything.
+ */
+export type RebrandMode = 'check' | 'write' | 'upstream'
+
+/**
+ * Classify rules in order against file texts, applying each pending rule before the next is classified.
+ * @param rules - the swaps, in application order.
+ * @param read - returns a repository-relative file's text.
+ * @param mode - which states are problems and whether pending rules are applied.
+ * @returns the problems and the rewritten texts.
+ */
+export function applyRebrandRules(rules: readonly RebrandRule[], read: (file: string) => string, mode: RebrandMode): RebrandRun {
+  const problems: RebrandProblem[] = []
+  const texts = new Map<string, string>()
+  const changed = new Map<string, string>()
+  for (const rule of rules) {
+    const text = texts.get(rule.file) ?? read(rule.file)
+    const state = ruleState(text, rule)
+    if (state === 'pending' && mode !== 'check') {
+      const next = text.split(rule.from).join(rule.to)
+      texts.set(rule.file, next)
+      changed.set(rule.file, next)
+    } else {
+      texts.set(rule.file, text)
+      if (state !== 'applied' || mode === 'upstream') problems.push({ rule, state })
+    }
+  }
+  return { problems, changed }
+}
+
 /**
  * Apply or check every rule under a repository root.
  * @param root - repository root.
  * @param write - write pending swaps when true; only report them when false.
  * @returns rules left pending (check mode), stale, or ambiguous.
  */
-export function runRebrand(root: string, write: boolean): RebrandProblem[] {
-  const problems: RebrandProblem[] = []
-  const files = new Map<string, string>()
-  const changed = new Set<string>()
-  for (const rule of REBRAND_RULES) {
-    const path = resolve(root, rule.file)
-    const text = files.get(path) ?? readFileSync(path, 'utf8')
-    const state = ruleState(text, rule)
-    if (state === 'pending' && write) {
-      files.set(path, text.replace(rule.from, () => rule.to))
-      changed.add(path)
-    } else {
-      files.set(path, text)
-      if (state !== 'applied') problems.push({ rule, state })
-    }
-  }
-  for (const path of changed) writeFileSync(path, files.get(path) ?? '')
+export function runRebrand(root: string, write: boolean): readonly RebrandProblem[] {
+  const { problems, changed } = applyRebrandRules(REBRAND_RULES, file => readFileSync(resolve(root, file), 'utf8'), write ? 'write' : 'check')
+  for (const [file, text] of changed) writeFileSync(resolve(root, file), text)
   return problems
 }
 
 function main(): void {
-  const check = process.argv.includes('--check')
-  const problems = runRebrand(resolve(import.meta.dirname, '../..'), !check)
+  const root = resolve(import.meta.dirname, '../..')
+  const againstAt = process.argv.indexOf('--against')
+  const ref = againstAt === -1 ? undefined : process.argv[againstAt + 1]
+  if (againstAt !== -1 && ref === undefined) throw new Error('rebrand: --against needs a git ref')
+  const problems = ref === undefined
+    ? runRebrand(root, !process.argv.includes('--check'))
+    : applyRebrandRules(REBRAND_RULES, file => execFileSync('git', ['show', `${ref}:${file}`], { cwd: root, encoding: 'utf8', maxBuffer: 1 << 28 }), 'upstream').problems
   for (const { rule, state } of problems) console.error(`rebrand: ${state} ${rule.file}: ${rule.from}`)
   console.info(`rebrand: ${String(REBRAND_RULES.length - problems.length)}/${String(REBRAND_RULES.length)} rules applied`)
   if (problems.length > 0) process.exitCode = 1

@@ -19,6 +19,7 @@ import { HostReleasePrompt, type HostReleasePromptInjected } from '../src/client
 import { CloseLabel, HeaderContent, TriggerContent } from '../src/client/chrome.tsx'
 import type { DesktopChannelRowInjected, DesktopChannelToastInjected } from '../src/client/DesktopChannelRow.tsx'
 import type { DesktopChannelBridge } from '../src/types.ts'
+import type { SettingsRootInjected } from '../src/client/shell-contract.ts'
 import { GeneralSection } from '../src/client/GeneralSection.tsx'
 import { SettingsDocumentAction } from '../src/client/SettingsDocumentAction.tsx'
 import type { SettingsDocumentActionInjected } from '../src/client/SettingsDocumentAction.tsx'
@@ -240,6 +241,16 @@ describe('ui-settings-general apply', () => {
     await c.flush()
     expect(unsubscribe).toHaveBeenCalledOnce()
     expect(c.ctx.slots.entries('shell.overlay').some(entry => entry.options.id === 'desktop-channel-toast')).toBe(false)
+  })
+
+  it('registers no Desktop channel row, toast, or update status when the carrier omits updates', async ({ mock, start }) => {
+    vi.stubGlobal('dshDesktop', { protocolVersion: 1 })
+    onTestFinished(() => { vi.unstubAllGlobals() })
+    const { c } = await client(mock, start)
+    expect(c.ctx.slots.entries('settings.general.item').some(row => row.options.id === 'desktop-update-channel')).toBe(false)
+    expect(c.ctx.slots.entries('shell.overlay').some(entry => entry.options.id === 'desktop-channel-toast')).toBe(false)
+    const badge = (c.ctx.slots.entries('sidebar.toggle.badge')[0]!.inject as () => Pick<SettingsRootInjected, 'hooks'>)()
+    expect(badge.hooks.desktopUpdate.getSnapshot()).toEqual({ failed: false, opening: false })
   })
 
   it('the nav label thunk follows the active locale without re-registration', async ({ mock, start }) => {

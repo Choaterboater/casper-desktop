@@ -31,6 +31,7 @@ export const DESKTOP_OMITTED_PACKAGES: readonly string[] = [
   '@deepseek-ai/dsh-base',
   '@deepseek-ai/dsh-client-product-analytics',
   '@deepseek-ai/dsh-client-ui-settings-account',
+  '@deepseek-ai/dsh-client-ui-settings-session-log',
   '@deepseek-ai/dsh-headless',
   '@deepseek-ai/dsh-host-product-telemetry-otel',
   '@deepseek-ai/dsh-sdk-app',

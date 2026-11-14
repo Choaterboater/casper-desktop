@@ -83,7 +83,7 @@ export const en: Record<AgentPresetSettingsKey, string> = {
 export const zh: Record<AgentPresetSettingsKey, string> = {
   ...guideZh,
   builtInGroup: '内置', customGroup: '自定义',
-  sectionIntro: '选择 Agent 的工具和工作方式。日常任务用「标准模式」，扩展 DSH 的能力用「创造模式」。',
+  sectionIntro: '选择 Agent 的工具和工作方式。日常任务用「标准模式」，扩展 Casper 的能力用「创造模式」。',
 
   seatHint: '选择新任务使用的 Agent 预设',
   headerHint: '本任务的 Agent 预设，在任务开始时确定',
@@ -99,7 +99,7 @@ export const zh: Record<AgentPresetSettingsKey, string> = {
   presetMinimalName: '极简模式',
   presetMinimalDescription: 'Agent 使用终端和图片读取工具，并支持上下文压缩，适合测试和对比其基础表现。',
   presetCordisName: '创造模式',
-  presetCordisDescription: '用对话定制 DSH：让 Agent 编写插件，添加新功能或界面；也能组合工具和提示词，创建自己的模式。',
+  presetCordisDescription: '用对话定制 Casper：让 Agent 编写插件，添加新功能或界面；也能组合工具和提示词，创建自己的模式。',
 
   inUse: '新任务默认',
 
@@ -113,7 +113,7 @@ export const zh: Record<AgentPresetSettingsKey, string> = {
 
   creatorDraft: '让 Agent 帮我创建预设模式',
   createPlugin: '让 Agent 创建插件',
-  createPluginDescription: '进入创造模式，制作属于你的 DSH 插件',
+  createPluginDescription: '进入创造模式，制作属于你的 Casper 插件',
   createPluginChecking: '正在确认创造模式是否可用',
   createPluginUnavailable: '暂时不可用，请重新打开菜单重试',
   createPluginMissing: '当前配置未提供创造模式',
@@ -131,7 +131,7 @@ export const ja = {
   ...guideJa,
   'builtInGroup': '組み込み',
   'customGroup': 'カスタム',
-  'sectionIntro': 'エージェントのツールと動作を選択します。日々のタスクには標準モードを、DSH に機能を追加するにはクリエイターモードを使用してください。',
+  'sectionIntro': 'エージェントのツールと動作を選択します。日々のタスクには標準モードを、Casper に機能を追加するにはクリエイターモードを使用してください。',
   'seatHint': '新しいタスクで使用するエージェントプリセットを選択',
   'headerHint': 'このタスクの開始時に選択されたエージェントプリセット',
   'nav': 'エージェントプリセット',
@@ -144,7 +144,7 @@ export const ja = {
   'presetMinimalName': '最小モード',
   'presetMinimalDescription': 'エージェントはターミナルと画像読み取りを使用し、コンテキスト圧縮にも対応します。基本的な性能のテストや比較に役立ちます。',
   'presetCordisName': 'クリエイターモード',
-  'presetCordisDescription': '会話を通じて DSH をカスタマイズします。機能や UI を追加するプラグインをエージェントに書かせたり、ツールとプロンプトを組み合わせて独自のモードを作成したりできます。',
+  'presetCordisDescription': '会話を通じて Casper をカスタマイズします。機能や UI を追加するプラグインをエージェントに書かせたり、ツールとプロンプトを組み合わせて独自のモードを作成したりできます。',
   'inUse': '新しいタスクの既定',
   'noDescription': '説明はありません。',
   'brokenBadge': '読み込みに失敗',
@@ -153,7 +153,7 @@ export const ja = {
   'close': '閉じる',
   'creatorDraft': 'エージェントにプリセット作成を手伝ってもらう',
   'createPlugin': 'エージェントにプラグインを作成してもらう',
-  'createPluginDescription': 'クリエイターモードに入り、独自の DSH プラグインを作成',
+  'createPluginDescription': 'クリエイターモードに入り、独自の Casper プラグインを作成',
   'createPluginChecking': 'クリエイターモードが利用可能か確認中',
   'createPluginUnavailable': '一時的に利用できません。このメニューを開き直して再試行してください',
   'createPluginMissing': 'この構成にはクリエイターモードが含まれていません',
@@ -163,7 +163,7 @@ export const ja = {
 export const es = {
   ...guideEs,
   builtInGroup: 'Incorporado', customGroup: 'personalizado',
-  sectionIntro: 'Elija las herramientas del agente y cómo funciona. Utilice el modo Estándar para las tareas diarias o el modo Creador para agregar capacidades a DSH.',
+  sectionIntro: 'Elija las herramientas del agente y cómo funciona. Utilice el modo Estándar para las tareas diarias o el modo Creador para agregar capacidades a Casper.',
 
   seatHint: 'Elija el agente preestablecido para su nueva tarea',
   headerHint: 'El agente preestablecido elegido cuando comenzó esta tarea',
@@ -183,7 +183,7 @@ export const es = {
     'El agente utiliza un terminal y lectura de imágenes, con compactación de contexto. Útil para probar y comparar su rendimiento básico.',
   presetCordisName: 'Modo creador',
   presetCordisDescription:
-    'Personaliza DSH a través de la conversación. Deje que el agente escriba complementos que agreguen funciones o interfaz de usuario, o combine herramientas e indicaciones para crear su propio modo.',
+    'Personaliza Casper a través de la conversación. Deje que el agente escriba complementos que agreguen funciones o interfaz de usuario, o combine herramientas e indicaciones para crear su propio modo.',
 
   inUse: 'Nueva tarea predeterminada',
 
@@ -197,7 +197,7 @@ export const es = {
 
   creatorDraft: 'Deja que el agente me ayude a crear un preset',
   createPlugin: 'Deje que el agente cree un complemento',
-  createPluginDescription: 'Ingrese al modo Creador y cree su propio complemento DSH',
+  createPluginDescription: 'Ingrese al modo Creador y cree su propio complemento de Casper',
   createPluginChecking: 'Comprobando si el modo Creador está disponible',
   createPluginUnavailable: 'Temporalmente no disponible. Vuelve a abrir este menú para volver a intentarlo.',
   createPluginMissing: 'El modo creador no está incluido en esta configuración.',
@@ -208,7 +208,7 @@ export const es = {
 export const fr = {
   ...guideFr,
   builtInGroup: 'Intégré', customGroup: 'Personnalisé',
-  sectionIntro: 'Choisissez les outils de l’agent et son fonctionnement. Utilisez le mode Standard pour les tâches quotidiennes ou le mode Créateur pour ajouter des fonctionnalités à DSH.',
+  sectionIntro: 'Choisissez les outils de l’agent et son fonctionnement. Utilisez le mode Standard pour les tâches quotidiennes ou le mode Créateur pour ajouter des fonctionnalités à Casper.',
 
   seatHint: "Choisissez le préréglage d'agent pour votre nouvelle tâche",
   headerHint: "Le préréglage d'agent choisi au démarrage de cette tâche",
@@ -228,7 +228,7 @@ export const fr = {
     "L'agent utilise un terminal et une lecture d'image, avec compactage du contexte. Utile pour tester et comparer ses performances de base.",
   presetCordisName: 'Mode Créateur',
   presetCordisDescription:
-    "Personnalisez DSH via la conversation. Laissez l'agent écrire des plugins qui ajoutent des fonctionnalités ou une interface utilisateur, ou combinez des outils et des invites pour créer votre propre mode.",
+    "Personnalisez Casper via la conversation. Laissez l'agent écrire des plugins qui ajoutent des fonctionnalités ou une interface utilisateur, ou combinez des outils et des invites pour créer votre propre mode.",
 
   inUse: 'Nouvelle tâche par défaut',
 
@@ -242,7 +242,7 @@ export const fr = {
 
   creatorDraft: "Laissez l'agent m'aider à créer un préréglage",
   createPlugin: "Laissez l'agent créer un plugin",
-  createPluginDescription: 'Entrez en mode Créateur et créez votre propre plugin DSH',
+  createPluginDescription: 'Entrez en mode Créateur et créez votre propre plugin Casper',
   createPluginChecking: 'Vérifier si le mode Créateur est disponible',
   createPluginUnavailable: 'Temporairement indisponible. Rouvrez ce menu pour réessayer',
   createPluginMissing: "Le mode Créateur n'est pas inclus dans cette configuration",
@@ -253,7 +253,7 @@ export const fr = {
 export const de = {
   ...guideDe,
   builtInGroup: 'Eingebaut', customGroup: 'Benutzerdefiniert',
-  sectionIntro: 'Wählen Sie die Tools des Agenten und deren Funktionsweise aus. Verwenden Sie den Standardmodus für alltägliche Aufgaben oder den Creator-Modus, um DSH Funktionen hinzuzufügen.',
+  sectionIntro: 'Wählen Sie die Tools des Agenten und deren Funktionsweise aus. Verwenden Sie den Standardmodus für alltägliche Aufgaben oder den Creator-Modus, um Casper Funktionen hinzuzufügen.',
 
   seatHint: 'Wählen Sie die Agentenvoreinstellung für Ihre neue Aufgabe',
   headerHint: 'Die Agentenvoreinstellung, die beim Start dieser Aufgabe ausgewählt wurde',
@@ -273,7 +273,7 @@ export const de = {
     'Der Agent verwendet ein Terminal und das Lesen von Bildern mit Kontextkomprimierung. Nützlich zum Testen und Vergleichen der Grundleistung.',
   presetCordisName: 'Erstellermodus',
   presetCordisDescription:
-    'Passen Sie DSH durch Gespräche an. Lassen Sie den Agenten Plugins schreiben, die Funktionen oder Benutzeroberflächen hinzufügen, oder kombinieren Sie Tools und Eingabeaufforderungen, um Ihren eigenen Modus zu erstellen.',
+    'Passen Sie Casper durch Gespräche an. Lassen Sie den Agenten Plugins schreiben, die Funktionen oder Benutzeroberflächen hinzufügen, oder kombinieren Sie Tools und Eingabeaufforderungen, um Ihren eigenen Modus zu erstellen.',
 
   inUse: 'Neuer Aufgabenstandard',
 
@@ -287,7 +287,7 @@ export const de = {
 
   creatorDraft: 'Lassen Sie sich vom Agenten beim Erstellen einer Voreinstellung helfen',
   createPlugin: 'Lassen Sie den Agenten ein Plugin erstellen',
-  createPluginDescription: 'Wechseln Sie in den Erstellermodus und erstellen Sie Ihr eigenes DSH-Plugin',
+  createPluginDescription: 'Wechseln Sie in den Erstellermodus und erstellen Sie Ihr eigenes Casper-Plugin',
   createPluginChecking: 'Prüfen, ob der Creator-Modus verfügbar ist',
   createPluginUnavailable: 'Vorübergehend nicht verfügbar. Öffnen Sie dieses Menü erneut, um es erneut zu versuchen',
   createPluginMissing: 'Der Creator-Modus ist in dieser Konfiguration nicht enthalten',
@@ -298,7 +298,7 @@ export const de = {
 export const ru = {
   ...guideRu,
   builtInGroup: 'Встроенный', customGroup: 'Пользовательский',
-  sectionIntro: 'Выбирайте инструменты агента и то, как они работают. Используйте стандартный режим для повседневных задач или режим Creator, чтобы расширить возможности DSH.',
+  sectionIntro: 'Выбирайте инструменты агента и то, как они работают. Используйте стандартный режим для повседневных задач или режим Creator, чтобы расширить возможности Casper.',
 
   seatHint: 'Выберите предустановку агента для вашей новой задачи',
   headerHint: 'Предварительная настройка агента, выбранная при запуске этой задачи',
@@ -318,7 +318,7 @@ export const ru = {
     'Агент использует терминал и чтение изображений со сжатием контекста. Полезно для тестирования и сравнения его базовой производительности.',
   presetCordisName: 'Режим автора',
   presetCordisDescription:
-    'Настройте DSH через разговор. Позвольте агенту писать плагины, которые добавляют функции или пользовательский интерфейс, или комбинируйте инструменты и подсказки для создания собственного режима.',
+    'Настройте Casper через разговор. Позвольте агенту писать плагины, которые добавляют функции или пользовательский интерфейс, или комбинируйте инструменты и подсказки для создания собственного режима.',
 
   inUse: 'Новая задача по умолчанию',
 
@@ -332,7 +332,7 @@ export const ru = {
 
   creatorDraft: 'Позвольте агенту помочь мне создать пресет',
   createPlugin: 'Позвольте агенту создать плагин',
-  createPluginDescription: 'Войдите в режим Creator и создайте свой собственный плагин DSH.',
+  createPluginDescription: 'Войдите в режим Creator и создайте свой собственный плагин Casper.',
   createPluginChecking: 'Проверка доступности режима Creator',
   createPluginUnavailable: 'Временно недоступен. Откройте это меню еще раз, чтобы повторить попытку.',
   createPluginMissing: 'Режим Creator не включен в эту конфигурацию.',
@@ -343,7 +343,7 @@ export const ru = {
 export const pt = {
   ...guidePt,
   builtInGroup: 'Integrado', customGroup: 'Personalizado',
-  sectionIntro: 'Escolha as ferramentas do agente e como funciona. Use o modo Padrão para tarefas diárias ou o modo Criador para adicionar recursos ao DSH.',
+  sectionIntro: 'Escolha as ferramentas do agente e como funciona. Use o modo Padrão para tarefas diárias ou o modo Criador para adicionar recursos ao Casper.',
 
   seatHint: 'Escolha a predefinição de agente para sua nova tarefa',
   headerHint: 'A predefinição do agente escolhida quando esta tarefa foi iniciada',
@@ -363,7 +363,7 @@ export const pt = {
     'O agente utiliza terminal e leitura de imagens, com compactação de contexto. Útil para testar e comparar seu desempenho básico.',
   presetCordisName: 'Modo criador',
   presetCordisDescription:
-    'Personalize DSH por meio de conversa. Deixe o agente escrever plug-ins que adicionem recursos ou UI, ou combine ferramentas e prompts para criar seu próprio modo.',
+    'Personalize o Casper por meio de conversa. Deixe o agente escrever plug-ins que adicionem recursos ou UI, ou combine ferramentas e prompts para criar seu próprio modo.',
 
   inUse: 'Novo padrão de tarefa',
 
@@ -377,7 +377,7 @@ export const pt = {
 
   creatorDraft: 'Deixe o agente me ajudar a criar uma predefinição',
   createPlugin: 'Deixe o agente criar um plugin',
-  createPluginDescription: 'Entre no modo Criador e crie seu próprio plug-in DSH',
+  createPluginDescription: 'Entre no modo Criador e crie seu próprio plug-in do Casper',
   createPluginChecking: 'Verificando se o modo Criador está disponível',
   createPluginUnavailable: 'Temporariamente indisponível. Reabra este menu para tentar novamente',
   createPluginMissing: 'O modo criador não está incluído nesta configuração',

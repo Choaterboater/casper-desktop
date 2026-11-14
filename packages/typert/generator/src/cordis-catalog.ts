@@ -120,6 +120,8 @@ export interface CordisCatalogPolicy {
   readonly runtimeServices?: readonly ServiceEntry[]
   /** Harness Services omitted from the model-facing runtime catalog because dynamic Plugins must not call them. */
   readonly runtimeServiceExclusions?: ReadonlySet<string>
+  /** Harness Events, by scoped name, omitted from the model-facing runtime catalog. */
+  readonly runtimeEventExclusions?: ReadonlySet<string>
   /** Manually curated framework events inherited by every plugin. */
   readonly inheritedEvents: readonly InheritedEntry[]
   /** Manually curated framework context members inherited by every plugin. */
@@ -171,10 +173,11 @@ export class CordisCatalogProjector {
     const services = [...model.services, ...(this.policy.runtimeServices ?? [])]
       .filter(service => !this.policy.runtimeServiceExclusions?.has(service.key))
       .sort((left, right) => left.key.localeCompare(right.key))
+    const events = model.events.filter(event => !this.policy.runtimeEventExclusions?.has(event.name))
     return renderRuntimeApi(
       services,
-      model.events,
-      this.runtimeTypes(services, model.events),
+      events,
+      this.runtimeTypes(services, events),
       this.policy.inheritedServices,
     )
   }

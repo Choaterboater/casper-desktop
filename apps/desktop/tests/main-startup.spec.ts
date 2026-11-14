@@ -8,7 +8,7 @@ import { join } from 'node:path'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import type { MenuItemConstructorOptions, MessageBoxOptions } from 'electron'
-import { DESKTOP_IPC, type DesktopUpdateState } from '../src/ipc.ts'
+import { DESKTOP_IPC, DESKTOP_UPDATE_FEED_ARGUMENT, type DesktopUpdateState } from '../src/ipc.ts'
 import { MANDATORY_IPC } from '../src/mandatory-update-ipc.ts'
 import { DesktopHostFatalError, DesktopHostUncleanExitError } from '../src/host-process.ts'
 import { en, zh } from '../src/locale.ts'
@@ -61,6 +61,7 @@ const harness = await vi.hoisted(async () => {
   let embeddedPolicy: unknown
   let closeWindowsOnQuit = false
   let updateState: DesktopUpdateState = { phase: 'idle' }
+  let updateFeed = true
   let platformDisposeDeferred: ReturnType<typeof deferred> | undefined
   // The native Platform view owns persistent browser storage; Desktop startup tests replace it so
   // each quit can control when that cleanup settles.
@@ -237,6 +238,8 @@ const harness = await vi.hoisted(async () => {
     ipcOn: vi.fn<(channel: string, listener: (event: { sender: unknown; senderFrame: unknown }, ...args: unknown[]) => void) => void>(),
     get updateState() { return updateState },
     set updateState(value: DesktopUpdateState) { updateState = value },
+    get updateFeed() { return updateFeed },
+    set updateFeed(value: boolean) { updateFeed = value },
     get prepareUpdate() { return prepareUpdate! },
     set prepareUpdate(value: () => Promise<boolean>) { prepareUpdate = value },
     get publishUpdate() { return publishUpdate! },
@@ -278,6 +281,7 @@ const harness = await vi.hoisted(async () => {
       prepareUpdate = undefined
       publishUpdate = undefined
       updateState = { phase: 'idle' }
+      updateFeed = true
       updateCheck.mockReset().mockImplementation(async () => updateState)
       loginShell.mockReset().mockImplementation(base => readLoginShell(base))
       updateDownload.mockReset().mockImplementation(async () => updateState)
@@ -394,6 +398,7 @@ vi.mock('../src/update-coordinator.ts', () => ({ DesktopUpdateCoordinator: class
     harness.publishUpdate(harness.updateState)
   }
   get state() { return harness.updateState }
+  get hasFeed() { return harness.updateFeed }
   readonly check = harness.updateCheck
   readonly download = harness.updateDownload
   readonly install = harness.updateInstall
@@ -1345,6 +1350,18 @@ describe('desktop main startup', () => {
       ? ['about', 'separator', en.checkUpdatesMenu, en.cliCommandMenu, 'separator', 'toggleDevTools', 'separator', 'hide', 'hideOthers', 'unhide', 'separator', 'quit']
       : ['about', 'separator', en.checkUpdatesMenu, 'separator', 'toggleDevTools', 'separator', 'quit'])
     expect(harness.menu.setApplicationMenu).toHaveBeenCalledOnce()
+  })
+
+  it.each(([
+    ['darwin', true], ['darwin', false], ['win32', true], ['win32', false],
+  ] as const))('offers update checks and the product update carrier only with an update feed (%s, feed=%s)', async (platform, feed) => {
+    vi.stubGlobal('process', { ...process, platform })
+    harness.updateFeed = feed
+    await readyForUpdate()
+    expect(applicationMenuItems().some(item => item.label === en.checkUpdatesMenu)).toBe(feed)
+    expect(harness.windows[0]!.options).toMatchObject({
+      webPreferences: { additionalArguments: feed ? [DESKTOP_UPDATE_FEED_ARGUMENT] : [] },
+    })
   })
 
   it.each(['en-US', 'zh-CN'])('localizes macOS application commands without changing the application name (%s)', async (locale) => {

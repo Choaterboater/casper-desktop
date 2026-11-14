@@ -75,7 +75,7 @@ it.each([
   const { anchor, directory } = fixture()
   const file = join(directory, 'package.json')
   writeFileSync(file, JSON.stringify({ ...JSON.parse(readFileSync(file, 'utf8')), ...changes }))
-  expect(() => officialBundleInstallTarget(name, anchor, version)).toThrow('must declare a public bundle at DSH version')
+  expect(() => officialBundleInstallTarget(name, anchor, version)).toThrow('must declare a public bundle at version')
 })
 
 it.each(['missing-main', 'missing-output', 'directory-output'])('refuses an unbuilt workspace package: %s', (kind) => {
